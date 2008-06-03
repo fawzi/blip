@@ -87,6 +87,13 @@ template isObject(T)
         const isObject = false;
 }
 
+template staticArraySize(T)
+{
+    static assert(isStaticArray!(T),"staticArraySize needs a static array as type");
+    static assert(arrayRank!(T)==1,"implemented only for 1d arrays...");
+    const size_t staticArraySize=(T).sizeof / typeof(T.init).sizeof;
+}
+
 template isStaticArray(T)
 {
     static if( is( typeof(T.init)[(T).sizeof / typeof(T.init).sizeof] == T ) )
@@ -116,7 +123,7 @@ template dynArray(T)
 template arrayBaseT(T)
 {
     static if( is( T S : S[]) ) {
-        alias arrayBaseT!(S)  _DArrayBaseT;
+        alias arrayBaseT!(S)  arrayBaseT;
     }
     else {
         alias T arrayBaseT;
@@ -126,8 +133,8 @@ template arrayBaseT(T)
 /// Count the []'s on an array type
 template arrayRank(T) {
     static if(is(T S : S[])) {
-        const arrayRank = 1 + arrayRank!(S);
+        const uint arrayRank = 1 + arrayRank!(S);
     } else {
-        const arrayRank = 0;
+        const uint arrayRank = 0;
     }
 }

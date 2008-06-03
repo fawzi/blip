@@ -132,6 +132,7 @@ template reductionFactor(){
     const int reductionFactor=0;
 }
 /// returns the reduction of the rank done by the arguments in the tuple
+/// allow also static arrays?
 template reductionFactor(T,S...){
     static if (is(T==int) || is(T==long)|is(TT==uint)|is(TT==ulong))
         const int reductionFactor=1+reductionFactor!(S);
@@ -160,7 +161,7 @@ char [] s_loop_genIdx(int rank,char[][] arrayNames,char[][] startIdxs,
 
     foreach(i,arrayName;arrayNames){
         res~=indent[0..2];
-        res~=arrayNameDot(arrayName)~"dtype * "~arrayName~"BasePtr="~arrayNameDot(arrayName)~"mData.ptr;";
+        res~=arrayNameDot(arrayName)~"dtype * "~arrayName~"BasePtr="~arrayNameDot(arrayName)~"mData.ptr;\n";
         
         res~=indent[0..2];
         res~="index_type "~arrayName~"Idx"~ctfe_i2a(rank-1)~"=";
@@ -176,7 +177,7 @@ char [] s_loop_genIdx(int rank,char[][] arrayNames,char[][] startIdxs,
     for (int idim=0;idim<rank;idim++){
         char[] ivar=ivarStr.dup~"_"~ctfe_i2a(idim)~"_";
         if (rank<8) res~=indent[0..(2+idim*2)];
-        res~="for (index_type "~ivar~"=0;"~ivar~"<"~arrayNameDot(arrayNames[0])~"mShape["~ctfe_i2a(idim)~"];"~ivar~"++){\n";
+        res~="for (index_type "~ivar~"=0;"~ivar~"<"~arrayNameDot(arrayNames[0])~"mShape["~ctfe_i2a(idim)~"];++"~ivar~"){\n";
         if (idim<rank-1) {
             foreach(arrayName;arrayNames){
                 if (rank<8) res~=indent[0..(4+idim*2)];
@@ -337,10 +338,12 @@ char [] s_loopIdx(int rank,char[][] arrayNames,char[][] startIdxs,
     }
     res~=";\n    if (commonFlags&ArrayFlags.Contiguous){\n";
     foreach (i,arrayName;arrayNames){
-        res~="        "~arrayNameDot(arrayName)~"dtype * "~arrayName~"BasePtr="~arrayNameDot(arrayName)~"mData.ptr;";
+        res~="        "~arrayNameDot(arrayName)~"dtype * "~arrayName~"BasePtr="~arrayNameDot(arrayName)~"mData.ptr;\n";
     }
-    res~="        "~arrayNames[0]~"_length="~arrayNameDot(arrayNames[0])~"_length;";
-    res~="        for (int i=0,i!="~arrayNames[0]~"_length;++i){\n";
+    res~="        index_type "~arrayNames[0]~"_length="~arrayNameDot(arrayNames[0])~"mData.length;\n";
+    res~="        for (index_type "~ivarStr~"_=0;"~ivarStr~"_!="~arrayNames[0]~"_length;++"~ivarStr~"_){\n";
+    foreach(i,arrayName;arrayNames)
+        res~="        index_type "~arrayName~"Idx0="~ivarStr~"_;";
     res~="            "~loopBody~"\n";
     res~="        }";
     res~="    } else {";
@@ -378,6 +381,17 @@ char [] s_loopPtr(int rank,char[][] arrayNames,char[][] startIdxs,
     return res;
 }
 
+/// array to Sequence
+char[] arrayToSeq(char[] arrayName,int dim){
+    char[] res="".dup;
+    for (int i=0;i<dim;++i){
+        res~=arrayName~"["~ctfe_i2a(i)~"]";
+        if (i!=dim-1)
+            res~=", ";
+    }
+    return res;
+}
+
 /// threshold for manual allocation
 const int manualAllocThreshold=200*1024;
 
@@ -397,21 +411,21 @@ else {
         /// shape of the array
         index_type[rank] mShape;
         /// the raw data of the array
-        dtype[] mData;
+        T[] mData;
         /// flags to quickly check properties of the array
         uint mFlags = Flags.None;
         /// owner of the data if it is manually managed
         void *mBase = null;
 
         uint flags() { return mFlags; }
-        dtype[] data() { return mData; }
+        T[] data() { return mData; }
         index_type[] strides() { return mStrides; }
         index_type[] shape() { return mShape; }
         index_type startIdx() { return mStartIdx; }
         
         /// calulates the base flags (Contiguos,Fortran,Compact,Small,Large)
         static uint calcBaseFlags(index_type[rank] strides, index_type[rank] shape, index_type startIdx,
-            dtype[] data){
+            T[] data){
             uint flags=Flags.None;
             // check contiguos & fortran
             bool contiguos,fortran;
@@ -494,7 +508,7 @@ else {
         /// supposed to create arrays with higher level functions (empty,zeros,ones,...)
         /// the data will be freed if flags & Flags.ShouldFreeData, the other flags are ignored
         this(index_type[rank] strides, index_type[rank] shape, index_type startIdx,
-            dtype[] data, uint flags, void *mBase=null)
+            T[] data, uint flags, void *mBase=null)
         in {
             index_type minIndex=startIdx,maxIndex=startIdx,size=1;
             for (int i=0;i<rank;i++){
@@ -528,7 +542,7 @@ else {
         
         /// another way to construct an object (also low level, see empty, zeros and ones for better ways)
         static NArray opCall(index_type[rank] strides, index_type[rank] shape, index_type startIdx,
-            dtype[] data, uint flags, void* mBase=null){
+            T[] data, uint flags, void* mBase=null){
             return new NArray(strides,shape,startIdx,data,flags,mBase);
         }
                 
@@ -538,7 +552,7 @@ else {
             foreach (sz;shape)
                 size*=sz;
             uint flags=ArrayFlags.None;
-            dtype[] mData;
+            T[] mData;
             if (size*T.sizeof>manualAllocThreshold) {
                 T* mData2=cast(T*)calloc(size,T.sizeof);
                 if(mData2 is null) throw new Exception("calloc failed");
@@ -568,7 +582,7 @@ else {
         }
         /// returns an array initialized to 1 of the requested shape
         static NArray ones(index_type[rank] shape, bool fortran=false){
-            NArray!(T,rank) res=empty(shape,fortran);
+            NArray res=empty(shape,fortran);
             res.mData[]=cast(T)1;
             return res;
         }
@@ -591,7 +605,7 @@ else {
         /// array[3,Range(6,7)] -> 2D array, ...
         /// if a sub array is returned (and not a scalar) then it is *always* a subview
         /// indexing never copies data
-        NArray!(dtype,rank-reductionFactor!(S))opIndex(S...)(S idx_tup)
+        NArray!(T,rank-reductionFactor!(S))opIndex(S...)(S idx_tup)
         in {
             static assert(rank>=nArgs!(S),"too many argumens in indexing operation");
             static if(rank==reductionFactor!(S)){
@@ -603,7 +617,7 @@ else {
                     static if(is(TT==int)|is(TT==long)|is(TT==uint)|is(TT==ulong)){
                         assert(0<=idx_tup[i] && idx_tup[i]<mShape[i],"index "~ctfe_i2a(i)~" out of bounds");                        
                     } else static if(is(TT==Range)){
-                        index_type from=idx_tup[i].from,to=idx_tup[i].to;
+                        index_type from=idx_tup[i].from,to=idx_tup[i].to,step=idx_tup[i].inc;
                         if (from<0) from+=mShape[i];
                         if (to<0) to+=mShape[i]+1;
                         if (from<to && step>=0 || from>to && step<0){
@@ -612,8 +626,8 @@ else {
                             if (step==0)
                                 to=mShape[i]-1;
                             else
-                                to=to-(to-from)%range.step;
-                            assert(to>=0 && to<mShape[i],
+                                to=to-(to-from)%step;
+                            assert(to>=0 && to<=mShape[i],
                                 "invalid upper range for dimension "~ctfe_i2a(i));
                         }
                     } else static assert(0,"unexpected type <"~TT.stringof~"> in opIndex");
@@ -638,26 +652,26 @@ else {
                     static if (is(TT==int)|is(TT==long)|is(TT==uint)|is(TT==ulong)){
                         newStartIdx+=idx_tup[i]*mStrides[i];
                     } else static if (is(TT==Range)){
-                        index_type from=idx_tup[i].from,to=idx_tup[i].to;
+                        index_type from=idx_tup[i].from,to=idx_tup[i].to,step=idx_tup[i].inc;
                         if (from<0) from+=mShape[i];
                         if (to<0) to+=mShape[i]+1;
                         if (from<to && step>=0 || from>to && step<0){
-                            if (range.step==0)
+                            if (step==0)
                                 to=mShape[i]-1;
                             else
-                                to=to-(to-from)%range.step;
-                            newshape[idim]=1+(to-from)/range.step;
+                                to=to-(to-from)%step;
+                            newshape[idim]=1+(to-from)/step;
                             newStartIdx+=from*mStrides[i];
-                            if (range.step==0)
+                            if (step==0)
                                 newstrides[idim]=mStrides[i];
                             else
-                                newstrides[idim]=range.step*mStrides[i];
+                                newstrides[idim]=step*mStrides[i];
                         } else {
                             newshape[idim]=0; // set everything to 0?
-                            if (range.step==0)
+                            if (step==0)
                             newstrides[idim]=mStrides[i];
                             else
-                                newstrides[idim]=range.step*mStrides[i];
+                                newstrides[idim]=step*mStrides[i];
                         }
                         idim+=1;
                     } else static assert(0,"unexpected type in opIndex");
@@ -676,13 +690,13 @@ else {
                         maxIndex+=newstrides[i]*(newshape[i]-1);                            
                     }
                 }
-                dtype[] newdata;
+                T[] newdata;
                 if (size>0) {
                     newdata=mData[minIndex..maxIndex+1];
                 } else {
                     newdata=null;
                 }
-                NArray!(dtype,rank2) res=NArray!(dtype,rank2)(newstrides,newshape,newStartIdx-minIndex,newdata,
+                NArray!(T,rank2) res=NArray!(T,rank2)(newstrides,newshape,newStartIdx-minIndex,newdata,
                     flags & ~Flags.ShouldFreeData,newBase);
                 return res;
             }
@@ -690,11 +704,11 @@ else {
         
         /// index assignement
         /// if array has rank 3 array[1,2,3]=4.0, array[1]=2Darray, array[1,Range(3,7)]=2Darray
-        NArray!(dtype,rank-reductionFactor!(S)) opIndexAssign(U,S)(U val,
+        NArray!(T,rank-reductionFactor!(S)) opIndexAssign(U,S)(U val,
             S idx_tup)
         in{
-            assert(!mFlags&Flags.ReadOnly,"ReadOnly array cannot be assigned");
-            static assert(is(U==NArray!(dtype,rank-reductionFactor!(S)))||is(U==dtype),"invalid value type <"~U.stringof~"> in opIndexAssign");
+            assert(!(mFlags&Flags.ReadOnly),"ReadOnly array cannot be assigned");
+            static assert(is(U==NArray!(T,rank-reductionFactor!(S)))||is(U==T),"invalid value type <"~U.stringof~"> in opIndexAssign");
             static assert(rank>=nArgs!(S),"too many argumens in indexing operation");
             static if (rank==reductionFactor!(S)){
                 foreach(i,TT;S){
@@ -719,39 +733,58 @@ else {
                 subArr[]=val;
             }
         }
+                
+        /// static array indexing (separted from opIndex as potentially less efficient)
+        NArray!(T,rank-cast(int)staticArraySize!(S))arrayIndex(S)(S index){
+            static assert(is(S:int[])|is(S:long[])|is(S:uint[])|is(S:ulong[]),"only arrays of indexes supported");
+            static assert(isStaticArray!(S),"arrayIndex needs *static* arrays as input");
+            const char[] loopBody=("auto res=opIndex("~arrayToSeq("index",cast(int)staticArraySize!(S))~");");
+            mixin(loopBody);
+            return res;
+        }
+
+        /// static array indexAssign (separted from opIndexAssign as potentially less efficient)
+        NArray!(T,rank-cast(int)staticArraySize!(S))arrayIndexAssign(S,U)(U val,S index){
+            static assert(is(S:int[])|is(S:long[])|is(S:uint[])|is(S:ulong[]),"only arrays of indexes supported");
+            static assert(isStaticArray!(S),"arrayIndex needs *static* arrays as input");
+            mixin("NArray!(T,rank-cast(int)staticArraySize!(S)) res=opIndexAssign(val,"~arrayToSeq("index",staticArraySize!(S))~");");
+            return res;
+        }
         
         /// copies the array;
-        NArray opSliceAssign(S)(NArray!(S,rank) val)
-        in { assert(!mFlags&Flags.ReadOnly,"ReadOnly array cannot be assigned"); }
+        NArray opSliceAssign(S,int rank2)(NArray!(S,rank2) val)
+        in { 
+            static assert(rank2==rank,"assign operation should have same rank "~ctfe_i2a(rank)~"vs"~ctfe_i2a(rank2));
+            assert(!(mFlags&Flags.ReadOnly),"ReadOnly array cannot be assigned");
+        }
         body {
-            void assignF(out dtype x, S y){ x=cast(dtype)y; }
-            binary_op!(assignF,S)(val);
+            binary_op_str!("*aPtr0=cast(T)*bPtr0;",rank,T,S)(this,val);
             return this;
         }
         
         /// assign a scalar to the whole array with array[]=value;
-        NArray opSliceAssign()(dtype val)
-        in { assert(!mFlags&Flags.ReadOnly,"ReadOnly array cannot be assigned"); }
+        NArray opSliceAssign()(T val)
+        in { assert(!(mFlags&Flags.ReadOnly),"ReadOnly array cannot be assigned"); }
         body{
-            void assignF(out dtype x){ x=val; }
-            unary_op!(assignF)(val);
+            mixin unary_op_str!("*aPtr0=val",rank,T);
+            unary_op_str(this);
             return this;
         }
         
-        /+
-        + this sub iterator trades a little speed for more safety.
+        /++
+        + this sub iterator trades a little speed for more safety when used step by step.
         + For example instead of updating only the pointer or the starting point it updates the slice.
-        + Thus is safe also to updates of the base array mData in the sense that each next/get
+        + This is safe also to updates of the base array mData in the sense that each next/get
         + is done using the base array mData, not a local copy.
         + After an update in the base array a call to value is wrong, but next or get will set it correctly.
         + Dropping this (unlikely to be used) thing would speed up a little some things.
         +/
         static if (rank==1){
             struct SubView{
-                NArray!(T,rank) * baseArray;
+                NArray * baseArray;
                 index_type stride; // invariant
                 index_type iPos, iDim, iIdx;
-                static SubView opCall(NArray!(T,rank) *a, int axis=0)
+                static SubView opCall(NArray *a, int axis=0)
                 in { assert(axis==0); }
                 body {
                     SubView res;
@@ -782,7 +815,7 @@ else {
                 body {
                     baseArray.mData[iIdx]=val;
                 }
-                T get(int index)
+                T get(index_type index)
                 in { assert(0<=index && index<iDim,"invalid index in SubView.get"); }
                 body {
                     iIdx+=(index-iIdx)*stride;
@@ -799,7 +832,7 @@ else {
                     }
                     return 0;
                 }
-                int opApply( int delegate(int,ref T) loop_body ) {
+                int opApply( int delegate(index_type,ref T) loop_body ) {
                     if (iPos<iDim){
                         T*pos= &(baseArray.mData[iIdx]);
                         for (index_type i=iPos;i!=iDim;i++){
@@ -812,11 +845,11 @@ else {
             }
         } else {
             struct SubView{
-                NArray!(T,rank) * baseArray;
+                NArray * baseArray;
                 NArray!(T,rank-1) view;
                 index_type[2] subSlice;
                 index_type iPos, iDim, stride;
-                static SubView opCall(NArray!(T,rank) *a, int axis)
+                static SubView opCall(NArray *a, int axis)
                 in { assert(0<=axis && axis<rank); }
                 body {
                     index_type[rank-1] shape,strides;
@@ -873,7 +906,7 @@ else {
                 void value(NArray!(T,rank-1) val){
 
                 }
-                NArray!(T,rank-1) get(int index)
+                NArray!(T,rank-1) get(index_type index)
                 in { assert(0<=index && index<iDim,"invalid index in SubView.get"); }
                 body {
                     subSlice[0]+=(index-iPos)*stride;
@@ -903,6 +936,144 @@ else {
             }
         }
         
+        /++ Iterates over the values of the array according to the current strides. 
+         +  Usage is:  for(; !iter.end; iter.next) { ... } or (better and faster)
+         +  foreach(v;iter) foreach(i,v;iter)
+         +/
+        struct flat_iterator{
+            T* p;
+            NArray baseArray;
+            index_type [rank] left;
+            index_type [rank] dims;
+            index_type [rank] adds;
+            static flat_iterator forward_iterate(ref NArray baseArray){
+                flat_iterator res;
+                res.baseArray=baseArray;
+                res.left[]=baseArray.shape;
+                res.p=baseArray.mData.ptr+baseArray.mStartIdx;
+                foreach (s; baseArray.shape) {
+                    if (s==0) {
+                        res.left[]=0;
+                        res.p=null;
+                    }
+                }
+                res.adds[0]=baseArray.mStrides[0];
+                for(int i=1;i<rank;i++){
+                    res.adds[i]=baseArray.mStrides[i]-baseArray.mStrides[i-1]*(baseArray.shape[i-1]-1);
+                }
+                return res;
+            }
+            /// Advance to the next item.  Return false if there is no next item.
+            bool next(){
+                if (left[0]!=0){
+                    left[0]-=1;
+                    p+=adds[0];
+                    return true;
+                } else {
+                    static if (rank==1){
+                        p=null;
+                        return false;
+                    } else static if (rank==2){
+                        if (left[1]!=0){
+                            left[0]=baseArray.mShape[0];
+                            left[1]-=1;
+                            p+=adds[1];
+                            return true;
+                        } else {
+                            p=null;
+                            return false;
+                        }
+                    } else {
+                        if (!p) return false; // remove?
+                        left[0]=baseArray.mShape[0];
+                        for (int i=1;i<rank;i++){
+                            if (left[i]!=0){
+                                left[i]-=1;
+                                p+=adds[i];
+                                return true;
+                            } else{
+                                left[i]=baseArray.mShape[i];
+                            }
+                        }
+                        p=null;
+                        return false;
+                    }
+                }
+            }
+            /// Advance to the next item.  Return false if there is no next item.
+            bool opAddAssign(int i) {
+                assert(i==1, "+=1, or ++ are the only allowed increments");
+                return next();
+            }
+            /// Assign a value to the element the iterator points at using 
+            /// The syntax  iter[] = value.
+            /// Equivalent to  *iter.ptr = value
+            /// This is an error if the iter.end() is true.
+            void opSliceAssign(T v) { *p = v; }
+            /// Advance to the next item.  Return false if there is no next item.
+            bool opPostInc() {  return next(); }
+            /// Return true if at the end, false otherwise.
+            bool end() { return p is null; }
+            /// Return the value at the current location of the iterator
+            T value() { return *p; }
+            /// Sets the value at the current location of the iterator
+            void value(T val) { *p=val; }
+            /// Return a pointer to the value at the current location of the iterator
+            T* ptr() { return p; }
+            /// Return the array over which this iterator is iterating
+            NArray array() { return baseArray; }
+
+            int opApply( int delegate(ref T) loop_body ) 
+            {
+                if (p is null) return 0;
+                if (left!=baseArray.mShape){
+                    for(;!end(); next()) {
+                        int ret = loop_body(*p);
+                        if (ret) return ret;
+                    }
+                } else {
+                    const char[] loopBody=`
+                    int ret=loop_body(*p);
+                    if (ret) return ret;
+                    `;
+                    mixin(s_loopPtr(rank,["baseArray"],[],loopBody,"i"));
+                }
+                return 0;
+            }
+            int opApply( int delegate(index_type,ref T) loop_body ) 
+            {
+                if (p is null) return 0;
+                if (left==baseArray.mShape) {
+                    for(index_type i=0; !end(); next(),i++) {
+                        int ret = loop_body(i,*p);
+                        if (ret) return ret;
+                    }
+                } else {
+                    const char[] loopBody=`
+                    int ret=loop_body(iPos,*p);
+                    if (ret) return ret;
+                    ++iPos;
+                    `;
+                    index_type iPos=0;
+                    mixin(s_loopPtr(rank,["baseArray"],[],loopBody,"i"));
+                }
+                return 0;
+            }
+        }
+        
+        /// returns an array that loops from the end toward the beginning of this array
+        /// (returns a view, no data is copied)
+        NArray reverse(){
+            index_type[rank] newstrides;
+            index_type newStartIdx=startIdx;
+            for (int i=0;i<rank;++i){
+                newStartIdx+=(mShape[i]-1)*mStrides[i];
+                newstrides[i]=-mStrides[i];
+            }
+            return NArray(newstrides,mShape,newStartIdx,mData,
+                flags&~Flags.ShouldFreeData,newBase);
+        }
+        
         /// applies an operation that "collects" data on an axis of the array
         /// this is basically a possibly parallel fold on the array along that axis
         /// foldOp(x,t) is the operations that accumulates on x the element t
@@ -922,7 +1093,7 @@ else {
                 }
             }
         } body {
-            void myFold(ref S x0,dtype[] my_data, int my_stride, int my_dim, int my_start){
+            void myFold(ref S x0,T[] my_data, int my_stride, int my_dim, int my_start){
                 S x=x0;
                 index_type ii=my_start;
                 for (int i=0;i<my_dim;i++){
@@ -944,7 +1115,7 @@ else {
                         }
                     }
                 }
-                NArray!(dtype,rank-1) tmp=NArray!(dtype,rank-1)(newstrides,res.mShape,mStartIdx,mData,
+                NArray!(T,rank-1) tmp=NArray!(T,rank-1)(newstrides,res.mShape,mStartIdx,mData,
                     flags & ~Flags.ShouldFreeData);
                 mixin(p_loopIdx(maxRank,["res","tmp"],[],
                     "myFold(res.mData[resIdx0],mData,tmpIdx0,mStrides[axis],mShape[axis]);\n","i"));
@@ -953,7 +1124,7 @@ else {
         
         /// fuses two arrays combining two axis of the same length with the given fuse op
         /// basically this is a generalized dot product of tensors
-        void fuse1(alias fuseOp,S,rank2,U)(
+        void fuse1(alias fuseOp,S,int rank2,U)(
             NArray!(S,rank2) b, inout NArray!(U,rank+rank2-2) c, int axis1=-1, int axis2=0)
         in {
             assert(0<=axis1 && axis1<rank,"invalid axis1 in fuse1");
@@ -972,7 +1143,7 @@ else {
                 }
             }
         } body {
-            void myFuse(inout U x0,dtype[] my_data1, int my_stride1, int my_start1, 
+            void myFuse(inout U x0,T[] my_data1, int my_stride1, int my_start1, 
                 S[] my_data2, int my_stride2, int my_start2, int my_dim, int my_start){
                 ii=my_start1;
                 ij=my_start2;
@@ -1044,11 +1215,11 @@ else {
             if ( flags & res.flags & (Flags.Fortran | Flags.Contiguous) ) 
             {
                 // use memcpy, the easy & fast way
-                memcpy(res.mData.ptr, mData.ptr, dtype.sizeof * mData.length);
+                memcpy(res.mData.ptr, mData.ptr, T.sizeof * mData.length);
             }
             else
             {
-                binary_op_str!("*aPtr0=*bPtr0;",rank,dtype,dtype)(this,res);
+                binary_op_str!("*aPtr0=*bPtr0;",rank,T,T)(res,this);
             }
             return res;
         }
@@ -1057,7 +1228,7 @@ else {
         // math ops
         // should the cast be removed from array opXxxAssign, and move out of the static if?
         
-        static if (is(typeof(-dtype.init))) {
+        static if (is(typeof(-T.init))) {
             /// Return a negated version of the array
             NArray opNeg() {
                 NArray res=empty(mShape);
@@ -1066,7 +1237,7 @@ else {
             }
         }
 
-        static if (is(typeof(+dtype.init))) {
+        static if (is(typeof(+T.init))) {
             /// Allowed as long as the underlying type has op pos
             /// But it always makes a full value copy regardless of whether the underlying unary+ 
             /// operator is a no-op.
@@ -1078,31 +1249,31 @@ else {
         }
 
         /// Add this array and another one and return a new array.
-        NArray!(typeof(dtype.init+S.init),rank) opAdd(S)(NArray!(S,rank) o) { 
-            NArray res=NArray!(typeof(dtype.init+S.init),rank).empty(mShape);
-            ternary_op_str!("*cPtr0=(*aPtr0)+(*bPtr0);",rank,T,S,typeof(dtype.init+S.init))(this,o,res);
+        NArray!(typeof(T.init+S.init),rank) opAdd(S)(NArray!(S,rank) o) { 
+            NArray!(typeof(T.init+S.init),rank) res=NArray!(typeof(T.init+S.init),rank).empty(mShape);
+            ternary_op_str!("*cPtr0=(*aPtr0)+(*bPtr0);",rank,T,S,typeof(T.init+S.init))(this,o,res);
             return res;
         }
-        static if (is(typeof(dtype.init+dtype.init))) {
+        static if (is(typeof(T.init+T.init))) {
             /// Add a scalar to this array and return a new array with the result.
             NArray!(typeof(T.init+T.init),rank) opAdd()(T o) { 
-                NArray res=NArray!(typeof(T.init+T.init),rank).empty(mShape);
+                NArray!(typeof(T.init+T.init),rank) res=NArray!(typeof(T.init+T.init),rank).empty(mShape);
                 mixin binary_op_str!("*bPtr0 = (*aPtr0) * o;",rank,T,T);
                 binary_op_str(this,res);
                 return res;
             }
         }
-        static if (is(typeof(dtype.init+dtype.init)==dtype)) {
+        static if (is(typeof(T.init+T.init)==T)) {
             /// Add another array onto this one in place.
             NArray opAddAssign(S)(NArray!(S,rank) o)
-            in { assert(!mFlags&Flags.ReadOnly,"ReadOnly array cannot be assigned"); }
+            in { assert(!(mFlags&Flags.ReadOnly),"ReadOnly array cannot be assigned"); }
             body { 
                 binary_op_str!("*aPtr0 += cast(T)*bPtr0;",rank,T,S)(this,o);
                 return this;
             }
             /// Add a scalar to this array in place.
             NArray opAddAssign()(T o)
-            in { assert(!mFlags&Flags.ReadOnly,"ReadOnly array cannot be assigned"); }
+            in { assert(!(mFlags&Flags.ReadOnly),"ReadOnly array cannot be assigned"); }
             body { 
                 mixin unary_op_str!("*aPtr0+=o;",rank,T);
                 unary_op_str(this);
@@ -1112,11 +1283,11 @@ else {
 
         /// Subtract this array and another one and return a new array.
         NArray!(typeof(T.init-S.init),rank) opSub(S)(NArray!(S,rank) o) { 
-            NArray res=NArray!(typeof(T.init-S.init),rank).empty(mShape);
+            NArray!(typeof(T.init-S.init),rank) res=NArray!(typeof(T.init-S.init),rank).empty(mShape);
             ternary_op_str!("*cPtr0=(*aPtr0)-(*bPtr0);",rank,T,S,typeof(T.init-S.init))(this,o,res);
             return res;
         }
-        static if (is(typeof(dtype.init-dtype.init))) {
+        static if (is(typeof(T.init-T.init))) {
             /// Subtract a scalar from this array and return a new array with the result.
             final NArray opSub()(T o) { 
                 NArray res=empty(mShape);
@@ -1125,17 +1296,17 @@ else {
                 return res;
             }
         }
-        static if (is(typeof(dtype.init-dtype.init)==dtype)) {
+        static if (is(typeof(T.init-T.init)==T)) {
             /// Subtract another array from this one in place.
             NArray opSubAssign(S)(NArray!(S,rank) o)
-            in { assert(!mFlags&Flags.ReadOnly,"ReadOnly array cannot be assigned"); }
+            in { assert(!(mFlags&Flags.ReadOnly),"ReadOnly array cannot be assigned"); }
             body { 
                 binary_op_str!("*aPtr0 -= cast(T)*bPtr0;",rank,T,T)(this,o);
                 return this;
             }
             /// Subtract a scalar from this array in place.
             NArray opSubAssign()(T o)
-            in { assert(!mFlags&Flags.ReadOnly,"ReadOnly array cannot be assigned"); }
+            in { assert(!(mFlags&Flags.ReadOnly),"ReadOnly array cannot be assigned"); }
             body { 
                 mixin unary_op_str!("*aPtr0-=o;",rank,T);
                 unary_op_str(this);
@@ -1150,28 +1321,28 @@ else {
             ternary_op_str!("*cPtr0=(*aPtr0)*(*bPtr0);",rank,T,S,typeof(T.init*S.init))(this,o,res);
             return res;
         }
-        static if (is(typeof(dtype.init*dtype.init))) {
+        static if (is(typeof(T.init*T.init))) {
             /// Multiplies this array by a scalar and returns a new array.
             final NArray!(typeof(T.init*T.init),rank) opMul()(T o) { 
-                NArray res=NArray!(typeof(T.init*T.init),rank).empty(mShape);
+                NArray!(typeof(T.init*T.init),rank) res=NArray!(typeof(T.init*T.init),rank).empty(mShape);
                 mixin binary_op_str!("*bPtr0=(*aPtr0)*o;",rank,T,typeof(T.init*T.init));
                 binary_op_str(this,res);
                 return res;
             }
         }
         
-        static if (is(typeof(dtype.init*dtype.init)==dtype)) {
+        static if (is(typeof(T.init*T.init)==T)) {
             /// Element-wise multiply this array by another in place.
             /// For matrix multiply, use the non-member dot(a,b) function.
             NArray opMulAssign(S)(NArray!(S,rank) o)
-            in { assert(!mFlags&Flags.ReadOnly,"ReadOnly array cannot be assigned"); }
+            in { assert(!(mFlags&Flags.ReadOnly),"ReadOnly array cannot be assigned"); }
             body { 
                 binary_op_str!("*aPtr0 *= cast(T)*bPtr0;",rank,T,typeof(T.init*T.init))(this,o);
                 return this;
             }
             /// scales the current array.
             NArray opMulAssign()(T o)
-            in { assert(!mFlags&Flags.ReadOnly,"ReadOnly array cannot be assigned"); }
+            in { assert(!(mFlags&Flags.ReadOnly),"ReadOnly array cannot be assigned"); }
             body { 
                 mixin unary_op_str!("*aPtr0 *= o;",rank,T);
                 unary_op_str(this);
@@ -1183,32 +1354,32 @@ else {
         /// To solve linear equations like A * x = b for x, use the nonmember linsolve
         /// function.
         NArray!(typeof(T.init/S.init),rank) opDiv(S)(NArray!(S,rank) o) { 
-            NArray res=NArray!(typeof(T.init/S.init),rank).empty(mShape);
+            NArray!(typeof(T.init/S.init),rank) res=NArray!(typeof(T.init/S.init),rank).empty(mShape);
             ternary_op_str!("*cPtr0=(*aPtr0)/(*bPtr0);",rank,T,S,typeof(T.init/S.init))(this,o,res);
             return res;
         }
-        static if (is(typeof(dtype.init/dtype.init))) {
+        static if (is(typeof(T.init/T.init))) {
             /// divides this array by a scalar and returns a new array with the result.
             NArray!(typeof(T.init/T.init),rank) opDiv()(T o) { 
-                NArray res=NArray!(typeof(T.init/T.init),rank).empty(mShape);
+                NArray!(typeof(T.init/T.init),rank) res=NArray!(typeof(T.init/T.init),rank).empty(mShape);
                 mixin binary_op_str!("*bPtr0=(*aPtr0)/o;",rank,T,typeof(T.init/T.init));
                 binary_op_str(this,res);
                 return res;
             }
         }
-        static if (is(typeof(dtype.init/dtype.init)==dtype)) {
+        static if (is(typeof(T.init/T.init)==T)) {
             /// Element-wise divide this array by another in place.
             /// To solve linear equations like A * x = b for x, use the nonmember linsolve
             /// function.
             NArray opDivAssign(S)(NArray!(S,rank) o)
-            in { assert(!mFlags&Flags.ReadOnly,"ReadOnly array cannot be assigned"); }
+            in { assert(!(mFlags&Flags.ReadOnly),"ReadOnly array cannot be assigned"); }
             body { 
                 binary_op_str!("*aPtr0 /= cast(T)*bPtr0;",rank,T,S)(this,o);
                 return this;
             }
             /// divides in place this array by a scalar.
             NArray opDivAssign()(T o)
-            in { assert(!mFlags&Flags.ReadOnly,"ReadOnly array cannot be assigned"); }
+            in { assert(!(mFlags&Flags.ReadOnly),"ReadOnly array cannot be assigned"); }
             body { 
                 mixin unary_op_str!("*aPtr0 /= o;",rank,T);
                 unary_op_str(this);
@@ -1255,7 +1426,7 @@ else {
         }
         
         /// returns the base for an array that is a view of the current array
-        private void *newBase(){
+        void *newBase(){
             void *res=mBase;
             if (flags&Flags.ShouldFreeData){
                 assert(mBase is null,"if this array is the owner of the data it should not have base arrays");
@@ -1387,7 +1558,17 @@ else {
             }
         }
         
-        /// convolve
+        /// increments a static index array, return true if it did wrap
+        bool incrementArrayIdx(index_type[rank] index){
+            int i=rank-1;
+            while (i>=0) {
+                ++index[i];
+                if (index[i]<mShape[i]) break;
+                index[i]=0;
+                --i;
+            }
+            return i<0;
+        }
         
     }
 }// end static if
@@ -1638,7 +1819,8 @@ body {
 }
 
 /// returns a into shape the shape of the nested D array T
-private void calcShapeArray(T)(T arr,index_type[arrayRank!(T)] shape){
+void calcShapeArray(T,uint rank)(T arr,index_type[rank] shape){
+    static assert(rank==arrayRank!(T),"inconsistent rank/shape");
     static if (arrayRank!(T)>0) {
         shape[0]=arr.length;
         static if (arrayRank!(T)>1){
@@ -1648,7 +1830,8 @@ private void calcShapeArray(T)(T arr,index_type[arrayRank!(T)] shape){
 }
 
 /// checks that the D array arr is rectangular and has the shape in shape
-private void checkShape(T)(T arr,index_type[arrayRank!(T)] shape){
+private void checkShape(T,uint rank)(T arr,index_type[rank] shape){
+    static assert(rank==arrayRank!(T),"inconsistent rank/shape");
     static if (arrayRank!(T)>0) {
         assert(shape[0]==arr.length,"array does not match shape (non rectangular?)");
         static if (arrayRank!(T)>1){
@@ -1672,7 +1855,7 @@ char[] arrayInLoop(char[] arrName,int rank,char[] ivarStr){
 + The array has to be rectangular.
 + note: this put all the indexes of the array arr in the inner loop, not so efficient with many dimensions
 +/
-NArray!(arrayBaseT!(T),arrayRank!(T)) a2NA(T)(T arr)
+NArray!(arrayBaseT!(T),cast(int)arrayRank!(T)) a2NA(T)(T arr)
 in {
     index_type[arrayRank!(T)] shape;
     calcShapeArray(arr,shape);
@@ -1682,8 +1865,8 @@ body{
     const int rank=arrayRank!(T);
     index_type[rank] shape;
     calcShapeArray(arr,shape);
-    auto res=NArray!(arrayBaseT!(T),arrayRank!(T)).empty(shape);
-    const char[] loop_body="*(resBasePtr+resIdx)="~arrayInLoop("arr",rank,"i");
+    auto res=NArray!(arrayBaseT!(T),cast(int)arrayRank!(T)).empty(shape);
+    const char[] loop_body="*(resBasePtr+resIdx0)="~arrayInLoop("arr",rank,"i")~";";
     mixin(p_loop_genIdx(rank,["res"],[],loop_body,"i"));
     return res;
 }
@@ -1705,4 +1888,72 @@ int minFeqrel(T,int rank)(NArray!(T,rank) a,T b=cast(T)0){
     return minEq;
 }
 
-/// 
+/+ -------- TESTS ------- +/
+/// returns a NArray indexed with the variables of a p_loop_genIdx or s_loop_genIdx
+char[] NArrayInLoop(char[] arrName,int rank,char[] ivarStr){
+    char[] res="".dup;
+    res~=arrName~"[";
+    for (int i=0;i<rank;++i) {
+        res~=ivarStr~"_"~ctfe_i2a(i)~"_";
+        if (i!=rank-1)
+            res~=", ";
+    }
+    res~="]";
+    return res;
+}
+
+void checkLoop1(T,int rank)(NArray!(T,rank) a){
+    {
+        mixin(p_loop_genIdx(rank,["a"],[],
+        "assert(*(aBasePtr+aIdx0)=="~NArrayInLoop("a",rank,"i")~",\"p_loop_genIdx looping1 failed\");","i"));
+    }
+    {
+        mixin(s_loop_genIdx(rank,["a"],[],
+        "assert(*(aBasePtr+aIdx0)=="~NArrayInLoop("a",rank,"i")~",\"s_loop_genIdx looping1 failed\");","i"));
+    }
+    {
+        mixin(s_loop_genIdx(rank,["a"],[],
+        "assert(*(aBasePtr+aIdx0)=="~NArrayInLoop("a",rank,"i")~",\"s_loop_genPtr looping1 failed\");","i"));
+    }
+    index_type[rank] iPos;
+    const char[] loopBody1=`
+    assert(!did_wrap,"counter wrapped");
+    assert(a.arrayIndex(iPos)==*aPtr0,"s_loopPtr failed");
+    did_wrap=a.incrementArrayIdx(iPos);
+    `;
+    {
+        bool did_wrap=false;
+        iPos[]=cast(index_type)0;
+        mixin(s_loopPtr(rank,["a"],[],loopBody1,"i"));
+        assert(did_wrap,"incomplete loop");
+    }
+    const char[] loopBody2=`
+    assert(!did_wrap,"counter wrapped");
+    assert(a.arrayIndex(iPos)==*(aBasePtr+aIdx0),"s_loopIdx looping failed");
+    did_wrap=a.incrementArrayIdx(iPos);
+    `;
+    {
+        bool did_wrap=false;
+        iPos[]=cast(index_type)0;
+        pragma(msg,s_loopIdx(rank,["a"],[],loopBody2,"i"));
+        mixin(s_loopIdx(rank,["a"],[],loopBody2,"i"));
+        assert(did_wrap,"incomplete loop");
+    }
+}
+
+unittest{
+    NArray!(int,1) a1=a2NA([1,2,3,4,5,6]);
+    NArray!(int,1) a2=NArray!(int,1).zeros([6]);
+    auto a3=NArray!(int,2).zeros([5,6]);
+    auto a4=NArray!(int,3).zeros([2,3,4]);
+    assert(a1!=a2,"should be different");
+    a2[]=a1;
+    assert(a1==a2,"should be equal");
+    checkLoop1(a1);
+    checkLoop1(a2);
+    checkLoop1(a3);
+    checkLoop1(a4);
+    auto a5=a3[1,Range(0,6,2)];
+    a5[]=a1[Range(0,3)];
+    Stdout("a5:")(a5).newline;
+}
