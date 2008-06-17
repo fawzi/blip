@@ -216,7 +216,7 @@ void main(char [][] argv)
     int iii;
     void sumRes(double a,double b){ res[iii]+=a*b; }
     for (iii=0;iii<ndim;iii++){
-        binary_op!(sumRes,2,double,double)(d1[iii],sc2);
+        binaryOp!(sumRes,2,double,double)(d1[iii],sc2);
     }
     auto t10=timer.stop();
     foreach(i,t;res)
@@ -227,7 +227,7 @@ void main(char [][] argv)
     NArray!(double,2) sc3=d2[0];
     for (int i=0;i<ndim;i++){
         NArray!(double,2) d1i=d1[i];
-        mixin(p_loopPtr(2,["d1i","sc3"],[],"res[i]+=(*d1iPtr0)*(*sc3Ptr0);","j"));
+        mixin(pLoopPtr(2,["d1i","sc3"],[],"res[i]+=(*d1iPtr0)*(*sc3Ptr0);","j"));
     }
     auto t11=timer.stop();
     foreach(i,t;res)
@@ -238,7 +238,7 @@ void main(char [][] argv)
     //NArray!(double,2) sc3=d2[0];
     for (int i=0;i<ndim;i++){
         NArray!(double,2) d1i=d1[i];
-        mixin(p_loopIdx(2,["d1i","sc3"],[],
+        mixin(pLoopIdx(2,["d1i","sc3"],[],
             "res[i]+=(*(d1iBasePtr+d1iIdx0))*(*(sc3BasePtr+sc3Idx0));","k"));
     }
     auto t12=timer.stop();
@@ -255,9 +255,9 @@ void main(char [][] argv)
     Stdout("t7: index op floated to outer loops on class (smart compiler)").newline;
     Stdout("t8: index op floated to outer loops and removal of multiplication on struct (smart compiler)").newline;
     Stdout("t9: index loop on NArray").newline;
-    Stdout("t10: loop+binary_op on NArray").newline;
-    Stdout("t11: loop+mixin p_loopPtr on NArray").newline;
-    Stdout("t12: loop+mixin p_loopIdx on NArray").newline;
+    Stdout("t10: loop+binaryOp on NArray").newline;
+    Stdout("t11: loop+mixin pLoopPtr on NArray").newline;
+    Stdout("t12: loop+mixin pLoopIdx on NArray").newline;
     Stdout.format("tref: {} t1:{} t2:{} t3:{} t4:{} t5:{} t6:{} t7:{} t8:{} t9:{} t10:{}, t11:{} t12:{}",tref,t1,t2,t3,t4,t5,t6,t7,t8,t9,t10,t11,t12).newline;
     Stdout.format("tref: {} t1:{} t2:{} t3:{} t4:{} t5:{} t6:{} t7:{} t8:{} t9:{} t10:{}, t11:{}, t12:{}",tref/tref,t1/tref,t2/tref,t3/tref,t4/tref,t5/tref,t6/tref,t7/tref,t8/tref,
     t9/tref,t10/tref,t11/tref,t12/tref).newline;

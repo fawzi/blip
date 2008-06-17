@@ -138,3 +138,16 @@ template arrayRank(T) {
         const uint arrayRank = 0;
     }
 }
+
+/+ // does not work as it is now..
+template takeNTuple(int n){
+    alias Tuple!() takeNTuple;
+}
+template takeNTuple(int n,T,S...){
+    static if(n>0){
+        alias Tuple!(T,takeNTuple!(n-1,S)) takeNTuple;
+    } else {
+        alias Tuple!() takeNTuple;
+    }
+}
++/
