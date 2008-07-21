@@ -59,7 +59,7 @@ char[] completeInitStr(S...)(char[] manualInit,char[] checks,char[] indent="    
     char[]indent3=indent2~"    ";
     res~=indent1~"Rand r=test.r;\n";
     foreach (i,T;S){
-        // res~=indent1~T.stringof~" arg"~ctfe_i2a(i)~";\n";
+        res~=indent1~"int arg"~ctfe_i2a(i)~"_max=0;\n";
         res~=indent1~"int arg"~ctfe_i2a(i)~"_i=test.counter["~ctfe_i2a(i)~"];\n";
     }
     res~=indent1;
@@ -542,8 +542,19 @@ template checkTestInitArgs(S...){
 ///     /// uses an int in [0;10) as first argument, automatic generation for the remaining
 ///     private mixin testInit!("arg0=r.uniformR(10);") smallIntT;
 /// then it gets used as follow:
-///     autoInitT.testTrue((int x){ return ((2*x)%2==0);}).doNTest();
-///     smallIntT.testTrue((int x){ return (x*x<100);}).doNTest();
+///     autoInitT.testTrue("(2*x)%2==0",(int x){ return ((2*x)%2==0);},__LINE__,__FILE__).runTests();
+///     smallIntT.testTrue("x*x<10",(int x){ return (x*x<100);},__LINE__,__FILE__).runTests();
+/// in manualInit you have the following variables:
+///   arg0,arg1,... : variable of the first,second,... argument that you can initialize
+///   arg0_i,arg0_i,... : index variable for combinatorial (extensive) coverage.
+///     if you use it you probably want to initialize the next variable
+///   arg0_max, arg1_max,...: variable that can be initialized to an integer that gives 
+///     the maximum value of arg0_i+1, arg1_i+1,... giving it a value makes the combinatorial
+///     machine work, and does not set test.hasRandom to true for this variable
+/// checkInit can be used if the generation of the random configurations is mostly good,
+///   but might contain some configurations that should be skipped. In check init one
+///   should set the boolean variable "acceptable" to false if the configutation
+///   should be skipped.
 template testInit(char[] manualInit="", char[] checkInit=""){
 
     /// creates a test that executes the given function and fails if it throws an exception

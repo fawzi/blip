@@ -43,10 +43,3 @@ dynArray!(T) generateRandom(T:T[])(Rand r) {
     dynArray!(T) res=new dynArray!(T)(size);
     return mkRandomArray(res);
 }
-
-import tango.io.Stdout;
-
-unittest{
-    Rand r=new Rand();
-    Stdout("genR")(generateRandom!(int)(r))(" ")(generateRandom!(int)(r)).newline;
-}
