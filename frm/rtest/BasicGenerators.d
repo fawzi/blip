@@ -16,30 +16,32 @@ int generateSize(int mean=4,int hardMin=0,int hardMax=mean*3)(Rand r) {
     return res;
 }
 
-T[] mkRandomArray(T)(T[] array){
+T[] mkRandomArray(T)(T[] array,uint idx,ref uint nEl){
     foreach (ref x;array){
-        x=generateRandom!(S)(r);
+        x=generateRandom!(S)(r,idx,nEl);
+        assert(nEl==0,"combinatorial generation in an array, this is probably not what you want...");
     }
     return array;
 }
 
-T generateRandom(T:int)(Rand r)  { return r.uniform!(T); }
-T generateRandom(T:uint)(Rand r) { return r.uniform!(T); }
-T generateRandom(T:long)(Rand r) { return r.uniform!(T); }
-T generateRandom(T:ulong)(Rand r) { return r.uniform!(T); }
-T generateRandom(T:byte)(Rand r) { return r.uniform!(T); }
-T generateRandom(T:ubyte)(Rand r) { return r.uniform!(T); }
-T generateRandom(T:char)(Rand r) { return r.uniform!(T); } // avoid null char? restrict to letters?
-T generateRandom(T:float)(Rand r) { return r.uniformRSymm(1.5f); }
-T generateRandom(T:double)(Rand r) { return r.uniformRSymm(1.5); }
-T generateRandom(T:real)(Rand r) { return r.uniformRSymm(1.5L); }
+T generateRandom(T:int)   (Rand r,uint idx,ref uint nEl) { nEl=0; return r.uniform!(T); }
+T generateRandom(T:uint)  (Rand r,uint idx,ref uint nEl) { nEl=0; return r.uniform!(T); }
+T generateRandom(T:long)  (Rand r,uint idx,ref uint nEl) { nEl=0; return r.uniform!(T); }
+T generateRandom(T:ulong) (Rand r,uint idx,ref uint nEl) { nEl=0; return r.uniform!(T); }
+T generateRandom(T:byte)  (Rand r,uint idx,ref uint nEl) { nEl=0; return r.uniform!(T); }
+T generateRandom(T:ubyte) (Rand r,uint idx,ref uint nEl) { nEl=0; return r.uniform!(T); }
+T generateRandom(T:char)  (Rand r,uint idx,ref uint nEl) { nEl=0; return r.uniform!(T); } // avoid null char? restrict to letters?
+T generateRandom(T:float) (Rand r,uint idx,ref uint nEl) { nEl=0; return r.uniformRSymm(1.5f); }
+T generateRandom(T:double)(Rand r,uint idx,ref uint nEl) { nEl=0; return r.uniformRSymm(1.5); }
+T generateRandom(T:real)  (Rand r,uint idx,ref uint nEl) { nEl=0; return r.uniformRSymm(1.5L); }
 
-dynArray!(T) generateRandom(T:T[])(Rand r) {
+dynArray!(T) generateRandom(T:T[])(Rand r,uint idx, ref uint nEl) {
+    nEl=0;
     static if (isStaticArray!(T)){
         int size=staticArraySize!(T);
     } else {
         int size=generateSize(10);
     }
     dynArray!(T) res=new dynArray!(T)(size);
-    return mkRandomArray(res);
+    return mkRandomArray(res,idx,nEl);
 }

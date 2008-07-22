@@ -57,10 +57,11 @@ char[] completeInitStr(S...)(char[] manualInit,char[] checks,char[] indent="    
     char[]indent1=indent~"    ";
     char[]indent2=indent1~"    ";
     char[]indent3=indent2~"    ";
+    char[]indent4=indent3~"    ";
     res~=indent1~"Rand r=test.r;\n";
     foreach (i,T;S){
-        res~=indent1~"int arg"~ctfe_i2a(i)~"_max=0;\n";
-        res~=indent1~"int arg"~ctfe_i2a(i)~"_i=test.counter["~ctfe_i2a(i)~"];\n";
+        res~=indent1~"uint arg"~ctfe_i2a(i)~"_max=0;\n";
+        res~=indent1~"uint arg"~ctfe_i2a(i)~"_i=test.counter["~ctfe_i2a(i)~"];\n";
     }
     res~=indent1;
     res~=manualInit;
@@ -68,9 +69,10 @@ char[] completeInitStr(S...)(char[] manualInit,char[] checks,char[] indent="    
     foreach (i,T;S){
         char[] argName="arg"~ctfe_i2a(i);
         if (!hasToken(argName,manualInit)){
-            res~=indent1~"static assert(is(typeof(generateRandom!("~T.stringof~")(new Rand()))),\n";
-            res~=indent2~"\""~T.stringof~" cannot be automatically generated, missing T generateRandom(T:"~T.stringof~")(Rand r)\");\n";
-            res~=indent1~argName~"=generateRandom!("~T.stringof~")(r);\n";
+            res~=indent1~"static assert(is(typeof(generateRandom!("~T.stringof~")(new Rand(),arg0_i,arg0_max))),\n";
+            res~=indent2~"\""~T.stringof~" cannot be automatically generated, missing T generateRandom(T:"~T.stringof~")(Rand r,uint idx,ref uint nEl)\");\n";
+            res~=indent1~argName~"=generateRandom!("~T.stringof~")(r,arg"~
+                ctfe_i2a(i)~"_i,arg"~ctfe_i2a(i)~"_max);\n";
         }
         if (!hasToken("argSize"~ctfe_i2a(i),manualInit)){
             res~=indent1~"int argSize"~ctfe_i2a(i)~"=0;\n";
@@ -80,21 +82,21 @@ char[] completeInitStr(S...)(char[] manualInit,char[] checks,char[] indent="    
     res~=indent1~"int increase=1;\n";
     foreach (i,T;S){
         char[] argName="arg"~ctfe_i2a(i)~"_max";
-        if (hasToken(argName,manualInit)){
-            res~=indent1~"if (increase) {\n";
-            res~=indent2~"test.newCounter["~ctfe_i2a(i)~"]=test.counter["~ctfe_i2a(i)~"]+1;\n";
-            res~=indent2~"if (test.newCounter["~ctfe_i2a(i)~"]>="~argName~"){\n";
-            res~=indent3~"test.newCounter["~ctfe_i2a(i)~"]=0;\n";
-            res~=indent2~"} else {\n";
-            res~=indent3~"increase=0;\n";
-            res~=indent2~"}\n";
-            res~=indent1~"} else {";
-            res~=indent2~"test.newCounter["~ctfe_i2a(i)~"]=test.counter["~ctfe_i2a(i)~"];\n";
-            res~=indent1~"}\n";
-        } else {
-            res~=indent1~"test.newCounter["~ctfe_i2a(i)~"]=0;\n";
-            res~=indent1~"test.hasRandom=true;\n";
-        }
+        res~=indent1~"if ("~argName~"!=0){\n";
+        res~=indent2~"if (increase) {\n";
+        res~=indent3~"test.newCounter["~ctfe_i2a(i)~"]=test.counter["~ctfe_i2a(i)~"]+1;\n";
+        res~=indent3~"if (test.newCounter["~ctfe_i2a(i)~"]>="~argName~"){\n";
+        res~=indent4~"test.newCounter["~ctfe_i2a(i)~"]=0;\n";
+        res~=indent3~"} else {\n";
+        res~=indent4~"increase=0;\n";
+        res~=indent3~"}\n";
+        res~=indent2~"} else {";
+        res~=indent3~"test.newCounter["~ctfe_i2a(i)~"]=test.counter["~ctfe_i2a(i)~"];\n";
+        res~=indent2~"}\n";
+        res~=indent1~"} else {\n";
+        res~=indent2~"test.newCounter["~ctfe_i2a(i)~"]=0;\n";
+        res~=indent2~"test.hasRandom=true;\n";
+        res~=indent1~"}\n";
     }
     res~=indent1~"test.didCombinations=increase;\n";
     res~=indent1~"bool acceptable=true;\n";
@@ -188,7 +190,7 @@ class TextController: TestControllerI{
             (printLevel==PrintLevel.Skip && test.stat.skippedTests>0);
         if (shouldPrint) {
             if (printLevel!=PrintLevel.AllVerbose || test.stat.failedTests>0)
-                log.format("test`{,-30}",test.testName~"`");
+                log.format("test`{,-50}",test.testName~"`");
             log.format(" {,3}-{,3}/{,3}({,3})",test.stat.failedTests,
                 test.stat.passedTests,test.stat.nTests,test.stat.nCombTest).newline;
         }
@@ -548,9 +550,9 @@ template checkTestInitArgs(S...){
 ///   arg0,arg1,... : variable of the first,second,... argument that you can initialize
 ///   arg0_i,arg0_i,... : index variable for combinatorial (extensive) coverage.
 ///     if you use it you probably want to initialize the next variable
-///   arg0_max, arg1_max,...: variable that can be initialized to an integer that gives 
-///     the maximum value of arg0_i+1, arg1_i+1,... giving it a value makes the combinatorial
-///     machine work, and does not set test.hasRandom to true for this variable
+///   arg0_max, arg1_max,...: variable that can be initialized to an uint that gives 
+///     the maximum value of arg0_i+1, arg1_i+1,... giving it a non 0 value makes the
+///     combinatorial machine work, and does not set test.hasRandom to true for this variable
 /// checkInit can be used if the generation of the random configurations is mostly good,
 ///   but might contain some configurations that should be skipped. In check init one
 ///   should set the boolean variable "acceptable" to false if the configutation
