@@ -55,9 +55,6 @@ char[] completeInitStr(S...)(char[] manualInit,char[] checks,char[] indent="    
     }
     res~=indent~"bool doSetup(SingleRTest test){\n";
     char[]indent1=indent~"    ";
-    char[]indent2=indent1~"    ";
-    char[]indent3=indent2~"    ";
-    char[]indent4=indent3~"    ";
     res~=indent1~"Rand r=test.r;\n";
     foreach (i,T;S){
         res~=indent1~"uint arg"~ctfe_i2a(i)~"_max=0;\n";
@@ -70,7 +67,7 @@ char[] completeInitStr(S...)(char[] manualInit,char[] checks,char[] indent="    
         char[] argName="arg"~ctfe_i2a(i);
         if (!hasToken(argName,manualInit)){
             res~=indent1~"static assert(is(typeof(generateRandom!("~T.stringof~")(new Rand(),arg0_i,arg0_max))),\n";
-            res~=indent2~"\""~T.stringof~" cannot be automatically generated, missing T generateRandom(T:"~T.stringof~")(Rand r,uint idx,ref uint nEl)\");\n";
+            res~=indent1~"    \""~T.stringof~" cannot be automatically generated, missing T generateRandom(T:"~T.stringof~")(Rand r,uint idx,ref uint nEl)\");\n";
             res~=indent1~argName~"=generateRandom!("~T.stringof~")(r,arg"~
                 ctfe_i2a(i)~"_i,arg"~ctfe_i2a(i)~"_max);\n";
         }
@@ -83,19 +80,19 @@ char[] completeInitStr(S...)(char[] manualInit,char[] checks,char[] indent="    
     foreach (i,T;S){
         char[] argName="arg"~ctfe_i2a(i)~"_max";
         res~=indent1~"if ("~argName~"!=0){\n";
-        res~=indent2~"if (increase) {\n";
-        res~=indent3~"test.newCounter["~ctfe_i2a(i)~"]=test.counter["~ctfe_i2a(i)~"]+1;\n";
-        res~=indent3~"if (test.newCounter["~ctfe_i2a(i)~"]>="~argName~"){\n";
-        res~=indent4~"test.newCounter["~ctfe_i2a(i)~"]=0;\n";
-        res~=indent3~"} else {\n";
-        res~=indent4~"increase=0;\n";
-        res~=indent3~"}\n";
-        res~=indent2~"} else {";
-        res~=indent3~"test.newCounter["~ctfe_i2a(i)~"]=test.counter["~ctfe_i2a(i)~"];\n";
-        res~=indent2~"}\n";
+        res~=indent1~"    if (increase) {\n";
+        res~=indent1~"        test.newCounter["~ctfe_i2a(i)~"]=test.counter["~ctfe_i2a(i)~"]+1;\n";
+        res~=indent1~"        if (test.newCounter["~ctfe_i2a(i)~"]>="~argName~"){\n";
+        res~=indent1~"            test.newCounter["~ctfe_i2a(i)~"]=0;\n";
+        res~=indent1~"        } else {\n";
+        res~=indent1~"            increase=0;\n";
+        res~=indent1~"        }\n";
+        res~=indent1~"    } else {";
+        res~=indent1~"        test.newCounter["~ctfe_i2a(i)~"]=test.counter["~ctfe_i2a(i)~"];\n";
+        res~=indent1~"    }\n";
         res~=indent1~"} else {\n";
-        res~=indent2~"test.newCounter["~ctfe_i2a(i)~"]=0;\n";
-        res~=indent2~"test.hasRandom=true;\n";
+        res~=indent1~"    test.newCounter["~ctfe_i2a(i)~"]=0;\n";
+        res~=indent1~"    test.hasRandom=true;\n";
         res~=indent1~"}\n";
     }
     res~=indent1~"test.didCombinations=increase;\n";
@@ -129,13 +126,12 @@ char[] callF(S...)(char[] retType){
 /// tries to print the arguments of the test
 char[] printArgs(int nargs,char[] printC="Stdout",char[] indent="    "){
     char[] res="".dup;
-    char[] indent1=indent~"    ";
     res~=indent~"try{\n";
     for (int i=0;i<nargs;++i){
-        res~=indent1~printC~"(\"arg"~ctfe_i2a(i)~": \")(arg"~ctfe_i2a(i)~").newline;\n";
+        res~=indent~"    "~printC~"(\"arg"~ctfe_i2a(i)~": \")(arg"~ctfe_i2a(i)~").newline;\n";
     }
     res~=indent~"}catch (Exception e) {\n";
-    res~=indent1~"test.failureLog(\"could not print arguments due to exception\")(e).newline;\n";
+    res~=indent~"    test.failureLog(\"could not print arguments due to exception\")(e).newline;\n";
     res~=indent~"};\n";
     return res;
 }
