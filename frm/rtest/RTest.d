@@ -1,12 +1,15 @@
 /*******************************************************************************
-    A module to perform random tests
+    A module to perform random tests (the text that follows should be copied to the README.txt file)
 
     = RTest
     == RTest a random testing framework
 
-    A framework to quickly write tests that check property/functions using randomly generated data or all combinations of some values.
+    A framework to quickly write tests that check property/functions using randomly
+    generated data or all combinations of some values.
 
     I wrote this framework inspired by Haskell's Quickcheck, but the result is quite different.
+
+    At the moment it is only tango based.
 
     The idea is to be able to write tests as quickly and as painlessly as possible.
     Typical use would be for example:
@@ -17,7 +20,8 @@
     spend all your time waiting for a valid test case).
     Then (if detA>0) you can check that the solution really solves the system of equations 
     with a small residual error.
-    Your test can fail in many ways also due to the internal checks of the equation solver, and you want to  always have a nice report that lets you reproduce the problem.
+    Your test can fail in many ways also due to the internal checks of the equation solver,
+    and you want to  always have a nice report that lets you reproduce the problem.
     Another typical use case is when you have a slow reference implementation for something
     and a fast one, and you want to be sure they are the same.
 
@@ -40,7 +44,8 @@
             myTests.runTests();
         }
     }}}
-    If everything goes well not much should happen, because by default the printer does not write successes.
+    If everything goes well not much should happen, because by default the printer does
+    not write successes.
     You can change the default controller as follows:
     {{{
         SingleRTest.defaultTestController=new TextController(
@@ -85,7 +90,8 @@
     }}}
     in manualInit you have the following variables:
       arg0,arg1,... : variable of the first,second,... argument that you can initialize
-      arg0_i,arg0_i,... : index variable for combinatorial (extensive) coverage.
+        (if you use it you are supposed to initialize it)
+      arg0_i,arg1_i,... : index variable for combinatorial (extensive) coverage.
         if you use it you probably want to initialize the next variable
       arg0_max, arg1_max,...: variable that can be initialized to an uint that gives 
         the maximum value of arg0_i+1, arg1_i+1,... giving it a non 0 value makes the

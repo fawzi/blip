@@ -1,13 +1,14 @@
+// this readme is taken from the comments in the source frm.rtest.RTest
 = RTest
 == RTest a random testing framework
 
 A framework to quickly write tests that check property/functions using randomly generated data or all combinations of some values.
-At the moment it is only tango based.
 
 I wrote this framework inspired by Haskell's Quickcheck, but the result is quite different.
 
-The idea is to be able to write tests as quickly and as painlessly as possible.
+At the moment it is only tango based.
 
+The idea is to be able to write tests as quickly and as painlessly as possible.
 Typical use would be for example:
 You have a function that solves linear systems of equations, and you want to test it.
 The matrix should be square, and the b vector should have the same size as the matrix dimension.
@@ -16,7 +17,8 @@ So either you define  an ad-hoc structure, or you write a custom generator for i
 spend all your time waiting for a valid test case).
 Then (if detA>0) you can check that the solution really solves the system of equations 
 with a small residual error.
-Your test can fail in many ways also due to the internal checks of the equation solver, and you want to  always have a nice report that lets you reproduce the problem.
+Your test can fail in many ways also due to the internal checks of the equation solver,
+and you want to  always have a nice report that lets you reproduce the problem.
 Another typical use case is when you have a slow reference implementation for something
 and a fast one, and you want to be sure they are the same.
 
@@ -29,17 +31,18 @@ For simplicity here we use really simple tests, in this case a possible use is:
     void myTests(){
         // define a collection for my tests
         TestCollection myTests=new TestCollection("myTests",__LINE__,__FILE__);
-    
+
         // define a test
         autoInitTst.testTrue("testName",functionToTest,__LINE__,__FILE__);
         // for example
         autoInitTst.testTrue("(2*x)%2==0",(int x){ return ((2*x)%2==0);},__LINE__,__FILE__);
-    
+
         // run the tests
         myTests.runTests();
     }
 }}}
-If everything goes well not much should happen, because by default the printer does not write successes.
+If everything goes well not much should happen, because by default the printer does
+not write successes.
 You can change the default controller as follows:
 {{{
     SingleRTest.defaultTestController=new TextController(
@@ -84,7 +87,8 @@ If the default generator is not good enough you can create tests that use a cust
 }}}
 in manualInit you have the following variables:
   arg0,arg1,... : variable of the first,second,... argument that you can initialize
-  arg0_i,arg0_i,... : index variable for combinatorial (extensive) coverage.
+    (if you use it you are supposed to initialize it)
+  arg0_i,arg1_i,... : index variable for combinatorial (extensive) coverage.
     if you use it you probably want to initialize the next variable
   arg0_max, arg1_max,...: variable that can be initialized to an uint that gives 
     the maximum value of arg0_i+1, arg1_i+1,... giving it a non 0 value makes the
@@ -110,7 +114,10 @@ then gets used as follow:
 }}}
 by the way this is also a faster way to perform a test, as you can see you don't need to define a collection (but probably it is a good idea to define one)
 
-If you end up using custom generators much probably you should define a struct/class/typedef, use that as input to your testing function and define T generateRandom(T:YourType)(Rand r), so that you can use the default automatic generation.
+If you end up using custom generators much probably you should define a 
+struct/class/typedef, and use that as input to your testing function and define
+T generateRandom(T:YourType)(Rand r,uint idx,ref uint nEl),
+so that you can use the default automatic generation.
 
 enjoy
 

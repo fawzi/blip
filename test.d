@@ -16,7 +16,6 @@ private mixin testInit!(`arg0=specialNrs[arg0_i]; arg0_max=specialNrs.length;
 arg1=specialNrs[arg1_i]; arg1_max=specialNrs.length;`) combNrTst; // combinatorial cases
 
 void main(){
-    
     Print!(char) nullPrt=new FormatOutput(new NullStream());
     nullPrt=Stdout;
     SingleRTest.defaultTestController=new TextController(TextController.OnFailure.StopTest,

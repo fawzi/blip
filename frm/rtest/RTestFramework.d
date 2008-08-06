@@ -8,7 +8,7 @@
 module frm.rtest.RTestFramework;
 import frm.random.Random: RandomG;
 import frm.random.engines.CMWC: CMWC_32_1;
-public import frm.TemplateFu: nArgs,ctfe_i2a;
+public import frm.TemplateFu: nArgs,ctfe_i2a,ctfe_hasToken, ctfe_replaceToken;
 public import tango.io.Print:Print;
 import tango.io.Stdout: Stdout;
 public import tango.core.Variant: Variant;
@@ -17,42 +17,23 @@ import tango.core.Array: find,remove;
 // a reasonably collision free, fast and small (seedwise) rng
 alias RandomG!(CMWC_32_1) Rand;
 
-/// checks is c is a valid token char (also at compiletime), assumes a-z A-Z 1-9 sequences in collation
-bool isTokenChar(char c){
-    return (c=='_' || c>='a'&&c<='z' || c>='A'&&c<='Z' || c=='0'|| c>='1' && c<='9');
-}
-
-/// checks if code contains the given token
-bool hasToken(char[] token,char[] code){
-    bool outOfTokens=true;
-    int i=0;
-    while(i<code.length){
-        if (outOfTokens){
-            int j=0;
-            for (;((j<token.length)&&(i<code.length));++j,++i){
-                if (code[i]!=token[j]) break;
-            }
-            if (j==token.length){
-                if (i==code.length || !isTokenChar(code[i])){
-                    return true;
-                }
-            }
+/// replaces arg0,... with arg[0]...
+char[] replaceArgI(S...)(char[] manualInit){
+    char[] manualInit2=manualInit;
+    foreach (i,T;S){
+        char[] argName="arg"~ctfe_i2a(i);
+        if (ctfe_hasToken(argName,manualInit)){
+            char[] argRepl="arg["~ctfe_i2a(i)~"]";
+            manualInit2=ctfe_replaceToken(argName,argRepl,manualInit2);
         }
-        do {
-            outOfTokens=(!isTokenChar(code[i]));
-            ++i;
-        } while((!outOfTokens) && i<code.length)
     }
-    return false;
+    return manualInit2;
 }
 
-/// returns a sting defining the arguments arg0...argN and a function bool doSetup(SingleRTest)
+/// returns a string defining the arguments arg0...argN and a function bool doSetup(SingleRTest)
 /// that initializes them
 char[] completeInitStr(S...)(char[] manualInit,char[] checks,char[] indent="    "){
     char[]res="".dup;
-    foreach (i,T;S){
-        res~=indent~T.stringof~" arg"~ctfe_i2a(i)~";\n";
-    }
     res~=indent~"bool doSetup(SingleRTest test){\n";
     char[]indent1=indent~"    ";
     res~=indent1~"Rand r=test.r;\n";
@@ -61,17 +42,17 @@ char[] completeInitStr(S...)(char[] manualInit,char[] checks,char[] indent="    
         res~=indent1~"uint arg"~ctfe_i2a(i)~"_i=test.counter["~ctfe_i2a(i)~"];\n";
     }
     res~=indent1;
-    res~=manualInit;
+    res~=replaceArgI!(S)(manualInit);
     res~="\n";
     foreach (i,T;S){
         char[] argName="arg"~ctfe_i2a(i);
-        if (!hasToken(argName,manualInit)){
-            res~=indent1~"static assert(is(typeof(generateRandom!("~T.stringof~")(new Rand(),arg0_i,arg0_max))),\n";
-            res~=indent1~"    \""~T.stringof~" cannot be automatically generated, missing T generateRandom(T:"~T.stringof~")(Rand r,uint idx,ref uint nEl)\");\n";
-            res~=indent1~argName~"=generateRandom!("~T.stringof~")(r,arg"~
+        if (!ctfe_hasToken(argName,manualInit)){
+            res~=indent1~"static assert(is(typeof(generateRandom!(S["~ctfe_i2a(i)~"])(new Rand(),arg0_i,arg0_max))),\n";
+            res~=indent1~"    \""~T.stringof~" cannot be automatically generated, missing T generateRandom(T:"~T.stringof~")(Rand r,uint idx,ref uint nEl) or RandGen interface.\");\n";
+            res~=indent1~"arg["~ctfe_i2a(i)~"]"~"=generateRandom!(S["~ctfe_i2a(i)~"])(r,arg"~
                 ctfe_i2a(i)~"_i,arg"~ctfe_i2a(i)~"_max);\n";
         }
-        if (!hasToken("argSize"~ctfe_i2a(i),manualInit)){
+        if (!ctfe_hasToken("argSize"~ctfe_i2a(i),manualInit)){
             res~=indent1~"int argSize"~ctfe_i2a(i)~"=0;\n";
         }
     }
@@ -87,7 +68,7 @@ char[] completeInitStr(S...)(char[] manualInit,char[] checks,char[] indent="    
         res~=indent1~"        } else {\n";
         res~=indent1~"            increase=0;\n";
         res~=indent1~"        }\n";
-        res~=indent1~"    } else {";
+        res~=indent1~"    } else {\n";
         res~=indent1~"        test.newCounter["~ctfe_i2a(i)~"]=test.counter["~ctfe_i2a(i)~"];\n";
         res~=indent1~"    }\n";
         res~=indent1~"} else {\n";
@@ -97,7 +78,7 @@ char[] completeInitStr(S...)(char[] manualInit,char[] checks,char[] indent="    
     }
     res~=indent1~"test.didCombinations=increase;\n";
     res~=indent1~"bool acceptable=true;\n";
-    res~=indent1~checks~"\n";
+    res~=indent1~replaceArgI!(S)(checks)~"\n";
     res~=indent1~"return acceptable;\n";
     res~=indent~"}\n";
     return res;
@@ -114,12 +95,7 @@ char[] callF(S...)(char[] retType){
         if (i!=0) res~=",";
         res~=T.stringof;
     }
-    res~="))()(";
-    foreach (i,T;S){
-        if (i!=0) res~=",";
-        res~="arg"~ctfe_i2a(i);
-    }
-    res~=");\n";
+    res~="))()(arg);\n";
     return res;
 }
 
@@ -128,7 +104,7 @@ char[] printArgs(int nargs,char[] printC="Stdout",char[] indent="    "){
     char[] res="".dup;
     res~=indent~"try{\n";
     for (int i=0;i<nargs;++i){
-        res~=indent~"    "~printC~"(\"arg"~ctfe_i2a(i)~": \")(arg"~ctfe_i2a(i)~").newline;\n";
+        res~=indent~"    "~printC~"(\"arg"~ctfe_i2a(i)~": \")(arg["~ctfe_i2a(i)~"]).newline;\n";
     }
     res~=indent~"}catch (Exception e) {\n";
     res~=indent~"    test.failureLog(\"could not print arguments due to exception\")(e).newline;\n";
@@ -519,7 +495,7 @@ class TestCollection: SingleRTest, TestControllerI {
 /// template that checks that the initialization arguments of testInit (manualInit and checkInit)
 /// are compatible with the arguments of the test, and if not gives a nice error message
 template checkTestInitArgs(S...){
-    const validArgs=is(typeof(function(){mixin(completeInitStr!(S)(manualInit,checkInit));}));
+    const validArgs=is(typeof(function(){S arg;mixin(completeInitStr!(S)(manualInit,checkInit));}));
     static if(!validArgs){
         pragma(msg,"invalid arguments to template testInit for the current context.");
         pragma(msg,"context (arguments to generate randomly for the test):"~S.stringof);
@@ -527,8 +503,10 @@ template checkTestInitArgs(S...){
         pragma(msg,"checkInit=`"~checkInit~"`");
         pragma(msg,"and the resulting setup mixin is:`");
         pragma(msg,completeInitStr!(S)(manualInit,checkInit));
-        pragma(msg,"`\n-------------\n");
-        static assert(0,"stopping due to invalid arguments to testInit for current context");
+        pragma(msg,"`");
+        pragma(msg,"actual error message should follow, but might be misleading, have wrong line number,...");
+        pragma(msg,"-------------");
+        // static assert(0,"stopping due to invalid arguments to testInit for current context");
     }
 }
 
@@ -562,12 +540,13 @@ template testInit(char[] manualInit="", char[] checkInit=""){
     {
         mixin checkTestInitArgs!(S);
         TestResult doTest(SingleRTest test){
+            S arg;
             mixin(completeInitStr!(S)(manualInit,checkInit));
             if (!doSetup(test)){
                 return TestResult.Skip;
             }
             try{
-                mixin(callF!(S)("void"));
+                test.baseDelegate.get!(void delegate(S))()(arg);
             }catch (Exception e){
                 test.failureLog("test`")(test.testName)("` failed with exception").newline;
                 test.failureLog(e).newline;
@@ -587,10 +566,11 @@ template testInit(char[] manualInit="", char[] checkInit=""){
     {
         mixin checkTestInitArgs!(S);
         TestResult doTest(SingleRTest test){
+            S arg;
             mixin(completeInitStr!(S)(manualInit,checkInit));
             if (!doSetup(test)) return TestResult.Skip;
             try{
-                mixin(callF!(S)("void"));
+                test.baseDelegate.get!(void delegate(S))()(arg);
             }catch (Exception e){
                 return TestResult.Pass;
             }
@@ -609,10 +589,11 @@ template testInit(char[] manualInit="", char[] checkInit=""){
     {
         mixin checkTestInitArgs!(S);
         TestResult doTest(SingleRTest test){
+            S arg;
             mixin(completeInitStr!(S)(manualInit,checkInit));
             if (!doSetup(test)) return TestResult.Skip;
             try{
-                mixin(callF!(S)("bool"));
+                bool callRes=test.baseDelegate.get!(bool delegate(S))()(arg);
                 if (callRes){
                     return TestResult.Pass;
                 } else {
@@ -639,10 +620,11 @@ template testInit(char[] manualInit="", char[] checkInit=""){
         mixin checkTestInitArgs!(S);
         int nargs=nArgs!(S);
         TestResult doTest(SingleRTest test){
+            S arg;
             mixin(completeInitStr!(S)(manualInit,checkInit));
             if (!doSetup(test)) return TestResult.Skip;
             try{
-                mixin(callF!(S)("bool"));
+                bool callRes=test.baseDelegate.get!(bool delegate(S))()(arg);
                 if (callRes){
                     test.failureLog("test`")(test.testName)("` failed (returned true instead of false)").newline;
                     mixin(printArgs(nArgs!(S),"test.failureLog"));
