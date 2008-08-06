@@ -1083,9 +1083,10 @@ final class RandomG(SourceT=KissCmwc_default): IWritable, IReadable
         T d=alpha-(cast(T)1)/(cast(T)3);
         T c=(cast(T)1)/sqrt(d*cast(T)9);
         for (;;) {
+            T x,v;
             do {
-                T x=n.getRandom();
-                T v=c*x+cast(T)1;
+                x=n.getRandom();
+                v=c*x+cast(T)1;
                 v=v*v*v; // might underflow (in extreme situations) so it is in the loop
             } while (v<=0)
             T u=uniform!(T)();
