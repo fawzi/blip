@@ -16,28 +16,6 @@ template nArgs(T,S...){
     const int nArgs=1+nArgs!(S);
 }
 
-/// compile time integer to string
-char [] ctfe_i2a(int i){
-    char[] digit="0123456789";
-    char[] res="".dup;
-    if (i==0){
-        return "0".dup;
-    }
-    bool neg=false;
-    if (i<0){
-        neg=true;
-        i=-i;
-    }
-    while (i>0) {
-        res=digit[i%10]~res;
-        i/=10;
-    }
-    if (neg)
-        return '-'~res;
-    else
-        return res;
-}
-
 /// identity function
 T Id(T)(T a) { return a; }
 
@@ -68,10 +46,7 @@ template isAtomicType(T)
 
 template isArray(T)
 {
-    static if( is( T U : U[] ) )
-        const isArray = true;
-    else
-        const isArray = false;
+    const bool isArray=is( T U : U[] );
 }
 
 template staticArraySize(T)
@@ -83,10 +58,7 @@ template staticArraySize(T)
 
 template isStaticArray(T)
 {
-    static if( is( typeof(T.init)[(T).sizeof / typeof(T.init).sizeof] == T ) )
-        const isStaticArray = true;
-    else
-        const isStaticArray = false;
+    const bool isStaticArray=is( typeof(T.init)[(T).sizeof / typeof(T.init).sizeof] == T );
 }
 
 template dynArray(T)
@@ -127,3 +99,83 @@ template arrayRank(T) {
     }
 }
 
+// ------- CTFE -------
+
+/// compile time integer to string
+char [] ctfe_i2a(int i){
+    char[] digit="0123456789";
+    char[] res="".dup;
+    if (i==0){
+        return "0".dup;
+    }
+    bool neg=false;
+    if (i<0){
+        neg=true;
+        i=-i;
+    }
+    while (i>0) {
+        res=digit[i%10]~res;
+        i/=10;
+    }
+    if (neg)
+        return '-'~res;
+    else
+        return res;
+}
+
+/// checks is c is a valid token char (also at compiletime), assumes a-z A-Z 1-9 sequences in collation
+bool ctfe_isTokenChar(char c){
+    return (c=='_' || c>='a'&&c<='z' || c>='A'&&c<='Z' || c=='0'|| c>='1' && c<='9');
+}
+
+/// checks if code contains the given token
+bool ctfe_hasToken(char[] token,char[] code){
+    bool outOfTokens=true;
+    int i=0;
+    while(i<code.length){
+        if (outOfTokens){
+            int j=0;
+            for (;((j<token.length)&&(i<code.length));++j,++i){
+                if (code[i]!=token[j]) break;
+            }
+            if (j==token.length){
+                if (i==code.length || !ctfe_isTokenChar(code[i])){
+                    return true;
+                }
+            }
+        }
+        do {
+            outOfTokens=(!ctfe_isTokenChar(code[i]));
+            ++i;
+        } while((!outOfTokens) && i<code.length)
+    }
+    return false;
+}
+
+/// replaces all occurrences of token in code with repl
+char[] ctfe_replaceToken(char[] token,char[] repl,char[] code){
+    char[] res="".dup;
+    bool outOfTokens=true;
+    int i=0,i0;
+    while(i<code.length){
+        i0=i;
+        if (outOfTokens){
+            int j=0;
+            for (;((j<token.length)&&(i<code.length));++j,++i){
+                if (code[i]!=token[j]) break;
+            }
+            if (j==token.length){
+                if (i==code.length || !ctfe_isTokenChar(code[i])){
+                    res~=repl;
+                    i0=i;
+                }
+            }
+        }
+        do {
+            outOfTokens=(!ctfe_isTokenChar(code[i]));
+            ++i;
+        } while((!outOfTokens) && i<code.length)
+        res~=code[i0..i];
+    }
+    return res;
+}
