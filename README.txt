@@ -2,7 +2,8 @@
 = RTest
 == RTest a random testing framework
 
-A framework to quickly write tests that check property/functions using randomly generated data or all combinations of some values.
+A framework to quickly write tests that check property/functions using randomly
+generated data or all combinations of some values.
 
 I wrote this framework inspired by Haskell's Quickcheck, but the result is quite different.
 
@@ -83,20 +84,21 @@ autoInitTst.testTrue("(2*x)%4==0 || (2*x)%4==2 (should fail)",(int x){ return ((
 
 If the default generator is not good enough you can create tests that use a custom generator like this:
 {{{
-    private mixin testInit!(manualInit,checkInit) customTst;
+    private mixin testInit!(checkInit,manualInit) customTst;
 }}}
 in manualInit you have the following variables:
   arg0,arg1,... : variable of the first,second,... argument that you can initialize
     (if you use it you are supposed to initialize it)
   arg0_i,arg1_i,... : index variable for combinatorial (extensive) coverage.
     if you use it you probably want to initialize the next variable
-  arg0_max, arg1_max,...: variable that can be initialized to an uint that gives 
-    the maximum value of arg0_i+1, arg1_i+1,... giving it a non 0 value makes the
-    combinatorial machine work, and does not set test.hasRandom to true for this variable
-If an argument is not defined the default generation procedure
+  arg0_nEl, arg1_nEl,...: variable that can be initialized to an int and defaults to -1 
+    abs(argI_nEl) gives the number of elements of argI_i, if argI_nEl>=0 then a purely
+    combinatorial generation is assumed, and does not set test.hasRandom to true for
+    this variable whereas if argI_nEl<0 a random component in the generation is assumed
+If the argument argI is not used in manualInit the default generation procedure
 {{{
     Rand r=...;
-    argI=generateRandom!(typeof(argI))(r,argI_i,argI_max);
+    argI=generateRandom!(typeof(argI))(r,argI_i,argI_nEl,acceptable);
 }}}
 is used.
 checkInit can be used if the generation of the random configurations is mostly good,
@@ -106,18 +108,20 @@ checkInit can be used if the generation of the random configurations is mostly g
 
 For example:
 {{{
-    private mixin testInit!("arg0=r.uniformR(10);") smallIntTst;
+    private mixin testInit!("acceptable=(arg0%3!=0);","arg0=r.uniformR(10);") smallIntTst;
 }}}
 then gets used as follow:
 {{{
     smallIntTst.testTrue("x*x<100",(int x){ return (x*x<100);},__LINE__,__FILE__).runTests();
 }}}
-by the way this is also a faster way to perform a test, as you can see you don't need to define a collection (but probably it is a good idea to define one)
+by the way this is also a faster way to perform a test, as you can see you don't
+need to define a collection (but probably it is a good idea to define one)
 
 If you end up using custom generators much probably you should define a 
 struct/class/typedef, and use that as input to your testing function and define
-T generateRandom(T:YourType)(Rand r,uint idx,ref uint nEl),
-so that you can use the default automatic generation.
+T generateRandom(T:YourType)(Rand r,int idx,ref int nEl, ref bool acceptable)
+or implement the RandGen interface so that you can use the default automatic generation.
+For a description of generateRandom and RandGen see the module frm.rtest.BasicGenerators.
 
 enjoy
 

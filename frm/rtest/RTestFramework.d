@@ -32,54 +32,54 @@ char[] replaceArgI(S...)(char[] manualInit){
 
 /// returns a string defining the arguments arg0...argN and a function bool doSetup(SingleRTest)
 /// that initializes them
-char[] completeInitStr(S...)(char[] manualInit,char[] checks,char[] indent="    "){
+char[] completeInitStr(S...)(char[] checks,char[] manualInit,char[] indent="    "){
     char[]res="".dup;
     res~=indent~"bool doSetup(SingleRTest test){\n";
     char[]indent1=indent~"    ";
     res~=indent1~"Rand r=test.r;\n";
     foreach (i,T;S){
-        res~=indent1~"uint arg"~ctfe_i2a(i)~"_max=0;\n";
-        res~=indent1~"uint arg"~ctfe_i2a(i)~"_i=test.counter["~ctfe_i2a(i)~"];\n";
+        res~=indent1~"int arg"~ctfe_i2a(i)~"_nEl=-1;\n";
+        res~=indent1~"int arg"~ctfe_i2a(i)~"_i=test.counter["~ctfe_i2a(i)~"];\n";
     }
+    res~=indent1~"bool acceptable=true,acceptableAll=true;\n";
     res~=indent1;
     res~=replaceArgI!(S)(manualInit);
     res~="\n";
     foreach (i,T;S){
         char[] argName="arg"~ctfe_i2a(i);
         if (!ctfe_hasToken(argName,manualInit)){
-            res~=indent1~"static assert(is(typeof(generateRandom!(S["~ctfe_i2a(i)~"])(new Rand(),arg0_i,arg0_max))),\n";
-            res~=indent1~"    \""~T.stringof~" cannot be automatically generated, missing T generateRandom(T:"~T.stringof~")(Rand r,uint idx,ref uint nEl) or RandGen interface.\");\n";
+            res~=indent1~"static assert(is(typeof(generateRandom!(S["~ctfe_i2a(i)~"])(new Rand(),arg0_i,arg0_nEl,acceptable))),\n";
+            res~=indent1~"    \""~T.stringof~" cannot be automatically generated, missing T generateRandom(T:"~T.stringof~")(Rand r,int idx,ref int nEl, ref bool acceptable) or RandGen interface.\");\n";
             res~=indent1~"arg["~ctfe_i2a(i)~"]"~"=generateRandom!(S["~ctfe_i2a(i)~"])(r,arg"~
-                ctfe_i2a(i)~"_i,arg"~ctfe_i2a(i)~"_max);\n";
-        }
-        if (!ctfe_hasToken("argSize"~ctfe_i2a(i),manualInit)){
-            res~=indent1~"int argSize"~ctfe_i2a(i)~"=0;\n";
+                ctfe_i2a(i)~"_i,arg"~ctfe_i2a(i)~"_nEl,acceptable);\n";
+            res~=indent1~"acceptableAll=acceptableAll && acceptable;\n";
         }
     }
     // updateCounter
     res~=indent1~"int increase=1;\n";
     foreach (i,T;S){
-        char[] argName="arg"~ctfe_i2a(i)~"_max";
-        res~=indent1~"if ("~argName~"!=0){\n";
-        res~=indent1~"    if (increase) {\n";
-        res~=indent1~"        test.newCounter["~ctfe_i2a(i)~"]=test.counter["~ctfe_i2a(i)~"]+1;\n";
-        res~=indent1~"        if (test.newCounter["~ctfe_i2a(i)~"]>="~argName~"){\n";
-        res~=indent1~"            test.newCounter["~ctfe_i2a(i)~"]=0;\n";
-        res~=indent1~"        } else {\n";
-        res~=indent1~"            increase=0;\n";
-        res~=indent1~"        }\n";
+        char[] argNEl="arg"~ctfe_i2a(i)~"_nEl";
+        res~=indent1~"if ("~argNEl~"<0) test.hasRandom=true;\n";
+        res~=indent1~"if (increase) {\n";
+        res~=indent1~"    test.newCounter["~ctfe_i2a(i)~"]=test.counter["~ctfe_i2a(i)~"]+1;\n";
+        res~=indent1~"    if (test.newCounter["~ctfe_i2a(i)~"]>=("~argNEl~">0?"~argNEl~":-"~argNEl~")){\n";
+        res~=indent1~"        test.newCounter["~ctfe_i2a(i)~"]=0;\n";
+        res~=indent1~"        if ("~argNEl~"==0){\n"; // skip all, change behaviour, make it equivalent to -1?
+        res~=indent1~"            test.didCombinations=true;\n";
+        res~=indent1~"            test.hasRandom=false;\n";
+        res~=indent1~"            return false;\n";
+        res~=indent1~"        };\n";
         res~=indent1~"    } else {\n";
-        res~=indent1~"        test.newCounter["~ctfe_i2a(i)~"]=test.counter["~ctfe_i2a(i)~"];\n";
+        res~=indent1~"        increase=0;\n";
         res~=indent1~"    }\n";
         res~=indent1~"} else {\n";
-        res~=indent1~"    test.newCounter["~ctfe_i2a(i)~"]=0;\n";
-        res~=indent1~"    test.hasRandom=true;\n";
+        res~=indent1~"    test.newCounter["~ctfe_i2a(i)~"]=test.counter["~ctfe_i2a(i)~"];\n";
         res~=indent1~"}\n";
     }
     res~=indent1~"test.didCombinations=increase;\n";
-    res~=indent1~"bool acceptable=true;\n";
     res~=indent1~replaceArgI!(S)(checks)~"\n";
-    res~=indent1~"return acceptable;\n";
+    res~=indent1~"acceptableAll=acceptableAll && acceptable;\n";
+    res~=indent1~"return acceptableAll;\n";
     res~=indent~"}\n";
     return res;
 }
@@ -492,17 +492,17 @@ class TestCollection: SingleRTest, TestControllerI {
     }
 }
 
-/// template that checks that the initialization arguments of testInit (manualInit and checkInit)
+/// template that checks that the initialization arguments of testInit (checkInit and manualInit)
 /// are compatible with the arguments of the test, and if not gives a nice error message
 template checkTestInitArgs(S...){
-    const validArgs=is(typeof(function(){S arg;mixin(completeInitStr!(S)(manualInit,checkInit));}));
+    const validArgs=is(typeof(function(){S arg;mixin(completeInitStr!(S)(checkInit,manualInit));}));
     static if(!validArgs){
         pragma(msg,"invalid arguments to template testInit for the current context.");
         pragma(msg,"context (arguments to generate randomly for the test):"~S.stringof);
-        pragma(msg,"manualInit=`"~manualInit~"`");
         pragma(msg,"checkInit=`"~checkInit~"`");
+        pragma(msg,"manualInit=`"~manualInit~"`");
         pragma(msg,"and the resulting setup mixin is:`");
-        pragma(msg,completeInitStr!(S)(manualInit,checkInit));
+        pragma(msg,completeInitStr!(S)(checkInit,manualInit));
         pragma(msg,"`");
         pragma(msg,"actual error message should follow, but might be misleading, have wrong line number,...");
         pragma(msg,"-------------");
@@ -516,22 +516,25 @@ template checkTestInitArgs(S...){
 ///     /// auto init using the generating functions available in this context
 ///     private mixin testInit!() autoInitT;
 ///     /// uses an int in [0;10) as first argument, automatic generation for the remaining
-///     private mixin testInit!("arg0=r.uniformR(10);") smallIntT;
+///     private mixin testInit!("","arg0=r.uniformR(10);") smallIntT;
 /// then it gets used as follow:
 ///     autoInitT.testTrue("(2*x)%2==0",(int x){ return ((2*x)%2==0);},__LINE__,__FILE__).runTests();
 ///     smallIntT.testTrue("x*x<10",(int x){ return (x*x<100);},__LINE__,__FILE__).runTests();
+/// checkInit can be used if the generation of the random configurations is mostly good,
+///   but might contain some configurations that should be skipped. In check init one
+///   should set the boolean variable "acceptable" to false if the configuration
+///   should be skipped.
 /// in manualInit you have the following variables:
 ///   arg0,arg1,... : variable of the first,second,... argument that you can initialize
 ///   arg0_i,arg0_i,... : index variable for combinatorial (extensive) coverage.
 ///     if you use it you probably want to initialize the next variable
-///   arg0_max, arg1_max,...: variable that can be initialized to an uint that gives 
-///     the maximum value of arg0_i+1, arg1_i+1,... giving it a non 0 value makes the
-///     combinatorial machine work, and does not set test.hasRandom to true for this variable
-/// checkInit can be used if the generation of the random configurations is mostly good,
-///   but might contain some configurations that should be skipped. In check init one
-///   should set the boolean variable "acceptable" to false if the configutation
-///   should be skipped.
-template testInit(char[] manualInit="", char[] checkInit=""){
+///   arg0_nEl, arg1_nEl,...: variable that can be initialized to an int and defaults to -1 
+///     abs(argI_nEl) gives the number of elements of argI_i, if argI_nEl>=0 then a purely
+///     combinatorial generation is assumed, and does not set test.hasRandom to true for
+///     this variable whereas if argI_nEl<0 a random component in the generation is assumed
+///   acceptable: variable that can be set to false if the actual configuration should be skipped
+///     (never set it unconditionally true)
+template testInit(char[] checkInit="", char[] manualInit=""){
 
     /// creates a test that executes the given function and fails if it throws an exception
     SingleRTest testNoFail(S...)(char[] testName, void delegate(S) testF,long sourceLine=-1,
@@ -541,7 +544,7 @@ template testInit(char[] manualInit="", char[] checkInit=""){
         mixin checkTestInitArgs!(S);
         TestResult doTest(SingleRTest test){
             S arg;
-            mixin(completeInitStr!(S)(manualInit,checkInit));
+            mixin(completeInitStr!(S)(checkInit,manualInit));
             if (!doSetup(test)){
                 return TestResult.Skip;
             }
@@ -567,7 +570,7 @@ template testInit(char[] manualInit="", char[] checkInit=""){
         mixin checkTestInitArgs!(S);
         TestResult doTest(SingleRTest test){
             S arg;
-            mixin(completeInitStr!(S)(manualInit,checkInit));
+            mixin(completeInitStr!(S)(checkInit,manualInit));
             if (!doSetup(test)) return TestResult.Skip;
             try{
                 test.baseDelegate.get!(void delegate(S))()(arg);
@@ -590,7 +593,7 @@ template testInit(char[] manualInit="", char[] checkInit=""){
         mixin checkTestInitArgs!(S);
         TestResult doTest(SingleRTest test){
             S arg;
-            mixin(completeInitStr!(S)(manualInit,checkInit));
+            mixin(completeInitStr!(S)(checkInit,manualInit));
             if (!doSetup(test)) return TestResult.Skip;
             try{
                 bool callRes=test.baseDelegate.get!(bool delegate(S))()(arg);
@@ -621,7 +624,7 @@ template testInit(char[] manualInit="", char[] checkInit=""){
         int nargs=nArgs!(S);
         TestResult doTest(SingleRTest test){
             S arg;
-            mixin(completeInitStr!(S)(manualInit,checkInit));
+            mixin(completeInitStr!(S)(checkInit,manualInit));
             if (!doSetup(test)) return TestResult.Skip;
             try{
                 bool callRes=test.baseDelegate.get!(bool delegate(S))()(arg);

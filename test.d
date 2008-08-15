@@ -9,11 +9,11 @@ import frm.TemplateFu;
 private int[4] specialNrs=[0,2,5,8];
 
 private mixin testInit!() autoInitTst; 
-private mixin testInit!("","acceptable= int.max/2>=arg0 && arg0>=0;") posArg0Tst; 
-private mixin testInit!("arg0=r.uniformRSymm(10);") smallIntTst;
-private mixin testInit!("","acceptable= 10>arg0 && arg0>-10;") smallIntSkipTst; // very unlikely
-private mixin testInit!(`arg0=specialNrs[arg0_i]; arg0_max=specialNrs.length;
-arg1=specialNrs[arg1_i]; arg1_max=specialNrs.length;`) combNrTst; // combinatorial cases
+private mixin testInit!("acceptable= int.max/2>=arg0 && arg0>=0;") posArg0Tst; 
+private mixin testInit!("","arg0=r.uniformRSymm(10);") smallIntTst;
+private mixin testInit!("acceptable= 10>arg0 && arg0>-10;") smallIntSkipTst; // very unlikely
+private mixin testInit!("",`arg0=specialNrs[arg0_i]; arg0_nEl=specialNrs.length;
+arg1=specialNrs[arg1_i]; arg1_nEl=specialNrs.length;`) combNrTst; // combinatorial cases
 
 void main(){
     Print!(char) nullPrt=new FormatOutput(new NullStream());

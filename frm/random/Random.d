@@ -761,7 +761,6 @@ final class RandomG(SourceT=KissCmwc_default): IWritable, IReadable
                             nV=cast(int)source.next;
                             if (nV<dTo&&nV>-dTo) break;
                         }
-                        Stdout("nV:")(nV)(" dTo:")(dTo).newline;
                         assert(nV<dTo && nV>-dTo,"this is less probable than 1.e-301, something is wrong with the random number generator");
                         el=cast(T)(nV% cast(int)to);
                     }
