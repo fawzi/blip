@@ -143,6 +143,7 @@ import frm.random.engines.CMWC;
 import frm.random.engines.KissCmwc;
 import frm.random.NormalSource;
 import frm.random.ExpSource;
+import frm.TemplateFu: ctfe_powI;
 
 version (Win32)
          private extern(Windows) int QueryPerformanceCounter (ulong *);
@@ -154,18 +155,6 @@ version (Posix)
 
 version(darwin) { version=has_urandom; }
 version(linux)  { version=has_urandom; }
-
-/// compile time integer power
-private T powI(T)(T x,int p){
-    T xx=cast(T)1;
-    if (p<0){
-        p=-p;
-        x=1/x;
-    }
-    for (int i=0;i<p;++i)
-        xx*=x;
-    return xx;
-}
 
 /// if T is a float
 template isFloat(T){
@@ -274,11 +263,11 @@ final class RandomG(SourceT=KissCmwc_default): IWritable, IReadable
         } else static if (is(T==long) || is (T==ulong)){
             return cast(T)source.nextL;
         } else static if (is(T==bool)){
-            return source.next & 1u; // check lowest bit
+            return cast(bool)(source.next & 1u); // check lowest bit
         } else static if (is(T==float)){
             static assert(T.mant_dig<32,"float mantissa expected to be at most 32 bit");
             const T halfT=(cast(T)1)/(cast(T)2);
-            const T fact32=powI(halfT,32);
+            const T fact32=ctfe_powI(halfT,32);
             const uint minV=1u<<(T.mant_dig-1);
             uint nV=source.next;
             if (nV>=minV) {
@@ -308,8 +297,8 @@ final class RandomG(SourceT=KissCmwc_default): IWritable, IReadable
             static if (T.mant_dig>62) {
                 static assert(T.mant_dig<=64,T.stringof~" matissa larger than 64 bits");
                 const T halfT=(cast(T)1)/(cast(T)2);
-                const T fact8=powI(halfT,8);
-                const T fact72=powI(halfT,72);
+                const T fact8=ctfe_powI(halfT,8);
+                const T fact72=ctfe_powI(halfT,72);
                 ubyte nB=source.nextB;
                 if (nB!=0){
                     T res=nB*fact8+source.nextL*fact72;
@@ -321,7 +310,7 @@ final class RandomG(SourceT=KissCmwc_default): IWritable, IReadable
                         return res;
                     }
                 } else { // probability 0.00390625
-                    const T fact64=powI(halfT,64);
+                    const T fact64=ctfe_powI(halfT,64);
                     T scale=fact8;
                     while (nB==0){
                         nB=source.nextB;
@@ -340,7 +329,7 @@ final class RandomG(SourceT=KissCmwc_default): IWritable, IReadable
                 static assert(32<T.mant_dig && T.mant_dig<=64,T.stringof~
                     " mantissa sizes larger than 64 bits or smaller than 32 not suported");
                 const T halfT=(cast(T)1)/(cast(T)2);
-                const T fact64=powI(halfT,64);
+                const T fact64=ctfe_powI(halfT,64);
                 const ulong minV=1UL<<(T.mant_dig-1);
                 ulong nV=source.nextL;
                 if (nV>=minV) {
@@ -353,7 +342,7 @@ final class RandomG(SourceT=KissCmwc_default): IWritable, IReadable
                         return res;
                     }
                 } else { // probability 0.00048828125 for 53 bit mantissa
-                    const T fact32=powI(halfT,32);
+                    const T fact32=ctfe_powI(halfT,32);
                     const ulong minV2=1UL<<(T.mant_dig-33);
                     if (nV>=minV2){
                         return ((cast(T)nV)+(cast(T)source.next)*fact32)*fact64;
@@ -467,7 +456,7 @@ final class RandomG(SourceT=KissCmwc_default): IWritable, IReadable
         } else static if (is(T==float)){
             static assert(T.mant_dig<32,"float mantissa expected to be at most 32 bit");
             const T halfT=(cast(T)1)/(cast(T)2);
-            const T fact32=powI(halfT,32);
+            const T fact32=ctfe_powI(halfT,32);
             const uint minV=1u<<T.mant_dig;
             uint nV=source.next;
             if (nV>=minV) {
@@ -498,8 +487,8 @@ final class RandomG(SourceT=KissCmwc_default): IWritable, IReadable
             static if (T.mant_dig>62) {
                 static assert(T.mant_dig<=64,T.stringof~" matissa larger than 64 bits");
                 const T halfT=(cast(T)1)/(cast(T)2);
-                const T fact8=powI(halfT,8);
-                const T fact72=powI(halfT,72);
+                const T fact8=ctfe_powI(halfT,8);
+                const T fact72=ctfe_powI(halfT,72);
                 ubyte nB=source.nextB;
                 if (nB!=0){
                     ulong nL=source.nextL;
@@ -512,7 +501,7 @@ final class RandomG(SourceT=KissCmwc_default): IWritable, IReadable
                         return (1-2*cast(int)(nL&1UL))*res;
                     }
                 } else { // probability 0.00390625
-                    const T fact64=powI(halfT,64);
+                    const T fact64=ctfe_powI(halfT,64);
                     T scale=fact8;
                     while (nB==0){
                         nB=source.nextB;
@@ -532,7 +521,7 @@ final class RandomG(SourceT=KissCmwc_default): IWritable, IReadable
                 static assert(32<T.mant_dig && T.mant_dig<=63,T.stringof~
                     " mantissa sizes larger than 64 bits or smaller than 32 not suported");
                 const T halfT=(cast(T)1)/(cast(T)2);
-                const T fact64=powI(halfT,64);
+                const T fact64=ctfe_powI(halfT,64);
                 const ulong minV=1UL<<(T.mant_dig);
                 ulong nV=source.nextL;
                 if (nV>=minV) {
@@ -545,7 +534,7 @@ final class RandomG(SourceT=KissCmwc_default): IWritable, IReadable
                         return (1-2*cast(int)(nV&1UL))*res;
                     }
                 } else { // probability 0.00048828125 for 53 bit mantissa
-                    const T fact32=powI(halfT,32);
+                    const T fact32=ctfe_powI(halfT,32);
                     const ulong minV2=1UL<<(T.mant_dig-32);
                     if (nV>=minV2){
                         uint nV2=source.next;

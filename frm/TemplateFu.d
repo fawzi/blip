@@ -61,6 +61,7 @@ template isStaticArray(T)
     const bool isStaticArray=is( typeof(T.init)[(T).sizeof / typeof(T.init).sizeof] == T );
 }
 
+/// returns a dynamic array
 template dynArray(T)
 {
     static if( isStaticArray!(T) )
@@ -69,6 +70,15 @@ template dynArray(T)
         alias T dynArray;
     else
         alias T[] dynArray;
+}
+
+/// transform eventual static arrays to dynamic ones
+template noStaticArray(T)
+{
+    static if( isStaticArray!(T) )
+        alias typeof(T.dup) noStaticArray;
+    else
+        alias T noStaticArray;
 }
 
 /// Strips the []'s off of a type.
@@ -178,4 +188,16 @@ char[] ctfe_replaceToken(char[] token,char[] repl,char[] code){
         res~=code[i0..i];
     }
     return res;
+}
+
+/// compile time integer power
+T ctfe_powI(T)(T x,int p){
+    T xx=cast(T)1;
+    if (p<0){
+        p=-p;
+        x=1/x;
+    }
+    for (int i=0;i<p;++i)
+        xx*=x;
+    return xx;
 }

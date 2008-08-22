@@ -68,23 +68,13 @@ debug(UnitTest){
 }
 
 T[] printToString(T)(void delegate(Print!(T))w){
-    GrowBuffer buf=new GrowBuffer(capacity);
-    Print!(T) stringIO=new FormatOutput(buf);
-    w(stringIO);
-    stringIO.flush();
-    void[] data=buf.slice();
-    assert(data.length%T.sizeof==0,"invalid (fractional) size in printToString buffer");
-    T[] res=(cast(T*)data.ptr)[0..(data.length/t.sizeof)];
-    return res;
+    StringIO!(T) s=new StringIO!(T)();
+    w(s);
+    return s.getString();
 }
 
 T[] printToString(T)(Print!(T) delegate(Print!(T))w){
-    GrowBuffer buf=new GrowBuffer(capacity);
-    Print!(T) stringIO=new FormatOutput(buf);
-    w(stringIO);
-    stringIO.flush();
-    void[] data=buf.slice();
-    assert(data.length%T.sizeof==0,"invalid (fractional) size in printToString buffer");
-    T[] res=(cast(T*)data.ptr)[0..(data.length/t.sizeof)];
-    return res;
+    StringIO!(T) s=new StringIO!(T)();
+    w(s);
+    return s.getString();
 }
