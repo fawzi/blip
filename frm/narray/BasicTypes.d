@@ -1,40 +1,47 @@
-/+
-+ N dimensional dense rectangular arrays
-+
-+ Inspired by muarray by William V. Baxter (III) with hints of 
-+ numpy, and haskell GSL/Matrix Library, but evolved to something of quite different
-+
-+ - rank must be choosen at compiletime -> smart indexing possible
-+ - sizes can be choosen at runtime -> no compile time size
-+   (overhead should be acceptable for all but the smallest arrays)
-+ - a given array has fixed startIdx, and strides (in D 2.0 these should be invariant)
-+ - also the rest of the structure should be as "fixed" as possible.
-+ - at the moment only the underlying array is modified after creation when using
-+   subviews, but in the future also this might go away.
-+ - generic efficent looping templates are available.
-+ - store array not pointer (safer, but might be changed in the future)
-+ - structure not class (faster, but might be changed)
-+ Rationale:
-+ - indexing should be as fast as possible (if one uses multidimensional arrays
-+   probably indexing is going to be important to him) -> fixed rank, invariant strides
-+ - close to optimal (performacewise) looping should be easy to perform -> generic looping templates
-+ - A good compiler should be able to move most of indexing out of a loop -> invariant strides
-+ - avoid copying as much as possible (lots of operations guaranteed to return a view).
-+
-+ all operation assume that there is *no* overlap between parst that are assigned and those
-+ that are read (for example assignement of an array to itself has an undefined behaviour)
-+
-+ author: Fawzi Mohamed
-+/
-
+/*******************************************************************************
+    N dimensional dense rectangular arrays
+    
+    Inspired by muarray by William V. Baxter (III) with hints of 
+    numpy, and haskell GSL/Matrix Library, but evolved to something of quite different
+    
+    - rank must be choosen at compiletime -> smart indexing possible
+    - sizes can be choosen at runtime -> no compile time size
+      (overhead should be acceptable for all but the smallest arrays)
+    - a given array has fixed startIdx, and strides (in D 2.0 these should be invariant)
+    - also the rest of the structure should be as "fixed" as possible.
+    - at the moment only the underlying array is modified after creation when using
+      subviews, but in the future also this might go away.
+    - generic efficent looping templates are available.
+    - store array not pointer (safer, but might be changed in the future)
+    - structure not class (faster, but might be changed)
+    Rationale:
+    - indexing should be as fast as possible (if one uses multidimensional arrays
+      probably indexing is going to be important to him) -> fixed rank, invariant strides
+    - close to optimal (performacewise) looping should be easy to perform -> generic looping templates
+    - A good compiler should be able to move most of indexing out of a loop -> invariant strides
+    - avoid copying as much as possible (lots of operations guaranteed to return a view).
+    
+    all operation assume that there is *no* overlap between parst that are assigned and those
+    that are read (for example assignement of an array to itself has an undefined behaviour)
+    
+    Possible changes: I might switch to a struct+class to keep a pointer to non gc memory
+      (should be a little bit faster)
+    
+    copyright:      Copyright (c) 2008. Fawzi Mohamed
+    license:        BSD style: $(LICENSE)
+    version:        Initial release: July 2008
+    author:         Fawzi Mohamed
+*******************************************************************************/
 module frm.narray.BasicTypes;
 import tango.stdc.stdlib: calloc,free,realloc;
 import tango.core.Array: sort;
 import tango.stdc.string: memset,memcpy,memcmp;
 import frm.TemplateFu;
-import tango.io.Print:Print;
-import tango.io.stream.FormatStream:FormatOutput;
-import tango.io.Buffer:GrowBuffer;
+import tango.io.Print: Print;
+import tango.io.stream.FormatStream: FormatOutput;
+import tango.io.Buffer: GrowBuffer;
+import tango.math.Math: abs;
+import frm.rtest.RTest;
 
 /// flags for fast checking of 
 enum ArrayFlags {
@@ -125,7 +132,7 @@ template NArray(V=double,int rank=1){
 static if (rank<1)
     alias V NArray;
 else {
-    final class NArray
+    final class NArray : RandGen
     {
         alias V dtype;
         alias ArrayFlags Flags;
@@ -969,11 +976,11 @@ else {
         
         /// Returns a copy of the given type (if the type is the same return itself)
         NArray!(S,rank)asType(S)(){
-            static if(is(S==T)){
+            static if(is(S==V)){
                 return this;
             } else {
                 auto res=NArray!(S,rank).empty(mShape);
-                binaryOpStr!("*aPtr0=cast("~S.stringof~")*bPtr0;",rank,V,V)(res,this);
+                binaryOpStr!("*aPtr0=cast("~S.stringof~")*bPtr0;",rank,S,V)(res,this);
                 return res;
             }
         }
@@ -1373,6 +1380,25 @@ else {
             }
             return NArray(newstrides,newshape,newStartIdx,mData,newFlags,newBase);
         }
+        
+        /// returns a random array (here with randNArray & co due to bug 2246)
+        static NArray randomGenerate(Rand r,int idx,ref int nEl, ref bool acceptable){
+            const index_type maxSize=1_000_000;
+            float mean=10.0f;
+            index_type[rank] dims;
+            index_type totSize;
+            do {
+                foreach (ref el;dims){
+                    el=cast(index_type)r.gamma(mean);;
+                }
+                totSize=1;
+                foreach (el;dims)
+                    totSize*=el;
+                mean*=(cast(float)maxSize)/(cast(float)totSize);
+            } while (totSize>maxSize)
+            NArray res=NArray.empty(dims);
+            return randNArray(r,res);
+        }
     }
 }// end static if
 }// end template NArray
@@ -1553,20 +1579,21 @@ char [] pLoopIdx(int rank,char[][] arrayNames,char[][] startIdxs,
     }
     assert(arrayNamesDot.length==arrayNames.length);
     if(hasNamesDot)
-        res~=indent~"commonFlags=";
+        res~=indent~"commonFlags"~ivarStr~"=";
     else
-        res~=indent~"uint commonFlags=";
+        res~=indent~"uint commonFlags"~ivarStr~"=";
     foreach (i,arrayName;arrayNames){
         res~=arrayNameDot(arrayName)~"mFlags";
         if (i!=arrayNames.length-1) res~=" & ";
     }
     res~=";\n";
-    res~=indent~"if (commonFlags&(ArrayFlags.Contiguous|ArrayFlags.Fortran) ||\n";
-    res~=indent2~"commonFlags&(ArrayFlags.Small | ArrayFlags.Compact)==ArrayFlags.Compact\n";
+    res~=indent~"if ("~arrayNameDot(arrayNames[0])~"mData !is null &&\n";
+    res~=indent~"    (commonFlags"~ivarStr~"&(ArrayFlags.Contiguous|ArrayFlags.Fortran) ||\n";
+    res~=indent~"    commonFlags"~ivarStr~"&(ArrayFlags.Small | ArrayFlags.Compact)==ArrayFlags.Compact\n";
     res~=indent2;
     for (int i=1;i<arrayNames.length;i++)
         res~="&& "~arrayNameDot(arrayNames[0])~"mStrides=="~arrayNameDot(arrayNames[i])~"mStrides ";
-    res~="){\n";
+    res~=")){\n";
     res~=indent2~"index_type "~ivarStr~"_0;\n";
     res~=indent2~"index_type "~ivarStr~"Length="~arrayNameDot(arrayNames[0])~"mData.length;\n";
     foreach(i,arrayName;arrayNames){
@@ -1579,14 +1606,14 @@ char [] pLoopIdx(int rank,char[][] arrayNames,char[][] startIdxs,
     res~=indent2~"}\n";
     res~=indent~"}";
     if(!hasNamesDot && arrayNames.length==1){
-        res~=" else if (commonFlags&ArrayFlags.Large){\n";
+        res~=" else if (commonFlags"~ivarStr~"&ArrayFlags.Large){\n";
         res~=indent2~"typeof("~arrayNames[0]~") "~arrayNames[0]~"_opt_="
             ~arrayNamesDot[0]~"optAxisOrder;\n";
         char[][] newNamesDot=[arrayNames[0]~"_opt_."];
         res~=pLoopIdx(rank,arrayNames,startIdxs,loopBody,ivarStr,newNamesDot,[],indent2);
         res~=indent~"}";
     } else if ((!hasNamesDot) && arrayNames.length>1 && optAccess.length>0){
-        res~=" else if (commonFlags&ArrayFlags.Large){\n";
+        res~=" else if (commonFlags"~ivarStr~"&ArrayFlags.Large){\n";
         res~=indent2~"int[rank] perm,invert;\n";
         res~=indent2~"findOptAxisTransform(perm,invert,[";
         foreach(i,iArr;optAccess){
@@ -1632,16 +1659,16 @@ char [] pLoopPtr(int rank,char[][] arrayNames,char[][] startIdxs,
     }
     assert(arrayNamesDot.length==arrayNames.length);
     if(hasNamesDot)
-        res~=indent~"commonFlags=";
+        res~=indent~"commonFlags"~ivarStr~"=";
     else
-        res~=indent~"uint commonFlags=";
+        res~=indent~"uint commonFlags"~ivarStr~"=";
     foreach (i,arrayNameD;arrayNamesDot){
         res~=arrayNameD~"mFlags";
         if (i!=arrayNamesDot.length-1) res~=" & ";
     }
     res~=";\n";
-    res~=indent~"if (commonFlags&(ArrayFlags.Contiguous|ArrayFlags.Fortran) ||\n";
-    res~=indent2~"commonFlags&(ArrayFlags.Small | ArrayFlags.Compact)==ArrayFlags.Compact\n";
+    res~=indent~"if (commonFlags"~ivarStr~"&(ArrayFlags.Contiguous|ArrayFlags.Fortran) ||\n";
+    res~=indent2~"commonFlags"~ivarStr~"&(ArrayFlags.Small | ArrayFlags.Compact)==ArrayFlags.Compact\n";
     res~=indent2;
     for (int i=1;i<arrayNamesDot.length;i++)
         res~="&& "~arrayNamesDot[0]~"mStrides=="~arrayNamesDot[i]~"mStrides ";
@@ -1657,14 +1684,14 @@ char [] pLoopPtr(int rank,char[][] arrayNames,char[][] startIdxs,
     res~=indent2~"}\n";
     res~=indent~"}";
     if(!hasNamesDot && arrayNames.length==1){
-        res~=" else if (commonFlags&ArrayFlags.Large){\n";
+        res~=" else if (commonFlags"~ivarStr~"&ArrayFlags.Large){\n";
         res~=indent2~"typeof("~arrayNames[0]~") "~arrayNames[0]~"_opt_="
             ~arrayNamesDot[0]~"optAxisOrder;\n";
         char[][] newNamesDot=[arrayNames[0]~"_opt_."];
         res~=pLoopPtr(rank,arrayNames,startIdxs,loopBody,ivarStr,newNamesDot,[],indent2);
         res~=indent~"}";
     } else if ((!hasNamesDot) && arrayNames.length>1 && optAccess.length>0){
-        res~=" else if (commonFlags&ArrayFlags.Large){\n";
+        res~=" else if (commonFlags"~ivarStr~"&ArrayFlags.Large){\n";
         res~=indent2~"int[rank] perm,invert;\n";
         res~=indent2~"findOptAxisTransform(perm,invert,[";
         foreach(i,iArr;optAccess){
@@ -1699,12 +1726,12 @@ char [] sLoopIdx(int rank,char[][] arrayNames,char[][] startIdxs,
     if (arrayNames.length==0)
         return "".dup;
     char[] res="".dup;
-    res~="    uint commonFlags=";
+    res~="    uint commonFlags"~ivarStr~"=";
     foreach (i,arrayName;arrayNames){
         res~=arrayNameDot(arrayName)~"mFlags";
         if (i!=arrayNames.length-1) res~=" & ";
     }
-    res~=";\n    if (commonFlags&ArrayFlags.Contiguous){\n";
+    res~=";\n    if (commonFlags"~ivarStr~"&ArrayFlags.Contiguous){\n";
     foreach (i,arrayName;arrayNames){
         res~="        "~arrayNameDot(arrayName)~"dtype * "~arrayName~"BasePtr="~arrayNameDot(arrayName)~"mData.ptr;\n";
     }
@@ -1728,12 +1755,12 @@ char [] sLoopPtr(int rank,char[][] arrayNames,char[][] startIdxs,
     if (arrayNames.length==0)
         return "".dup;
     char[] res="".dup;
-    res~="    uint commonFlags=";
+    res~="    uint commonFlags"~ivarStr~"=";
     foreach (i,arrayName;arrayNames){
         res~=arrayNameDot(arrayName)~"mFlags";
         if (i!=arrayNames.length-1) res~=" & ";
     }
-    res~=";\n    if (commonFlags&ArrayFlags.Contiguous){\n";
+    res~=";\n    if (commonFlags"~ivarStr~"&ArrayFlags.Contiguous){\n";
     foreach (i,arrayName;arrayNames){
         res~="        "~arrayNameDot(arrayName)~"dtype * "~arrayName~"Ptr0="~arrayNameDot(arrayName)~"mData.ptr;\n";
     }
@@ -1839,5 +1866,82 @@ body {
             }
         }
     }
+}
+/+ ------------------------------------------------- +/
+// array randomization (here because due to bug 2246 in the 
+// compiler the specialization of randomGenerate does not work,
+// and it uses the RandGen interface)
+
+/// randomizes the content of the array
+NArray!(T,rank) randomizeNArray(RandG,T,int rank)(RandG r,NArray!(T,rank)a){
+    if (a.mFlags | ArrayFlags.Compact){
+        r.randomize(a.mData);
+    } else {
+        mixin unaryOpStr!("r.randomize(*aPtr0);",rank,T);
+        unaryOpStr(a);
+    }
+    return a;
+}
+/// returns a random array of the given size with the given distribution
+template randomNArray(T){
+    NArray!(T,rkOfShape!(S))randomNArray(RandG,S)(RandG r,S dim){
+        static if (arrayElT!(S)==index_type){
+            alias dim mdim;
+        } else {
+            index_type[rkOfShape!(S)] mdim;
+            foreach (i,ref el;mdim)
+                el=dim[i];
+        }
+        NArray!(T,rkOfShape!(S)) res=NArray!(T,rkOfShape!(S)).empty!(T)(mdim);
+        return randomizeNArray(r,res);
+    }
+}
+/// returns a random array of the given size with normal (signed values)
+/// or exp (unsigned values) distribued numbers.
+NArray!(T,rank) randNArray(T,int rank)(Rand r, NArray!(T,rank) a){
+    static if (is(T==float)|| is(T==double)||is(T==real)){
+        auto source=r.normalD(cast(T)3.0);
+    }else static if (is(T==ubyte)||is(T==uint)||is(T==ulong)) {
+        auto source=r.expD(10.0);
+    } else {
+        auto source=r.normalD(30.0);
+    }
+    return randomizeNArray(source,a);
+}
+
+/// returns a new array with the same content as a, but with a random layout
+/// (row ordering, loop order, strides,...)
+NArray!(T,rank) randLayout(T,int rank)(Rand r, NArray!(T,rank)a){
+    if (a.size==0) return a;
+    int[rank] permutation,rest;
+    foreach (i,ref el;rest)
+        el=i;
+    foreach (i,ref el;permutation){
+        int pRest=r.uniformR(rank-i);
+        permutation[i]=rest[pRest];
+        rest[pRest]=rest[rank-i-1];
+    }
+    index_type[rank] gaps;
+    index_type[] g=gaps[];
+    r.normalD(1.0).randomize(g);
+    foreach(ref el;gaps){
+        if (el==0 || el>5 || el<-5) el=1;
+    }
+    index_type newStartIdx=0;
+    index_type[rank] newStrides;
+    index_type sz=1;
+    foreach(perm;permutation){
+        newStrides[perm]=sz*gaps[perm];
+        sz*=a.mShape[perm]*abs(gaps[perm]);
+        if (gaps[perm]<0) {
+            newStartIdx+=-(a.mShape[perm]-1)*newStrides[perm];
+        }
+    }
+    auto base=NArray!(T,1).empty([sz]);
+    auto res=NArray!(T,rank)(newStrides,a.mShape,newStartIdx,
+        base.mData,a.newFlags&~ArrayFlags.ReadOnly,base.newBase);
+    res[]=a;
+    res.mFlags|=(a.mFlags&ArrayFlags.ReadOnly);
+    return res;
 }
 /+ ------------------------------------------------- +/

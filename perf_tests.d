@@ -87,7 +87,7 @@ void main(char [][] argv)
     auto t1=timer.stop();
     
     foreach(i,t;res)
-        if (abs(t-res2[i])>1.e-13) Stdout.format("error1 {} {} {}",i,t,res2[i]).newline;
+        if (!(abs(t-res2[i])<1.e-13)) Stdout.format("error1 {} {} {}",i,t,res2[i]).newline;
         
     res[]=0.0L;
     timer.start();
@@ -98,7 +98,7 @@ void main(char [][] argv)
     }
     auto t2=timer.stop();
     foreach(i,t;res)
-        if (abs(t-res2[i])>1.e-13) Stdout.format("error2 {} {} {}",i,t,res2[i]).newline;
+        if (!(abs(t-res2[i])<1.e-13)) Stdout.format("error2 {} {} {}",i,t,res2[i]).newline;
     
     array c1=ones!(double)([ndim,ndim,ndim]);
     array c2=ones!(double)([1,ndim,ndim]);
@@ -111,7 +111,7 @@ void main(char [][] argv)
     }
     auto t3=timer.stop();
     foreach(i,t;res)
-        if (abs(t-res2[i])>1.e-13) Stdout.format("error3 {} {} {}",i,t,res2[i]).newline;
+        if (!(abs(t-res2[i])<1.e-13)) Stdout.format("error3 {} {} {}",i,t,res2[i]).newline;
     
     res[]=0.0L;
     timer.start();
@@ -123,7 +123,7 @@ void main(char [][] argv)
     }
     auto t4=timer.stop();
     foreach(i,t;res)
-        if (abs(t-res2[i])>1.e-13) Stdout.format("error4 {} {} {}",i,t,res2[i]).newline;
+        if (!(abs(t-res2[i])<1.e-13)) Stdout.format("error4 {} {} {}",i,t,res2[i]).newline;
     
     res[]=0.0L;
     timer.start();
@@ -137,7 +137,7 @@ void main(char [][] argv)
     }
     auto t5=timer.stop();
     foreach(i,t;res)
-        if (abs(t-res2[i])>1.e-13) Stdout.format("error5 {} {} {}",i,t,res2[i]).newline;
+        if (!(abs(t-res2[i])<1.e-13)) Stdout.format("error5 {} {} {}",i,t,res2[i]).newline;
     
     // smart compiler
     res[]=0.0L;
@@ -154,7 +154,7 @@ void main(char [][] argv)
     }
     auto t6=timer.stop();
     foreach(i,t;res)
-        if (abs(t-res2[i])>1.e-13) Stdout.format("error6 {} {} {}",i,t,res2[i]).newline;
+        if (!(abs(t-res2[i])<1.e-13)) Stdout.format("error6 {} {} {}",i,t,res2[i]).newline;
     
     res[]=0.0L;
     timer.start();
@@ -170,7 +170,7 @@ void main(char [][] argv)
     }
     auto t7=timer.stop();
     foreach(i,t;res)
-        if (abs(t-res2[i])>1.e-13) Stdout.format("error7 {} {} {}",i,t,res2[i]).newline;
+        if (!(abs(t-res2[i])<1.e-13)) Stdout.format("error7 {} {} {}",i,t,res2[i]).newline;
 
     // check removal of multiplication by compiler
     res[]=0.0L;
@@ -194,7 +194,7 @@ void main(char [][] argv)
     }
     auto t8=timer.stop();
     foreach(i,t;res)
-        if (abs(t-res2[i])>1.e-13) Stdout.format("error8 {} {} {}",i,t,res2[i]).newline;
+        if (!(abs(t-res2[i])<1.e-13)) Stdout.format("error8 {} {} {}",i,t,res2[i]).newline;
     
     res[]=0.0L;
     alias NArray!(double,3) NArr;
@@ -208,7 +208,7 @@ void main(char [][] argv)
     }
     auto t9=timer.stop();
     foreach(i,t;res)
-        if (abs(t-res2[i])>1.e-13) Stdout.format("error9 {} {} {}",i,t,res2[i]).newline;
+        if (!(abs(t-res2[i])<1.e-13)) Stdout.format("error9 {} {} {}",i,t,res2[i]).newline;
     
     res[]=0.0L;
     timer.start();
@@ -220,7 +220,7 @@ void main(char [][] argv)
     }
     auto t10=timer.stop();
     foreach(i,t;res)
-        if (abs(t-res2[i])>1.e-13) Stdout.format("error10 {} {} {}",i,t,res2[i]).newline;
+        if (!(abs(t-res2[i])<1.e-13)) Stdout.format("error10 {} {} {}",i,t,res2[i]).newline;
     
     res[]=0.0L;
     timer.start();
@@ -231,7 +231,7 @@ void main(char [][] argv)
     }
     auto t11=timer.stop();
     foreach(i,t;res)
-        if (abs(t-res2[i])>1.e-13) Stdout.format("error11 {} {} {}",i,t,res2[i]).newline;
+        if (!(abs(t-res2[i])<1.e-13)) Stdout.format("error11 {} {} {}",i,t,res2[i]).newline;
     
     res[]=0.0L;
     timer.start();
@@ -243,7 +243,7 @@ void main(char [][] argv)
     }
     auto t12=timer.stop();
     foreach(i,t;res)
-        if (abs(t-res2[i])>1.e-13) Stdout.format("error11 {} {} {}",i,t,res2[i]).newline;
+        if (!(abs(t-res2[i])<1.e-13)) Stdout.format("error11 {} {} {}",i,t,res2[i]).newline;
 
     Stdout("tref: contiguous pointer loop").newline;
     Stdout("t1: index loop on struct").newline;

@@ -1,7 +1,103 @@
+/*******************************************************************************
+    Tests for NArray
+        copyright:      Copyright (c) 2008. Fawzi Mohamed
+        license:        BSD style: $(LICENSE)
+        version:        Initial release: July 2008
+        author:         Fawzi Mohamed
+*******************************************************************************/
 module frm.narray.Test;
 import frm.narray.NArray;
 import frm.TemplateFu;
 import tango.io.Stdout;
+import frm.Stringify;
+import tango.math.Math: abs;
+import frm.rtest.RTest;
+
+/// creates arrays that can be dotted with each other along the given axis
+/// useful mainly for random tests
+/// startAxis1 defalt should be -1, but negative default values have a bug with gdc (#2291)
+class Dottable(T,int rank1,S,int rank2,bool scanAxis=false, bool randomLayout=false,
+    int startAxis1=0,int startAxis2=0): RandGen{
+    static assert(rank1>0 && rank2>0,"ranks must be strictly positive");
+    static assert(-rank1<=startAxis1 && startAxis1<rank1,"startAxis1 out of bounds");
+    static assert(-rank2<=startAxis2 && startAxis2<rank2,"startAxis2 out of bounds");
+    index_type k;
+    int axis1,axis2;
+    NArray!(T,rank1) a;
+    NArray!(S,rank2) b;
+    this(NArray!(T,rank1) a,NArray!(S,rank2) b,int axis1=startAxis1,int axis2=startAxis2)
+    {
+        assert(-rank1<=axis1 && axis1<rank1,"axis1 out of bounds");
+        assert(-rank2<=axis2 && axis2<rank2,"axis2 out of bounds");
+        assert(a.shape[((axis1<0)?(rank1+axis1):axis1)]==b.shape[((axis2<0)?(rank2+axis2):axis2)],
+            "incompatible sizes");
+        this.a=a;
+        this.b=b;
+        this.axis1=axis1;
+        this.axis2=axis2;
+        this.k=a.shape[((axis1<0)?(rank1+axis1):axis1)];
+    }
+    /// returns a random array (here with randNArray & co due to bug 2246)
+    static Dottable randomGenerate(Rand r,int idx,ref int nEl,ref bool acceptable){
+        const index_type maxSize=1_000_000;
+        float mean=10.0f;
+        index_type[rank1+rank2-1] dims;
+        index_type totSize;
+        do {
+            foreach (ref el;dims){
+                el=cast(index_type)(r.gamma(mean));
+            }
+            totSize=1;
+            foreach (el;dims)
+                totSize*=el;
+            mean*=(cast(float)maxSize)/(cast(float)totSize);
+        } while (totSize>maxSize)
+        static if(scanAxis){
+            int axis1=-rank1+(idx % (2*rank1));
+            int axis2=-rank2+((idx / (2*rank1))%(2*rank2));
+            nEl=-(4*rank1*rank2);
+        } else {
+            int axis1=startAxis1;
+            int axis2=startAxis2;
+        }
+        index_type[rank1] dims1=dims[0..rank1];
+        auto a=randNArray(r,NArray!(T,rank1).empty(dims1));
+        static if (randomLayout) {
+            if (r.uniform!(bool)()) a=randLayout(r,a);
+        }
+        index_type[rank2] dims2;
+        int ii=rank1;
+        for (int i=0;i<rank2;++i){
+            if (i!=axis2 && i!=rank2+axis2){
+                dims2[i]=dims[ii];
+                ++ii;
+            } else {
+                dims2[i]=dims[((axis1<0)?(rank1+axis1):axis1)];
+            }
+        }
+        auto b=randNArray(r,NArray!(S,rank2).empty(dims2));
+        static if (randomLayout) {
+            if (r.uniform!(bool)()) b=randLayout(r,b);
+        }
+        return new Dottable(a,b,axis1,axis2);
+    }
+    char[] toString(){
+        return getString(printData(new Stringify()));
+    }
+    Print!(char) printData(Print!(char)s,char[] formatEl="{,10}", index_type elPerLine=10,
+        char[] indent=""){
+        s(indent)("Dottable{").newline;
+        s(indent)("axis1=")(axis1).newline;
+        s(indent)("axis2=")(axis2).newline;
+        s(indent)("k    =")(k).newline;
+        s(indent)("a=");
+        a.printData(s,formatEl,elPerLine,indent~"  ").newline;
+        s(indent)("b=");
+        b.printData(s,formatEl,elPerLine,indent~"  ").newline;
+        s(indent)("}").newline;
+        return s;
+    }
+}
 
 /// returns a NArray indexed with the variables of a pLoopGenIdx or sLoopGenIdx
 char[] NArrayInLoop(char[] arrName,int rank,char[] ivarStr){
@@ -143,8 +239,140 @@ void test_iter()
     }
 }
 
+void testDot1x1(T,S)(Dottable!(T,1,S,1,true,true) d){
+    alias typeof(T.init*S.init) U;
+    real refValT=0.0L;
+    index_type nEl=d.a.shape[0];
+    for (index_type i=0;i<nEl;++i){
+        refValT+=d.a[i]*d.b[i];
+    }
+    U refVal=cast(U)refValT;
+    auto v=dot(d.a,d.b,d.axis1,d.axis2);
+    static if(is(typeof(feqrel2(U.init,U.init)))&& is(typeof(U.mant_dig))){
+        auto err=feqrel2(refVal,v);
+        if (err<2*U.mant_dig/3-4){
+            d.a.desc(Stdout("a:")).newline;
+            d.b.desc(Stdout("b:")).newline;
+            Stdout("v=")(v).newline;
+            Stdout("refVal=")(refVal).newline;
+            Stdout("error:")(err)("/")(U.mant_dig).newline;
+        }
+        assert(err>=2*U.mant_dig/3-4,"error too large");
+    } else {
+        assert(refVal==v,"value different from reference");
+    }
+}
 
-unittest{
+/// checks if refVal almost== v, if not prints 
+bool checkResDot(T,int rank1,S,int rank2,U,int rank3)(NArray!(T,rank1) a, NArray!(S,rank2) b,
+    NArray!(U,rank3)refVal,NArray!(U,rank3)v){
+    bool res;
+    static if(is(typeof(feqrel2(U.init,U.init)))&& is(typeof(U.mant_dig))){
+        auto err=minFeqrel2(refVal,v);
+        res=(err>=2*U.mant_dig/3-4);
+        if (!res) Stdout("error:")(err)("/")(U.mant_dig).newline;
+    } else {
+        res=(refVal==v);
+    }
+    if (!res){
+        a.desc(Stdout("a:")).newline;
+        b.desc(Stdout("b:")).newline;
+        Stdout("v=")(v).newline;
+        Stdout("refVal=")(refVal).newline;
+    }
+    return res;
+}
+
+void testDot2x1(T,S)(Dottable!(T,2,S,1,true,true) d){
+    alias typeof(T.init*S.init) U;
+    auto a=d.a;
+    if (d.axis1==0 || d.axis1==-2) a=d.a.T;
+    auto refValT=zeros!(real)(a.shape[0]);
+    for (index_type j=0;j<a.shape[0];++j){
+        for (index_type i=0;i<d.k;++i){
+            refValT[j]=refValT[j]+cast(real)(a[j,i]*d.b[i]);
+        }
+    }
+    auto refVal=refValT.asType!(U)();
+    auto v=dot(d.a,d.b,d.axis1,d.axis2);
+    assert(checkResDot(d.a,d.b,refVal,v),"value too different from reference");
+}
+
+void testDot1x2(T,S)(Dottable!(T,1,S,2,true,true) d){
+    alias typeof(T.init*S.init) U;
+    auto a=d.a;
+    auto b=d.b;
+    if (d.axis2==1 || d.axis2==-1) b=d.b.T;
+    auto refValT=zeros!(real)(b.shape[1]);
+    for (index_type j=0;j<b.shape[1];++j){
+        for (index_type i=0;i<d.k;++i){
+            refValT[j]=refValT[j]+cast(real)(a[i]*b[i,j]);
+        }
+    }
+    auto refVal=refValT.asType!(U)();
+    auto v=dot(d.a,d.b,d.axis1,d.axis2);
+    assert(checkResDot(d.a,d.b,refVal,v),"value too different from reference");
+}
+
+void testDot2x2(T,S)(Dottable!(T,2,S,2,true,true) d){
+    alias typeof(T.init*S.init) U;
+    auto a=d.a;
+    if (d.axis1==0 || d.axis1==-2) a=d.a.T;
+    auto b=d.b;
+    if (d.axis2==1 || d.axis2==-1) b=d.b.T;
+    auto refValT=zeros!(real)([a.shape[0],b.shape[1]]);
+    for (index_type i=0;i<a.shape[0];++i){
+        for (index_type j=0;j<d.k;++j){
+            for (index_type k=0;k<b.shape[1];++k){
+                refValT[i,k]=refValT[i,k]+cast(real)(a[i,j]*b[j,k]);
+            }
+        }
+    }
+    auto refVal=refValT.asType!(U)();
+    auto v=dot(d.a,d.b,d.axis1,d.axis2);
+    assert(checkResDot(d.a,d.b,refVal,v),"value too different from reference");
+}
+
+private mixin testInit!() autoInitTst;
+
+TestCollection narrayRTst1(T,int rank)(TestCollection superColl){
+    TestCollection coll=new TestCollection("NArray!("~T.stringof~","~ctfe_i2a(rank)~")",
+        __LINE__,__FILE__,superColl);
+    autoInitTst.testNoFail("loopCheck1",(NArray!(T,rank) x){checkLoop1!(T,rank)(x);},
+        __LINE__,__FILE__,TestSize(),coll);
+    static if (rank==1){
+        autoInitTst.testNoFail("testDot1x1",(Dottable!(T,1,T,1,true,true) d){ testDot1x1!(T,T)(d); },
+            __LINE__,__FILE__,TestSize(),coll);
+        autoInitTst.testNoFail("testDot1x2",(Dottable!(T,1,T,2,true,true) d){ testDot1x2!(T,T)(d); },
+            __LINE__,__FILE__,TestSize(),coll);
+    }
+    static if (rank==2){
+        autoInitTst.testNoFail("testDot2x1",(Dottable!(T,2,T,1,true,true) d){ testDot2x1!(T,T)(d); },
+            __LINE__,__FILE__,TestSize(),coll);
+        autoInitTst.testNoFail("testDot2x2",(Dottable!(T,2,T,2,true,true) d){ testDot2x2!(T,T)(d); },
+            __LINE__,__FILE__,TestSize(),coll);
+    }
+    return coll;
+}
+
+TestCollection rtestNArray(){
+    TestCollection coll=new TestCollection("NArray",__LINE__,__FILE__);
+    narrayRTst1!(int,1)(coll);
+    narrayRTst1!(int,2)(coll);
+    narrayRTst1!(int,3)(coll);
+    narrayRTst1!(float,1)(coll);
+    narrayRTst1!(float,2)(coll);
+    narrayRTst1!(float,3)(coll);
+    narrayRTst1!(double,1)(coll);
+    narrayRTst1!(double,2)(coll);
+    narrayRTst1!(double,3)(coll);
+    narrayRTst1!(real,1)(coll);
+    narrayRTst1!(real,2)(coll);
+    narrayRTst1!(real,3)(coll);
+    return coll;
+}
+
+void doNArrayTests(){
     NArray!(int,1) a1=a2NA([1,2,3,4,5,6]);
     NArray!(int,1) a2=NArray!(int,1).zeros([6]);
     auto a3=NArray!(int,2).zeros([5,6]);
@@ -166,7 +394,15 @@ unittest{
     checkeq(a3[1],[1,0,2,0,3,0]);
     checkeq(a3[2],[0,0,0,0,0,0]);
     checkeq(a4[0,Range(1,3),Range(1,4,2)],[5,7,9,11]);
-    a4.printData(Stdout("a4:"),"{,6}",10,"   ").newline;
+    //Stdout("`")(getString(a4.printData((new Stringify)("a4:"),"{,6}",10,"   ").newline))("`").newline;
+    assert(getString(a4.printData((new Stringify)("a4:"),"{,6}",10,"   ").newline)==
+`a4:[[[     0,     1,     2,     3],
+     [     4,     5,     6,     7],
+     [     8,     9,    10,    11]],
+    [[    12,    13,    14,    15],
+     [    16,    17,    18,    19],
+     [    20,    21,    22,    23]]]
+`,"NArray.printData wrote unexpected value");
     arangeTests;
     test_iter;
     auto a6=a4.dup;
@@ -200,4 +436,14 @@ unittest{
     }
     NArray!(double,2) a=NArray!(double,2).ones([3,4]);
     auto b=axisFilter(a,2,[3,2,1,1,0]);
+    
+    // random tests
+    // SingleRTest.defaultTestController=new TextController(TextController.OnFailure.StopAllTests,
+    //     TextController.PrintLevel.AllShort);
+    TestCollection narrayTsts=rtestNArray();
+    narrayTsts.runTests();
+}
+
+unittest{
+    doNArrayTests();
 }

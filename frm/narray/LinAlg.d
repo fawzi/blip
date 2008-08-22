@@ -1,44 +1,41 @@
-/++
-+ Basic linear algebra on NArrays
-+ at the moment only dot is available without blas/lapack
-+  norm       --- Vector or matrix norm
-+  inv        --- Inverse of a square matrix
-+  solve      --- Solve a linear system of equations
-+  det        --- Determinant of a square matrix
-+  lstsq      --- Solve linear least-squares problem
-+  pinv       --- Pseudo-inverse (Moore-Penrose) using lstsq
-+
-+Eigenvalues and Decompositions:
-+
-+  eig        --- Eigenvalues and vectors of a square matrix
-+  eigh       --- Eigenvalues and eigenvectors of a Hermitian matrix
-+  eigvals    --- Eigenvalues of a square matrix
-+  eigvalsh   --- Eigenvalues of a Hermitian matrix.
-+  svd        --- Singular value decomposition of a matrix
-+  cholesky   --- Cholesky decomposition of a matrix
-+/
+/*******************************************************************************
+    Basic linear algebra on NArrays
+    at the moment only dot is available without blas/lapack
+     norm       --- Vector or matrix norm
+     inv        --- Inverse of a square matrix
+     solve      --- Solve a linear system of equations
+     det        --- Determinant of a square matrix
+     lstsq      --- Solve linear least-squares problem
+     pinv       --- Pseudo-inverse (Moore-Penrose) using lstsq
+    
+    Eigenvalues and Decompositions:
+    
+     eig        --- Eigenvalues and vectors of a square matrix
+     eigh       --- Eigenvalues and eigenvectors of a Hermitian matrix
+     eigvals    --- Eigenvalues of a square matrix
+     eigvalsh   --- Eigenvalues of a Hermitian matrix.
+     svd        --- Singular value decomposition of a matrix
+     cholesky   --- Cholesky decomposition of a matrix
+    
+    copyright:      Copyright (c) 2008. Fawzi Mohamed
+    license:        BSD style: $(LICENSE)
+    version:        Initial release: July 2008
+    author:         Fawzi Mohamed
+*******************************************************************************/
 module frm.narray.LinAlg;
 import frm.narray.BasicTypes;
 import frm.narray.BasicOps;
+version(darwin){
+    version=blas;
+    version=lapack;
+}
 version(blas){
-    static import blaslapack.dblas;
-    alias blaslapack.dblas dblas;
-// import blaslapack.dblas: f_float,f_double,f_cfloat,f_cdouble,isBlasType
-// something like the following is expected in dblas
-    alias float f_float;
-    alias double f_double;
-    alias cfloat f_cfloat;
-    alias cdouble f_cdouble;
-    alias int f_int;
-
-    template isBlasType(T){
-        const bool isBlasType=is(T==f_float)|| is(T==f_double) || is(T==f_cfloat) || is(T==f_cdouble);
-    }
+    import DBlas=gobo.blas.DBlas;
+    import gobo.blas.Types;
 }
 version(lapack){
     static assert(is(typeof(f_float)),"lapack needs blas");
-    static import blaslapack.dlapack;
-    alias blaslapack.dlapack dlapack;
+    import DLapack=gobo.lapack.DLapack;
 }
 
 class LinAlgException:Exception{
@@ -75,8 +72,12 @@ body {
             ++ii;
         }
     }
-    auto res=NArray!(S,rank3).empty(newshape);
-    return dot(a,b,res,cast(S)1,cast(S)0,axis1,axis2);
+    static if(rank3==0){
+        S res;
+    } else {
+        auto res=NArray!(S,rank3).empty(newshape);
+    }
+    return dot!(T,rank1,U,rank2,S,rank3)(a,b,res,cast(S)1,cast(S)0,axis1,axis2);
 }
 
 /// dot product between tensors (reduces a single axis) with scaling and
@@ -100,7 +101,7 @@ in {
         }
         for (int i=0;i<rank2;++i){
             if (i!=axis2 && i!=rank2+axis2){
-                assert(c.mShape[ii]==a.mShape[i],"invalid shape for c");
+                assert(c.mShape[ii]==b.mShape[i],"invalid shape for c");
                 ++ii;
             }
         }
@@ -110,44 +111,51 @@ body {
     if (axis1<0) axis1+=rank1;
     if (axis2<0) axis2+=rank2;
     version(blas){
-        static if ((is(T==U) && dblas.isBlasType(T)) && (rank1==1 || rank1==2)&&(rank2==1 || rank2==2)){
+        static if ((is(T==U) && isBlasType!(T)) && (rank1==1 || rank1==2)&&(rank2==1 || rank2==2)){
             // call blas
-            // do not accept negative increments?
+            // negative incremented vector in blas loops backwards on a[0..n], not on a[-n+1..1]
             static if(rank1==1 && rank2==1){
-                static if (is(T==f_float) && (is(S==f_double) || is(S==f_real))){
-                    c=cast(S)dblas.ddot(a.mShape[0], a.mData.ptr+a.mStartIdx, a.mStrides[0],
-                        b.mData.ptr+b.mStartIdx, b.mStrides[0]);
+                index_type aStartIdx=a.mStartIdx,bStartIdx=b.mStartIdx;
+                if (a.mStrides[0]<0) aStartIdx+=(a.mShape[0]-1)*a.mStrides[0];
+                if (b.mStrides[0]<0) bStartIdx+=(b.mShape[0]-1)*b.mStrides[0];
+                static if (is(T==f_float) && is(S==f_double)){
+                    c=cast(S)DBlas.ddot(a.mShape[0], a.mData.ptr+aStartIdx, a.mStrides[0],
+                        b.mData.ptr+bStartIdx, b.mStrides[0]);
                 } else static if (is(T==cfloat)|| is(T==cdouble)){
-                    c=cast(S)dblas.dotu(a.mShape[0], a.mData.ptr+a.mStartIdx, a.mStrides[0],
-                        b.mData.ptr+b.mStartIdx, b.mStrides[0]);
+                    c=cast(S)DBlas.dotu(a.mShape[0], a.mData.ptr+aStartIdx, a.mStrides[0],
+                        b.mData.ptr+bStartIdx, b.mStrides[0]);
                 } else {
-                    c=cast(S)dblas.dot(a.mShape[0], a.mData.ptr+a.mStartIdx, a.mStrides[0],
-                        b.mData.ptr+b.mStartIdx, b.mStrides[0]);
+                    c=cast(S)DBlas.dot(a.mShape[0], a.mData.ptr+aStartIdx, a.mStrides[0],
+                        b.mData.ptr+bStartIdx, b.mStrides[0]);
                 }
                 return c;
             } else static if (rank1==1 && rank2==2) {
+                index_type aStartIdx=a.mStartIdx;
+                if (a.mStrides[0]<0) aStartIdx+=(a.mShape[0]-1)*a.mStrides[0];
                 if (b.mStrides[0]==1 && b.mStrides[1]>0 ||
                     b.mStrides[1]==1 && b.mStrides[0]>0){
                     int transpose=1;
                     if (axis2==1) transpose=0;
                     if (b.mStrides[0]!=1) transpose=!transpose;
-                    dblas.gemv((transpose?'T':'N'), (transpose?a.mShape[0]:c.mShape[0]),
+                    DBlas.gemv((transpose?'T':'N'), (transpose?a.mShape[0]:c.mShape[0]),
                         (transpose?c.mShape[0]:a.mShape[0]),scaleRes,
                         b.mData.ptr+b.mStartIdx, ((b.mStrides[0]==1)?b.mStrides[1]:b.mStrides[0]),
-                        a.mData.ptr+a.mStartIdx,a.mStrides[0],
+                        a.mData.ptr+aStartIdx,a.mStrides[0],
                         scaleC, c.mData.ptr+c.mStartIdx, c.mStrides[0]);
                     return c;
                 }
             } else static if (rank1==2 && rank2==1) {
+                index_type bStartIdx=b.mStartIdx;
+                if (b.mStrides[0]<0) bStartIdx+=(b.mShape[0]-1)*b.mStrides[0];
                 if (a.mStrides[0]==1 && a.mStrides[1]>0 ||
                     a.mStrides[1]==1 && a.mStrides[0]>0){
                     int transpose=1;
                     if (axis1==1) transpose=0;
                     if (a.mStrides[0]!=1) transpose=!transpose;
-                    dblas.gemv((transpose?'T':'N'), (transpose?b.mShape[0]:c.mShape[0]),
+                    DBlas.gemv((transpose?'T':'N'), (transpose?b.mShape[0]:c.mShape[0]),
                         (transpose?c.mShape[0]:b.mShape[0]), scaleRes,
                         a.mData.ptr+a.mStartIdx, ((a.mStrides[0]==1)?a.mStrides[1]:a.mStrides[0]),
-                        b.mData.ptr+b.mStartIdx,b.mStrides[0],
+                        b.mData.ptr+bStartIdx,b.mStrides[0],
                         scaleC, c.mData.ptr+c.mStartIdx, c.mStrides[0]);
                     return c;
                 }
@@ -164,14 +172,14 @@ body {
                     if (b.mStrides[0]!=1) transposeB=!transposeB;
                     int swapAB=c.mStrides[0]!=1;
                     if (swapAB){
-                        dblas.gemm((transposeB?'N':'T'), (transposeA?'N':'T'),
+                        DBlas.gemm((transposeB?'N':'T'), (transposeA?'N':'T'),
                         b.mShape[1-axis2], a.mShape[1-axis1], a.mShape[axis1], scaleRes,
                         b.mData.ptr+b.mStartIdx,((b.mStrides[0]==1)?b.mStrides[1]:b.mStrides[0]),
                         a.mData.ptr+a.mStartIdx,((a.mStrides[0]==1)?a.mStrides[1]:a.mStrides[0]),
                         scaleC,
                         c.mData.ptr+c.mStartIdx,((c.mStrides[0]==1)?c.mStrides[1]:c.mStrides[0]));
                     } else {
-                        dblas.gemm((transposeA?'T':'N'), (transposeB?'T':'N'),
+                        DBlas.gemm((transposeA?'T':'N'), (transposeB?'T':'N'),
                         a.mShape[1-axis1], b.mShape[1-axis2], a.mShape[axis1], scaleRes,
                         a.mData.ptr+a.mStartIdx,((a.mStrides[0]==1)?a.mStrides[1]:a.mStrides[0]),
                         b.mData.ptr+b.mStartIdx,((b.mStrides[0]==1)?b.mStrides[1]:b.mStrides[0]),
@@ -206,7 +214,7 @@ version (lapack){
     /// not so efficient (copies a)
     NArray!(T,2) solve(T)(NArray!(T,2)a,NArray!(T,2)b,NArray!(T,2)x=null)
     in{
-        static assert(dblas.isBlasType!(T),"implemented only for blas types");
+        static assert(isBlasType!(T),"implemented only for blas types");
         assert(a.shape[0]==a.shape[1],"a should be square");
         assert(a.shape[0]==b.shape[0],"incompatible shapes a-b");
         if (x !is null){
@@ -221,11 +229,11 @@ version (lapack){
         if (x is null) x=b.dup(true);
         if (!(x.mStrides[0]==1 && x.mStrides[1]>0 || x.mStrides[1]==1 && x.mStrides[0]>0)){
             scope NArray!(T,2) xx=b.dup(true);
-            gesv(a.shape[0], b.shape[1], a.mData.ptr+a.mStartIdx, a.mStrides[1], ipiv.mData.ptr,
+            DLapack.gesv(a.shape[0], b.shape[1], a.mData.ptr+a.mStartIdx, a.mStrides[1], ipiv.mData.ptr,
                 xx.mData.ptr+xx.mStartIdx, xx.mShape[1], info);
             x[]=xx;
         } else {
-            gesv(a.shape[0], b.shape[1], a.mData.ptr+a.mStartIdx, a.mStrides[1], ipiv.mData.ptr,
+            DLapack.gesv(a.shape[0], b.shape[1], a.mData.ptr+a.mStartIdx, a.mStrides[1], ipiv.mData.ptr,
                 x.mData.ptr+x.mStartIdx, x.mShape[1], info);
         }
         if (info > 0)
@@ -235,7 +243,7 @@ version (lapack){
     /// ditto
     NArray!(T,1) solve(T)(NArray!(T,2)a,NArray!(T,1)b,NArray!(T,1)x=null)
     in{
-        static assert(dblas.isBlasType!(T),"implemented only for blas types");
+        static assert(isBlasType!(T),"implemented only for blas types");
         assert(a.shape[0]==a.shape[1],"a should be square");
         assert(a.shape[0]==b.shape[0],"incompatible shapes a-b");
         assert(x is null || x.shape[0]==b.shape[0],"incompatible shapes b-x");
@@ -251,7 +259,7 @@ version (lapack){
     /// returns the inverse matrix
     NArray!(T,2) inv(T)(NArray!(T,2)a)
     in {
-        static assert(dblas.isBlasType!(T),"implemented only for blas types");
+        static assert(isBlasType!(T),"implemented only for blas types");
         assert(a.mShape[0]==a.mShape[1],"a has to be square");
     }
     body {
@@ -262,14 +270,14 @@ version (lapack){
     /// determinant of the matrix a
     T det(T)(NArray!(T,2)a)
     in {
-        static assert(dblas.isBlasType!(T),"implemented only for blas types");
+        static assert(isBlasType!(T),"implemented only for blas types");
         assert(a.mShape[0]==b.mShape[1],"a has to be square");
     }
     body {
         scope NArray!(f_int,1) pivots = NArray!(f_int,1).zeros();
         f_int info;
         auto a2=a.dup(true);
-        results = getrf(a2, pivots, info);
+        results = DLapack.getrf(a2, pivots, info);
         if (info > 0)
             return cast(T)0;
         int sign=0;
@@ -288,15 +296,15 @@ version (lapack){
     /// has been completed, but the factor U is exactly
     /// singular, and division by zero will occur if it is used
     /// to solve a system of equations.
-    NArray!(T,2) getrf(NArray!(T,2) a,NArray!(f_int,1) ipiv,f_int info)
+    NArray!(T,2) getrf(T)(NArray!(T,2) a,NArray!(f_int,1) ipiv,f_int info)
     in {
-        static assert(dblas.isBlasType!(T),"implemented only for blas types");
+        static assert(isBlasType!(T),"implemented only for blas types");
         assert(a.strides[0]==1 && a.strides[1]>=a.shape[0],"a has to be a blas matrix");
         assert(ipiv.strides[0]==1,"ipiv has to have stride 1");
         assert(ipiv.shape[0]>=a.shape[0]||ipiv.shape[0]>=a.shape[1],"ipiv should be at least min(a.shape)");
     }
     body {
-        getrf(a.mShape[0], a.mShape[1], a.mData.ptr+a.mStartIdx, a.mStrides[1],
+        DLapack.getrf(a.mShape[0], a.mShape[1], a.mData.ptr+a.mStartIdx, a.mStrides[1],
             pivots.mData.ptr+mStartIdx, info);
         if (info < 0)
             throw new LinAlgException("Illegal input to Fortran routine");
@@ -327,10 +335,10 @@ version (lapack){
     
     /// calculates eigenvalues and (if not null) the  right (and left) eigenvectors
     /// of the given matrix
-    NArray!(complexType!(T),1) eig(NArray!(T,2)a,NArray!(complexType!(T),1) ev=null,
+    NArray!(complexType!(T),1) eig(T)(NArray!(T,2)a,NArray!(complexType!(T),1) ev=null,
         NArray!(complexType!(T),2)leftEVect=null,NArray!(complexType!(T),2)rightEVect=null)
     in {
-        static assert(dblas.isBlasType!(T),"only blas types accepted");
+        static assert(isBlasType!(T),"only blas types accepted");
         assert(a.shape[0]==a.shape[1],"matrix a has to be square");
         assert(a.shape[0]==ev.shape[1],"ev has an incorrect size");
         if (rightEVect !is null) {
@@ -370,24 +378,24 @@ version (lapack){
         T workTmp;
         static if(is(complexType!(T)==T)){
             scope NArray!(realType!(T),1) rwork = zeros!(realType!(T))(2*n);
-            geev(((lEPtr is null)?'N':'V'),((rEPtr is null)?'N':'V'),n,
+            DLapack.geev(((lEPtr is null)?'N':'V'),((rEPtr is null)?'N':'V'),n,
                 a1.ptr, a1.mStrides[1], w.ptr, lEPtr, lELd, rEPtr, rELd,
                 &workTmp, lwork, rwork.ptr, info);
             lwork = cast(int)abs(work[0])+1;
             scope NArray!(T,1) work = zeros!(T)(lwork);
-            geev(((lEPtr is null)?'N':'V'),((rEPtr is null)?'N':'V'),n,
+            DLapack.geev(((lEPtr is null)?'N':'V'),((rEPtr is null)?'N':'V'),n,
                 a1.ptr, a1.mStrides[1], w.ptr, lEPtr, lELd, rEPtr, rELd,
                 work, work.mStrides[1], rwork.ptr, info);
             
         } else {
             scope NArray!(realType!(T),1) wr = zeros!(realType!(T))(n);
             scope NArray!(realType!(T),1) wi = zeros!(realType!(T))(n);
-            geev(((lEPtr is null)?'N':'V'),((rEPtr is null)?'N':'V'),n,
+            DLapack.geev(((lEPtr is null)?'N':'V'),((rEPtr is null)?'N':'V'),n,
                 a1.ptr, a1.mStrides[1], wr.ptr, wi.ptr, lEPtr, lELd, rEPtr, rELd,
                 &workTmp, lwork, info);
             lwork = cast(int)abs(work[0])+1;
             scope NArray!(T,1) work = zeros!(T)(lwork);
-            geev(((lEPtr is null)?'N':'V'),((rEPtr is null)?'N':'V'),n,
+            DLapack.geev(((lEPtr is null)?'N':'V'),((rEPtr is null)?'N':'V'),n,
                 a1.ptr, a1.mStrides[1], wr.ptr, wi.ptr, lEPtr, lELd, rEPtr, rELd,
                 work, work.mStrides[1], info);
             for (int i=0;i<n;++i)

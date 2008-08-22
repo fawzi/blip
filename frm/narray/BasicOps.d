@@ -1,7 +1,17 @@
+/*******************************************************************************
+    Basic Operations on NArrays.
+    
+        copyright:      Copyright (c) 2008. Fawzi Mohamed
+        license:        BSD style: $(LICENSE)
+        version:        Initial release: July 2008
+        author:         Fawzi Mohamed
+*******************************************************************************/
 module frm.narray.BasicOps;
 import frm.narray.BasicTypes;
 import frm.TemplateFu;
 import tango.math.Math: round;
+import frm.rtest.RTest;
+import tango.math.IEEE: feqrel;
 
 template nullNArray(T,int rank){
     static if (rank>0){
@@ -13,8 +23,9 @@ template nullNArray(T,int rank){
 /+ ---------------- structural ops -------------------- +/
 
 /// returns a view of the current data with the axes reordered
-NArray!(T,rank) reorderAxis(T,int rank)(NArray!(T,rank) a,int[rank] perm)
+NArray!(T,rank) reorderAxis(T,int rank,int r2)(NArray!(T,rank) a,int[r2] perm)
 in {
+    static assert(rank==r2,"array rank and permutation must have the same size");
     foreach (i,iAxis;perm) {
         assert(0<=i && i<rank);
         foreach(iAxis2;perm[0..i])
@@ -29,7 +40,7 @@ body {
     for (int i=0;i<rank;++i){
         newstrides[i]=a.mStrides[perm[i]];
     }
-    return NArray(newstrides,newshape,a.mStartIdx,a.mData,a.newFlags,a.newBase);
+    return NArray!(T,rank)(newstrides,newshape,a.mStartIdx,a.mData,a.newFlags,a.newBase);
 }
 
 /// transposed view
@@ -806,22 +817,40 @@ NArray!(T,rank-reductionFactorFilt!(S)) axisUnfilter1(T,int rank,S...)
     return b;
 }
 
-// to do: axis filter (index with array, NArray, range, ints)
 // -------------- norm/compare -------------
-/// returns the minimum number of significand bits in common between this array and b
-int minFeqrel(T,int rank)(NArray!(T,rank) a,NArray!(T,rank) b)
+/// feqrel version more forgiving close to 0
+int feqrel2(T)(T x,T y){
+    const T shift=T.epsilon*ctfe_powI(2,2*T.mant_dig/3);
+    if (x<0){
+        return feqrel(x-shift,y-shift);
+    } else {
+        return feqrel(x+shift,y+shift);
+    }
+}
+
+/// returns the minimum number of significand bits in common between array a and b
+/// using feqrel2
+int minFeqrel2(T,int rank)(NArray!(T,rank) a,NArray!(T,rank) b)
 in { assert(b.mShape==a.mShape,"array need to have the same size in minFeqrel"); }
 body {
-    int minEq=feqrel(T.init,T.init);
+    int minEq=T.mant_dig;
     mixin(sLoopPtr(rank,["a","b"],[],
-        "int diffAtt=feqrel(*aPtr0,*bPtr0); if (diffAtt<minEq) minEq=diffAtt;","i"));
+        "int diffAtt=feqrel2(*aPtr0,*bPtr0); if (diffAtt<minEq) minEq=diffAtt;","i"));
     return minEq;
 }
+
 /// returns the minimum number of significand bits in common between this array and b
 int minFeqrel(T,int rank)(NArray!(T,rank) a,T b=cast(T)0){
     int minEq=feqrel(T.init,T.init);
     mixin(sLoopPtr(rank,["a"],[],
         "int diffAtt=feqrel(*aPtr0,b); if (diffAtt<minEq) minEq=diffAtt;","i"));
     return minEq;
+}
+
+/// return the square of the 2 norm of the array
+S norm2(T,int rank, S=T)(NArray!(T,rank)a){
+    S res=reduceAll!((ref S x,T y){ x+=cast(S)y*cast(S)y; },(ref S x,S y){ x+=y; }, (S x){return x;},
+        T,rank,S)(a,cast(S)0);
+    return cast(S)sqrt(res);
 }
 

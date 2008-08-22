@@ -1,3 +1,11 @@
+/*******************************************************************************
+    Implements convolution on NArrays
+    
+        copyright:      Copyright (c) 2008. Fawzi Mohamed
+        license:        BSD style: $(LICENSE)
+        version:        Initial release: July 2008
+        author:         Fawzi Mohamed
+*******************************************************************************/
 module frm.narray.Convolve;
 import frm.narray.BasicTypes;
 import frm.narray.BasicOps;
