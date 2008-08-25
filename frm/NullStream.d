@@ -6,30 +6,51 @@
         author:         Fawzi Mohamed
 *******************************************************************************/
 module frm.NullStream;
-import tango.io.model.IConduit;
-class NullStream: OutputStream {
-    this(){}
+import tango.io.device.Conduit;
 
-    uint write (void[] src){
-        return src.length;
-    }
+/// a conduit that discards its input
+class NullConduit: Conduit{
+    char[] toString (){
+        return "NullConduit";
+    } 
 
-    OutputStream copy (InputStream src){
-        if (src !is null){
-            ubyte[512] buf;
-            uint count;
-            do {
-                count = src.read(buf[]);
-            } while(count != Eof)
-        }
-        return this;
-    }
+    uint bufferSize () { return 256u;}
+
+    uint read (void[] dst) { return Eof; }
+
+    uint write (void[] src) { return src.length; }
+
+    void detach () { }
     
-    // alias IConduit.Eof Eof;
-    
-    IConduit conduit () { return null; } // ok??
+}
 
-    void close () { } // do something to avoid successive writes?
+debug(UnitTest){
+    unittest{
+        auto a=new NullConduit();
+        a.write("bla");
+        a.flush();
+        a.detach();
+        a.write("b"); // at the moment it works, disallow?
+        uint[4] b=0;
+        a.read(b);
+        foreach (el;b)
+            assert(el==0);
+    }
+}
 
-    OutputStream flush () { return this; }
+/// a stream that discards its input
+/// (make it a singleton? would be slower due to locking somewhere?)
+OutputStream nullStream(){
+    return (new NullConduit).output;
+}
+
+
+debug(UnitTest){
+    unittest{
+        OutputStream a=nullStream();
+        a.write("bla");
+        a.flush();
+        a.close();
+        a.write("b"); // at the moment it works, disallow?
+    }
 }

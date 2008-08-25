@@ -52,6 +52,8 @@ T[] mkRandomArray(T)(Rand r,T[] array,ref bool acceptable){
 // valid chars (restrict to alphanumeric chars?)
 private char[] valid_chars=
     "abcdefghijklmnopqrstuwxyzABCDEFGHIJKLMNOPQRSTUWXYZ0123456789_+-*%&/()=?!$`'\"\\[]{}<>.:;, \t\n";
+/// returns the actual random generator
+T generateRandom(T:Rand)   (Rand r,int idx,ref int nEl, ref bool acceptable) { return r; }
 /// generation of a random object
 T generateRandom(T:int)   (Rand r,int idx,ref int nEl, ref bool acceptable) { return r.uniform!(T); }
 /// ditto                                                

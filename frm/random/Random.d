@@ -785,6 +785,15 @@ final class RandomG(SourceT=KissCmwc_default): IWritable, IReadable
         return a;
     }
     
+    /// returns another (mostly indipendent, depending on seed size) random generator
+    RandG spawn(RandG=RandomG)(){
+        RandG res=new RandG(false);
+        synchronized(this){
+            res.seed(&uniform!(uint));
+        }
+        return res;
+    }
+    
     // ------- structs for uniform distributions -----
     /// uniform distribution on the whole range for integers, and on (0;1) for floats
     /// with boundCheck=true this is equivalent to r itself, here just for completness

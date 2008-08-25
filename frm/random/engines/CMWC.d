@@ -7,7 +7,7 @@
 module frm.random.engines.CMWC;
 import tango.io.protocol.model.IWriter:IWritable,IWriter;
 import tango.io.protocol.model.IReader:IReadable,IReader;
-import Integer = tango.text.convert.Integer;
+private import Integer=tango.text.convert.Integer;
 
 /+ CMWC a random number generator,
 + Marisaglia, Journal of Modern Applied Statistical Methods (2003), vol.2,No.1,p 2-13
@@ -186,4 +186,3 @@ alias CMWC!(8U  ,987651670UL)  CMWC_8_2;
 alias CMWC!(4U  ,987654366UL)  CMWC_4_1;
 alias CMWC!(4U  ,987654978UL)  CMWC_4_2;
 alias CMWC_1024_2 CMWC_default;
-

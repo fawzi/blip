@@ -14,6 +14,11 @@ import tango.io.Stdout: Stdout;
 public import tango.core.Variant: Variant;
 import tango.core.Array: find,remove;
 
+/// exception that causes a test to skip
+class SkipException: Exception{
+    this(char [] message){ super(message); }
+}
+
 // a reasonably collision free, fast and small (seedwise) rng
 alias RandomG!(CMWC_32_1) Rand;
 
@@ -120,10 +125,12 @@ enum TestResult : int{
 
 /// a test controller that writes out text to the given Print!(char) stream
 class TextController: TestControllerI{
-    Print!(char) log;
-    bool isStopping;
+    Print!(char) progressLog;
+    Print!(char) errorLog;
+    bool isStopping,trace;
     enum PrintLevel:int{ Error, Skip, AllShort, AllVerbose}
     PrintLevel printLevel;
+    Rand r;
     /// what to do upon failure
     enum OnFailure : int{
         Continue, /// do no stop
@@ -134,25 +141,53 @@ class TextController: TestControllerI{
     OnFailure onFailure; /// what to do upon failure
     int testFactor; /// increase for a more throughly testing
     this(OnFailure onFailure=OnFailure.Throw,PrintLevel printLevel=PrintLevel.Skip,
-        Print!(char) log=Stdout,int testFactor=1){
-        this.log=log;
+        Print!(char) progressLog=Stdout,Print!(char) errorLog=Stdout,int testFactor=1,
+        bool trace=false,Rand r=null){
+        this.progressLog=progressLog;
+        this.errorLog=errorLog;
         this.onFailure=onFailure;
         this.isStopping=false;
+        this.trace=trace;
         this.printLevel=printLevel;
         assert(testFactor>0,"testFactor must be positive");
         this.testFactor=testFactor;
+        this.r=r;
+        if (r is null)
+            this.r=new Rand();
     }
     /// test has the object as controller
-    void willControlTest(SingleRTest test) { }
+    void willControlTest(SingleRTest test) {
+        if (test.r is null) {
+            test.r=r.spawn();
+        }
+    }
     /// test does not have anymore the object as controller
     void removeTest(SingleRTest test) { }
     /// test is about to run its tests
     bool willRunTests(SingleRTest test) {
-        test.failureLog=log;
+        test.failureLog=errorLog; // make a copy??
         test.testSize.nCombTestMax=test.testSize.nCombTestMax*testFactor;
         test.testSize.nSetupMax=test.testSize.nSetupMax*testFactor;
         test.testSize.budgetMax=test.testSize.budgetMax*testFactor;
-        if (printLevel==PrintLevel.AllVerbose) log.format("{,-20} ",test.testName)();
+        if (trace) {
+            char[] state;
+            if (test.initialState is null){
+                if (test.r is null) test.r=r.spawn();
+                state=test.r.toString;
+            } else {
+                state=test.initialState;
+            }
+            progressLog(test.testName).newline;
+            progressLog("initial rng state: ")(state).newline;
+            progressLog(" counter: [");
+            foreach (i,c;test.counter){
+                if (i!=0) progressLog(", ");
+                progressLog(c);
+            }
+            progressLog("]").newline;
+            progressLog.flush;
+        }
+        if (printLevel==PrintLevel.AllVerbose) progressLog.format("{,-20} ",test.testName)();
         return !isStopping;
     }
     /// test did run all its tests
@@ -162,8 +197,8 @@ class TextController: TestControllerI{
             (printLevel==PrintLevel.Skip && test.stat.skippedTests>0);
         if (shouldPrint) {
             if (printLevel!=PrintLevel.AllVerbose || test.stat.failedTests>0)
-                log.format("test`{,-50}",test.testName~"`");
-            log.format(" {,3}-{,3}/{,3}({,3})",test.stat.failedTests,
+                progressLog.format("test`{,-50}",test.testName~"`");
+            progressLog.format(" {,3}-{,3}/{,3}({,3})",test.stat.failedTests,
                 test.stat.passedTests,test.stat.nTests,test.stat.nCombTest).newline;
         }
         test.testSize.nCombTestMax=test.testSize.nCombTestMax/testFactor;
@@ -172,32 +207,32 @@ class TextController: TestControllerI{
     }
     /// test will run a test
     bool willRunTest(SingleRTest test) {
-        if (printLevel==PrintLevel.AllVerbose) log(".")();
+        if (printLevel==PrintLevel.AllVerbose) progressLog(".")();
         return !isStopping;
     }
     /// test has skipped one test, should return wether the testing should continue
     bool testSkipped(SingleRTest test) {
-        if (printLevel==PrintLevel.AllVerbose) log("-")();
+        if (printLevel==PrintLevel.AllVerbose) progressLog("-")();
         return !isStopping;
     }
     /// test has passed one test, should return wether the testing should continue
     bool testPassed(SingleRTest test) {
-        if (printLevel==PrintLevel.AllVerbose) log("+")();
+        if (printLevel==PrintLevel.AllVerbose) progressLog("+")();
         return !isStopping;
     }
     /// test has failed one test, should return wether the testing should continue
     bool testFailed(SingleRTest test){
-        log.newline;
-        log("To reproduce:\n intial rng state: ")(test.initialState).newline;
-        log(" counter: [");
+        progressLog.newline;
+        progressLog("To reproduce:\n intial rng state: ")(test.initialState).newline;
+        progressLog(" counter: [");
         foreach (i,c;test.counter){
-            if (i!=0) log(", ");
-            log(c);
+            if (i!=0) progressLog(", ");
+            progressLog(c);
         }
-        log("]").newline;
-        log("ERROR test `")(test.testName)("` from `")(test.sourceFile)(":")(test.sourceLine)("` FAILED!!").newline;
-        log("-----------------------------------------------------------").newline;
-        log.flush; // guaratee flush on file log
+        progressLog("]").newline;
+        progressLog("ERROR test `")(test.testName)("` from `")(test.sourceFile)(":")(test.sourceLine)("` FAILED!!").newline;
+        progressLog("-----------------------------------------------------------").newline;
+        progressLog.flush; // guaratee flush on file log
         switch (onFailure){
         case OnFailure.StopTest:
             return false;
@@ -284,7 +319,7 @@ class SingleRTest{
         if (_testController !is nC){
             if (_testController !is null) _testController.removeTest(this);
             _testController=nC;
-            _testController.willControlTest(this);
+            if (_testController !is null) _testController.willControlTest(this);
         }
     }
     /// internal storage for the final test delegate
@@ -334,17 +369,18 @@ class SingleRTest{
     }
     // runs the tests possibly restarting them with the given rngState/counterVal
     SingleRTest runTests(int testFactor=1,char[] rngState=null,int[] counterVal=null){
+        initialState=rngState;
+        if (counterVal !is null){
+            counter[]=counterVal;
+        }
         assert(testFactor>0,"testFactor should be positive");
         scope(exit) testController.didRunTests(this);
         if (!testController.willRunTests(this)) return this;
         budgetLeft=testSize.budgetMax*testFactor;
-        if (r is null) r=new Rand();
+        assert(r !is null,"null rng in test"); // setting it here might introduce non determinism
         if (failureLog is null) failureLog=Stdout; // use Stderr ?
-        if (rngState !is null){
+        if (initialState !is null){
             r.fromString(rngState);
-        }
-        if (counterVal !is null){
-            counter[]=counterVal;
         }
         int myCombTest=0;
         for (int iTest=0;budgetLeft>0;++iTest){
@@ -398,6 +434,7 @@ class SingleRTest{
         reset;
         this.baseDelegate=baseDelegate;
         this.testController=testController;
+        if (testController is null) this.testController.willControlTest(this);
     }
 }
 
@@ -446,6 +483,10 @@ class TestCollection: SingleRTest, TestControllerI {
         if (subTests.find(test)==subTests.length){
             subTests~=test;
             test.testName=testName~"/"~test.testName;
+            if (test.r is null){
+                assert(r !is null,"random source not set"); // setting it here might introduce non determinism
+                test.r=r.spawn();
+            }
         }
     }
     /// test does not have anymore the object as controller
@@ -550,7 +591,9 @@ template testInit(char[] checkInit="", char[] manualInit=""){
             }
             try{
                 test.baseDelegate.get!(void delegate(S))()(arg);
-            }catch (Exception e){
+            } catch (SkipException s){
+                return TestResult.Skip;
+            } catch (Exception e){
                 test.failureLog("test`")(test.testName)("` failed with exception").newline;
                 test.failureLog(e).newline;
                 mixin(printArgs(nArgs!(S),"test.failureLog"));
@@ -574,7 +617,9 @@ template testInit(char[] checkInit="", char[] manualInit=""){
             if (!doSetup(test)) return TestResult.Skip;
             try{
                 test.baseDelegate.get!(void delegate(S))()(arg);
-            }catch (Exception e){
+            } catch (SkipException s){
+                return TestResult.Skip;
+            } catch (Exception e){
                 return TestResult.Pass;
             }
             test.failureLog("test`")(test.testName)("` failed (no exception thrown and one expected)").newline;
@@ -604,7 +649,9 @@ template testInit(char[] checkInit="", char[] manualInit=""){
                     mixin(printArgs(nArgs!(S),"test.failureLog"));
                     return TestResult.Fail;
                 }
-            }catch (Exception e){
+            } catch (SkipException s){
+                return TestResult.Skip;
+            } catch (Exception e){
                 test.failureLog("test`")(test.testName)("` failed with exception").newline;
                 test.failureLog(e).newline;
                 mixin(printArgs(nArgs!(S),"test.failureLog"));
@@ -635,7 +682,9 @@ template testInit(char[] checkInit="", char[] manualInit=""){
                 } else {
                     return TestResult.Pass;
                 }
-            }catch (Exception e){
+            } catch (SkipException s){
+                return TestResult.Skip;
+            } catch (Exception e){
                 test.failureLog("test`")(test.testName)("` unexpectedly failed with exception").newline;
                 test.failureLog(e).newline;
                 mixin(printArgs(nArgs!(S),"test.failureLog"));

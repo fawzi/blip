@@ -153,10 +153,10 @@ debug(UnitTest){
     arg1=specialNrs[arg1_i]; arg1_nEl=specialNrs.length;`) combNrTst; // combinatorial cases
 
     unittest{
-        Print!(char) nullPrt=new FormatOutput(new NullStream());
+        Print!(char) nullPrt=new FormatOutput(nullStream());
         // nullPrt=Stdout;
         SingleRTest.defaultTestController=new TextController(TextController.OnFailure.StopTest,
-            TextController.PrintLevel.AllShort,nullPrt);
+            TextController.PrintLevel.AllShort,nullPrt,nullPrt);
         TestCollection failTests=new TestCollection("failTests",__LINE__,__FILE__);
 
         SingleRTest[] tests=[

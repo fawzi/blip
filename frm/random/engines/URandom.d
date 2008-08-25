@@ -11,9 +11,9 @@ version(linux)  { version=has_urandom; }
 version(has_urandom) {
     import tango.io.protocol.model.IWriter:IWritable,IWriter;
     import tango.io.protocol.model.IReader:IReadable,IReader;
-    import Integer = tango.text.convert.Integer;
+    private import Integer = tango.text.convert.Integer;
     import tango.core.sync.Mutex: Mutex;
-    import tango.io.FileConduit; // use stdc read/write?
+    import tango.io.device.FileConduit; // use stdc read/write?
 
     /// basic source that takes data from system random device
     /// This is an engine, do not use directly, use RandomG!(Urandom)

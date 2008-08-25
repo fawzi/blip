@@ -7,7 +7,7 @@
 module frm.random.NormalSource;
 import tango.io.protocol.model.IWriter:IWritable,IWriter;
 import tango.io.protocol.model.IReader:IReadable,IReader;
-import Integer = tango.text.convert.Integer;
+private import Integer = tango.text.convert.Integer;
 import tango.math.Math:exp,sqrt,log,PI;
 import tango.math.ErrorFunction:erfc;
 import frm.random.Ziggurat;

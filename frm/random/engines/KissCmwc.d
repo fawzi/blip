@@ -7,7 +7,7 @@
 module frm.random.engines.KissCmwc;
 import tango.io.protocol.model.IWriter:IWritable,IWriter;
 import tango.io.protocol.model.IReader:IReadable,IReader;
-import Integer = tango.text.convert.Integer;
+private import Integer = tango.text.convert.Integer;
 
 /+ CMWC and KISS random number generators combined, for extra security wrt. plain CMWC and
 + Marisaglia, Journal of Modern Applied Statistical Methods (2003), vol.2,No.1,p 2-13

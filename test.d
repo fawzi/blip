@@ -16,10 +16,10 @@ private mixin testInit!("",`arg0=specialNrs[arg0_i]; arg0_nEl=specialNrs.length;
 arg1=specialNrs[arg1_i]; arg1_nEl=specialNrs.length;`) combNrTst; // combinatorial cases
 
 void main(){
-    Print!(char) nullPrt=new FormatOutput(new NullStream());
+    Print!(char) nullPrt=new FormatOutput(nullStream());
     nullPrt=Stdout;
     SingleRTest.defaultTestController=new TextController(TextController.OnFailure.StopTest,
-        TextController.PrintLevel.AllShort,nullPrt);
+        TextController.PrintLevel.AllShort,nullPrt,nullPrt,1,false);
     TestCollection failTests=new TestCollection("failTests",__LINE__,__FILE__);
     
     SingleRTest[] tests=[

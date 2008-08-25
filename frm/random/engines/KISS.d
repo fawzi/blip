@@ -7,7 +7,7 @@
 module frm.random.engines.KISS;
 import tango.io.protocol.model.IWriter:IWritable,IWriter;
 import tango.io.protocol.model.IReader:IReadable,IReader;
-import Integer = tango.text.convert.Integer;
+private import Integer = tango.text.convert.Integer;
 import tango.core.sync.Mutex: Mutex;
 
 /+ Kiss99 random number generator, by Marisaglia
