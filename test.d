@@ -10,14 +10,14 @@ module test;
 import frm.rtest.RTest;
 import tango.io.Stdout;
 import frm.narray.NArray;
-import frm.narray.Test: doNArrayTests;
-import frm.Stringify;
-import tango.math.Math: abs;
+import frm.narray.Test;
+import frm.random.Random: rand;
+
+private mixin testInit!() autoInitTst2;
 
 void main(){
-    
+    Stdout(rand.toString()).newline;
     SingleRTest.defaultTestController=new TextController(TextController.OnFailure.StopAllTests,
-        TextController.PrintLevel.AllShort);
-    
+        TextController.PrintLevel.AllShort,Stdout,Stdout,1,true);
     doNArrayTests();
 }

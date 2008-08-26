@@ -528,7 +528,7 @@ else {
         NArray opSliceAssign()(V val)
         in { assert(!(mFlags&Flags.ReadOnly),"ReadOnly array cannot be assigned"); }
         body{
-            mixin unaryOpStr!("*aPtr0=val",rank,V);
+            mixin unaryOpStr!("*aPtr0=val;",rank,V);
             unaryOpStr(this);
             return this;
         }

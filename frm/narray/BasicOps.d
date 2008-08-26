@@ -65,26 +65,28 @@ NArray!(T,rank) reverse(T,int rank)(NArray!(T,rank) a){
 /// Use dup to have a vritable fully replicated version
 /// note: putting this in the class forces the instantiation of NArray!(T,rank+1)
 ///       which then forces the instantiation of N+2 which...
-NArray!(T,rank+1) repeat(T,rank)(NArray!(T,rank) a,index_type amount, int axis=0)
+NArray!(T,rank+1) repeat(T,int rank)(NArray!(T,rank) a,index_type amount, int axis=0)
 in {
     assert(0<=amount);
     assert(-rank-1<=axis && axis<rank+1,"axis out of bounds in repeat"); }
 body {
     if (axis<0) axis+=rank+1;
     index_type[rank+1] newshape,newstrides;
-    int ii=0;
-    for (int i=0;i<rank;++i){
-        if (i==axis) {
+    int i=0,ii=0;
+    for (;;){
+        if (ii==axis) {
             newshape[ii]=amount;
             newstrides[ii]=0;
             ++ii;
         }
+        if (i>=rank) break;
         newshape[ii]=a.mShape[i];
         newstrides[ii]=a.mStrides[i];
         ++ii;
+        ++i;
     }
     uint newflags=a.newFlags;
-    if (amount>1) newflags|=Flags.ReadOnly;
+    if (amount>1) newflags|=ArrayFlags.ReadOnly;
     return NArray!(T,rank+1)(newstrides,newshape,a.mStartIdx,a.mData,
         newflags,a.newBase);
 }
@@ -819,8 +821,13 @@ NArray!(T,rank-reductionFactorFilt!(S)) axisUnfilter1(T,int rank,S...)
 
 // -------------- norm/compare -------------
 /// feqrel version more forgiving close to 0
+/// if you sum values you cannot expect better than T.epsilon absolute error.
+/// feqrel compares relative error, and close to 0 (where the density of floats is high) it is
+/// much more stringent.
+/// To guarantee T.epsilon absolute error one should use shift=1.0, here we are more stingent
+/// and we use T.mant_dig/4 digits more when close to 0.
 int feqrel2(T)(T x,T y){
-    const T shift=T.epsilon*ctfe_powI(2,2*T.mant_dig/3);
+    const T shift=ctfe_powI(0.5,T.mant_dig/4);
     if (x<0){
         return feqrel(x-shift,y-shift);
     } else {

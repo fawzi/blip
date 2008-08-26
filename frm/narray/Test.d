@@ -17,7 +17,7 @@ import frm.rtest.RTest;
 /// useful mainly for random tests
 /// startAxis1 defalt should be -1, but negative default values have a bug with gdc (#2291)
 class Dottable(T,int rank1,S,int rank2,bool scanAxis=false, bool randomLayout=false,
-    int startAxis1=0,int startAxis2=0): RandGen{
+    bool square1=false,int startAxis1=0,int startAxis2=0): RandGen{
     static assert(rank1>0 && rank2>0,"ranks must be strictly positive");
     static assert(-rank1<=startAxis1 && startAxis1<rank1,"startAxis1 out of bounds");
     static assert(-rank2<=startAxis2 && startAxis2<rank2,"startAxis2 out of bounds");
@@ -44,8 +44,15 @@ class Dottable(T,int rank1,S,int rank2,bool scanAxis=false, bool randomLayout=fa
         index_type[rank1+rank2-1] dims;
         index_type totSize;
         do {
-            foreach (ref el;dims){
-                el=cast(index_type)(r.gamma(mean));
+            static if (square1){
+                index_type sz=cast(index_type)(r.gamma(mean));
+                foreach (ref el;dims){
+                    el=sz;
+                }
+            } else {
+                foreach (ref el;dims){
+                    el=cast(index_type)(r.gamma(mean));
+                }
             }
             totSize=1;
             foreach (el;dims)
@@ -90,9 +97,9 @@ class Dottable(T,int rank1,S,int rank2,bool scanAxis=false, bool randomLayout=fa
         s(indent)("axis1=")(axis1).newline;
         s(indent)("axis2=")(axis2).newline;
         s(indent)("k    =")(k).newline;
-        s(indent)("a=");
+        a.desc(s(indent)("a:")).newline;
         a.printData(s,formatEl,elPerLine,indent~"  ").newline;
-        s(indent)("b=");
+        b.desc(s(indent)("b:")).newline;
         b.printData(s,formatEl,elPerLine,indent~"  ").newline;
         s(indent)("}").newline;
         return s;
@@ -264,19 +271,16 @@ void testDot1x1(T,S)(Dottable!(T,1,S,1,true,true) d){
 }
 
 /// checks if refVal almost== v, if not prints 
-bool checkResDot(T,int rank1,S,int rank2,U,int rank3)(NArray!(T,rank1) a, NArray!(S,rank2) b,
-    NArray!(U,rank3)refVal,NArray!(U,rank3)v){
+bool checkResDot(U,int rank3)(NArray!(U,rank3)refVal,NArray!(U,rank3)v,int tol=4){
     bool res;
     static if(is(typeof(feqrel2(U.init,U.init)))&& is(typeof(U.mant_dig))){
         auto err=minFeqrel2(refVal,v);
-        res=(err>=2*U.mant_dig/3-4);
+        res=(err>=2*U.mant_dig/3-tol);
         if (!res) Stdout("error:")(err)("/")(U.mant_dig).newline;
     } else {
         res=(refVal==v);
     }
     if (!res){
-        a.desc(Stdout("a:")).newline;
-        b.desc(Stdout("b:")).newline;
         Stdout("v=")(v).newline;
         Stdout("refVal=")(refVal).newline;
     }
@@ -295,13 +299,15 @@ void testDot2x1(T,S)(Dottable!(T,2,S,1,true,true) d){
     }
     auto refVal=refValT.asType!(U)();
     auto v=dot(d.a,d.b,d.axis1,d.axis2);
-    assert(checkResDot(d.a,d.b,refVal,v),"value too different from reference");
+    assert(checkResDot(refVal,v),"value too different from reference");
 }
 
 void testDot1x2(T,S)(Dottable!(T,1,S,2,true,true) d){
+    static int iCall;    
     alias typeof(T.init*S.init) U;
     auto a=d.a;
     auto b=d.b;
+    ++iCall;
     if (d.axis2==1 || d.axis2==-1) b=d.b.T;
     auto refValT=zeros!(real)(b.shape[1]);
     for (index_type j=0;j<b.shape[1];++j){
@@ -311,7 +317,7 @@ void testDot1x2(T,S)(Dottable!(T,1,S,2,true,true) d){
     }
     auto refVal=refValT.asType!(U)();
     auto v=dot(d.a,d.b,d.axis1,d.axis2);
-    assert(checkResDot(d.a,d.b,refVal,v),"value too different from reference");
+    assert(checkResDot(refVal,v),"value too different from reference");
 }
 
 void testDot2x2(T,S)(Dottable!(T,2,S,2,true,true) d){
@@ -330,7 +336,39 @@ void testDot2x2(T,S)(Dottable!(T,2,S,2,true,true) d){
     }
     auto refVal=refValT.asType!(U)();
     auto v=dot(d.a,d.b,d.axis1,d.axis2);
-    assert(checkResDot(d.a,d.b,refVal,v),"value too different from reference");
+    assert(checkResDot(refVal,v),"value too different from reference");
+}
+
+void testSolve2x2(T)(Dottable!(T,2,T,2,false,true,true,0,0) d,Rand r){
+    auto x=randLayout(r,empty!(T)([d.a.shape[1],d.b.shape[1]]));
+    try{
+        x=solve(d.a,d.b,x);
+    } catch (LinAlgException l) {
+        assert(feqrel2(det(d.a),cast(T)0)>T.mant_dig/2,"solve failed with non 0 det");
+    }
+    assert(checkResDot(dot(d.a,x),d.b),"solution too far away form correct one");
+    try{
+        x=solve(d.a,d.b);
+    } catch (LinAlgException l) {
+        assert(feqrel2(det(d.a),cast(T)0)>T.mant_dig/2,"solve 2 failed with non 0 det");
+    }
+    assert(checkResDot(dot(d.a,x),d.b),"solution 2 too far away form correct one");
+}
+
+void testSolve2x1(T)(Dottable!(T,2,T,1,false,true,true,0,0) d,Rand r){
+    auto x=randLayout(r,empty!(T)([d.a.shape[1]]));
+    try{
+        x=solve(d.a,d.b,x);
+    } catch (LinAlgException l) {
+        assert(feqrel2(det(d.a),cast(T)0)>T.mant_dig/2,"solve failed with non 0 det");
+    }
+    assert(checkResDot(dot(d.a,x),d.b),"solution too far away form correct one");
+    try{
+        x=solve(d.a,d.b);
+    } catch (LinAlgException l) {
+        assert(feqrel2(det(d.a),cast(T)0)>T.mant_dig/2,"solve 2 failed with non 0 det");
+    }
+    assert(checkResDot(dot(d.a,x),d.b),"solution too far away form correct one");
 }
 
 private mixin testInit!() autoInitTst;
@@ -351,6 +389,12 @@ TestCollection narrayRTst1(T,int rank)(TestCollection superColl){
             __LINE__,__FILE__,TestSize(),coll);
         autoInitTst.testNoFail("testDot2x2",(Dottable!(T,2,T,2,true,true) d){ testDot2x2!(T,T)(d); },
             __LINE__,__FILE__,TestSize(),coll);
+//        static if (isBlasType!(T)){
+//            autoInitTst.testNoFail("testSolve2x1",(Dottable!(T,2,T,1,false,true,true,0,0) d,Rand r)
+//                { testSolve2x1!(T)(d,r); },__LINE__,__FILE__,TestSize(),coll);
+//            autoInitTst.testNoFail("testSolve2x2",(Dottable!(T,2,T,2,false,true,true,0,0) d,Rand r)
+//                { testSolve2x2!(T)(d,r); },__LINE__,__FILE__,TestSize(),coll);
+//        }
     }
     return coll;
 }
@@ -441,9 +485,11 @@ void doNArrayTests(){
     // SingleRTest.defaultTestController=new TextController(TextController.OnFailure.StopAllTests,
     //     TextController.PrintLevel.AllShort);
     TestCollection narrayTsts=rtestNArray();
-    narrayTsts.runTests();
+    narrayTsts.runTests(10);
 }
 
-unittest{
-    doNArrayTests();
+debug(UnitTest){
+    unittest{
+        doNArrayTests();
+    }
 }

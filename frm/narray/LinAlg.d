@@ -23,6 +23,7 @@
     author:         Fawzi Mohamed
 *******************************************************************************/
 module frm.narray.LinAlg;
+import tango.io.Stdout;
 import frm.narray.BasicTypes;
 import frm.narray.BasicOps;
 version(darwin){
@@ -31,7 +32,7 @@ version(darwin){
 }
 version(blas){
     import DBlas=gobo.blas.DBlas;
-    import gobo.blas.Types;
+    public import gobo.blas.Types;
 }
 version(lapack){
     static assert(is(typeof(f_float)),"lapack needs blas");
@@ -110,6 +111,18 @@ in {
 body {
     if (axis1<0) axis1+=rank1;
     if (axis2<0) axis2+=rank2;
+    if ((a.mFlags|b.mFlags)&ArrayFlags.Zero){
+        if (scaleC==0){
+            static if(rank3>0){
+                c[]=cast(T)0;
+            } else {
+                c=cast(T)0;
+            }
+        } else {
+            c *= scaleC;
+        }
+        return c;
+    }
     version(blas){
         static if ((is(T==U) && isBlasType!(T)) && (rank1==1 || rank1==2)&&(rank2==1 || rank2==2)){
             // call blas
@@ -137,9 +150,14 @@ body {
                     int transpose=1;
                     if (axis2==1) transpose=0;
                     if (b.mStrides[0]!=1) transpose=!transpose;
-                    DBlas.gemv((transpose?'T':'N'), (transpose?a.mShape[0]:c.mShape[0]),
+                    f_int ldb=cast(f_int)((b.mStrides[0]==1)?b.mStrides[1]:b.mStrides[0]);
+                    f_int m=(transpose?a.mShape[0]:c.mShape[0]);
+                    // this check is needed to give a valid ldb to blas (that checks it)
+                    // even if ldb is never needed (only one column)
+                    if (ldb==cast(f_int)1) ldb=m;
+                    DBlas.gemv((transpose?'T':'N'), m,
                         (transpose?c.mShape[0]:a.mShape[0]),scaleRes,
-                        b.mData.ptr+b.mStartIdx, ((b.mStrides[0]==1)?b.mStrides[1]:b.mStrides[0]),
+                        b.mData.ptr+b.mStartIdx, ldb,
                         a.mData.ptr+aStartIdx,a.mStrides[0],
                         scaleC, c.mData.ptr+c.mStartIdx, c.mStrides[0]);
                     return c;
@@ -152,9 +170,14 @@ body {
                     int transpose=1;
                     if (axis1==1) transpose=0;
                     if (a.mStrides[0]!=1) transpose=!transpose;
-                    DBlas.gemv((transpose?'T':'N'), (transpose?b.mShape[0]:c.mShape[0]),
+                    f_int lda=cast(f_int)((a.mStrides[0]==1)?a.mStrides[1]:a.mStrides[0]);
+                    f_int m=(transpose?b.mShape[0]:c.mShape[0]);
+                    // this check is needed to give a valid lda to blas (that checks it)
+                    // even if lda is never needed (only one column)
+                    if (lda==cast(f_int)1) lda=m;
+                    DBlas.gemv((transpose?'T':'N'), m,
                         (transpose?c.mShape[0]:b.mShape[0]), scaleRes,
-                        a.mData.ptr+a.mStartIdx, ((a.mStrides[0]==1)?a.mStrides[1]:a.mStrides[0]),
+                        a.mData.ptr+a.mStartIdx, lda,
                         b.mData.ptr+bStartIdx,b.mStrides[0],
                         scaleC, c.mData.ptr+c.mStartIdx, c.mStrides[0]);
                     return c;
@@ -171,20 +194,28 @@ body {
                     if (axis2==1) transposeB=1;
                     if (b.mStrides[0]!=1) transposeB=!transposeB;
                     int swapAB=c.mStrides[0]!=1;
+                    f_int ldb=cast(f_int)((b.mStrides[0]==1)?b.mStrides[1]:b.mStrides[0]);
+                    f_int lda=cast(f_int)((a.mStrides[0]==1)?a.mStrides[1]:a.mStrides[0]);
+                    f_int ldc=cast(f_int)((c.mStrides[0]==1)?c.mStrides[1]:c.mStrides[0]);
+                    // these checks are needed to give a valid ldX to blas (that checks it)
+                    // even if ldX is never needed (only one column)
+                    if (ldb==cast(f_int)1) ldb=(transposeB?b.mShape[1-axis2]:b.mShape[axis2]);
+                    if (lda==cast(f_int)1) lda=(transposeA?a.mShape[axis1]:a.mShape[1-axis1]);
+                    if (ldc==cast(f_int)1) ldc=c.mShape[0];
                     if (swapAB){
                         DBlas.gemm((transposeB?'N':'T'), (transposeA?'N':'T'),
                         b.mShape[1-axis2], a.mShape[1-axis1], a.mShape[axis1], scaleRes,
-                        b.mData.ptr+b.mStartIdx,((b.mStrides[0]==1)?b.mStrides[1]:b.mStrides[0]),
-                        a.mData.ptr+a.mStartIdx,((a.mStrides[0]==1)?a.mStrides[1]:a.mStrides[0]),
+                        b.mData.ptr+b.mStartIdx,ldb,
+                        a.mData.ptr+a.mStartIdx,lda,
                         scaleC,
-                        c.mData.ptr+c.mStartIdx,((c.mStrides[0]==1)?c.mStrides[1]:c.mStrides[0]));
+                        c.mData.ptr+c.mStartIdx,ldc);
                     } else {
                         DBlas.gemm((transposeA?'T':'N'), (transposeB?'T':'N'),
                         a.mShape[1-axis1], b.mShape[1-axis2], a.mShape[axis1], scaleRes,
-                        a.mData.ptr+a.mStartIdx,((a.mStrides[0]==1)?a.mStrides[1]:a.mStrides[0]),
-                        b.mData.ptr+b.mStartIdx,((b.mStrides[0]==1)?b.mStrides[1]:b.mStrides[0]),
+                        a.mData.ptr+a.mStartIdx,lda,
+                        b.mData.ptr+b.mStartIdx,ldb,
                         scaleC,
-                        c.mData.ptr+c.mStartIdx,((c.mStrides[0]==1)?c.mStrides[1]:c.mStrides[0]));
+                        c.mData.ptr+c.mStartIdx,ldc);
                     }
                     return c;
                 }
