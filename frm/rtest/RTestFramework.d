@@ -127,7 +127,7 @@ enum TestResult : int{
 class TextController: TestControllerI{
     Print!(char) progressLog;
     Print!(char) errorLog;
-    bool isStopping,trace;
+    bool _isStopping,trace;
     enum PrintLevel:int{ Error, Skip, AllShort, AllVerbose}
     PrintLevel printLevel;
     Rand r;
@@ -146,7 +146,7 @@ class TextController: TestControllerI{
         this.progressLog=progressLog;
         this.errorLog=errorLog;
         this.onFailure=onFailure;
-        this.isStopping=false;
+        this._isStopping=false;
         this.trace=trace;
         this.printLevel=printLevel;
         assert(testFactor>0,"testFactor must be positive");
@@ -154,6 +154,9 @@ class TextController: TestControllerI{
         this.r=r;
         if (r is null)
             this.r=new Rand();
+    }
+    bool isStopping(){
+        return _isStopping;
     }
     /// test has the object as controller
     void willControlTest(SingleRTest test) {
@@ -223,13 +226,15 @@ class TextController: TestControllerI{
     /// test has failed one test, should return wether the testing should continue
     bool testFailed(SingleRTest test){
         progressLog.newline;
-        progressLog("To reproduce:\n intial rng state: ")(test.initialState).newline;
-        progressLog(" counter: [");
+        progressLog("To reproduce:").newline;
+        progressLog(" testCollection").newline;
+        progressLog(" .findTest(`")(test.testName)("`)").newline;
+        progressLog(" .runTests(1,`")(test.initialState)("`,[");
         foreach (i,c;test.counter){
             if (i!=0) progressLog(", ");
             progressLog(c);
         }
-        progressLog("]").newline;
+        progressLog("]);").newline;
         progressLog("ERROR test `")(test.testName)("` from `")(test.sourceFile)(":")(test.sourceLine)("` FAILED!!").newline;
         progressLog("-----------------------------------------------------------").newline;
         progressLog.flush; // guaratee flush on file log
@@ -239,7 +244,7 @@ class TextController: TestControllerI{
         case OnFailure.Throw:
             throw new Exception("test failure");
         case OnFailure.StopAllTests:
-            this.isStopping=true;
+            this._isStopping=true;
             break;
         case OnFailure.Continue:
             break;
@@ -266,6 +271,8 @@ interface TestControllerI{
     bool testPassed(SingleRTest test);
     /// test has failed one test, should return werether the testing should continue
     bool testFailed(SingleRTest test);
+    /// if the testing is stopping
+    bool isStopping();
 }
 
 /// structure describing the number of tests to perform
@@ -369,6 +376,7 @@ class SingleRTest{
     }
     // runs the tests possibly restarting them with the given rngState/counterVal
     SingleRTest runTests(int testFactor=1,char[] rngState=null,int[] counterVal=null){
+        if (this is null) throw new Exception("SingleRTest run on null test");
         initialState=rngState;
         if (counterVal !is null){
             counter[]=counterVal;
@@ -436,6 +444,14 @@ class SingleRTest{
         this.testController=testController;
         if (testController is null) this.testController.willControlTest(this);
     }
+    
+    /// finds the requested test (for completness only)
+    SingleRTest findTest(char[] name){
+        if (name==testName)
+            return this;
+        else
+            return null;
+    }
 }
 
 class TestCollection: SingleRTest, TestControllerI {
@@ -458,8 +474,20 @@ class TestCollection: SingleRTest, TestControllerI {
             }
         }
     }
+    SingleRTest findTest(char[] name){
+        foreach(subT;subTests){
+            if (subT.testName==name){
+                return subT;
+            } else if (auto coll=cast(TestCollection)subT){
+                SingleRTest res=coll.findTest(name);
+                if (res !is null) return res;
+            }
+        }
+        return null;
+    }
     // runs the tests possibly restarting them with the given rngState/counterVal
     SingleRTest runTests(int testFactor=1,char[] rngState=null,int[] counterVal=null){
+        if (this is null) throw new Exception("TestCollection run on null collection");
         assert(testFactor>0,"testFactor should be positive");
         scope(exit) testController.didRunTests(this);
         if (!testController.willRunTests(this)) return this;
@@ -474,6 +502,7 @@ class TestCollection: SingleRTest, TestControllerI {
         }
         foreach (t;subTests){
             t.runTests(testFactor);
+            if (testController.isStopping) break;
         }
         stat.nCombTest++;
         return this;
@@ -530,6 +559,9 @@ class TestCollection: SingleRTest, TestControllerI {
     bool testFailed(SingleRTest test){
         test.failureLog.format("test failed in collection`{}` created at `{}:{}`",testName,sourceFile,sourceLine).newline;
         return testController.testFailed(test);
+    }
+    bool isStopping(){
+        return testController.isStopping;
     }
 }
 
