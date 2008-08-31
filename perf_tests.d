@@ -40,7 +40,16 @@ class ATst2{
     }
 }
 
-void main(char [][] argv) 
+long timerT()
+{
+     asm
+     {   naked                   ;
+         rdtsc                   ;
+         ret                     ;
+     }
+}
+
+void tst()
 {
     int ndim=250;
     ATst a1,a2;
@@ -61,7 +70,7 @@ void main(char [][] argv)
     
     a1.m_data[]=1.0L;
     a2.m_data[]=1.0L;
-    
+    for (int mX=0;mX<4;++mX){
     double[] res2=new double[ndim];
     res2[]=0.0L;
     timer.start;
@@ -102,7 +111,7 @@ void main(char [][] argv)
     
     array c1=ones!(double)([ndim,ndim,ndim]);
     array c2=ones!(double)([1,ndim,ndim]);
-    res[]=0.0L;
+/+    res[]=0.0L;
     timer.start();
     for (int i=0;i!=ndim;++i)
     for (int j=0;j!=ndim;++j)
@@ -138,6 +147,8 @@ void main(char [][] argv)
     auto t5=timer.stop();
     foreach(i,t;res)
         if (!(abs(t-res2[i])<1.e-13)) Stdout.format("error5 {} {} {}",i,t,res2[i]).newline;
+    +/
+    double t3=-1.0,t4=-1.0,t5=-1.0;
     
     // smart compiler
     res[]=0.0L;
@@ -199,12 +210,12 @@ void main(char [][] argv)
     res[]=0.0L;
     alias NArray!(double,3) NArr;
     NArr d1=NArr.ones([ndim,ndim,ndim]),d2=NArr.ones([1,ndim,ndim]);
-    Stdout("d1=")(&d1.desc).newline;
+    auto resNArr=a2NA2(res);
     timer.start();
     for (int i=0;i<ndim;i++)
     for (int j=0;j<ndim;j++)
     for (int k=0;k<ndim;k++){
-        res[i]+=d1[i,j,k]*d2[0,j,k];
+        resNArr[i]=resNArr[i]+d1[i,j,k]*d2[0,j,k];
     }
     auto t9=timer.stop();
     foreach(i,t;res)
@@ -225,9 +236,11 @@ void main(char [][] argv)
     res[]=0.0L;
     timer.start();
     NArray!(double,2) sc3=d2[0];
+    double *resPtr=res.ptr;
     for (int i=0;i<ndim;i++){
         NArray!(double,2) d1i=d1[i];
-        mixin(pLoopPtr(2,["d1i","sc3"],[],"res[i]+=(*d1iPtr0)*(*sc3Ptr0);","j"));
+        mixin(pLoopPtr(2,["d1i","sc3"],"*resPtr+=(*d1iPtr0)*(*sc3Ptr0);","j"));
+        ++resPtr;
     }
     auto t11=timer.stop();
     foreach(i,t;res)
@@ -235,30 +248,147 @@ void main(char [][] argv)
     
     res[]=0.0L;
     timer.start();
+    long ta,tb;
     //NArray!(double,2) sc3=d2[0];
     for (int i=0;i<ndim;i++){
+        auto tt0=timerT();
         NArray!(double,2) d1i=d1[i];
-        mixin(pLoopIdx(2,["d1i","sc3"],[],
-            "res[i]+=(*(d1iBasePtr+d1iIdx0))*(*(sc3BasePtr+sc3Idx0));","k"));
+        auto tt1=timerT();
+        mixin(pLoopIdx(2,["d1i","sc3"],
+            "res[i]+=(*d1iPtr0)*(*sc3Ptr0);","k"));
+        auto tt2=timerT();
+        ta+=tt1-tt0;
+        tb+=tt2-tt1;
     }
+    Stdout("timings:")(ta)(" ")(tb)(" ")(cast(real)ta/cast(real)(ta+tb))(" ")(cast(real)tb/cast(real)(ta+tb)).newline;
     auto t12=timer.stop();
     foreach(i,t;res)
         if (!(abs(t-res2[i])<1.e-13)) Stdout.format("error11 {} {} {}",i,t,res2[i]).newline;
 
-    Stdout("tref: contiguous pointer loop").newline;
-    Stdout("t1: index loop on struct").newline;
-    Stdout("t2: index loop on class (const strides)").newline;
-    Stdout("t3: Multiarray index loop").newline;
-    Stdout("t4: Multiarray flat iter").newline;
-    Stdout("t5: Multiarray foreach + flat iter").newline;
-    Stdout("t6: index op floated to outer loops on struct (smart compiler)").newline;
-    Stdout("t7: index op floated to outer loops on class (smart compiler)").newline;
-    Stdout("t8: index op floated to outer loops and removal of multiplication on struct (smart compiler)").newline;
-    Stdout("t9: index loop on NArray").newline;
-    Stdout("t10: loop+binaryOp on NArray").newline;
-    Stdout("t11: loop+mixin pLoopPtr on NArray").newline;
-    Stdout("t12: loop+mixin pLoopIdx on NArray").newline;
-    Stdout.format("tref: {} t1:{} t2:{} t3:{} t4:{} t5:{} t6:{} t7:{} t8:{} t9:{} t10:{}, t11:{} t12:{}",tref,t1,t2,t3,t4,t5,t6,t7,t8,t9,t10,t11,t12).newline;
-    Stdout.format("tref: {} t1:{} t2:{} t3:{} t4:{} t5:{} t6:{} t7:{} t8:{} t9:{} t10:{}, t11:{}, t12:{}",tref/tref,t1/tref,t2/tref,t3/tref,t4/tref,t5/tref,t6/tref,t7/tref,t8/tref,
-    t9/tref,t10/tref,t11/tref,t12/tref).newline;
+
+    // check removal of multiplication by compiler, ptr + fast striding
+    res[]=0.0L;
+    timer.start();
+    size_t a1PtrL=cast(size_t)a1.m_data.ptr, a2PtrL=cast(size_t)a2.m_data.ptr;
+    size_t resPtrL=cast(size_t)res.ptr;
+    ptrdiff_t a1Strides0=a1.strides[0]*double.sizeof,
+        a1Strides1=a1.strides[1]*double.sizeof,
+        a1Strides2=a1.strides[2]*double.sizeof;
+    ptrdiff_t a2Strides0=a2.strides[0]*double.sizeof,
+        a2Strides1=a2.strides[1]*double.sizeof,
+        a2Strides2=a2.strides[2]*double.sizeof;
+    for (int i=0;i!=ndim;++i){
+        size_t a22Ptr=a2PtrL;
+        size_t a11Ptr=a1PtrL;
+        for (int j=0;j!=ndim;++j){
+            size_t a222Ptr=a22Ptr;
+            size_t a111Ptr=a11Ptr;
+            for (int k=0;k!=ndim;++k){
+                *(cast(double *)resPtrL)+=(*cast(double*)a111Ptr)*(*cast(double*)a222Ptr);
+                a111Ptr+=a1Strides2;
+                a222Ptr+=a2Strides2;
+            }
+            a11Ptr+=a1Strides1;
+            a22Ptr+=a2Strides1;
+        }
+        a1PtrL+=a1Strides0;
+        resPtrL+=double.sizeof;
+    }
+    auto t13=timer.stop();
+    foreach(i,t;res)
+        if (!(abs(t-res2[i])<1.e-13)) Stdout.format("error13 {} {} {}",i,t,res2[i]).newline;
+
+    res[]=0.0L;
+    timer.start();
+    double *a1Ptr=a1.m_data.ptr, a2Ptr=a2.m_data.ptr;
+    resPtr=res.ptr;
+    a1Strides0=a1.strides[0];
+    a1Strides1=a1.strides[1];
+    a1Strides2=a1.strides[2];
+    a2Strides0=a2.strides[0];
+    a2Strides1=a2.strides[1];
+    a2Strides2=a2.strides[2];
+    for (int i=0;i!=ndim;++i){
+        double * a22Ptr=a2Ptr;
+        double * a11Ptr=a1Ptr;
+        for (int j=0;j!=ndim;++j){
+            double * a222Ptr=a22Ptr;
+            double * a111Ptr=a11Ptr;
+            for (int k=0;k!=ndim;++k){
+                *resPtr+=(*a111Ptr)*(*a222Ptr);
+                a111Ptr+=a1Strides2;
+                a222Ptr+=a2Strides2;
+            }
+            a11Ptr+=a1Strides1;
+            a22Ptr+=a2Strides1;
+        }
+        a1Ptr+=a1Strides0;
+        ++resPtr;
+    }
+    auto t14=timer.stop();
+    foreach(i,t;res)
+        if (!(abs(t-res2[i])<1.e-13)) Stdout.format("error13 {} {} {}",i,t,res2[i]).newline;
+
+    // check removal of multiplication by compiler, ptr + fast striding
+    res[]=0.0L;
+    timer.start();
+    a1Ptr =a1.m_data.ptr, a2Ptr=a2.m_data.ptr;
+    resPtr=res.ptr;
+    a1Strides0=a1.strides[0]*double.sizeof,
+        a1Strides1=a1.strides[1]*double.sizeof,
+        a1Strides2=a1.strides[2]*double.sizeof;
+    a2Strides0=a2.strides[0]*double.sizeof,
+        a2Strides1=a2.strides[1]*double.sizeof,
+        a2Strides2=a2.strides[2]*double.sizeof;
+    for (int i=0;i!=ndim;++i){
+        double* a22Ptr=a2Ptr;
+        double* a11Ptr=a1Ptr;
+        for (int j=0;j!=ndim;++j){
+            double* a222Ptr=a22Ptr;
+            double* a111Ptr=a11Ptr;
+            for (int k=0;k!=ndim;++k){
+                *(resPtr)+=(*a111Ptr)*(*a222Ptr);
+                a111Ptr=cast(double*)(cast(size_t)a111Ptr+a1Strides2);
+                a222Ptr=cast(double*)(cast(size_t)a222Ptr+a2Strides2);
+            }
+            a11Ptr=cast(double*)(cast(size_t)a11Ptr+a1Strides1);
+            a22Ptr=cast(double*)(cast(size_t)a22Ptr+a2Strides1);
+        }
+        a1Ptr =cast(double*)(cast(size_t)a1Ptr+a1Strides0);
+        resPtr=cast(double*)(cast(size_t)resPtr+double.sizeof);
+    }
+    t3=timer.stop();
+    foreach(i,t;res)
+        if (!(abs(t-res2[i])<1.e-13)) Stdout.format("error14 {} {} {}",i,t,res2[i]).newline;
+
+    Stdout.format("tref: {} t1:{} t2:{} t3:{} t4:{} t5:{} t6:{} t7:{} t8:{} t9:{} t10:{}, t11:{} t12:{} t13:{} t14:{}",tref,t1,t2,t3,t4,t5,t6,t7,t8,t9,t10,t11,t12,t13,t14).newline;
+    Stdout.format("tref: {} t1:{} t2:{} t3:{} t4:{} t5:{} t6:{} t7:{} t8:{} t9:{} t10:{}, t11:{}, t12:{} t13:{} t14:{}",tref/tref,t1/tref,t2/tref,t3/tref,t4/tref,t5/tref,t6/tref,t7/tref,t8/tref,
+    t9/tref,t10/tref,t11/tref,t12/tref,t13/tref,t14/tref).newline;
+}
+Stdout("tref: contiguous pointer loop").newline;
+Stdout("t1: index loop on struct").newline;
+Stdout("t2: index loop on class (const strides)").newline;
+Stdout("t3: Multiarray index loop").newline;
+Stdout("t4: Multiarray flat iter").newline;
+Stdout("t5: Multiarray foreach + flat iter").newline;
+Stdout("t6: index op floated to outer loops on struct (smart compiler)").newline;
+Stdout("t7: index op floated to outer loops on class (smart compiler)").newline;
+Stdout("t8: index op floated to outer loops and removal of multiplication on struct (smart compiler)").newline;
+Stdout("t9: index loop on NArray").newline;
+Stdout("t10: loop+binaryOp on NArray").newline;
+Stdout("t11: loop+mixin pLoopPtr on NArray").newline;
+Stdout("t12: loop+mixin pLoopIdx on NArray").newline;
+Stdout("t13: index op floated to outer loops and removal of multiplication on struct without *T.sizeof(smart compiler)").newline;
+Stdout("t13: index op floated to outer loops and removal of multiplication on struct with (no native,w var )").newline;
+
+Stdout("pLoopPtr").newline;
+Stdout(pLoopPtr(2,["d1i","sc3"],
+    "*(resPtr+=(*d1iPtr0)*(*sc3Ptr0);","k")).newline;
+
 } 
+
+void main(char [][] argv) 
+{
+    tst();
+    tst();
+}

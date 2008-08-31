@@ -51,7 +51,7 @@ NArray!(typeof(T.init*U.init),rank1+rank2-2)dot(T,int rank1,U,int rank2)
 in {
     assert(-rank1<=axis1 && axis1<rank1,"axis1 out of bounds");
     assert(-rank2<=axis2 && axis2<rank2,"axis2 out of bounds");
-    assert(a.mShape[((axis1<0)?(rank1+axis1):axis1)]==b.mShape[((axis2<0)?(rank2+axis2):axis2)],
+    assert(a.shape[((axis1<0)?(rank1+axis1):axis1)]==b.shape[((axis2<0)?(rank2+axis2):axis2)],
         "fuse axis has to have the same size in a and b");
 }
 body {
@@ -63,13 +63,13 @@ body {
     if (axis2<0) axis2+=rank2;
     for (int i=0;i<rank1;++i){
         if (i!=axis1){
-            newshape[ii]=a.mShape[i];
+            newshape[ii]=a.shape[i];
             ++ii;
         }
     }
     for (int i=0;i<rank2;++i){
         if (i!=axis2){
-            newshape[ii]=b.mShape[i];
+            newshape[ii]=b.shape[i];
             ++ii;
         }
     }
@@ -90,19 +90,19 @@ in {
     static assert(rank3==rank1+rank2-2,"rank3 has to be rank1+rank2-2");
     assert(-rank1<=axis1 && axis1<rank1,"axis1 out of bounds");
     assert(-rank2<=axis2 && axis2<rank2,"axis2 out of bounds");
-    assert(a.mShape[((axis1<0)?(rank1+axis1):axis1)]==b.mShape[((axis2<0)?(rank2+axis2):axis2)],
+    assert(a.shape[((axis1<0)?(rank1+axis1):axis1)]==b.shape[((axis2<0)?(rank2+axis2):axis2)],
         "fuse axis has to have the same size in a and b");
     int ii=0;
     static if(rank3!=0){
         for (int i=0;i<rank1;++i){
             if (i!=axis1 && i!=rank1+axis1){
-                assert(c.mShape[ii]==a.mShape[i],"invalid shape for c");
+                assert(c.shape[ii]==a.shape[i],"invalid shape for c");
                 ++ii;
             }
         }
         for (int i=0;i<rank2;++i){
             if (i!=axis2 && i!=rank2+axis2){
-                assert(c.mShape[ii]==b.mShape[i],"invalid shape for c");
+                assert(c.shape[ii]==b.shape[i],"invalid shape for c");
                 ++ii;
             }
         }
@@ -111,7 +111,7 @@ in {
 body {
     if (axis1<0) axis1+=rank1;
     if (axis2<0) axis2+=rank2;
-    if ((a.mFlags|b.mFlags)&ArrayFlags.Zero){
+    if ((a.flags|b.flags)&ArrayFlags.Zero){
         if (scaleC==0){
             static if(rank3>0){
                 c[]=cast(T)0;
@@ -128,94 +128,111 @@ body {
             // call blas
             // negative incremented vector in blas loops backwards on a[0..n], not on a[-n+1..1]
             static if(rank1==1 && rank2==1){
-                index_type aStartIdx=a.mStartIdx,bStartIdx=b.mStartIdx;
-                if (a.mStrides[0]<0) aStartIdx+=(a.mShape[0]-1)*a.mStrides[0];
-                if (b.mStrides[0]<0) bStartIdx+=(b.mShape[0]-1)*b.mStrides[0];
+                T* aStartPtr=a.startPtrArray,bStartPtr=b.startPtrArray;
+                if (a.bStrides[0]<0) aStartPtr=cast(T*)(cast(size_t)aStartPtr+(a.shape[0]-1)*a.bStrides[0]);
+                if (b.bStrides[0]<0) bStartPtr=cast(T*)(cast(size_t)bStartPtr+(b.shape[0]-1)*b.bStrides[0]);
                 static if (is(T==f_float) && is(S==f_double)){
-                    c=cast(S)DBlas.ddot(a.mShape[0], a.mData.ptr+aStartIdx, a.mStrides[0],
-                        b.mData.ptr+bStartIdx, b.mStrides[0]);
+                    c=cast(S)DBlas.ddot(a.shape[0], aStartPtr, a.bStrides[0]/cast(index_type)T.sizeof,
+                        bStartPtr, b.bStrides[0]/cast(index_type)T.sizeof);
                 } else static if (is(T==cfloat)|| is(T==cdouble)){
-                    c=cast(S)DBlas.dotu(a.mShape[0], a.mData.ptr+aStartIdx, a.mStrides[0],
-                        b.mData.ptr+bStartIdx, b.mStrides[0]);
+                    c=cast(S)DBlas.dotu(a.shape[0], aStartPtr, a.bStrides[0]/cast(index_type)T.sizeof,
+                        bStartPtr, b.bStrides[0]/cast(index_type)T.sizeof);
                 } else {
-                    c=cast(S)DBlas.dot(a.mShape[0], a.mData.ptr+aStartIdx, a.mStrides[0],
-                        b.mData.ptr+bStartIdx, b.mStrides[0]);
+                    c=cast(S)DBlas.dot(a.shape[0], aStartPtr, a.bStrides[0]/cast(index_type)T.sizeof,
+                        bStartPtr, b.bStrides[0]/cast(index_type)T.sizeof);
                 }
                 return c;
             } else static if (rank1==1 && rank2==2) {
-                index_type aStartIdx=a.mStartIdx;
-                if (a.mStrides[0]<0) aStartIdx+=(a.mShape[0]-1)*a.mStrides[0];
-                if (b.mStrides[0]==1 && b.mStrides[1]>0 ||
-                    b.mStrides[1]==1 && b.mStrides[0]>0){
+                T* aStartPtr=a.startPtrArray;
+                if (a.bStrides[0]<0) aStartPtr=cast(T*)(cast(size_t)aStartPtr+(a.shape[0]-1)*a.bStrides[0]);
+                if (b.bStrides[0]==cast(index_type)T.sizeof && b.bStrides[1]>0 ||
+                    b.bStrides[1]==cast(index_type)T.sizeof && b.bStrides[0]>0){
                     int transpose=1;
                     if (axis2==1) transpose=0;
-                    if (b.mStrides[0]!=1) transpose=!transpose;
-                    f_int ldb=cast(f_int)((b.mStrides[0]==1)?b.mStrides[1]:b.mStrides[0]);
-                    f_int m=(transpose?a.mShape[0]:c.mShape[0]);
+                    if (b.bStrides[0]!=cast(index_type)T.sizeof) transpose=!transpose;
+                    f_int ldb=cast(f_int)((b.bStrides[0]==cast(index_type)T.sizeof)?b.bStrides[1]:b.bStrides[0]);
+                    f_int m=(transpose?a.shape[0]:c.shape[0]);
                     // this check is needed to give a valid ldb to blas (that checks it)
                     // even if ldb is never needed (only one column)
-                    if (ldb==cast(f_int)1) ldb=m;
+                    if (ldb!=cast(f_int)T.sizeof){
+                        ldb/=cast(index_type)T.sizeof;
+                    } else {
+                        ldb=m;
+                    }
                     DBlas.gemv((transpose?'T':'N'), m,
-                        (transpose?c.mShape[0]:a.mShape[0]),scaleRes,
-                        b.mData.ptr+b.mStartIdx, ldb,
-                        a.mData.ptr+aStartIdx,a.mStrides[0],
-                        scaleC, c.mData.ptr+c.mStartIdx, c.mStrides[0]);
+                        (transpose?c.shape[0]:a.shape[0]),scaleRes,
+                        b.startPtrArray, ldb,
+                        aStartPtr,a.bStrides[0]/cast(index_type)T.sizeof,
+                        scaleC, c.startPtrArray, c.bStrides[0]/cast(index_type)T.sizeof);
                     return c;
                 }
             } else static if (rank1==2 && rank2==1) {
-                index_type bStartIdx=b.mStartIdx;
-                if (b.mStrides[0]<0) bStartIdx+=(b.mShape[0]-1)*b.mStrides[0];
-                if (a.mStrides[0]==1 && a.mStrides[1]>0 ||
-                    a.mStrides[1]==1 && a.mStrides[0]>0){
+                T* bStartPtr=b.startPtrArray;
+                if (b.bStrides[0]<0) bStartPtr=cast(T*)(cast(size_t)bStartPtr+(b.shape[0]-1)*b.bStrides[0]);
+                if (a.bStrides[0]==cast(index_type)T.sizeof && a.bStrides[1]>0 ||
+                    a.bStrides[1]==cast(index_type)T.sizeof && a.bStrides[0]>0){
                     int transpose=1;
                     if (axis1==1) transpose=0;
-                    if (a.mStrides[0]!=1) transpose=!transpose;
-                    f_int lda=cast(f_int)((a.mStrides[0]==1)?a.mStrides[1]:a.mStrides[0]);
-                    f_int m=(transpose?b.mShape[0]:c.mShape[0]);
+                    if (a.bStrides[0]!=cast(index_type)T.sizeof) transpose=!transpose;
+                    f_int lda=cast(f_int)((a.bStrides[0]==cast(index_type)T.sizeof)?a.bStrides[1]:a.bStrides[0]);
+                    f_int m=(transpose?b.shape[0]:c.shape[0]);
                     // this check is needed to give a valid lda to blas (that checks it)
                     // even if lda is never needed (only one column)
-                    if (lda==cast(f_int)1) lda=m;
+                    if (lda!=cast(f_int)T.sizeof){
+                        lda/=cast(index_type)T.sizeof;
+                    } else {
+                        lda=m;
+                    }
                     DBlas.gemv((transpose?'T':'N'), m,
-                        (transpose?c.mShape[0]:b.mShape[0]), scaleRes,
-                        a.mData.ptr+a.mStartIdx, lda,
-                        b.mData.ptr+bStartIdx,b.mStrides[0],
-                        scaleC, c.mData.ptr+c.mStartIdx, c.mStrides[0]);
+                        (transpose?c.shape[0]:b.shape[0]), scaleRes,
+                        a.startPtrArray, lda,
+                        bStartPtr,b.bStrides[0]/cast(index_type)T.sizeof,
+                        scaleC, c.startPtrArray, c.bStrides[0]/cast(index_type)T.sizeof);
                     return c;
                 }
             } else static if(is(S==T)){
                 static assert(rank1==2 && rank2==2);
-                if ((a.mStrides[0]==1 && a.mStrides[1]>0 || a.mStrides[1]==1 && a.mStrides[0]>0)&&
-                    (b.mStrides[0]==1 && b.mStrides[1]>0 || b.mStrides[1]==1 && b.mStrides[0]>0)&&
-                    (c.mStrides[0]==1 && c.mStrides[1]>0 || c.mStrides[1]==1 && c.mStrides[0]>0)){
+                if ((a.bStrides[0]==cast(index_type)T.sizeof && a.bStrides[1]>0 || a.bStrides[1]==cast(index_type)T.sizeof && a.bStrides[0]>0)&&
+                    (b.bStrides[0]==cast(index_type)T.sizeof && b.bStrides[1]>0 || b.bStrides[1]==cast(index_type)T.sizeof && b.bStrides[0]>0)&&
+                    (c.bStrides[0]==cast(index_type)T.sizeof && c.bStrides[1]>0 || c.bStrides[1]==cast(index_type)T.sizeof && c.bStrides[0]>0)){
                     int transposeA=0;
                     if (axis1==0) transposeA=1;
-                    if (a.mStrides[0]!=1) transposeA=!transposeA;
+                    if (a.bStrides[0]!=cast(index_type)T.sizeof) transposeA=!transposeA;
                     int transposeB=0;
                     if (axis2==1) transposeB=1;
-                    if (b.mStrides[0]!=1) transposeB=!transposeB;
-                    int swapAB=c.mStrides[0]!=1;
-                    f_int ldb=cast(f_int)((b.mStrides[0]==1)?b.mStrides[1]:b.mStrides[0]);
-                    f_int lda=cast(f_int)((a.mStrides[0]==1)?a.mStrides[1]:a.mStrides[0]);
-                    f_int ldc=cast(f_int)((c.mStrides[0]==1)?c.mStrides[1]:c.mStrides[0]);
+                    if (b.bStrides[0]!=cast(index_type)T.sizeof) transposeB=!transposeB;
+                    int swapAB=c.bStrides[0]!=cast(index_type)T.sizeof;
+                    f_int ldb=cast(f_int)((b.bStrides[0]==cast(index_type)T.sizeof)?b.bStrides[1]:b.bStrides[0]);
+                    f_int lda=cast(f_int)((a.bStrides[0]==cast(index_type)T.sizeof)?a.bStrides[1]:a.bStrides[0]);
+                    f_int ldc=cast(f_int)((c.bStrides[0]==cast(index_type)T.sizeof)?c.bStrides[1]:c.bStrides[0]);
                     // these checks are needed to give a valid ldX to blas (that checks it)
                     // even if ldX is never needed (only one column)
-                    if (ldb==cast(f_int)1) ldb=(transposeB?b.mShape[1-axis2]:b.mShape[axis2]);
-                    if (lda==cast(f_int)1) lda=(transposeA?a.mShape[axis1]:a.mShape[1-axis1]);
-                    if (ldc==cast(f_int)1) ldc=c.mShape[0];
+                    if (ldb!=cast(f_int)T.sizeof)
+                        ldb/=cast(index_type)T.sizeof;
+                    else
+                        ldb=(transposeB?b.shape[1-axis2]:b.shape[axis2]);
+                    if (lda!=cast(f_int)T.sizeof)
+                        lda/=cast(index_type)T.sizeof;
+                    else
+                        lda=(transposeA?a.shape[axis1]:a.shape[1-axis1]);
+                    if (ldc!=cast(f_int)T.sizeof)
+                        ldc/=cast(index_type)T.sizeof;
+                    else
+                        ldc=c.shape[0];
                     if (swapAB){
                         DBlas.gemm((transposeB?'N':'T'), (transposeA?'N':'T'),
-                        b.mShape[1-axis2], a.mShape[1-axis1], a.mShape[axis1], scaleRes,
-                        b.mData.ptr+b.mStartIdx,ldb,
-                        a.mData.ptr+a.mStartIdx,lda,
+                        b.shape[1-axis2], a.shape[1-axis1], a.shape[axis1], scaleRes,
+                        b.startPtrArray,ldb,
+                        a.startPtrArray,lda,
                         scaleC,
-                        c.mData.ptr+c.mStartIdx,ldc);
+                        c.startPtrArray,ldc);
                     } else {
                         DBlas.gemm((transposeA?'T':'N'), (transposeB?'T':'N'),
-                        a.mShape[1-axis1], b.mShape[1-axis2], a.mShape[axis1], scaleRes,
-                        a.mData.ptr+a.mStartIdx,lda,
-                        b.mData.ptr+b.mStartIdx,ldb,
+                        a.shape[1-axis1], b.shape[1-axis2], a.shape[axis1], scaleRes,
+                        a.startPtrArray,lda,
+                        b.startPtrArray,ldb,
                         scaleC,
-                        c.mData.ptr+c.mStartIdx,ldc);
+                        c.startPtrArray,ldc);
                     }
                     return c;
                 }
@@ -258,14 +275,14 @@ version (lapack){
         scope ipiv=NArray!(f_int,1).empty(a.shape[0]);
         f_int info;
         if (x is null) x=b.dup(true);
-        if (!(x.mStrides[0]==1 && x.mStrides[1]>0 || x.mStrides[1]==1 && x.mStrides[0]>0)){
+        if (!(x.bStrides[0]==cast(index_type)T.sizeof && x.bStrides[1]>0 || x.bStrides[1]==cast(index_type)T.sizeof && x.bStrides[0]>0)){
             scope NArray!(T,2) xx=b.dup(true);
-            DLapack.gesv(a.shape[0], b.shape[1], a.mData.ptr+a.mStartIdx, a.mStrides[1], ipiv.mData.ptr,
-                xx.mData.ptr+xx.mStartIdx, xx.mShape[1], info);
+            DLapack.gesv(a.shape[0], b.shape[1], a.startPtrArray, a.bStrides[1]/cast(index_type)T.sizeof, ipiv.startPtrArray,
+                xx.startPtrArray, xx.shape[1], info);
             x[]=xx;
         } else {
-            DLapack.gesv(a.shape[0], b.shape[1], a.mData.ptr+a.mStartIdx, a.mStrides[1], ipiv.mData.ptr,
-                x.mData.ptr+x.mStartIdx, x.mShape[1], info);
+            DLapack.gesv(a.shape[0], b.shape[1], a.startPtrArray, a.bStrides[1]/cast(index_type)T.sizeof, ipiv.startPtrArray,
+                x.startPtrArray, x.shape[1], info);
         }
         if (info > 0)
             throw new LinAlgException("Singular matrix");
@@ -291,10 +308,10 @@ version (lapack){
     NArray!(T,2) inv(T)(NArray!(T,2)a)
     in {
         static assert(isBlasType!(T),"implemented only for blas types");
-        assert(a.mShape[0]==a.mShape[1],"a has to be square");
+        assert(a.shape[0]==a.shape[1],"a has to be square");
     }
     body {
-        scope un=eye!(T)(a.mShape[0]);
+        scope un=eye!(T)(a.shape[0]);
         return solve(a,un);
     }
     
@@ -302,17 +319,17 @@ version (lapack){
     T det(T)(NArray!(T,2)a)
     in {
         static assert(isBlasType!(T),"implemented only for blas types");
-        assert(a.mShape[0]==b.mShape[1],"a has to be square");
+        assert(a.shape[0]==b.shape[1],"a has to be square");
     }
     body {
         scope NArray!(f_int,1) pivots = NArray!(f_int,1).zeros();
         f_int info;
         auto a2=a.dup(true);
-        results = DLapack.getrf(a2, pivots, info);
+        results = getrf(a2, pivots, info);
         if (info > 0)
             return cast(T)0;
         int sign=0;
-        for (index_type i=0;i<a.mShape[0];++i)
+        for (index_type i=0;i<a.shape[0];++i)
             sign += (pivots[i] != i+1);
         sign=sign % 2;
         return (1.-2.*sign)*multiplyAll(diag(a2));
@@ -330,13 +347,13 @@ version (lapack){
     NArray!(T,2) getrf(T)(NArray!(T,2) a,NArray!(f_int,1) ipiv,f_int info)
     in {
         static assert(isBlasType!(T),"implemented only for blas types");
-        assert(a.strides[0]==1 && a.strides[1]>=a.shape[0],"a has to be a blas matrix");
-        assert(ipiv.strides[0]==1,"ipiv has to have stride 1");
+        assert(a.bStrides[0]==cast(index_type)T.sizeof && a.bStrides[1]>=a.shape[0],"a has to be a blas matrix");
+        assert(ipiv.bStrides[0]==cast(index_type)T.sizeof,"ipiv has to have stride 1");
         assert(ipiv.shape[0]>=a.shape[0]||ipiv.shape[0]>=a.shape[1],"ipiv should be at least min(a.shape)");
     }
     body {
-        DLapack.getrf(a.mShape[0], a.mShape[1], a.mData.ptr+a.mStartIdx, a.mStrides[1],
-            pivots.mData.ptr+mStartIdx, info);
+        DLapack.getrf(a.shape[0], a.shape[1], a.startPtrArray, a.bStrides[1]/cast(index_type)T.sizeof,
+            pivots.startPtrArray, info);
         if (info < 0)
             throw new LinAlgException("Illegal input to Fortran routine");
         return a;
@@ -387,48 +404,48 @@ version (lapack){
         T* lEPtr=null,rEPtr=null;
         f_int lELd,rELd;
         if (leftEVect !is null){
-            if (leftEVect.strides[0]!=1 || leftEVect.strides[1]<leftEVect.shape[0]) {
+            if (leftEVect.bStrides[0]!=cast(index_type)T.sizeof || leftEVect.bStrides[1]<leftEVect.shape[0]*cast(index_type)T.sizeof) {
                 lE=leftEVect.dup(true);
             }
-            lEPtr=lE.ptr;
-            lELd=lE.strides[1];
+            lEPtr=lE.startPtrArray;
+            lELd=lE.bStrides[1]/cast(index_type)T.sizeof;
         }
         if (rightEVect !is null){
-            if (rightEVect.strides[0]!=1 || rightEVect.strides[1]<rightEVect.shape[0]) {
+            if (rightEVect.bStrides[0]!=cast(index_type)T.sizeof || rightEVect.bStrides[1]<rightEVect.shape[0]*cast(index_type)T.sizeof) {
                 rE=rightEVect.dup(true);
             }
-            rEPtr=rE.ptr;
-            rELd=rE.strides[1];
+            rEPtr=rE.startPtrArray;
+            rELd=rE.bStrides[1]/cast(index_type)T.sizeof;
         }
         NArray!(complexType!(T),1) eigenval=ev;
-        if (eigenval is null || eigenval.strides[0]!=1 || eigenval.strides[1]<=eigenval.shape[0]) {
+        if (eigenval is null || eigenval.bStrides[0]!=cast(index_type)T.sizeof || eigenval.bStrides[1]<=eigenval.shape[0]*cast(index_type)T.sizeof) {
             eigenval = zeros!(complexType!(T))(n);
         }
         f_int n=a.shape[0],info;
         f_int lwork = -1;
         T workTmp;
         static if(is(complexType!(T)==T)){
-            scope NArray!(realType!(T),1) rwork = zeros!(realType!(T))(2*n);
+            scope NArray!(realType!(T),1) rwork = empty!(realType!(T))(2*n);
             DLapack.geev(((lEPtr is null)?'N':'V'),((rEPtr is null)?'N':'V'),n,
-                a1.ptr, a1.mStrides[1], w.ptr, lEPtr, lELd, rEPtr, rELd,
-                &workTmp, lwork, rwork.ptr, info);
+                a1.startPtrArray, a1.bStrides[1]/cast(index_type)T.sizeof, w.startPtrArray, lEPtr, lELd, rEPtr, rELd,
+                &workTmp, lwork, rwork.startPtrArray, info);
             lwork = cast(int)abs(work[0])+1;
-            scope NArray!(T,1) work = zeros!(T)(lwork);
+            scope NArray!(T,1) work = empty!(T)(lwork);
             DLapack.geev(((lEPtr is null)?'N':'V'),((rEPtr is null)?'N':'V'),n,
-                a1.ptr, a1.mStrides[1], w.ptr, lEPtr, lELd, rEPtr, rELd,
-                work, work.mStrides[1], rwork.ptr, info);
+                a1.startPtrArray, a1.bStrides[1]/cast(index_type)T.sizeof, w.startPtrArray, lEPtr, lELd, rEPtr, rELd,
+                work, work.bStrides[1]/cast(index_type)T.sizeof, rwork.startPtrArray, info);
             
         } else {
-            scope NArray!(realType!(T),1) wr = zeros!(realType!(T))(n);
-            scope NArray!(realType!(T),1) wi = zeros!(realType!(T))(n);
+            scope NArray!(realType!(T),1) wr = empty!(realType!(T))(n);
+            scope NArray!(realType!(T),1) wi = empty!(realType!(T))(n);
             DLapack.geev(((lEPtr is null)?'N':'V'),((rEPtr is null)?'N':'V'),n,
-                a1.ptr, a1.mStrides[1], wr.ptr, wi.ptr, lEPtr, lELd, rEPtr, rELd,
+                a1.startPtrArray, a1.bStrides[1]/cast(index_type)T.sizeof, wr.ptr, wi.ptr, lEPtr, lELd, rEPtr, rELd,
                 &workTmp, lwork, info);
             lwork = cast(int)abs(work[0])+1;
-            scope NArray!(T,1) work = zeros!(T)(lwork);
+            scope NArray!(T,1) work = empty!(T)(lwork);
             DLapack.geev(((lEPtr is null)?'N':'V'),((rEPtr is null)?'N':'V'),n,
-                a1.ptr, a1.mStrides[1], wr.ptr, wi.ptr, lEPtr, lELd, rEPtr, rELd,
-                work, work.mStrides[1], info);
+                a1.ptr, a1.bStrides[1]/cast(index_type)T.sizeof, wr.startPtrArray, wi.startPtrArray, lEPtr, lELd, rEPtr, rELd,
+                work.startPtrArray, work.bStrides[1]/cast(index_type)T.sizeof, info);
             for (int i=0;i<n;++i)
                 eigenval[i]=wr[i]+wi[i]*1i;
         }

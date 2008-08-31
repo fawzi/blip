@@ -106,7 +106,7 @@ class Dottable(T,int rank1,S,int rank2,bool scanAxis=false, bool randomLayout=fa
     }
 }
 
-/// returns a NArray indexed with the variables of a pLoopGenIdx or sLoopGenIdx
+/// returns a NArray indexed with the variables of a pLoopIdx or sLoopGenIdx
 char[] NArrayInLoop(char[] arrName,int rank,char[] ivarStr){
     char[] res="".dup;
     res~=arrName~"[";
@@ -121,16 +121,12 @@ char[] NArrayInLoop(char[] arrName,int rank,char[] ivarStr){
 
 void checkLoop1(T,int rank)(NArray!(T,rank) a){
     {
-        mixin(pLoopGenIdx(rank,["a"],[],
-        "assert(*(aBasePtr+aIdx0)=="~NArrayInLoop("a",rank,"i")~",\"pLoopGenIdx looping1 failed\");","i"));
+        mixin(pLoopIdx(rank,["a"],
+        "assert(*aPtr0=="~NArrayInLoop("a",rank,"i")~",\"pLoopIdx looping1 failed\");","i"));
     }
     {
-        mixin(sLoopGenIdx(rank,["a"],[],
-        "assert(*(aBasePtr+aIdx0)=="~NArrayInLoop("a",rank,"i")~",\"sLoopGenIdx looping1 failed\");","i"));
-    }
-    {
-        mixin(sLoopGenIdx(rank,["a"],[],
-        "assert(*(aBasePtr+aIdx0)=="~NArrayInLoop("a",rank,"i")~",\"sLoopGenPtr looping1 failed\");","i"));
+        mixin(sLoopGenIdx(rank,["a"],
+        "assert(*aPtr0=="~NArrayInLoop("a",rank,"i")~",\"sLoopGenIdx looping1 failed\");","i"));
     }
     index_type[rank] iPos;
     const char[] loopBody1=`
@@ -141,18 +137,18 @@ void checkLoop1(T,int rank)(NArray!(T,rank) a){
     {
         bool did_wrap=false;
         iPos[]=cast(index_type)0;
-        mixin(sLoopPtr(rank,["a"],[],loopBody1,"i"));
+        mixin(sLoopPtr(rank,["a"],loopBody1,"i"));
         assert(did_wrap,"incomplete loop");
     }
     const char[] loopBody2=`
     assert(!did_wrap,"counter wrapped");
-    assert(a.arrayIndex(iPos)==*(aBasePtr+aIdx0),"sLoopIdx looping failed");
+    assert(a.arrayIndex(iPos)==*aPtr0,"sLoopIdx looping failed");
     did_wrap=a.incrementArrayIdx(iPos);
     `;
     {
         bool did_wrap=false;
         iPos[]=cast(index_type)0;
-        mixin(sLoopIdx(rank,["a"],[],loopBody2,"i"));
+        mixin(sLoopGenIdx(rank,["a"],loopBody2,"i"));
         assert(did_wrap,"incomplete loop");
     }
 }
@@ -438,7 +434,7 @@ void doNArrayTests(){
     checkeq(a3[1],[1,0,2,0,3,0]);
     checkeq(a3[2],[0,0,0,0,0,0]);
     checkeq(a4[0,Range(1,3),Range(1,4,2)],[5,7,9,11]);
-    //Stdout("`")(getString(a4.printData((new Stringify)("a4:"),"{,6}",10,"   ").newline))("`").newline;
+    Stdout("`")(getString(a4.printData((new Stringify)("a4:"),"{,6}",10,"   ").newline))("`").newline;
     assert(getString(a4.printData((new Stringify)("a4:"),"{,6}",10,"   ").newline)==
 `a4:[[[     0,     1,     2,     3],
      [     4,     5,     6,     7],
@@ -471,9 +467,9 @@ void doNArrayTests(){
         v+=i+j;
     }
     auto r32=dot(a3,a2);
-    auto t=zeros!(int)(r32.mShape);
-    for (int i=0;i<a3.mShape[0];++i)
-        for (int j=0;j<a3.mShape[1];++j)
+    auto t=zeros!(int)(r32.shape);
+    for (int i=0;i<a3.shape[0];++i)
+        for (int j=0;j<a3.shape[1];++j)
             t[i]=t[i]+a3[i,j]*a2[j];
     foreach (i,v;r32){
         assert(v==t[i]);
@@ -485,7 +481,8 @@ void doNArrayTests(){
     // SingleRTest.defaultTestController=new TextController(TextController.OnFailure.StopAllTests,
     //     TextController.PrintLevel.AllShort);
     TestCollection narrayTsts=rtestNArray();
-    narrayTsts.runTests(10);
+    narrayTsts
+    .runTests(10);
 }
 
 debug(UnitTest){

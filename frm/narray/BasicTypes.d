@@ -1,8 +1,7 @@
 /*******************************************************************************
     N dimensional dense rectangular arrays
     
-    Inspired by muarray by William V. Baxter (III) with hints of 
-    numpy, and haskell GSL/Matrix Library, but evolved to something of quite different
+    An attempt a creating a reasonably fast and easy to use multidimensional array
     
     - rank must be choosen at compiletime -> smart indexing possible
     - sizes can be choosen at runtime -> no compile time size
@@ -26,6 +25,11 @@
     
     Possible changes: I might switch to a struct+class to keep a pointer to non gc memory
       (should be a little bit faster)
+     
+    History:
+        Inspired by muarray by William V. Baxter (III) with hints of 
+        numpy, and haskell GSL/Matrix Library, but evolved to something of quite different
+        I used native strides as Robert Jacques suggested for strided arrays
     
     copyright:      Copyright (c) 2008. Fawzi Mohamed
     license:        BSD style: $(LICENSE)
@@ -46,18 +50,20 @@ import frm.rtest.RTest;
 /// flags for fast checking of 
 enum ArrayFlags {
     /// C-style contiguous which means that a linear scan of
-    /// mData with stride 1 is equivalent to scanning with a loop
+    /// data with stride 1 is equivalent to scanning with a loop
     /// in which the last index is the fastest varying
     Contiguous   = 0x1,
     /// Fortran-style contiguous means that a lineat scan of
-    /// mData with stride 1 with a (transpose of Contiguous).
+    /// data with stride 1 with a (transpose of Contiguous).
     Fortran      = 0x2,
     /// If this flag is set this array frees its data in the destructor.
     ShouldFreeData      = 0x4,
-    /// if the array is "compact" and mData scans the whole array
-    /// only once (and mData can be directly used to loop on all elements)
-    /// Contiguous|Fortran implies Compact
-    Compact      = 0x8,
+    /// if the array is "compact" and data=startPtr[0..size]
+    /// Contiguous|Fortran implies Compact1
+    Compact1      = 0x8,
+    /// if the array is "compact" and data.length==size
+    /// Contiguous|Fortran|Compact1 implies Compact2
+    Compact2      = 0x100,
     /// if the array is non small
     Small        = 0x10,
     /// if the array is large
@@ -68,11 +74,11 @@ enum ArrayFlags {
     Zero         = 0x80,
     /// flags that the user can set (the other are automatically calculated)
     ExtFlags = ShouldFreeData | ReadOnly,
-    All = Contiguous | Fortran | ShouldFreeData | Compact | Small | Large| ReadOnly| Zero, // useful ??
+    All = Contiguous | Fortran | ShouldFreeData | Compact1 | Compact2 | Small | Large| ReadOnly| Zero, // useful ??
     None = 0
 }
 
-alias int index_type; // switch back to int later
+alias ptrdiff_t index_type; // switch back to int later
 
 /// describes a range
 /// upper bound is not part of the range if positive
@@ -134,87 +140,122 @@ static if (rank<1)
 else {
     final class NArray : RandGen
     {
-        alias V dtype;
-        alias ArrayFlags Flags;
-
-        /// initial index (useful when looping backward)
-        const index_type mStartIdx;
-        /// strides (can be negative)
-        index_type[rank] mStrides;
-        /// shape of the array
-        index_type[rank] mShape;
-        /// the raw data of the array
-        V[] mData;
+        /// pointer to the element 0,...0 (not necessarily the start of the slice)
+        V* startPtrArray;
+        /// strides multiplied by V.sizeof (can be negative)
+        index_type[rank] bStrides;
+        /// shape of the array (should never be changed)
+        index_type[rank] shape;
+        /// size of the array
+        index_type nElArray;
         /// flags to quickly check properties of the array
-        uint mFlags = Flags.None;
+        uint flags = Flags.None;
         /// owner of the data if it is manually managed
         void *mBase = null;
-        /// flags
-        uint flags() { return mFlags; }
+        alias V dtype;
+        alias ArrayFlags Flags;
         /// the underlying data slice
-        V[] data() { return mData; }
-        /// strides of the array
-        index_type[] strides() { return mStrides; }
-        /// shape of the array
-        index_type[] shape() { return mShape; }
-        /// position of first element in the data slice (to allow reverse indexing)
-        index_type startIdx() { return mStartIdx; }
-        /// pointer to the first element of the array (not necessarily the start of the slice)
-        V* ptr() { return mData.ptr+mStartIdx; }
-        /// calulates the base flags (Contiguos,Fortran,Compact,Small,Large)
-        static uint calcBaseFlags(index_type[rank] strides, index_type[rank] shape, index_type startIdx,
-            V[] data){
+        V[] data() {
+            if (nElArray==0) return null;
+            index_type minExt=0,maxExt=0;
+            for (int i=0;i<rank;++i){
+                if (bStrides[i]>=0){
+                    maxExt+=bStrides[i]*(shape[i]-1);
+                } else {
+                    minExt+=bStrides[i]*(shape[i]-1);
+                }
+            }
+            return (cast(V*)(cast(size_t)startPtrArray+minExt))[0..((maxExt-minExt)/cast(index_type)V.sizeof+1)];
+        }
+        /// calulates the base flags (Contiguos,Fortran,Compact1,Compact2,Small,Large)
+        static uint calcBaseFlags(index_type[rank] strides, index_type[rank] shape)
+        out(flags){
+            debug(TestNArray){
+                index_type sz=cast(index_type)V.sizeof;
+                for (int i=0;i<rank;++i){
+                    sz*=shape[i];
+                }
+                if (flags&Flags.Contiguous){
+                    assert(strides[rank-1]==cast(index_type)V.sizeof || sz==0 || shape[rank-1]==1);
+                    assert(flags&Flags.Compact1);
+                }
+                if (flags&Flags.Fortran){
+                    assert(strides[0]==cast(index_type)V.sizeof || sz==0 || shape[0]==1);
+                    assert(flags&Flags.Compact1);
+                }
+                if (flags&(Flags.Compact1|Flags.Compact2)){
+                    index_type minExt=0,maxExt=0;
+                    index_type size=cast(index_type)V.sizeof;
+                    for (int i=0;i<rank;++i){
+                        if (strides[i]>=0){
+                            maxExt+=strides[i]*(shape[i]-1);
+                        } else {
+                            minExt+=strides[i]*(shape[i]-1);
+                        }
+                        size*=shape[i];
+                    }
+                    if (flags&Flags.Compact1) {
+                        assert(minExt==0);
+                        assert(maxExt==size-cast(index_type)V.sizeof);
+                        assert(flags&Flags.Compact2);
+                    }
+                    if (flags&Flags.Compact2){
+                        assert(maxExt-minExt==size-cast(index_type)V.sizeof);
+                    }
+                }
+            }
+        }
+        body{
             uint flags=Flags.None;
             // check contiguos & fortran
             bool contiguos,fortran;
-            index_type size=-1;
-            contiguos=fortran=(startIdx==0);
-            if (contiguos){
-                static if (rank == 1) {
-                    contiguos=fortran=(shape[0]==0 || shape[0] == 1 || 1 == strides[0]);
-                    size=shape[0];
+            index_type bSize=-1;
+            static if (rank == 1) {
+                contiguos=fortran=(shape[0]==0 || shape[0] == 1 || cast(index_type)V.sizeof == strides[0]);
+                bSize=shape[0]*cast(index_type)V.sizeof;
+            } else {
+                index_type sz=cast(index_type)V.sizeof;
+                for (int i=0;i<rank;i++){
+                    if (strides[i]!=sz && shape[i]!=1)
+                        fortran=false;
+                    sz*=shape[i];
+                }
+                bSize=sz;
+                sz=cast(index_type)V.sizeof;
+                if (sz==0){
+                    contiguos=true;
+                    fortran=true;
                 } else {
-                    index_type sz=1;
-                    for (int i=0;i<rank;i++){
+                    for (int i=rank-1;i>=0;i--){
                         if (strides[i]!=sz && shape[i]!=1)
-                            fortran=false;
+                            contiguos=false;
                         sz*=shape[i];
-                    }
-                    size=sz;
-                    sz=1;
-                    if (sz==0){
-                        contiguos=true;
-                        fortran=true;
-                    } else {
-                        for (int i=rank-1;i>=0;i--){
-                            if (strides[i]!=sz && shape[i]!=1)
-                                contiguos=false;
-                            sz*=shape[i];
-                        }
                     }
                 }
             }
             if (contiguos)
-                flags|=Flags.Contiguous|Flags.Compact;
+                flags|=Flags.Contiguous|Flags.Compact1|Flags.Compact2;
             if (fortran)
-                flags|=Flags.Fortran|Flags.Compact;
+                flags|=Flags.Fortran|Flags.Compact1|Flags.Compact2;
             else if (! contiguos) {
                 // check compact
-                index_type[rank] posStrides=strides;
-                index_type posStart=startIdx;
-                for (int i=0;i<rank;i++){
-                    if (posStrides[i]<0){
-                        posStart+=posStrides[i]*(shape[i]-1);
-                        posStrides[i]=-posStrides[i];
+                index_type[rank] posStrides;
+                index_type minExt=0,maxExt=0;
+                for (int i=0;i<rank;++i){
+                    if (strides[i]>=0){
+                        maxExt+=strides[i]*(shape[i]-1);
+                        posStrides[i]=strides[i];
+                    } else {
+                        minExt+=strides[i]*(shape[i]-1);
+                        posStrides[i]=-strides[i];
                     }
                 }
                 int[rank] sortIdx;
                 static if(rank==1){
-                    bool compact=(strides[0]==1);
-                    size=shape[0];
+                    bool compact=(posStrides[0]==1);
                 } else {
                     static if(rank==2){
-                        if (strides[0]<=strides[1]){
+                        if (posStrides[0]<=posStrides[1]){
                             sortIdx[0]=1;
                             sortIdx[1]=0;
                         } else {
@@ -224,45 +265,42 @@ else {
                     } else {
                         for (int i=0;i<rank;i++)
                             sortIdx[i]=i;
-                        sortIdx.sort((int x,int y){return strides[x]<strides[y];});
+                        sortIdx.sort((int x,int y){return strides[x]<posStrides[y];});
                     }
-                    index_type sz=1;
+                    index_type sz2=cast(index_type)V.sizeof;
                     bool compact=true;
                     for (int i=0;i<rank;i++){
-                        if (posStrides[sortIdx[i]]!=sz)
+                        if (posStrides[sortIdx[i]]!=sz2)
                             compact=false;
-                        sz*=shape[sortIdx[i]];
+                        sz2*=shape[sortIdx[i]];
                     }
-                    size=sz;
                 }
-                if (size==0)
+                if (bSize==0)
                     compact=true;
-                if (posStart!=0)
-                    compact=false;
-                if (compact)
-                    flags|=Flags.Compact;
-            }
-            if (flags & Flags.Compact){
-                if (data !is null && data.length!=size){
-                    // should this be an error, or should it be accepted ???
-                    flags &= ~(Flags.Contiguous|Flags.Fortran|Flags.Compact);
+                if (compact){
+                    if (minExt==0)
+                        flags|=Flags.Compact1|Flags.Compact2;
+                    else
+                        flags|=Flags.Compact2;
                 }
             }
-            if (size==0){
+            if (bSize==0){
                 flags|=Flags.Zero;
             }
-            if (size< 4*rank && size<20) {
+            if (bSize< 4*rank*cast(index_type)V.sizeof && bSize<20*cast(index_type)V.sizeof) {
                 flags|=Flags.Small;
             }
-            if (size>30*rank || size>100) {
+            if (bSize>30*cast(index_type)V.sizeof || bSize>100*cast(index_type)V.sizeof) {
                 flags|=Flags.Large;
             }
             return flags;
         }
         
-        /// this is the default constructor, it is quite lowlevel and you are
+        /// constructor using an array storage, preferred over the pointer based,
+        /// as it does some checks more, still it is quite lowlevel, you are
         /// supposed to create arrays with higher level functions (empty,zeros,ones,...)
-        /// the data will be freed if flags & Flags.ShouldFreeData, the other flags are ignored
+        /// the data will be freed if flags & Flags.ShouldFreeData, flags not in
+        /// Flags.ExtFlags are ignored
         this(index_type[rank] strides, index_type[rank] shape, index_type startIdx,
             V[] data, uint flags, void *mBase=null)
         in {
@@ -275,42 +313,75 @@ else {
                 } else {
                     maxIndex+=strides[i]*(shape[i]-1);
                 }
+                assert(size==0|| data.ptr!is null,"null data allowed only for empty arrays"); // allow?
             }
             if (size!=0 && data !is null){
                 assert(minIndex>=0,"minimum real internal index negative in NArray construction");
-                assert(maxIndex<data.length,"data array too small in NArray construction");
+                assert(maxIndex<data.length*cast(index_type)V.sizeof,"data array too small in NArray construction");
+            }
+            if (flags&Flags.ShouldFreeData && data !is null){
+                assert(minIndex==0,"ShouldFreeData with array not starting at beginning of data");
+            }
+        }
+        body { this(strides,shape,data.ptr+startIdx,flags,mBase); }
+        
+        /// this is the designated constructor, it is quite lowlevel and you are
+        /// supposed to create arrays with higher level functions (empty,zeros,ones,...)
+        /// the data will be freed if flags & Flags.ShouldFreeData, flags not in
+        /// Flags.ExtFlags are ignored
+        this(index_type[rank] strides, index_type[rank] shape, V* startPtr, uint flags, void *mBase=null)
+        in{
+            index_type sz=1;
+            for (int i=0;i<rank;++i){
+                assert(strides[i]%cast(index_type)V.sizeof==0,"stride is not a multiple of element size"); // allow?
+                sz*=shape[i];
             }
         }
         body {
-            this.mShape[] = shape;
-            this.mStrides[] = strides;
-            this.mStartIdx = startIdx;
-            this.mData=data;
-            this.mFlags=calcBaseFlags(strides,shape,startIdx,data)|(flags & Flags.ExtFlags);
+            this.shape[] = shape;
+            this.bStrides[] = strides;
+            this.startPtrArray=startPtr;
+            index_type sz=1;
+            for(int i=0;i<rank;++i)
+                sz*=shape[i];
+            this.nElArray=sz;
+            this.flags=calcBaseFlags(strides,shape)|(flags & Flags.ExtFlags);
             this.mBase=mBase;
         }
         
         ~this(){
             if (flags&Flags.ShouldFreeData){
-                free(mData.ptr);
+                free(data.ptr);
             }
         }
         
-        /// another way to construct an object (also low level, see empty, zeros and ones for better ways)
+        /// the preferred low level way to construct an object
+        /// for high level see empty, zeros and ones for better ways)
+        /// this should be used over the constructor because it would ease the transition to a struct
+        /// should it be done
         static NArray opCall(index_type[rank] strides, index_type[rank] shape, index_type startIdx,
             V[] data, uint flags, void* mBase=null){
             return new NArray(strides,shape,startIdx,data,flags,mBase);
         }
+
+        /// another way to construct an object (also low level, see empty, zeros and ones for better ways)
+        /// this should be used over the constructor because it would ease the transition to a struct
+        /// should it be done
+        static NArray opCall(index_type[rank] strides, index_type[rank] shape, 
+            V*startPtr, uint flags, void* mBase=null){
+            return new NArray(strides,shape,startPtr,flags,mBase);
+        }
                     
         /// returns an empty (uninitialized) array of the requested shape
         static NArray empty(index_type[rank] shape,bool fortran=false){
+            
             index_type size=1;
             foreach (sz;shape)
                 size*=sz;
             uint flags=ArrayFlags.None;
             V[] mData;
-            if (size*V.sizeof>manualAllocThreshold) {
-                V* mData2=cast(V*)calloc(size,V.sizeof);
+            if (size>manualAllocThreshold/cast(index_type)V.sizeof) {
+                V* mData2=cast(V*)calloc(size,cast(index_type)V.sizeof);
                 if(mData2 is null) throw new Exception("calloc failed");
                 mData=mData2[0..size];
                 flags=ArrayFlags.ShouldFreeData;
@@ -319,13 +390,13 @@ else {
             }
             index_type[rank] strides;
             if (!fortran){
-                index_type sz=1;
+                index_type sz=cast(index_type)V.sizeof;
                 foreach_reverse(i, d; shape) {
                     strides[i] = sz;
                     sz *= d;
                 }
             } else {
-                index_type sz=1;
+                index_type sz=cast(index_type)V.sizeof;
                 foreach(i, d; shape) {
                     strides[i] = sz;
                     sz *= d;
@@ -337,16 +408,16 @@ else {
         static NArray zeros(index_type[rank] shape, bool fortran=false){
             NArray res=empty(shape,fortran);
             static if(isAtomicType!(V)){
-                memset(res.mData.ptr,0,res.mData.length*V.sizeof);
+                memset(res.startPtrArray,0,res.nElArray*cast(index_type)V.sizeof);
             } else {
-                res.mData[]=cast(V)0;
+                res.startPtrArray[0..res.nElArray]=cast(V)0;
             }
             return res;
         }
         /// returns an array initialized to 1 of the requested shape
         static NArray ones(index_type[rank] shape, bool fortran=false){
             NArray res=empty(shape,fortran);
-            res.mData[]=cast(V)1;
+            res.startPtrArray[0..res.nElArray]=cast(V)1;
             return res;
         }
         
@@ -361,27 +432,27 @@ else {
             static assert(rank>=nArgs!(S),"too many argumens in indexing operation");
             static if(rank==reductionFactor!(S)){
                 foreach (i,v;idx_tup){
-                    assert(0<=v && v<mShape[i],"index "~ctfe_i2a(i)~" out of bounds");
+                    assert(0<=v && v<shape[i],"index "~ctfe_i2a(i)~" out of bounds");
                 }
             } else {
                 foreach(i,TT;S){
                     static if(is(TT==int)||is(TT==long)||is(TT==uint)||is(TT==ulong)){
-                        assert(0<=idx_tup[i] && idx_tup[i]<mShape[i],"index "~ctfe_i2a(i)~" out of bounds");
+                        assert(0<=idx_tup[i] && idx_tup[i]<shape[i],"index "~ctfe_i2a(i)~" out of bounds");
                     } else static if(is(TT==Range)){
                         {
                             index_type from=idx_tup[i].from,to=idx_tup[i].to,step=idx_tup[i].inc;
-                            if (from<0) from+=mShape[i];
-                            if (to<0) to+=mShape[i]+1;
+                            if (from<0) from+=shape[i];
+                            if (to<0) to+=shape[i]+1;
                             if (from<to && step>=0 || from>to && step<0){
-                                assert(0<=from && from<mShape[i],
+                                assert(0<=from && from<shape[i],
                                     "invalid lower range for dimension "~ctfe_i2a(i));
                                 if (step==0)
-                                    to=mShape[i];
+                                    to=shape[i];
                                 else if (step>0)
                                     to=from+(to-from+step-1)/step;
                                 else
                                     to=from-(to-from+step+1)/step;
-                                assert(to>=0 && to<=mShape[i],
+                                assert(to>=0 && to<=shape[i],
                                     "invalid upper range for dimension "~ctfe_i2a(i));
                             }
                         }
@@ -389,70 +460,66 @@ else {
                 }
             }
         }
+        out(res){
+            debug(TestNArray){
+                static if (rank!=reductionFactor!(S)){
+                    V[] oldData=data;
+                    V[] newdata=res.data;
+                    assert(oldData.ptr<=newdata.ptr && ((oldData.ptr+oldData.length)>=(newdata.ptr+newdata.length)),
+                        "new data slice outside actual data slice");
+                }
+            }
+        }
         body {
             static assert(rank>=nArgs!(S),"too many arguments in indexing operation");
             static if (rank==reductionFactor!(S)){
-                index_type idx=mStartIdx;
+                V *pos=startPtrArray;
                 foreach(i,TT;S){
                     static assert(is(TT==int)||is(TT==long)||is(TT==uint)||is(TT==ulong),"unexpected type <"~TT.stringof~"> in full indexing");
-                    idx+=idx_tup[i]*mStrides[i];
+                    pos=cast(V*)(cast(size_t)pos+cast(index_type)idx_tup[i]*bStrides[i]);
                 }
-                return mData[idx];
+                return *pos;
             } else {
                 const int rank2=rank-reductionFactor!(S);
                 index_type[rank2] newstrides,newshape;
-                index_type newStartIdx;
+                index_type newStartIdx=cast(index_type)0;
                 int idim=0;
                 foreach(i,TT;S){
                     static if (is(TT==int)||is(TT==long)||is(TT==uint)||is(TT==ulong)){
-                        newStartIdx+=idx_tup[i]*mStrides[i];
+                        newStartIdx+=cast(index_type)idx_tup[i]*bStrides[i];
                     } else static if (is(TT==Range)){
                         {
                             index_type from=idx_tup[i].from,to=idx_tup[i].to,step=idx_tup[i].inc;
-                            if (from<0) from+=mShape[i];
-                            if (to<0) to+=mShape[i]+1;
+                            if (from<0) from+=shape[i];
+                            if (to<0) to+=shape[i]+1;
                             index_type n;
                             if (step>0) {
                                 n=(to-from+step-1)/step;
                             } else if (step==0) {
-                                n=mShape[i]-from;
+                                n=shape[i]-from;
                                 step=1;
                             } else{
                                 n=(to-from+step+1)/step;
                             }
                             if (n>0) {
                                 newshape[idim]=n;
-                                newStartIdx+=from*mStrides[i];
-                                newstrides[idim]=step*mStrides[i];
+                                newStartIdx+=from*bStrides[i];
+                                newstrides[idim]=step*bStrides[i];
                             } else {
                                 newshape[idim]=0; // set everything to 0?
-                                newstrides[idim]=step*mStrides[i];
+                                newstrides[idim]=step*bStrides[i];
                             }
                             idim+=1;
                         }
                     } else static assert(0,"unexpected type in opIndex");
                 }
                 for (int i=rank2-idim;i>0;--i){
-                    newstrides[rank2-i]=mStrides[rank-i];
-                    newshape[rank2-i]=mShape[rank-i];
+                    newstrides[rank2-i]=bStrides[rank-i];
+                    newshape[rank2-i]=shape[rank-i];
                 }
-                // calc min index & max index (optimal subslice)
-                index_type minIndex=newStartIdx,maxIndex=newStartIdx,size=1;
-                for (int i=0;i<rank2;i++){
-                    size*=newshape[i];
-                    if (newstrides[i]<0){
-                        minIndex+=newstrides[i]*(newshape[i]-1);
-                    } else {
-                        maxIndex+=newstrides[i]*(newshape[i]-1);                            
-                    }
-                }
-                V[] newdata;
-                if (size>0) {
-                    newdata=mData[minIndex..maxIndex+1];
-                } else {
-                    newdata=null;
-                }
-                NArray!(V,rank2) res=NArray!(V,rank2)(newstrides,newshape,newStartIdx-minIndex,newdata,
+                V* newStartPtr=cast(V*)(cast(size_t)startPtrArray+newStartIdx);
+                if (size==0) newStartPtr=null;
+                NArray!(V,rank2) res=NArray!(V,rank2)(newstrides,newshape,newStartPtr,
                     newFlags,newBase);
                 return res;
             }
@@ -463,13 +530,13 @@ else {
         NArray!(V,rank-reductionFactor!(S)) opIndexAssign(U,S...)(U val,
             S idx_tup)
         in{
-            assert(!(mFlags&Flags.ReadOnly),"ReadOnly array cannot be assigned");
+            assert(!(flags&Flags.ReadOnly),"ReadOnly array cannot be assigned");
             static assert(is(U==NArray!(V,rank-reductionFactor!(S)))||is(U==V),"invalid value type <"~U.stringof~"> in opIndexAssign");
             static assert(rank>=nArgs!(S),"too many argumens in indexing operation");
             static if (rank==reductionFactor!(S)){
                 foreach(i,TT;S){
                     static if(is(TT==int)||is(TT==long)||is(TT==uint)||is(TT==ulong)){
-                        assert(0<=idx_tup[i] && idx_tup[i]<mShape[i],"index "~ctfe_i2a(i)~" out of bounds");                        
+                        assert(0<=idx_tup[i] && idx_tup[i]<shape[i],"index "~ctfe_i2a(i)~" out of bounds");                        
                     } else static assert(0,"unexpected type <"~TT.stringof~"> in opIndexAssign");
                 } // else check done in opIndex...
             }
@@ -477,12 +544,12 @@ else {
         body{
             static assert(rank>=nArgs!(S),"too many arguments in indexing operation");
             static if (rank==reductionFactor!(S)){
-                index_type idx=mStartIdx;
+                V* pos=startPtrArray;
                 foreach(i,TT;S){
                     static assert(is(TT==int)||is(TT==long)||is(TT==uint)||is(TT==ulong),"unexpected type <"~TT.stringof~"> in full indexing");
-                    idx+=idx_tup[i]*mStrides[i];
+                    pos=cast(V*)(cast(size_t)pos+cast(index_type)idx_tup[i]*bStrides[i]);
                 }
-                data[idx]=val;
+                *pos=val;
                 return val;
             } else {
                 auto subArr=opIndex(idx_tup);
@@ -511,13 +578,13 @@ else {
         NArray opSliceAssign(S,int rank2)(NArray!(S,rank2) val)
         in { 
             static assert(rank2==rank,"assign operation should have same rank "~ctfe_i2a(rank)~"vs"~ctfe_i2a(rank2));
-            assert(mShape==val.mShape,"assign arrays need to have the same shape");
-            assert(!(mFlags&Flags.ReadOnly),"ReadOnly array cannot be assigned");
+            assert(shape==val.shape,"assign arrays need to have the same shape");
+            assert(!(flags&Flags.ReadOnly),"ReadOnly array cannot be assigned");
         }
         body {
             static if (is(T==S)){
-                if (mFlags & val.mFlags & (Flags.Fortran | Flags.Contiguous)){
-                    memcpy(mData.ptr,val.mData.ptr,mData.length*T.sizeof);
+                if (flags & val.flags & (Flags.Fortran | Flags.Contiguous)){
+                    memcpy(startPtrArray,val.startPtrArray,nElArray*cast(index_type)T.sizeof);
                 }
             }
             binaryOpStr!("*aPtr0=cast("~V.stringof~")*bPtr0;",rank,V,S)(this,val);
@@ -526,7 +593,7 @@ else {
         
         /// assign a scalar to the whole array with array[]=value;
         NArray opSliceAssign()(V val)
-        in { assert(!(mFlags&Flags.ReadOnly),"ReadOnly array cannot be assigned"); }
+        in { assert(!(flags&Flags.ReadOnly),"ReadOnly array cannot be assigned"); }
         body{
             mixin unaryOpStr!("*aPtr0=val;",rank,V);
             unaryOpStr(this);
@@ -535,9 +602,8 @@ else {
                 
         /++
         + this sub iterator trades a little speed for more safety when used step by step.
-        + For example instead of updating only the pointer or the starting point it updates the slice.
-        + This is safe also to updates of the base array mData in the sense that each next/get
-        + is done using the base array mData, not a local copy.
+        + This is safe also to updates of the base array in the sense that each next/get
+        + is done using the base array startPtrArray, not a local copy.
         + After an update in the base array a call to value is wrong, but next or get will set it correctly.
         + Dropping this (unlikely to be used) thing would speed up a little some things.
         +/
@@ -552,9 +618,9 @@ else {
                     SubView res;
                     res.baseArray=a;
                     res.iPos=0;
-                    res.stride=a.strides[axis];
+                    res.stride=a.bStrides[axis];
                     res.iDim=a.shape[axis];
-                    res.iIdx=a.startIdx;
+                    res.iIdx=0;
                     return res;
                 }
                 bool next(){
@@ -570,36 +636,36 @@ else {
                 V value()
                 in { assert(iPos<iDim); }
                 body {
-                    return baseArray.mData[iIdx];
+                    return *cast(V*)(cast(size_t)baseArray.startPtrArray+iIdx);
                 }
                 void value(V val)
                 in { assert(iPos<iDim); }
                 body {
-                    baseArray.mData[iIdx]=val;
+                    *cast(V*)(cast(size_t)baseArray.startPtrArray+iIdx)=val;
                 }
                 V get(index_type index)
                 in { assert(0<=index && index<iDim,"invalid index in SubView.get"); }
                 body {
                     iIdx+=(index-iIdx)*stride;
                     iPos=index;
-                    return baseArray.mData[iIdx];
+                    return *cast(V*)(cast(size_t)baseArray.startPtrArray+iIdx);
                 }
                 int opApply( int delegate(ref V) loop_body ) {
                     if (iPos<iDim){
-                        V* pos= &(baseArray.mData[iIdx]);
+                        V* pos=cast(V*)(cast(size_t)baseArray.startPtrArray+iIdx);
                         for (index_type i=iPos;i!=iDim;++i){
                             if (auto r=loop_body(*pos)) return r;
-                            pos+=stride;
+                            pos=cast(V*)(cast(size_t)pos+stride);
                         }
                     }
                     return 0;
                 }
                 int opApply( int delegate(ref index_type,ref V) loop_body ) {
                     if (iPos<iDim){
-                        V*pos= &(baseArray.mData[iIdx]);
+                        V* pos=cast(V*)(cast(size_t)baseArray.startPtrArray+iIdx);
                         for (index_type i=iPos;i!=iDim;i++){
                             if (auto r=loop_body(i,*pos)) return r;
-                            pos+=stride;
+                            pos=cast(V*)(cast(size_t)pos+stride);
                         }
                     }
                     return 0;
@@ -609,54 +675,51 @@ else {
             struct SubView{
                 NArray baseArray;
                 NArray!(V,rank-1) view;
-                index_type[2] subSlice;
-                index_type iPos, iDim, stride;
+                index_type iPos, iDim, stride,idxAtt;
                 static SubView opCall(NArray a, int axis=0)
                 in { assert(0<=axis && axis<rank); }
+                out(res){
+                    debug(TestNArray){
+                        V[] subData=res.view.data;
+                        V[] aData=a.data;
+                        assert(subData.ptr>=aData.ptr && (subData.ptr+subData.length)<=(aData.ptr+aData.length),
+                            "subview out of range");
+                    }
+                }
                 body {
                     index_type[rank-1] shape,strides;
                     int ii=0;
                     for(int i=0;i<rank;i++){
                         if (i!=axis){
                             shape[ii]=a.shape[i];
-                            strides[ii]=a.strides[i];
+                            strides[ii]=a.bStrides[i];
                             ii++;
                         }
                     }
-                    index_type startIdx;
-                    if (a.strides[axis]>=0)
-                        startIdx=a.startIdx;
-                    else
-                        startIdx=a.startIdx-(a.shape[axis]-1)*a.strides[axis];
-                    index_type [2]subSlice=a.startIdx;
-                    subSlice[1]+=1;
-                    for (int i=0;i<rank-1;i++) {
-                        if (shape[i]<1){
-                            subSlice[1]=subSlice[0];
-                            break;
-                        }
-                        if (strides[i]>=0)
-                            subSlice[1]+=(shape[i]-1)*strides[i];
-                        else
-                            subSlice[0]+=(shape[i]-1)*strides[i];
-                    }
                     SubView res;
                     res.baseArray=a;
-                    res.subSlice[]=subSlice;
-                    res.stride=a.strides[axis];
-                    res.iPos=0;
+                    res.stride=a.bStrides[axis];
+                    res.iPos=cast(index_type)0;
                     res.iDim=a.shape[axis];
-                    res.view=NArray!(V,rank-1)(strides,shape,startIdx-subSlice[0],
-                        a.mData[subSlice[0]..subSlice[1]],
+                    res.idxAtt=cast(index_type)0;
+                    res.view=NArray!(V,rank-1)(strides,shape,a.startPtrArray,
                         a.newFlags,a.newBase);
                     return res;
                 }
-                bool next(){
+                bool next()
+                out(res){
+                    debug(TestNArray){
+                        V[] subData=view.data;
+                        V[] aData=baseArray.data;
+                        assert(subData.ptr>=aData.ptr && (subData.ptr+subData.length)<=(aData.ptr+aData.length),
+                            "subview out of range");
+                    }
+                }
+                body {
                     iPos++;
                     if (iPos<iDim){
-                        subSlice[0]+=stride;
-                        subSlice[1]+=stride;
-                        view.mData=baseArray.mData[subSlice[0]..subSlice[1]];
+                        idxAtt+=stride;
+                        view.startPtrArray=cast(V*)(cast(size_t)baseArray.startPtrArray+idxAtt);
                         return true;
                     } else {
                         iPos=iDim;
@@ -667,32 +730,27 @@ else {
                     return view;
                 }
                 void value(NArray!(V,rank-1) val){
-
+                    view[]=val;
                 }
                 NArray!(V,rank-1) get(index_type index)
                 in { assert(0<=index && index<iDim,"invalid index in SubView.get"); }
                 body {
-                    subSlice[0]+=(index-iPos)*stride;
-                    subSlice[1]+=(index-iPos)*stride;
+                    idxAtt=index*stride;
                     iPos=index;
-                    view.mData=baseArray.mData[subSlice[0]..subSlice[1]];
+                    view.startPtrArray=cast(V*)(cast(size_t)baseArray.startPtrArray+idxAtt);
                     return view;
                 }
                 int opApply( int delegate(ref NArray!(V,rank-1)) loop_body ) {
                     for (index_type i=iPos;i<iDim-1;i++){
-                        view.mData=baseArray.mData[subSlice[0]..subSlice[1]];
                         if (auto r=loop_body(view)) return r;
-                        subSlice[0]+=stride;
-                        subSlice[1]+=stride;
+                        view.startPtrArray=cast(V*)(cast(size_t)view.startPtrArray+stride);
                     }
                     return 0;
                 }
                 int opApply( int delegate(ref index_type,ref NArray!(V,rank-1)) loop_body ) {
                     for (index_type i=iPos;i<iDim;i++){
-                        view.mData=baseArray.mData[subSlice[0]..subSlice[1]];
                         if (auto r=loop_body(i,view)) return r;
-                        subSlice[0]+=stride;
-                        subSlice[1]+=stride;
+                        view.startPtrArray=cast(V*)(cast(size_t)view.startPtrArray+stride);
                     }
                     return 0;
                 }
@@ -704,7 +762,7 @@ else {
                     s("baseArray:");
                     baseArray.desc(s)(",").newline;
                     view.desc(s("view:"))(",").newline;
-                    s("subSlice:")(subSlice)(",").newline;
+                    s("idxAtt:")(idxAtt)(",").newline;
                     s("iPos:")(iPos)(", ")("iDim:")(iDim)(", ")("stride :")(stride).newline;
                     s(">").newline;
                     return s;
@@ -725,17 +783,17 @@ else {
                 FlatIterator res;
                 res.baseArray=baseArray;
                 for (int i=0;i<rank;++i)
-                    res.left[rank-1-i]=baseArray.mShape[i]-1;
-                res.p=baseArray.mData.ptr+baseArray.mStartIdx;
+                    res.left[rank-1-i]=baseArray.shape[i]-1;
+                res.p=baseArray.startPtrArray;
                 foreach (s; baseArray.shape) {
                     if (s==0) {
                         res.left[]=0;
                         res.p=null;
                     }
                 }
-                res.adds[0]=baseArray.mStrides[rank-1];
+                res.adds[0]=baseArray.bStrides[rank-1];
                 for(int i=1;i<rank;i++){
-                    res.adds[i]=baseArray.mStrides[rank-1-i]-baseArray.mStrides[rank-i]*(baseArray.shape[rank-i]-1);
+                    res.adds[i]=baseArray.bStrides[rank-1-i]-baseArray.bStrides[rank-i]*(baseArray.shape[rank-i]-1);
                 }
                 return res;
             }
@@ -743,7 +801,7 @@ else {
             bool next(){
                 if (left[0]!=0){
                     left[0]-=1;
-                    p+=adds[0];
+                    p=cast(V*)(cast(size_t)p+adds[0]);
                     return true;
                 } else {
                     static if (rank==1){
@@ -751,9 +809,9 @@ else {
                         return false;
                     } else static if (rank==2){
                         if (left[1]!=0){
-                            left[0]=baseArray.mShape[rank-1]-1;
+                            left[0]=baseArray.shape[rank-1]-1;
                             left[1]-=1;
-                            p+=adds[1];
+                            p=cast(V*)(cast(size_t)p+adds[1]);
                             return true;
                         } else {
                             p=null;
@@ -761,14 +819,14 @@ else {
                         }
                     } else {
                         if (!p) return false; // remove?
-                        left[0]=baseArray.mShape[rank-1]-1;
+                        left[0]=baseArray.shape[rank-1]-1;
                         for (int i=1;i<rank;i++){
                             if (left[i]!=0){
                                 left[i]-=1;
-                                p+=adds[i];
+                                p=cast(V*)(cast(size_t)p+adds[i]);
                                 return true;
                             } else{
-                                left[i]=baseArray.mShape[rank-1-i]-1;
+                                left[i]=baseArray.shape[rank-1-i]-1;
                             }
                         }
                         p=null;
@@ -802,7 +860,7 @@ else {
             int opApply( int delegate(ref V) loop_body ) 
             {
                 if (p is null) return 0;
-                if (left!=baseArray.mShape){
+                if (left!=baseArray.shape){
                     for(;!end(); next()) {
                         int ret = loop_body(*p);
                         if (ret) return ret;
@@ -812,14 +870,14 @@ else {
                     int ret=loop_body(*baseArrayPtr0);
                     if (ret) return ret;
                     `;
-                    mixin(sLoopPtr(rank,["baseArray"],[],loopBody,"i"));
+                    mixin(sLoopPtr(rank,["baseArray"],loopBody,"i"));
                 }
                 return 0;
             }
             int opApply( int delegate(ref index_type,ref V) loop_body ) 
             {
                 if (p is null) return 0;
-                if (left==baseArray.mShape) {
+                if (left==baseArray.shape) {
                     for(index_type i=0; !end(); next(),i++) {
                         int ret = loop_body(i,*p);
                         if (ret) return ret;
@@ -831,7 +889,7 @@ else {
                     ++iPos;
                     `;
                     index_type iPos=0;
-                    mixin(sLoopPtr(rank,["baseArray"],[],loopBody,"i"));
+                    mixin(sLoopPtr(rank,["baseArray"],loopBody,"i"));
                 }
                 return 0;
             }
@@ -861,7 +919,7 @@ else {
                 int ret=loop_body(*aPtr0);
                 if (ret) return ret;
                 `;
-                mixin(sLoopPtr(rank,["a"],[],loopBody,"i"));
+                mixin(sLoopPtr(rank,["a"],loopBody,"i"));
                 return 0;
             }
             int opApply( int delegate(ref index_type,ref V) loop_body ) 
@@ -872,7 +930,7 @@ else {
                 ++iPos;
                 `;
                 index_type iPos=0;
-                mixin(sLoopPtr(rank,["a"],[],loopBody,"i"));
+                mixin(sLoopPtr(rank,["a"],loopBody,"i"));
                 return 0;
             }
             static if (rank>1){
@@ -893,7 +951,7 @@ else {
                 int ret=loop_body(*aPtr0);
                 if (ret) return ret;
                 `;
-                mixin(pLoopPtr(rank,["a"],[],loopBody,"i"));
+                mixin(pLoopPtr(rank,["a"],loopBody,"i"));
                 return 0;
             }
             int opApply( int delegate(ref index_type,ref V) loop_body ) 
@@ -905,7 +963,7 @@ else {
                 `;
                 index_type iPos=0;
                 // this should be changed if pLoopPtr becomes really parallel
-                mixin(sLoopPtr(rank,["a"],[],loopBody,"i"));
+                mixin(sLoopPtr(rank,["a"],loopBody,"i"));
                 return 0;
             }
             static if (rank>1){
@@ -962,10 +1020,10 @@ else {
             void cpVal(V a,out V b){
                 b=a;
             }
-            NArray res=empty(this.mShape,fortran);
+            NArray res=empty(this.shape,fortran);
             if ( flags & res.flags & (Flags.Fortran | Flags.Contiguous) ) 
             {
-                memcpy(res.mData.ptr, mData.ptr, V.sizeof * mData.length);
+                memcpy(res.startPtrArray, startPtrArray, cast(index_type)V.sizeof * nElArray);
             }
             else
             {
@@ -979,7 +1037,7 @@ else {
             static if(is(S==V)){
                 return this;
             } else {
-                auto res=NArray!(S,rank).empty(mShape);
+                auto res=NArray!(S,rank).empty(shape);
                 binaryOpStr!("*aPtr0=cast("~S.stringof~")*bPtr0;",rank,S,V)(res,this);
                 return res;
             }
@@ -993,7 +1051,7 @@ else {
         static if (is(typeof(-V.init))) {
             /// Return a negated version of the array
             NArray opNeg() {
-                NArray res=empty(mShape);
+                NArray res=empty(shape);
                 binaryOpStr!("*bPtr0=-(*aPtr0);",rank,V,V)(this,res);
                 return res;
             }
@@ -1004,7 +1062,7 @@ else {
             /// But it always makes a full value copy regardless of whether the underlying unary+ 
             /// operator is a no-op.
             NArray opPos() {
-                NArray res=empty(mShape);
+                NArray res=empty(shape);
                 binaryOpStr!("*bPtr0= +(*aPtr0);",rank,V,V)(this,res);
                 return res;
             }
@@ -1012,14 +1070,14 @@ else {
 
         /// Add this array and another one and return a new array.
         NArray!(typeof(V.init+S.init),rank) opAdd(S)(NArray!(S,rank) o) { 
-            NArray!(typeof(V.init+S.init),rank) res=NArray!(typeof(V.init+S.init),rank).empty(mShape);
+            NArray!(typeof(V.init+S.init),rank) res=NArray!(typeof(V.init+S.init),rank).empty(shape);
             ternaryOpStr!("*cPtr0=(*aPtr0)+(*bPtr0);",rank,V,S,typeof(V.init+S.init))(this,o,res);
             return res;
         }
         static if (is(typeof(V.init+V.init))) {
             /// Add a scalar to this array and return a new array with the result.
             NArray!(typeof(V.init+V.init),rank) opAdd()(V o) { 
-                NArray!(typeof(V.init+V.init),rank) res=NArray!(typeof(V.init+V.init),rank).empty(mShape);
+                NArray!(typeof(V.init+V.init),rank) res=NArray!(typeof(V.init+V.init),rank).empty(shape);
                 mixin binaryOpStr!("*bPtr0 = (*aPtr0) * o;",rank,V,V);
                 binaryOpStr(this,res);
                 return res;
@@ -1028,14 +1086,14 @@ else {
         static if (is(typeof(V.init+V.init)==V)) {
             /// Add another array onto this one in place.
             NArray opAddAssign(S)(NArray!(S,rank) o)
-            in { assert(!(mFlags&Flags.ReadOnly),"ReadOnly array cannot be assigned"); }
+            in { assert(!(flags&Flags.ReadOnly),"ReadOnly array cannot be assigned"); }
             body { 
                 binaryOpStr!("*aPtr0 += cast("~V.stringof~")*bPtr0;",rank,V,S)(this,o);
                 return this;
             }
             /// Add a scalar to this array in place.
             NArray opAddAssign()(V o)
-            in { assert(!(mFlags&Flags.ReadOnly),"ReadOnly array cannot be assigned"); }
+            in { assert(!(flags&Flags.ReadOnly),"ReadOnly array cannot be assigned"); }
             body { 
                 mixin unaryOpStr!("*aPtr0+=o;",rank,V);
                 unaryOpStr(this);
@@ -1045,14 +1103,14 @@ else {
 
         /// Subtract this array and another one and return a new array.
         NArray!(typeof(V.init-S.init),rank) opSub(S)(NArray!(S,rank) o) { 
-            NArray!(typeof(V.init-S.init),rank) res=NArray!(typeof(V.init-S.init),rank).empty(mShape);
+            NArray!(typeof(V.init-S.init),rank) res=NArray!(typeof(V.init-S.init),rank).empty(shape);
             ternaryOpStr!("*cPtr0=(*aPtr0)-(*bPtr0);",rank,V,S,typeof(V.init-S.init))(this,o,res);
             return res;
         }
         static if (is(typeof(V.init-V.init))) {
             /// Subtract a scalar from this array and return a new array with the result.
             final NArray opSub()(V o) { 
-                NArray res=empty(mShape);
+                NArray res=empty(shape);
                 mixin binaryOpStr!("*bPtr0=(*aPtr0)-o;",rank,V,V);
                 binaryOpStr(this,res);
                 return res;
@@ -1061,14 +1119,14 @@ else {
         static if (is(typeof(V.init-V.init)==V)) {
             /// Subtract another array from this one in place.
             NArray opSubAssign(S)(NArray!(S,rank) o)
-            in { assert(!(mFlags&Flags.ReadOnly),"ReadOnly array cannot be assigned"); }
+            in { assert(!(flags&Flags.ReadOnly),"ReadOnly array cannot be assigned"); }
             body { 
                 binaryOpStr!("*aPtr0 -= cast("~V.stringof~")*bPtr0;",rank,V,V)(this,o);
                 return this;
             }
             /// Subtract a scalar from this array in place.
             NArray opSubAssign()(V o)
-            in { assert(!(mFlags&Flags.ReadOnly),"ReadOnly array cannot be assigned"); }
+            in { assert(!(flags&Flags.ReadOnly),"ReadOnly array cannot be assigned"); }
             body { 
                 mixin unaryOpStr!("*aPtr0-=o;",rank,V);
                 unaryOpStr(this);
@@ -1079,14 +1137,14 @@ else {
         /// Element-wise multiply this array and another one and return a new array.
         /// For matrix multiply, use the non-member dot(a,b) function.
         NArray!(typeof(V.init*S.init),rank) opMul(S)(NArray!(S,rank) o) { 
-            NArray res=NArray!(typeof(V.init*S.init),rank).empty(mShape);
+            NArray res=NArray!(typeof(V.init*S.init),rank).empty(shape);
             ternaryOpStr!("*cPtr0=(*aPtr0)*(*bPtr0);",rank,V,S,typeof(V.init*S.init))(this,o,res);
             return res;
         }
         static if (is(typeof(V.init*V.init))) {
             /// Multiplies this array by a scalar and returns a new array.
             final NArray!(typeof(V.init*V.init),rank) opMul()(V o) { 
-                NArray!(typeof(V.init*V.init),rank) res=NArray!(typeof(V.init*V.init),rank).empty(mShape);
+                NArray!(typeof(V.init*V.init),rank) res=NArray!(typeof(V.init*V.init),rank).empty(shape);
                 mixin binaryOpStr!("*bPtr0=(*aPtr0)*o;",rank,V,typeof(V.init*V.init));
                 binaryOpStr(this,res);
                 return res;
@@ -1097,14 +1155,14 @@ else {
             /// Element-wise multiply this array by another in place.
             /// For matrix multiply, use the non-member dot(a,b) function.
             NArray opMulAssign(S)(NArray!(S,rank) o)
-            in { assert(!(mFlags&Flags.ReadOnly),"ReadOnly array cannot be assigned"); }
+            in { assert(!(flags&Flags.ReadOnly),"ReadOnly array cannot be assigned"); }
             body { 
                 binaryOpStr!("*aPtr0 *= cast("~V.stringof~")*bPtr0;",rank,V,typeof(V.init*V.init))(this,o);
                 return this;
             }
             /// scales the current array.
             NArray opMulAssign()(V o)
-            in { assert(!(mFlags&Flags.ReadOnly),"ReadOnly array cannot be assigned"); }
+            in { assert(!(flags&Flags.ReadOnly),"ReadOnly array cannot be assigned"); }
             body { 
                 mixin unaryOpStr!("*aPtr0 *= o;",rank,V);
                 unaryOpStr(this);
@@ -1116,14 +1174,14 @@ else {
         /// To solve linear equations like A * x = b for x, use the nonmember linsolve
         /// function.
         NArray!(typeof(V.init/S.init),rank) opDiv(S)(NArray!(S,rank) o) { 
-            NArray!(typeof(V.init/S.init),rank) res=NArray!(typeof(V.init/S.init),rank).empty(mShape);
+            NArray!(typeof(V.init/S.init),rank) res=NArray!(typeof(V.init/S.init),rank).empty(shape);
             ternaryOpStr!("*cPtr0=(*aPtr0)/(*bPtr0);",rank,V,S,typeof(V.init/S.init))(this,o,res);
             return res;
         }
         static if (is(typeof(V.init/V.init))) {
             /// divides this array by a scalar and returns a new array with the result.
             NArray!(typeof(V.init/V.init),rank) opDiv()(V o) { 
-                NArray!(typeof(V.init/V.init),rank) res=NArray!(typeof(V.init/V.init),rank).empty(mShape);
+                NArray!(typeof(V.init/V.init),rank) res=NArray!(typeof(V.init/V.init),rank).empty(shape);
                 mixin binaryOpStr!("*bPtr0=(*aPtr0)/o;",rank,V,typeof(V.init/V.init));
                 binaryOpStr(this,res);
                 return res;
@@ -1134,14 +1192,14 @@ else {
             /// To solve linear equations like A * x = b for x, use the nonmember linsolve
             /// function.
             NArray opDivAssign(S)(NArray!(S,rank) o)
-            in { assert(!(mFlags&Flags.ReadOnly),"ReadOnly array cannot be assigned"); }
+            in { assert(!(flags&Flags.ReadOnly),"ReadOnly array cannot be assigned"); }
             body { 
                 binaryOpStr!("*aPtr0 /= cast("~V.stringof~")*bPtr0;",rank,V,S)(this,o);
                 return this;
             }
             /// divides in place this array by a scalar.
             NArray opDivAssign()(V o)
-            in { assert(!(mFlags&Flags.ReadOnly),"ReadOnly array cannot be assigned"); }
+            in { assert(!(flags&Flags.ReadOnly),"ReadOnly array cannot be assigned"); }
             body { 
                 mixin unaryOpStr!("*aPtr0 /= o;",rank,V);
                 unaryOpStr(this);
@@ -1153,11 +1211,11 @@ else {
         
         /// Compare with another array for value equality
         bool opEquals(NArray o) { 
-            if (mShape!=o.mShape) return false;
-            if (flags & o.mFlags & Flags.Compact){
-                return !memcmp(mData.ptr,o.mData.ptr,mData.length*V.sizeof);
+            if (shape!=o.shape) return false;
+            if (flags & o.flags & Flags.Compact1){
+                return !memcmp(startPtrArray,o.startPtrArray,nElArray*cast(index_type)V.sizeof);
             }
-            mixin(sLoopPtr(rank,["","o"],[],"if (*Ptr0 != *oPtr0) return false;","i"));
+            mixin(sLoopPtr(rank,["","o"],"if (*Ptr0 != *oPtr0) return false;","i"));
             return true; 
         }
 
@@ -1181,7 +1239,7 @@ else {
             char[] indent=""){
             s("[");
             static if(rank==1) {
-                index_type lastI=mShape[0]-1;
+                index_type lastI=shape[0]-1;
                 foreach(index_type i,V v;SubView(this)){
                     s.format(formatEl,v);
                     if (i!=lastI){
@@ -1192,7 +1250,7 @@ else {
                     }
                 }
             } else {
-                index_type lastI=mShape[0]-1;
+                index_type lastI=shape[0]-1;
                 foreach(i,v;this){
                     v.printData(s,formatEl,elPerLine,indent~" ");
                     if (i!=lastI){
@@ -1210,19 +1268,19 @@ else {
                 return s("<NArray *null*>").newline;
             }
             s("<NArray @:")(&this)(",").newline;
-            s("  startIdx:")(mStartIdx)(",").newline;
-            s("  strides:")(mStrides)(",").newline;
-            s("  shape:")(mShape)(",").newline;
+            s("  bStrides:")(bStrides)(",").newline;
+            s("  shape:")(shape)(",").newline;
             s("  flags:")(flags)("=None");
             if (flags&Flags.Contiguous) s("|Contiguos");
             if (flags&Flags.Fortran) s("|Fortran");
-            if (flags&Flags.Compact) s("|Compact");
+            if (flags&Flags.Compact1) s("|Compact1");
+            if (flags&Flags.Compact2) s("|Compact2");
             if (flags&Flags.Small) s("|Small");
             if (flags&Flags.Large) s("|Large");
             if (flags&Flags.ShouldFreeData) s("|ShouldFreeData");
             if (flags&Flags.ReadOnly) s("|ReadOnly");
             s(",").newline;
-            s("  data: <array<")(V.stringof)("> @:")(mData.ptr)(", #:")(mData.length)(",").newline;
+            s("  data: <array<")(V.stringof)("> @:")(startPtrArray)(", #:")(nElArray)(",").newline;
             s("  base:")(mBase).newline;
             s(">");
             return s;
@@ -1231,7 +1289,7 @@ else {
         /// returns the base for an array that is a view of the current array
         void *newBase(){
             void *res=mBase;
-            if (mFlags&Flags.ShouldFreeData){
+            if (flags&Flags.ShouldFreeData){
                 assert(mBase is null,"if this array is the owner of the data it should not have base arrays");
                 res=cast(void *)&this;
             }
@@ -1240,7 +1298,7 @@ else {
         
         /// returns the flags for an array derived from the current one
         uint newFlags(){
-            return mFlags&~Flags.ShouldFreeData; // &Flags.ExtFlags ???
+            return flags&~Flags.ShouldFreeData; // &Flags.ExtFlags ???
         }
         
         /// increments a static index array, return true if it did wrap
@@ -1248,7 +1306,7 @@ else {
             int i=rank-1;
             while (i>=0) {
                 ++index[i];
-                if (index[i]<mShape[i]) break;
+                if (index[i]<shape[i]) break;
                 index[i]=0;
                 --i;
             }
@@ -1258,7 +1316,7 @@ else {
         index_type size(){
             index_type res=1;
             for (int i=0;i<rank;++i){
-                res*=mShape[i];
+                res*=shape[i];
             }
             return res;
         }
@@ -1266,70 +1324,78 @@ else {
         NArray T(){
             index_type[rank] newshape,newstrides;
             for (int i=0;i<rank;++i){
-                newshape[i]=mShape[rank-1-i];
+                newshape[i]=shape[rank-1-i];
             }
             for (int i=0;i<rank;++i){
-                newstrides[i]=mStrides[rank-1-i];
+                newstrides[i]=bStrides[rank-1-i];
             }
-            return NArray(newstrides,newshape,mStartIdx,mData,newFlags,newBase);
+            return NArray(newstrides,newshape,startPtrArray,newFlags,newBase);
         }
         
         /// returns an array that loops over the elements in the best possible way
         NArray optAxisOrder()
         in {
             for (int i=0;i<rank;++i)
-                assert(mShape[i]>0,"zero sized arrays not accepted");
+                assert(shape[i]>0,"zero sized arrays not accepted");
+        }
+        out(res){
+            debug(TestNArray){
+                V[]myData=data,resData=res.data;
+                assert(myData.ptr==resData.ptr && myData.length==resData.length,"underlying slice changed");
+            }
         }
         body {
             static if(rank==1){
-                if (mStrides[0]>=0)
+                if (bStrides[0]>=0)
                     return this;
-                return NArray([-mStrides[0]],mShape,mStartIdx+mStrides[0]*(mShape[0]-1),
-                    mData,newFlags,newBase);
+                return NArray([-bStrides[0]],shape,
+                    cast(V*)(cast(size_t)startPtrArray+bStrides[0]*(shape[0]-1)),
+                    newFlags,newBase);
             } else static if(rank==2){
-                if (mStrides[0]>=mStrides[1] && mStrides[0]>=0){
+                if (bStrides[0]>=bStrides[1] && bStrides[0]>=0){
                     return this;
                 } else {
                     index_type[rank] newstrides;
-                    index_type newStartIdx=mStartIdx;
-                    if (mStrides[0]>0){
-                        newstrides[0]=mStrides[0];
+                    index_type newStartIdx=0;
+                    if (bStrides[0]>0){
+                        newstrides[0]=bStrides[0];
                     } else {
-                        newstrides[0]=-mStrides[0];
-                        newStartIdx+=mStrides[0]*(mShape[0]-1);
+                        newstrides[0]=-bStrides[0];
+                        newStartIdx+=bStrides[0]*(shape[0]-1);
                     }
-                    if (mStrides[1]>0){
-                        newstrides[1]=mStrides[1];
+                    if (bStrides[1]>0){
+                        newstrides[1]=bStrides[1];
                     } else {
-                        newstrides[1]=-mStrides[1];
-                        newStartIdx+=mStrides[1]*(mShape[1]-1);
+                        newstrides[1]=-bStrides[1];
+                        newStartIdx+=bStrides[1]*(shape[1]-1);
                     }
                     index_type[rank] newshape;
                     if(newstrides[0]>=newstrides[1]){
-                        newshape[0]=mShape[0];
-                        newshape[1]=mShape[1];
+                        newshape[0]=shape[0];
+                        newshape[1]=shape[1];
                     } else {
-                        newshape[0]=mShape[1];
-                        newshape[1]=mShape[0];
+                        newshape[0]=shape[1];
+                        newshape[1]=shape[0];
                         auto tmp=newstrides[0];
                         newstrides[0]=newstrides[1];
                         newstrides[1]=tmp;
                     }
-                    return NArray(newstrides,newshape,newStartIdx,mData,newFlags,newBase);
+                    return NArray(newstrides,newshape,
+                        cast(V*)(cast(size_t)startPtrArray+newStartIdx),newFlags,newBase);
                 }
             } else {
                 int no_reorder=1;
                 for (int i=1;i<rank;++i)
-                    if(mStrides[i-1]<mStrides[i]) no_reorder=0;
-                if (no_reorder && mStrides[rank-1]>=0) return this;
+                    if(bStrides[i-1]<bStrides[i]) no_reorder=0;
+                if (no_reorder && bStrides[rank-1]>=0) return this;
                 index_type[rank] pstrides;
-                index_type newStartIdx=mStartIdx;
+                index_type newStartIdx=0;
                 for (int i=0;i<rank;++i){
-                    if (mStrides[i]>0){
-                        pstrides[i]=mStrides[i];
+                    if (bStrides[i]>0){
+                        pstrides[i]=bStrides[i];
                     } else {
-                        pstrides[i]=-mStrides[i];
-                        newStartIdx+=mStrides[i]*(mShape[i]-1);
+                        pstrides[i]=-bStrides[i];
+                        newStartIdx+=bStrides[i]*(shape[i]-1);
                     }
                 }
                 int[rank] sortIdx;
@@ -1338,10 +1404,11 @@ else {
                 sortIdx.sort((int x,int y){return pstrides[x]>pstrides[y];});
                 index_type[rank] newshape,newstrides;
                 for (int i=0;i<rank;i++)
-                    newshape[i]=mShape[sortIdx[i]];
+                    newshape[i]=shape[sortIdx[i]];
                 for (int i=0;i<rank;i++)
                     newstrides[i]=pstrides[sortIdx[i]];
-                return NArray(newstrides,newshape,newStartIdx,mData,newFlags,newBase);
+                return NArray(newstrides,newshape,
+                    cast(V*)(cast(size_t)startPtrArray+newStartIdx),newFlags,newBase);
             }
         }
         
@@ -1357,6 +1424,12 @@ else {
                 assert(found[i],"invalid permutation");
             }
         }
+        out(res){
+            debug(TestNArray){
+                V[]myData=data,resData=res.data;
+                assert(myData.ptr==resData.ptr && myData.length==resData.length,"underlying slice changed in axisTransform");
+            }
+        }
         body{
             int no_change=1;
             for (int i=0;i<rank;++i){
@@ -1365,20 +1438,21 @@ else {
             if (no_change)
                 return this;
             index_type[rank] newshape, pstrides, newstrides;
-            index_type newStartIdx=mStartIdx;
+            index_type newStartIdx=0;
             for (int i=0;i<rank;++i){
                 if (!invert[i]){
-                    pstrides[i]=-mStrides[i];
+                    pstrides[i]=-bStrides[i];
                 } else {
-                    pstrides[i]=-mStrides[i];
-                    newStartIdx+=mStrides[i]*(mShape[i]-1);
+                    pstrides[i]=-bStrides[i];
+                    newStartIdx+=bStrides[i]*(shape[i]-1);
                 }
             }
             for (int i=0;i<rank;++i){
                 newstrides[i]=pstrides[perm[i]];
-                newshape[i]=mShape[perm[i]];
+                newshape[i]=shape[perm[i]];
             }
-            return NArray(newstrides,newshape,newStartIdx,mData,newFlags,newBase);
+            return NArray(newstrides,newshape,
+                cast(V*)(cast(size_t)startPtrArray+newStartIdx),newFlags,newBase);
         }
         
         /// returns a random array (here with randNArray & co due to bug 2246)
@@ -1408,40 +1482,40 @@ else {
 /// applies an operation on all elements of the array. The looping order is arbitrary
 /// and might be concurrent
 void unaryOp(alias op,int rank,T)(NArray!(T,rank) a){
-    mixin(pLoopPtr(rank,["a"],[],"op(*aPtr0);\n","i"));
+    mixin(pLoopPtr(rank,["a"],"op(*aPtr0);\n","i"));
 }
 /// ditto
 void unaryOpStr(char[] op,int rank,T)(NArray!(T,rank) a){
-    mixin(pLoopPtr(rank,["a"],[],op,"i"));
+    mixin(pLoopPtr(rank,["a"],op,"i"));
 }
 
 /// applies an operation combining the corresponding elements of two arrays.
 /// The looping order is arbitrary and might be concurrent.
 void binaryOp(alias op,int rank,T,S)(NArray!(T,rank) a, NArray!(S,rank) b)
-in { assert(a.mShape==b.mShape,"incompatible shapes in binaryOp"); }
+in { assert(a.shape==b.shape,"incompatible shapes in binaryOp"); }
 body {
-    mixin(pLoopPtr(rank,["a","b"],[],"op(*aPtr0,*bPtr0);\n","i"));
+    mixin(pLoopPtr(rank,["a","b"],"op(*aPtr0,*bPtr0);\n","i"));
 }
 /// ditto
 void binaryOpStr(char[] op,int rank,T,S)(NArray!(T,rank) a, NArray!(S,rank) b)
-in { assert(a.mShape==b.mShape,"incompatible shapes in binaryOp"); }
+in { assert(a.shape==b.shape,"incompatible shapes in binaryOp"); }
 body {
-    mixin(pLoopPtr(rank,["a","b"],[],op,"i"));
+    mixin(pLoopPtr(rank,["a","b"],op,"i"));
 }
 
 /// applies an operation combining the corresponding elements of three arrays .
 /// The looping order is arbitrary and might be concurrent.
 void ternaryOp(alias op, int rank, T, S, U)(NArray!(T,rank) a, NArray!(S,rank) b, NArray!(U,rank) c)
-in { assert(a.mShape==b.mShape && a.mShape==c.mShape,"incompatible shapes in ternaryOp"); }
+in { assert(a.shape==b.shape && a.shape==c.shape,"incompatible shapes in ternaryOp"); }
 body {
-    mixin(pLoopPtr(rank,["a","b","c"],[],
+    mixin(pLoopPtr(rank,["a","b","c"],
         "op(*aPtr0,*bPtr0,*cPtr0);\n","i"));
 }
 /// ditto
 void ternaryOpStr(char[] op, int rank, T, S, U)(NArray!(T,rank) a, NArray!(S,rank) b, NArray!(U,rank) c)
-in { assert(a.mShape==b.mShape && a.mShape==c.mShape,"incompatible shapes in ternaryOp"); }
+in { assert(a.shape==b.shape && a.shape==c.shape,"incompatible shapes in ternaryOp"); }
 body {
-    mixin(pLoopPtr(rank,["a","b","c"],[],op,"i"));
+    mixin(pLoopPtr(rank,["a","b","c"],op,"i"));
 }
 
 /+ -------------- looping mixin constructs ---------------- +/
@@ -1456,34 +1530,33 @@ char [] arrayNameDot(char[] baseName){
 }
 /++
 + general sequential index based loop character mixin
++ guarantted to loop in order, and to make valid indexes (ivarStr~XX) available
++ pointers to the actual elements are also available (arrayName~"Ptr0")
 +/
-char [] sLoopGenIdx(int rank,char[][] arrayNames,char[][] startIdxs,
-        char[] loop_body,char[]ivarStr,char[]indent="    "){
+char [] sLoopGenIdx(int rank,char[][] arrayNames,char[] loop_body,char[]ivarStr,char[]indent="    "){
     char[] res="".dup;
     char[] indentInc="    ";
     char[] indent2=indent~indentInc;
 
     foreach(i,arrayName;arrayNames){
-        res~=indent~arrayNameDot(arrayName)~"dtype * "~arrayName~"BasePtr="
-            ~arrayNameDot(arrayName)~"mData.ptr;\n";
-        
-        res~=indent~"index_type "~arrayName~"Idx"~ctfe_i2a(rank-1)~"=";
-        if (startIdxs.length<=i || startIdxs[i]=="")
-            res~=arrayNameDot(arrayName)~"mStartIdx;\n";
-        else
-            res~=startIdxs[i]~";\n";
+        res~=indent~arrayNameDot(arrayName)~"dtype * "~arrayName~"Ptr"~ctfe_i2a(rank-1)~"="
+            ~arrayNameDot(arrayName)~"startPtrArray;\n";
         for (int idim=0;idim<rank;idim++){
             res~=indent~"index_type "~arrayName~"Stride"~ctfe_i2a(idim)~"="
-                ~arrayNameDot(arrayName)~"mStrides["~ctfe_i2a(idim)~"];\n";
+                ~arrayNameDot(arrayName)~"bStrides["~ctfe_i2a(idim)~"];\n";
         }
+    }
+    for (int idim=0;idim<rank;idim++){
+        res~=indent~"index_type "~ivarStr~"Shape"~ctfe_i2a(idim)~"="
+            ~arrayNameDot(arrayNames[0])~"shape["~ctfe_i2a(idim)~"];\n";
     }
     for (int idim=0;idim<rank;idim++){
         char[] ivar=ivarStr.dup~"_"~ctfe_i2a(idim)~"_";
         res~=indent~"for (index_type "~ivar~"=0;"
-            ~ivar~"<"~arrayNameDot(arrayNames[0])~"mShape["~ctfe_i2a(idim)~"];++"~ivar~"){\n";
+            ~ivar~"<"~ivarStr~"Shape"~ctfe_i2a(idim)~";++"~ivar~"){\n";
         if (idim<rank-1) {
             foreach(arrayName;arrayNames){
-                res~=indent2~"index_type "~arrayName~"Idx"~ctfe_i2a(rank-2-idim)~"="~arrayName~"Idx"~ctfe_i2a(rank-1-idim)~";\n";
+                res~=indent2~arrayNameDot(arrayName)~"dtype * "~arrayName~"Ptr"~ctfe_i2a(rank-2-idim)~"="~arrayName~"Ptr"~ctfe_i2a(rank-1-idim)~";\n";
             }
         }
         indent=indent2;
@@ -1493,8 +1566,9 @@ char [] sLoopGenIdx(int rank,char[][] arrayNames,char[][] startIdxs,
     for (int idim=rank-1;idim>=0;idim--){
         indent2=indent[0..indent.length-indentInc.length];
         foreach(arrayName;arrayNames){
-            res~=indent~arrayName~"Idx"~ctfe_i2a(rank-1-idim)~" += "
-                ~arrayName~"Stride"~ctfe_i2a(idim)~";\n";
+            res~=indent~arrayName~"Ptr"~ctfe_i2a(rank-1-idim)~" = "
+                ~"cast("~arrayNameDot(arrayName)~"dtype*)(cast(size_t)"~arrayName~"Ptr"~ctfe_i2a(rank-1-idim)
+                ~"+"~arrayName~"Stride"~ctfe_i2a(idim)~");\n";
         }
         res~=indent2~"}\n";
         indent=indent2;
@@ -1506,7 +1580,7 @@ char [] sLoopGenIdx(int rank,char[][] arrayNames,char[][] startIdxs,
 + general sequential pointer based mixin
 + partial pointers are defined, but indexes are not (counts backward)
 +/
-char [] sLoopGenPtr(int rank,char[][] arrayNames,char[][] startIdxs,
+char [] sLoopGenPtr(int rank,char[][] arrayNames,
         char[] loop_body,char[]ivarStr,char[] indent="    "){
     char[] res="".dup;
     char[] indInc="    ";
@@ -1514,19 +1588,15 @@ char [] sLoopGenPtr(int rank,char[][] arrayNames,char[][] startIdxs,
 
     foreach(i,arrayName;arrayNames){
         res~=indent;
-        res~=arrayNameDot(arrayName)~"dtype * "~arrayName~"Ptr"~ctfe_i2a(rank-1)~"="~arrayNameDot(arrayName)~"mData.ptr+";
-        if (startIdxs.length<=i || startIdxs[i]=="")
-            res~=arrayNameDot(arrayName)~"mStartIdx;\n";
-        else
-            res~=startIdxs[i]~";\n";
+        res~=arrayNameDot(arrayName)~"dtype * "~arrayName~"Ptr"~ctfe_i2a(rank-1)~"="~arrayNameDot(arrayName)~"startPtrArray;\n";
         for (int idim=0;idim<rank;idim++){
             res~=indent;
-            res~="index_type "~arrayName~"Stride"~ctfe_i2a(idim)~"="~arrayNameDot(arrayName)~"mStrides["~ctfe_i2a(idim)~"];\n";
+            res~="index_type "~arrayName~"Stride"~ctfe_i2a(idim)~"="~arrayNameDot(arrayName)~"bStrides["~ctfe_i2a(idim)~"];\n";
         }
     }
     for (int idim=0;idim<rank;idim++){
         char[] ivar=ivarStr.dup~"_"~ctfe_i2a(idim)~"_";
-        res~=indent~"for (index_type "~ivar~"="~arrayNameDot(arrayNames[0])~"mShape["~ctfe_i2a(idim)~"];"
+        res~=indent~"for (index_type "~ivar~"="~arrayNameDot(arrayNames[0])~"shape["~ctfe_i2a(idim)~"];"
             ~ivar~"!=0;--"~ivar~"){\n";
         if (idim<rank-1) {
             foreach(arrayName;arrayNames){
@@ -1540,8 +1610,9 @@ char [] sLoopGenPtr(int rank,char[][] arrayNames,char[][] startIdxs,
     for (int idim=rank-1;idim>=0;idim--){
         indent2=indent[0..indent.length-indInc.length];
         foreach(arrayName;arrayNames){
-            res~=indent~arrayName~"Ptr"~ctfe_i2a(rank-1-idim)~" += "
-                ~arrayName~"Stride"~ctfe_i2a(idim)~";\n";
+            res~=indent~arrayName~"Ptr"~ctfe_i2a(rank-1-idim)~" = "
+                ~"cast("~arrayNameDot(arrayName)~"dtype*)(cast(size_t)"~arrayName~"Ptr"~ctfe_i2a(rank-1-idim)
+                ~"+"~arrayName~"Stride"~ctfe_i2a(idim)~");\n";
         }
         res~=indent2~"}\n";
         indent=indent2;
@@ -1553,17 +1624,7 @@ char [] sLoopGenPtr(int rank,char[][] arrayNames,char[][] startIdxs,
 + possibly parallel Index based loop that never compacts.
 + All indexes (flat and in each dimension) are defined.
 +/
-char [] pLoopGenIdx(int rank,char[][] arrayNames,char[][] startIdxs,
-        char[] loop_body,char[]ivarStr){
-    return sLoopGenIdx(rank,arrayNames,startIdxs,loop_body,ivarStr);
-}
-
-/++
-+ (possibly) parallel index based loop character mixin.
-+ Only the flat indexes are valid if it can do a compact loop.
-+ startIdxs is ignored if it can do a compact loop.
-+/
-char [] pLoopIdx(int rank,char[][] arrayNames,char[][] startIdxs,
+char [] pLoopIdx(int rank,char[][] arrayNames,
         char[] loopBody,char[]ivarStr,char[][] arrayNamesDot=[],int[] optAccess=[],char[] indent="    "){
     if (arrayNames.length==0)
         return "".dup;
@@ -1578,12 +1639,13 @@ char [] pLoopIdx(int rank,char[][] arrayNames,char[][] startIdxs,
             arrayNamesDot~=[arrayNameDot(arrayName)];
     }
     assert(arrayNamesDot.length==arrayNames.length);
-    if(hasNamesDot)
+    // needs more finesse: flat itaration not correct and reordering has to recover correct indexes
+/+    if(hasNamesDot)
         res~=indent~"commonFlags"~ivarStr~"=";
     else
         res~=indent~"uint commonFlags"~ivarStr~"=";
     foreach (i,arrayName;arrayNames){
-        res~=arrayNameDot(arrayName)~"mFlags";
+        res~=arrayNameDot(arrayName)~"flags";
         if (i!=arrayNames.length-1) res~=" & ";
     }
     res~=";\n";
@@ -1592,7 +1654,7 @@ char [] pLoopIdx(int rank,char[][] arrayNames,char[][] startIdxs,
     res~=indent~"    commonFlags"~ivarStr~"&(ArrayFlags.Small | ArrayFlags.Compact)==ArrayFlags.Compact\n";
     res~=indent2;
     for (int i=1;i<arrayNames.length;i++)
-        res~="&& "~arrayNameDot(arrayNames[0])~"mStrides=="~arrayNameDot(arrayNames[i])~"mStrides ";
+        res~="&& "~arrayNameDot(arrayNames[0])~"bStrides=="~arrayNameDot(arrayNames[i])~"bStrides ";
     res~=")){\n";
     res~=indent2~"index_type "~ivarStr~"_0;\n";
     res~=indent2~"index_type "~ivarStr~"Length="~arrayNameDot(arrayNames[0])~"mData.length;\n";
@@ -1634,16 +1696,16 @@ char [] pLoopIdx(int rank,char[][] arrayNames,char[][] startIdxs,
         res~=pLoopIdx(rank,arrayNames,startIdxs,loopBody,ivarStr,newNamesDot,[],indent2);
         res~=indent~"}";
     }
-    res~=" else {\n";
-    res~=sLoopGenIdx(rank,arrayNames,startIdxs,loopBody,ivarStr,indent2);
-    res~=indent~"}";
+    res~=" else {\n";+/
+    res~=sLoopGenIdx(rank,arrayNames,loopBody,ivarStr,indent2);
+//    res~=indent~"}";
     return res;
 }
 /++
 + (possibly) parallel pointer based loop character mixin
-+ startIdxs is ignored if it can do a compact loop, only the final pointers are valid
++ might do a compact loop, only the final pointers are valid
 +/
-char [] pLoopPtr(int rank,char[][] arrayNames,char[][] startIdxs,
+char [] pLoopPtr(int rank,char[][] arrayNames,
         char[] loopBody,char[]ivarStr,char[][] arrayNamesDot=[],int[] optAccess=[],char[] indent="    "){
     if (arrayNames.length==0)
         return "".dup;
@@ -1663,23 +1725,25 @@ char [] pLoopPtr(int rank,char[][] arrayNames,char[][] startIdxs,
     else
         res~=indent~"uint commonFlags"~ivarStr~"=";
     foreach (i,arrayNameD;arrayNamesDot){
-        res~=arrayNameD~"mFlags";
+        res~=arrayNameD~"flags";
         if (i!=arrayNamesDot.length-1) res~=" & ";
     }
     res~=";\n";
     res~=indent~"if (commonFlags"~ivarStr~"&(ArrayFlags.Contiguous|ArrayFlags.Fortran) ||\n";
-    res~=indent2~"commonFlags"~ivarStr~"&(ArrayFlags.Small | ArrayFlags.Compact)==ArrayFlags.Compact\n";
+    res~=indent2~"commonFlags"~ivarStr~"&(ArrayFlags.Small | ArrayFlags.Compact1)==ArrayFlags.Compact1\n";
     res~=indent2;
-    for (int i=1;i<arrayNamesDot.length;i++)
-        res~="&& "~arrayNamesDot[0]~"mStrides=="~arrayNamesDot[i]~"mStrides ";
+    for (int i=1;i<arrayNamesDot.length;i++){
+        res~="&& is("~arrayNamesDot[0]~"dtype=="~arrayNamesDot[i]~"dtype) ";
+        res~="&& "~arrayNamesDot[0]~"bStrides=="~arrayNamesDot[i]~"bStrides ";
+    }
     res~="){\n";
     foreach(i,arrayName;arrayNames)
         res~=indent2~arrayNamesDot[i]~"dtype * "~arrayName~"Ptr0="
-            ~arrayNamesDot[i]~"mData.ptr;\n";
-    res~=indent2~"for (index_type "~ivarStr~"_0="~arrayNamesDot[0]~"mData.length;"~
+            ~arrayNamesDot[i]~"startPtrArray;\n";
+    res~=indent2~"for (index_type "~ivarStr~"_0="~arrayNamesDot[0]~"nElArray;"~
         ivarStr~"_0!=0;--"~ivarStr~"_0){\n";
     res~=indent3~loopBody~"\n";
-    foreach(arrayName;arrayNames)
+    foreach(i,arrayName;arrayNames)
         res~=indent3~"++"~arrayName~"Ptr0;\n";
     res~=indent2~"}\n";
     res~=indent~"}";
@@ -1688,7 +1752,7 @@ char [] pLoopPtr(int rank,char[][] arrayNames,char[][] startIdxs,
         res~=indent2~"typeof("~arrayNames[0]~") "~arrayNames[0]~"_opt_="
             ~arrayNamesDot[0]~"optAxisOrder;\n";
         char[][] newNamesDot=[arrayNames[0]~"_opt_."];
-        res~=pLoopPtr(rank,arrayNames,startIdxs,loopBody,ivarStr,newNamesDot,[],indent2);
+        res~=pLoopPtr(rank,arrayNames,loopBody,ivarStr,newNamesDot,[],indent2);
         res~=indent~"}";
     } else if ((!hasNamesDot) && arrayNames.length>1 && optAccess.length>0){
         res~=" else if (commonFlags"~ivarStr~"&ArrayFlags.Large){\n";
@@ -1709,69 +1773,39 @@ char [] pLoopPtr(int rank,char[][] arrayNames,char[][] startIdxs,
         foreach(arrayName;arrayNames){
             newNamesDot~=[arrayName~"_opt_."];
         }
-        res~=pLoopPtr(rank,arrayNames,startIdxs,loopBody,ivarStr,newNamesDot,[],indent2);
+        res~=pLoopPtr(rank,arrayNames,loopBody,ivarStr,newNamesDot,[],indent2);
         res~=indent~"}";
     }
     res~=" else {\n";
-    res~=sLoopGenPtr(rank,arrayNames,startIdxs,loopBody,ivarStr,indent2);
+    res~=sLoopGenPtr(rank,arrayNames,loopBody,ivarStr,indent2);
     res~=indent~"}\n";
-    return res;
-}
-/++
-+ sequential (inner fastest) index based loop character mixin
-+ only the 
-+/
-char [] sLoopIdx(int rank,char[][] arrayNames,char[][] startIdxs,
-        char[] loopBody,char[]ivarStr){
-    if (arrayNames.length==0)
-        return "".dup;
-    char[] res="".dup;
-    res~="    uint commonFlags"~ivarStr~"=";
-    foreach (i,arrayName;arrayNames){
-        res~=arrayNameDot(arrayName)~"mFlags";
-        if (i!=arrayNames.length-1) res~=" & ";
-    }
-    res~=";\n    if (commonFlags"~ivarStr~"&ArrayFlags.Contiguous){\n";
-    foreach (i,arrayName;arrayNames){
-        res~="        "~arrayNameDot(arrayName)~"dtype * "~arrayName~"BasePtr="~arrayNameDot(arrayName)~"mData.ptr;\n";
-    }
-    res~="        index_type "~arrayNames[0]~"_length="~arrayNameDot(arrayNames[0])~"mData.length;\n";
-    res~="        for (index_type "~ivarStr~"_=0;"~ivarStr~"_!="~arrayNames[0]~"_length;++"~ivarStr~"_){\n";
-    foreach(i,arrayName;arrayNames)
-        res~="        index_type "~arrayName~"Idx0="~ivarStr~"_;";
-    res~="            "~loopBody~"\n";
-    res~="        }\n";
-    res~="    } else {\n";
-    res~=sLoopGenIdx(rank,arrayNames,startIdxs,loopBody,ivarStr);
-    res~="    }";
     return res;
 }
 
 /++
 + sequential (inner fastest) loop character mixin
 +/
-char [] sLoopPtr(int rank,char[][] arrayNames,char[][] startIdxs,
-        char[] loopBody,char[]ivarStr){
+char [] sLoopPtr(int rank,char[][] arrayNames, char[] loopBody,char[]ivarStr){
     if (arrayNames.length==0)
         return "".dup;
     char[] res="".dup;
     res~="    uint commonFlags"~ivarStr~"=";
     foreach (i,arrayName;arrayNames){
-        res~=arrayNameDot(arrayName)~"mFlags";
+        res~=arrayNameDot(arrayName)~"flags";
         if (i!=arrayNames.length-1) res~=" & ";
     }
     res~=";\n    if (commonFlags"~ivarStr~"&ArrayFlags.Contiguous){\n";
     foreach (i,arrayName;arrayNames){
-        res~="        "~arrayNameDot(arrayName)~"dtype * "~arrayName~"Ptr0="~arrayNameDot(arrayName)~"mData.ptr;\n";
+        res~="        "~arrayNameDot(arrayName)~"dtype * "~arrayName~"Ptr0="~arrayNameDot(arrayName)~"startPtrArray;\n";
     }
-    res~="        for (index_type "~ivarStr~"_0="~arrayNameDot(arrayNames[0])~"mData.length;"~
+    res~="        for (index_type "~ivarStr~"_0="~arrayNameDot(arrayNames[0])~"nElArray;"~
         ivarStr~"_0!=0;--"~ivarStr~"_0){\n";
     res~="            "~loopBody~"\n";
     foreach(i,arrayName;arrayNames)
         res~="            ++"~arrayName~"Ptr0;\n";
     res~="        }\n";
     res~="    } else {\n";
-    res~=sLoopGenPtr(rank,arrayNames,startIdxs,loopBody,ivarStr);
+    res~=sLoopGenPtr(rank,arrayNames,loopBody,ivarStr);
     res~="    }\n";
     return res;
 }
@@ -1800,12 +1834,12 @@ char[] opApplyIdxAll(int rank,char[] arrayName,bool sequential){
     for (int i=0;i<rank;++i){
         loopBody~="i_"~ctfe_i2a(i)~"_, ";
     }
-    loopBody~="*(aBasePtr+aIdx0));\n";
+    loopBody~="*aPtr0);\n";
     loopBody~=indent~"if (ret) return ret;\n";
     if (sequential) {
-        res~=sLoopGenIdx(rank,["a"],[],loopBody,"i");
+        res~=sLoopGenIdx(rank,["a"],loopBody,"i");
     } else {
-        res~=pLoopGenIdx(rank,["a"],[],loopBody,"i");
+        res~=pLoopIdx(rank,["a"],loopBody,"i");
     }
     res~="    return 0;";
     res~="}\n";
@@ -1817,9 +1851,9 @@ char[] opApplyIdxAll(int rank,char[] arrayName,bool sequential){
 void findOptAxisTransform(int rank,T,uint nArr)(out int[rank]perm,out int[rank]invert,
     NArray!(T,rank)[nArr] arrays)
 in {
-    assert(!(arrays[0].mFlags&ArrayFlags.Zero),"zero arrays not supported"); // accept them??
+    assert(!(arrays[0].flags&ArrayFlags.Zero),"zero arrays not supported"); // accept them??
     for (int iArr=1;i<nArr;++i){
-        assert(arrays[0].mShape==arrays[i].mShape,"all arrays need to have the same shape");
+        assert(arrays[0].shape==arrays[i].shape,"all arrays need to have the same shape");
     }
 }
 body {
@@ -1828,15 +1862,15 @@ body {
     index_type[nArr] newStartIdx;
     for (int iArr=0;iArr<nArr;++iArr){
         auto nArr=arrays[iArr];
-        newStartIdx[iArr]=nArr.mStartIdx;
+        newStartIdx[iArr]=0;
         for (int i=0;i<rank;++i){
-            auto s=nArr.mStrides[i];
+            auto s=nArr.bStrides[i];
             if (s>0){
                 pstrides[i][iArr]=s;
                 invert-=1;
             } else if (s!=0){
                 pstrides[i][iArr]=-s;
-                newStartIdx[iArr]+=s*(nArr.mShape[i]-1);
+                newStartIdx[iArr]+=s*(nArr.shape[i]-1);
                 invert+=1;
             } else {
                 pstrides[i][iArr]=s;
@@ -1874,8 +1908,9 @@ body {
 
 /// randomizes the content of the array
 NArray!(T,rank) randomizeNArray(RandG,T,int rank)(RandG r,NArray!(T,rank)a){
-    if (a.mFlags | ArrayFlags.Compact){
-        r.randomize(a.mData);
+    if (a.flags | ArrayFlags.Compact2){
+        T[] d=a.data;
+        r.randomize(d);
     } else {
         mixin unaryOpStr!("r.randomize(*aPtr0);",rank,T);
         unaryOpStr(a);
@@ -1929,19 +1964,26 @@ NArray!(T,rank) randLayout(T,int rank)(Rand r, NArray!(T,rank)a){
     }
     index_type newStartIdx=0;
     index_type[rank] newStrides;
-    index_type sz=1;
+    index_type sz=cast(index_type)T.sizeof;
     foreach(perm;permutation){
         newStrides[perm]=sz*gaps[perm];
-        sz*=a.mShape[perm]*abs(gaps[perm]);
+        sz*=a.shape[perm]*abs(gaps[perm]);
         if (gaps[perm]<0) {
-            newStartIdx+=-(a.mShape[perm]-1)*newStrides[perm];
+            newStartIdx+=-(a.shape[perm]-1)*newStrides[perm];
         }
     }
-    auto base=NArray!(T,1).empty([sz]);
-    auto res=NArray!(T,rank)(newStrides,a.mShape,newStartIdx,
-        base.mData,a.newFlags&~ArrayFlags.ReadOnly,base.newBase);
+    auto base=NArray!(T,1).empty([sz/cast(index_type)T.sizeof]);
+    auto res=NArray!(T,rank)(newStrides,a.shape,cast(T*)
+        (cast(size_t)base.startPtrArray+newStartIdx),a.newFlags&~ArrayFlags.ReadOnly,base.newBase);
+    debug(TestNArray){
+        if (sz>0){
+            T[] resData=res.data;
+            assert(base.startPtrArray<=resData.ptr && base.startPtrArray+base.nElArray>=resData.ptr+resData.length,
+                "error randLayout slice outside expected region ");
+        }
+    }
     res[]=a;
-    res.mFlags|=(a.mFlags&ArrayFlags.ReadOnly);
+    res.flags|=(a.flags&ArrayFlags.ReadOnly);
     return res;
 }
 /+ ------------------------------------------------- +/
