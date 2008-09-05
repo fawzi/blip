@@ -9,7 +9,7 @@
 module frm.narray.BasicOps;
 import frm.narray.BasicTypes;
 import frm.TemplateFu;
-import tango.math.Math: round;
+import tango.math.Math: round,sqrt,min;
 import frm.rtest.RTest;
 import tango.math.IEEE: feqrel;
 
@@ -155,11 +155,11 @@ NArray!(T,newRank) reshape(T,int rank,int newRank)(NArray!(T,rank) a,int[newRank
     static if (rank==1) {
         return NArray!(T,newRank)(newstrides,ns,a.startPtrArray,a.newFlags,a.newBase);
     } else {
-        if (m.flags&Flags.Contiguous) {
+        if (a.flags&ArrayFlags.Contiguous) {
             return NArray!(T,newRank)(newstrides,ns,a.startPtrArray,a.newFlags,a.newBase);
         } else {
             // copy data to contiguous mem first.
-            NArray cpy = this.dup;
+            NArray!(T,rank) cpy = a.dup();
             T* newData=cpy.startPtrArray;
             uint newF=cpy.flags;
             // Steal new array's data (do as with slices without really stealing the data?)
@@ -167,6 +167,11 @@ NArray!(T,newRank) reshape(T,int rank,int newRank)(NArray!(T,rank) a,int[newRank
             return NArray!(T,newRank)(newstrides,ns,newData,newF);
         }
     }
+}
+
+/// returns a flattened view of the array, copyes if the array is not Contiguos
+NArray!(T,1) ravel(T,int rank)(NArray!(T,rank)a){
+    return reshape(a,[-1]);
 }
 
 /// diagonal view
@@ -177,8 +182,8 @@ in {
 }
 body {
     index_type inc=0;
-    for (int i=0;i<rank;++i) inc+=a.shape[i];
-    index_type[1] newstrides=inc*cast(index_type)T.sizeof, newshape=a.shape[0];
+    for (int i=0;i<rank;++i) inc+=a.bStrides[i];
+    index_type[1] newstrides=inc, newshape=a.shape[0];
     return NArray!(T,1)(newstrides,newshape,a.startPtrArray,a.newFlags,a.newBase);
 }
 /+ --------- array creation ---------- +/
@@ -205,17 +210,17 @@ char[] freeFunMixin(char[] opName){
     res~="        NArray!(V,rkOfShape!(T))"~opName~"(T shape, bool fortran=false){\n";
     res~="            static if (isStaticArray!(T)){\n";
     res~="                static if(is(arrayBaseT!(T)==index_type)) {\n";
-    res~="                    return NArray!(V,rkOfShape!(T))."~opName~"(shape);\n";
+    res~="                    return NArray!(V,rkOfShape!(T))."~opName~"(shape,fortran);\n";
     res~="                } else {\n";
     res~="                    index_type[arrayRank!(T)] s;\n";
     res~="                    for (int i=0;i<shape;++i)\n";
     res~="                        s[i]=cast(index_type)shape[i];\n";
-    res~="                    return NArray!(V,rkOfShape!(T))."~opName~"(s);\n";
+    res~="                    return NArray!(V,rkOfShape!(T))."~opName~"(s,fortran);\n";
     res~="                }\n";
     res~="            } else {\n";
     res~="                index_type[1] s;\n";
     res~="                s[0]=cast(index_type) shape;\n";
-    res~="                return NArray!(V,rkOfShape!(T))."~opName~"(s);\n";
+    res~="                return NArray!(V,rkOfShape!(T))."~opName~"(s,fortran);\n";
     res~="            }\n";
     res~="        }\n";
     res~="    }\n";
@@ -301,7 +306,7 @@ template a2NAof(V){
 NArray!(T,1)a2NA2(T)(T[] arr,bool shouldFree=false){
     uint flags=ArrayFlags.None;
     if (shouldFree) flags=ArrayFlags.ShouldFreeData;
-    return NArray!(T,1)([T.sizeof],[arr.length],0,arr,flags,null);
+    return NArray!(T,1)([cast(index_type)T.sizeof],[cast(index_type)arr.length],0,arr,flags,null);
 }
 
 /// returns a into shape the shape of the nested D array T (for a2NA)
@@ -346,101 +351,131 @@ char[] arrayInLoop(char[] arrName,int rank,char[] ivarStr){
 /// this is basically a possibly parallel fold on the flattened array
 /// foldOp(x,t) is the operations that accumulates on x the element t
 /// of the array, mergeOp(x,y) merges in x the two partial results x and y
-/// dupOp(x) is an operation that makes a copy of x (for simple types normally a nop)
+/// dupInitial(x) is an operation that makes a copy of x (for simple types normally returns x)
+/// and is used to split the loop in different subloops starting with dupInitial(x0)
 /// the folding starts with the element x0, if S==T normally mergeOp==foldOp
-S reduceAll(alias foldOp,alias mergeOp, alias dupOp,T,int rank,S)(NArray!(T,rank)a,S x0){
-    S x=dupOp(x0);
-    mixin(sLoopPtr(rank,["a"],"foldOp(x,*(aPtr0));\n"));
+S reduceAllGen(alias foldOp,alias mergeOp, alias dupInitial,T,int rank,S=T)(NArray!(T,rank)a,S x0){
+    S x=dupInitial(x0);
+    mixin(sLoopPtr(rank,["a"],"foldOp(x,*(aPtr0));\n","i"));
     mergeOp(x,x0);  /+ just to test it +/
     return x;
+}
+
+/// collects data on the whole array using the given folding operation
+/// if not given mergeOp is build from foldOp 
+S reduceAll(T,int rank,S=T)(S delegate(S,T)foldOp,NArray!(T,rank)a,S x0,S delegate(S,S)mergeOp=null){
+    if (mergeOp is null){
+        mergeOp=(S x,S y){ x=foldOp(x,cast(T)y); };
+    }
+    return reduceAllGen!((ref S x,T y){ x=foldOp(x,y); },(ref S x,S y){ x=mergeOp(x,y); },(S x){ return x; }, T,rank,S)(a,x0);
 }
 
 /// applies an operation that "collects" data on an axis of the array
 /// this is basically a possibly parallel fold on the array along that axis
 /// foldOp(x,t) is the operations that accumulates on x the element t
 /// of the array, mergeOp(x,y) merges in x the two partial results x and y
-/// dupOp(x) is an operation that makes a copy of x (for simple types normally a nop)
+/// dupInitial(S x) is an operation that makes a copy of x at the beginning of the
+/// folding (receiving the value in res), and can be used to set x0.
 /// the folding starts with the corresponding element in the result array.
 /// If S==T normally mergeOp==foldOp
-NArray!(S,rank-1) reduceAxis(alias foldOp, alias mergeOp,alias dupOp, int rank, T, S=T)
+NArray!(S,rank-1) reduceAxisGen(alias foldOp, alias mergeOp,alias dupInitial, T, int rank, S=T)
     (NArray!(T,rank)a, int axis=-1, NArray!(S,rank-1) res=nullNArray!(S,rank-1))
 in {
     assert(-rank<=axis && axis<rank,"axis out of bounds");
     int ii=0;
-    if (res !is null){
-        for(int i=0;i<rank;i++){
-            if(i!=axis && i!=rank+axis){
-                assert(res.shape[ii]==a.shape[i],"invalid res shape");
-                ii++;
-            }
-        }
-    }
-} body {
-    void myFold(ref S x0,T* startP, int my_stride, int my_dim){
-        S x=x0;
-        T* ii=my_start;
-        for (int i=0;i<my_dim;i++){
-            foldOp(x,*ii);
-            ii=cast(T*)(cast(size_t)ii+my_stride);
-        }
-        x0=x;
-    }
-    if (axis<0) axis+=rank;
-    if (res is null){
-        index_type[rank-1] newshape;
-        int ii=0;
-        for(int i=0;i<rank;i++){
-            if(i!=axis && i!=rank+axis){
-                newshape[ii]=a.shape[i];
-                ii++;
-            }
-        }
-        res=NArray!(S,rank-1).empty(newshape);
-    }
-    static if (rank==1){
-        myFold(res,a.startPtrArray,a.bStrides[0],a.shape[0]);
-    } else {
-        int [rank-1] newstrides;
-        {
-            int ii=0;
+    static if (rank>1){
+        if (res !is null){
             for(int i=0;i<rank;i++){
-                if(i!=axis){
-                    newstrides[ii]=a.bStrides[i];
+                if(i!=axis && i!=rank+axis){
+                    assert(res.shape[ii]==a.shape[i],"invalid res shape");
                     ii++;
                 }
             }
         }
-        scope NArray!(T,rank-1) tmp=NArray!(T,rank-1)(newstrides,res.shape,a.startPtrArray,
-            newFlags,newBase);
-        index_type axisStride=a.bStrides[axis];
-        index_type axisDim=a.shape[axis];
-        mixin(pLoopPtr(rank-1,["res","tmp"],[],
-            "myFold(*resPtr0,*tmpPtr0,axisStride,axisDim);\n","i"));
+    }
+}
+body  {
+    static if (rank==1){
+        S x=dupInitial(res);
+        mixin(sLoopPtr(rank,["a"],"foldOp(x,*(aPtr0));\n","i"));
+        return x;
+    } else {
+        void myFold(ref S x0,T* startP, int my_stride, int my_dim){
+            S x=dupInitial(x0);
+            T* ii=startP;
+            for (int i=my_dim;i!=0;--i){
+                foldOp(x,*ii);
+                ii=cast(T*)(cast(size_t)ii+my_stride);
+            }
+            x0=x;
+        }
+        if (axis<0) axis+=rank;
+        if (res is null){
+            index_type[rank-1] newshape;
+            int ii=0;
+            for(int i=0;i<rank;i++){
+                if(i!=axis && i!=rank+axis){
+                    newshape[ii]=a.shape[i];
+                    ii++;
+                }
+            }
+            res=NArray!(S,rank-1).empty(newshape);
+        }
+        static if (rank==1){
+            myFold(res,a.startPtrArray,a.bStrides[0],a.shape[0]);
+        } else {
+            int [rank-1] newstrides;
+            {
+                int ii=0;
+                for(int i=0;i<rank;i++){
+                    if(i!=axis){
+                        newstrides[ii]=a.bStrides[i];
+                        ii++;
+                    }
+                }
+            }
+            scope NArray!(T,rank-1) tmp=NArray!(T,rank-1)(newstrides,res.shape,a.startPtrArray,
+                a.newFlags,a.newBase);
+            index_type axisStride=a.bStrides[axis];
+            index_type axisDim=a.shape[axis];
+            mixin(pLoopPtr(rank-1,["res","tmp"],
+                "myFold(*resPtr0,tmpPtr0,axisStride,axisDim);\n","i"));
+        }
     }
     return res;
 }
 
+/// applies a reduction operation along the given axis
+NArray!(S,rank-1) reduceAxis(int rank, T, S=T)
+    (S delegate(S,T) foldOp,NArray!(T,rank)a, S x0, int axis=-1, NArray!(S,rank-1) res=nullNArray!(S,rank-1),S delegate(S,S)mergeOp=null)
+{
+    if (mergeOp is null){
+        mergeOp=(S x,S y){ x=foldOp(x,cast(T)y); };
+    }
+    return reduceAxisGen!((ref S x,T y){ x=foldOp(x,y); },(ref S x,S y){ x=mergeOp(x,y); },(S x){ return x0; }, T,rank,S)(a,axis,res);
+}
+
 /// sum of the whole array
-T sumAll(T,int rank)(NArray!(T,rank)a){
-    return reduceAll((ref T x,T y){x+=y;},(ref T x,T y){x+=y;}, (ref T x,T y){x=cast(T)0;},
-        T, rank,T)(a,cast(T)0);
+S sumAll(T,int rank,S=T)(NArray!(T,rank)a){
+    return reduceAllGen!((ref S x,T y){x+=cast(S)y;},(ref S x,S y){x+=y;}, (S x){ return x;},
+        T, rank,S)(a,cast(S)0);
 }
 /// sum along an axis of the array
-NArray!(T,rank-1) sumAxis(T,int rank,S=T)(NArray!(T,rank)a,int axis=-1,NArray!(S,rank-1) res=null)
+NArray!(S,rank-1) sumAxis(T,int rank,S=T)(NArray!(T,rank)a,int axis=-1,NArray!(S,rank-1) res=nullNArray!(S,rank-1))
 {
-    reduceAxis((ref T x,T y){x+=y;},(ref T x,T y){x+=y;}, (ref T x,T y){x=cast(T)0;},
+    return reduceAxisGen!((ref S x,T y){x+=cast(S)y;},(ref S x,S y){x+=y;}, (S x){ return cast(S)0;},
         T, rank,S)(a,axis,res);
 }
 
 /// multiplies of the whole array
-T multiplyAll(T,int rank)(NArray!(T,rank)a){
-    return reduceAll((ref T x,T y){x*=y;},(ref T x,T y){x*=y;}, (ref T x,T y){x=cast(T)1;},
-        T, rank,T)(a,cast(T)1);
+S multiplyAll(T,int rank,S=T)(NArray!(T,rank)a){
+    return reduceAllGen!((ref S x,T y){x*=cast(S)y;},(ref S x,S y){x*=y;}, (S x){ return x; },
+        T, rank,S)(a,cast(S)1);
 }
 /// sum along an axis of the array
-NArray!(T,rank-1) multiplyAxis(T,int rank,S=T)(NArray!(T,rank)a,int axis=-1,NArray!(S,rank-1) res=null)
+NArray!(S,rank-1) multiplyAxis(T,int rank,S=T)(NArray!(T,rank)a,int axis=-1,NArray!(S,rank-1) res=nullNArray!(S,rank-1))
 {
-    reduceAxis((ref T x,T y){x*=y;},(ref T x,T y){x*=y;}, (ref T x,T y){x=cast(T)1;},
+    return reduceAxisGen!((ref S x,T y){x*=y;},(ref S x,S y){x*=y;}, (S x){ return cast(S)1; },
         T, rank,S)(a,axis,res);
 }
 
@@ -448,7 +483,7 @@ NArray!(T,rank-1) multiplyAxis(T,int rank,S=T)(NArray!(T,rank)a,int axis=-1,NArr
 /// basically this is a generalized dot product of tensors
 /// implements a simple streaming algorithm (some blocking in the x direction would 
 /// be a natural extension)
-void fuse1(alias fuseOp,alias inOp, alias outOp, T,int rank1,S,int rank2,U)(NArray!(S,rank1) a,
+void fuse1(alias fuseOp,alias inOp, alias outOp, T,int rank1,S,int rank2,U)(NArray!(T,rank1) a,
     NArray!(S,rank2) b, inout NArray!(U,rank1+rank2-2) c, int axis1=-1, int axis2=0)
 in {
     static assert(rank1>0,"rank1 should be at least 1");
@@ -568,7 +603,7 @@ body {
             bool[] maskData=mask.data; // this is not always correct, but it used just to have a quick guess
             for (index_type i=0;i<nTest;++i)
                 if(maskData[i]) ++resSize;
-            resSize=cast(size_t)(sqrt(cast(real)resSize/cast(real)(1+nTest))*a.nTest);
+            resSize=cast(size_t)(sqrt(cast(real)resSize/cast(real)(1+nTest))*a.nElArray);
         }
     }
     if (manualAlloc){
@@ -610,24 +645,26 @@ body {
     index_type[1] newshape,newstrides;
     newshape[0]=resSize;
     newstrides[0]=cast(index_type)T.sizeof;
-    uint newflags=Flags.None;
-    if (manualAlloc) newflags=Flags.ShouldFreeData;
+    uint newflags=ArrayFlags.None;
+    if (manualAlloc) newflags=ArrayFlags.ShouldFreeData;
     return NArray!(T,1)(newstrides,newshape,0,resA,newflags);
 }
 
 /// writes back the data to an array in the places where mask is true.
 /// if res is given it writes into res
-NArray!(T,rank2) unfilterMask(T,int rank2)(NArray!(T,1) a,NArray!(bool,rank2) mask, NArray!(T,rank2)res=null)
+NArray!(T,rank2) unfilterMask(T,int rank1,S,int rank2,U=T,int rank3=rank2)(NArray!(T,rank1) a,NArray!(S,rank2) mask, NArray!(T,rank3)res=null)
 in{
+    static assert(rank2==rank3,"mask and result need to have the same shape");
     if (res !is null){
         assert(res.shape==mask.shape);
     }
-    index_type nEl=reduceAll!((inout index_type x,bool r){ if (r) ++x; },
-        (inout index_type x,index_type y){ x+=y; },(index_type x){ return x; },
-        T,rank2,index_type)(mask,0);
+    index_type nEl=sumAll!(bool,rank2,index_type)(mask);
     assert(nEl<=a.shape[0],"mask has more true elements than size of filtered array");
 }
 body {
+    static assert(rank1==1,"a needs to have rank 1");
+    static assert(rank2==rank3,"mask and result need to have the same shape");
+    static assert(is(S:bool)||is(S:int),"maks should be castable to bool");
     if (res is null){
         res=NArray!(T,rank2).zeros(mask.shape);
     }
@@ -638,7 +675,7 @@ body {
         *resPtr0=*elAtt;
         elAtt=cast(T*)(cast(size_t)elAtt+myStride);
     }`;
-    mixin(sLoopPtr!(rank2,["res","mask"],loopInstr,"i"));
+    mixin(sLoopPtr(rank2,["res","mask"],loopInstr,"i"));
     return res;
 }
 
@@ -655,7 +692,7 @@ template reductionFactorFilt(T,S...){
         const int reductionFactorFilt=reductionFactorFilt!(S);
     } else static if (is(T:int[])||is(T:long[])||is(T:uint[])||is(T:ulong[])){
         const int reductionFactorFilt=reductionFactorFilt!(S);
-    } else static if (is(T==NArray!(long,1))||is(T==NArray!(uint,1))||is(T==NArray!(ulong,1))){
+    } else static if (is(T:NArray!(long,1))||is(T:NArray!(int,1))||is(T:NArray!(uint,1))||is(T:NArray!(ulong,1))){
         const int reductionFactorFilt=reductionFactorFilt!(S);
     } else {
         static assert(0,"ERROR: unexpected type <"~T.stringof~"> in reductionFactorFilt, this will fail");
@@ -692,7 +729,7 @@ NArray!(T,rank-reductionFactorFilt!(S)) arrayAxisFilter(T,int rank,S...)(NArray!
         } else static if (is(U:int[])||is(U:long[])||is(U:uint[])||is(U:ulong[])){
             newshape[ii]=idx_tup[i].length;
             ++ii;
-        } else static if (is(U==NArray!(long,1))||is(U==NArray!(uint,1))||is(U==NArray!(ulong,1))){
+        } else static if (is(U==NArray!(long,1))||is(U==NArray!(int,1))||is(U==NArray!(uint,1))||is(U==NArray!(ulong,1))){
             newshape[ii]=idx_tup[i].shape[0];
             ++ii;
         } else {
@@ -706,11 +743,10 @@ NArray!(T,rank-reductionFactorFilt!(S)) arrayAxisFilter(T,int rank,S...)(NArray!
 }
 
 // loops on filtered and non filtered array in parallel (support function)
-char[] axisFilterLoop(T,int rank,S...)(char[] loopBody)
+char[] axisFilterLoop(T,int rank,V,S...)(char[] loopBody)
 {
     char[] res="".dup;
     char[] indent="    ".dup;
-    alias T V;
     static const int rank2=rank-reductionFactorFilt!(S);
     res~=indent~"const int rank2=rank-reductionFactorFilt!(S);";
     res~=indent~"index_type from,to,step;\n";
@@ -718,6 +754,7 @@ char[] axisFilterLoop(T,int rank,S...)(char[] loopBody)
     res~=indent~"T* bPtr"~ctfe_i2a(rank2)~"=b.startPtrArray;\n";
     for (int i=0;i<rank;++i){
         res~=indent~"index_type aStride"~ctfe_i2a(i)~"=a.bStrides["~ctfe_i2a(i)~"];\n";
+        res~=indent~"index_type aShape"~ctfe_i2a(i)~"=a.shape["~ctfe_i2a(i)~"];\n";
     }
     for (int i=0;i<rank2;++i){
         res~=indent~"index_type bStride"~ctfe_i2a(i)~"=b.bStrides["~ctfe_i2a(i)~"];\n";
@@ -750,7 +787,7 @@ char[] axisFilterLoop(T,int rank,S...)(char[] loopBody)
             res~=indent~"aStride"~ctfe_i2a(i)~"*=inc;\n";
         } else static if (is(U:int[])||is(U:long[])||is(U:uint[])||is(U:ulong[])){
             res~=indent~"index_type j"~ctfe_i2a(i)~"_1=idx_tup["~ctfe_i2a(i)~"].length;\n";
-        } else static if (is(U==NArray!(long,1))||is(U==NArray!(uint,1))||is(U==NArray!(ulong,1))){
+        } else static if (is(U==NArray!(long,1))||is(U==NArray!(int,1))||is(U==NArray!(uint,1))||is(U==NArray!(ulong,1))){
             res~=indent~"index_type j"~ctfe_i2a(i)~"_1=idx_tup["~ctfe_i2a(i)~"].shape[0];\n";
             res~=indent~"index_type j"~ctfe_i2a(i)~"_2=idx_tup["~ctfe_i2a(i)~"].bStrides[0];\n";
         } else {
@@ -773,15 +810,20 @@ char[] axisFilterLoop(T,int rank,S...)(char[] loopBody)
             res~=indent~"T* bPtr"~ctfe_i2a(rank2-ii-1)~"=bPtr"~ctfe_i2a(rank2-ii)~";\n";
             res~=indent~"for(index_type i"~ctfe_i2a(i)~"=0;i"~ctfe_i2a(i)~"!=j"~ctfe_i2a(i)~"_1;++i"~ctfe_i2a(i)~"){\n";
             res~=indent2~"T* aPtr"~ctfe_i2a(rank-i-1)~"=cast(T*)(cast(size_t)aPtr"~ctfe_i2a(rank-i)~
-                "+(*idx"~ctfe_i2a(i)~")*aStride"~ctfe_i2a(i)~");\n";
+                "+cast(index_type)(*idx"~ctfe_i2a(i)~")*aStride"~ctfe_i2a(i)~");\n";
             ++ii;
-        } else static if (is(U==NArray!(long,1))||is(U==NArray!(uint,1))||is(U==NArray!(ulong,1))){
-            res~=indent~"S["~ctfe_i2a(i)~"].dtype* idx"~ctfe_i2a(i)~
+        } else static if (is(U==NArray!(long,1))||is(U:NArray!(int,1))||is(U:NArray!(uint,1))||is(U:NArray!(ulong,1))){
+            res~=indent;
+            static if (is(U:NArray!( long,1))) res~="long";
+            static if (is(U:NArray!(  int,1))) res~="int";
+            static if (is(U:NArray!(ulong,1))) res~="ulong";
+            static if (is(U:NArray!( uint,1))) res~="uint";
+            res~="* idx"~ctfe_i2a(i)~
                 "=idx_tup["~ctfe_i2a(i)~"].startPtrArray;\n";
             res~=indent~"T* bPtr"~ctfe_i2a(rank2-ii-1)~"=bPtr"~ctfe_i2a(rank2-ii)~";\n";
             res~=indent~"for(index_type i"~ctfe_i2a(i)~"=0;i"~ctfe_i2a(i)~"!=j"~ctfe_i2a(i)~"_1;++i"~ctfe_i2a(i)~"){\n";
             res~=indent2~"T* aPtr"~ctfe_i2a(rank-i-1)~"=cast(T*)(cast(size_t)aPtr"~ctfe_i2a(rank-i)~
-                "+(*idx"~ctfe_i2a(i)~")*aStride"~ctfe_i2a(i)~");\n";
+                "+cast(index_type)(*idx"~ctfe_i2a(i)~")*aStride"~ctfe_i2a(i)~");\n";
             ++ii;
         } else {
             static assert(0,"ERROR: unexpected type <"~U.stringof~"> in axisFilterLoop, this will fail");
@@ -791,18 +833,18 @@ char[] axisFilterLoop(T,int rank,S...)(char[] loopBody)
     for (int i=rank2-ii;i>0;--i){
         char[] indent2=indent~"    ";
         res~=indent~"T* aPtr"~ctfe_i2a(i-1)~"=aPtr"~ctfe_i2a(i)~";\n";
-        res~=indent~"T* bPtr"~ctfe_i2a(i-1)~"=aPtr"~ctfe_i2a(i)~";\n";
-        res~=indent~"for (index_type i"~ctfe_i2a(i-1)~"=aShape"~ctfe_i2a(i-1)~";i"~ctfe_i2a(i-1)~"!=0;--i"~ctfe_i2a(i-1)~"){\n";
+        res~=indent~"T* bPtr"~ctfe_i2a(i-1)~"=bPtr"~ctfe_i2a(i)~";\n";
+        res~=indent~"for (index_type iIn"~ctfe_i2a(i-1)~"=aShape"~ctfe_i2a(rank-i)~";iIn"~ctfe_i2a(i-1)~"!=0;--iIn"~ctfe_i2a(i-1)~"){\n";
         indent=indent2;
     }
     res~=indent~loopBody~"\n";
     for (int i=0;i<rank2-ii;++i){
         assert(indent.length>=4);
         char[] indent2=indent[0..(indent.length-4)];
-        res~=indent~"aPtr"~ctfe_i2a(i-1)~"=cast(T*)(cast(size_t)aPtr"~ctfe_i2a(i-1)
-            ~"+aStride"~ctfe_i2a(i)~");\n";
-        res~=indent~"bPtr"~ctfe_i2a(i-1)~"=cast(T*)(cast(size_t)bPtr"~ctfe_i2a(i-1)
-            ~"+bStride"~ctfe_i2a(i)~");\n";
+        res~=indent~"aPtr"~ctfe_i2a(i)~"=cast(T*)(cast(size_t)aPtr"~ctfe_i2a(i)
+            ~"+aStride"~ctfe_i2a(rank-1-i)~");\n";
+        res~=indent~"bPtr"~ctfe_i2a(i)~"=cast(T*)(cast(size_t)bPtr"~ctfe_i2a(i)
+            ~"+bStride"~ctfe_i2a(rank-1-i)~");\n";
         res~=indent2~"}\n";
         indent=indent2;
     }
@@ -813,9 +855,9 @@ char[] axisFilterLoop(T,int rank,S...)(char[] loopBody)
             res~=indent2~"}\n";
         } else static if (is(U==Range)){
             --ii;
-            res~=indent~"aPtr"~ctfe_i2a(i-1)~"=cast(T*)(cast(size_t)aPtr"~ctfe_i2a(i-1)
+            res~=indent~"aPtr"~ctfe_i2a(rank-i-1)~"=cast(T*)(cast(size_t)aPtr"~ctfe_i2a(rank-i-1)
                 ~"+aStride"~ctfe_i2a(i)~");\n";
-            res~=indent~"bPtr"~ctfe_i2a(ii-1)~"=cast(T*)(cast(size_t)bPtr"~ctfe_i2a(ii-1)
+            res~=indent~"bPtr"~ctfe_i2a(rank2-ii-1)~"=cast(T*)(cast(size_t)bPtr"~ctfe_i2a(rank2-ii-1)
                 ~"+bStride"~ctfe_i2a(ii)~");\n";
             res~=indent2~"}\n";
         } else static if (is(U:int[])||is(U:long[])||is(U:uint[])||is(U:ulong[])){
@@ -824,9 +866,9 @@ char[] axisFilterLoop(T,int rank,S...)(char[] loopBody)
             res~=indent~"bPtr"~ctfe_i2a(rank2-ii-1)~"=cast(T*)(cast(size_t)bPtr"~ctfe_i2a(rank2-ii-1)
                 ~"+bStride"~ctfe_i2a(ii)~");\n";
             res~=indent2~"}\n";
-        } else static if (is(U==NArray!(long,1))||is(U==NArray!(uint,1))||is(U==NArray!(ulong,1))){
+        } else static if (is(U==NArray!(long,1))||is(U==NArray!(int,1))||is(U==NArray!(uint,1))||is(U==NArray!(ulong,1))){
             --ii;
-            res~=indent~"idx"~ctfe_i2a(i)~"=cast(typeof(idx"~ctfe_i2a(i)~")*)"
+            res~=indent~"idx"~ctfe_i2a(i)~"=cast(typeof(idx"~ctfe_i2a(i)~"))"
                 ~"(cast(size_t)idx"~ctfe_i2a(i)~"+j"~ctfe_i2a(i)~"_2);\n";
             res~=indent~"bPtr"~ctfe_i2a(rank2-ii-1)~"=cast(T*)"
                 ~"(cast(size_t)bPtr"~ctfe_i2a(rank2-ii-1)~"+bStride"~ctfe_i2a(ii)~");\n";
@@ -839,25 +881,31 @@ char[] axisFilterLoop(T,int rank,S...)(char[] loopBody)
     return res;
 }
 
+/// Filters the array a into the array b using indexes, ranges and index arrays
+/// and returns the array b
 NArray!(T,rank-reductionFactorFilt!(S)) axisFilter1(T,int rank,S...)
     (NArray!(T,rank) a,NArray!(T,rank-reductionFactorFilt!(S)) b,S idx_tup)
 {
     static assert(nArgs!(S)<=rank,"too many indexing arguments");
-    mixin(axisFilterLoop!(T,rank,S)("*bPtr0=*aPtr0;"));
+    mixin(axisFilterLoop!(T,rank,T,S)("*bPtr0 = *aPtr0;"));
     return b;
 }
 
+/// Filters the array a using indexes, ranges and index arrays and returns the result
 NArray!(T,rank-reductionFactorFilt!(S))axisFilter(T,int rank,S...)(NArray!(T,rank) a,S index){
     static assert(nArgs!(S)<=rank,"too many indexing arguments");
     return axisFilter1!(T,rank,S)(a,arrayAxisFilter!(T,rank,S)(a,index),index);
 }
 
-NArray!(T,rank-reductionFactorFilt!(S)) axisUnfilter1(T,int rank,S...)
-    (NArray!(T,rank) a,NArray!(T,rank-reductionFactorFilt!(S)) b,S idx_tup)
+/// unfilters an array
+NArray!(T,rank) axisUnfilter1(T,int rank,V,int rank2,S...)
+    (NArray!(T,rank) a,NArray!(V,rank2) b,S idx_tup)
 {
+    static assert(rank2==rank-reductionFactorFilt!(S),"b has incorrect rank, expected "~
+        ctfe_i2a(rank-reductionFactorFilt!(S))~" got "~ctfe_i2a(rank2));
     static assert(nArgs!(S)<=rank,"too many indexing arguments");
-    mixin(axisFilterLoop!(T,rank,S)("*aPtr0=*bPtr0;"));
-    return b;
+    mixin(axisFilterLoop!(T,rank,V,S)("*aPtr0=*bPtr0;"));
+    return a;
 }
 
 // -------------- norm/compare -------------
@@ -868,11 +916,15 @@ NArray!(T,rank-reductionFactorFilt!(S)) axisUnfilter1(T,int rank,S...)
 /// To guarantee T.epsilon absolute error one should use shift=1.0, here we are more stingent
 /// and we use T.mant_dig/4 digits more when close to 0.
 int feqrel2(T)(T x,T y){
-    const T shift=ctfe_powI(0.5,T.mant_dig/4);
-    if (x<0){
-        return feqrel(x-shift,y-shift);
+    static if(isComplex!(T)){
+        return min(feqrel2(x.re,y.re),feqrel2(x.im,y.im));
     } else {
-        return feqrel(x+shift,y+shift);
+        const T shift=ctfe_powI(0.5,T.mant_dig/4);
+        if (x<0){
+            return feqrel(x-shift,y-shift);
+        } else {
+            return feqrel(x+shift,y+shift);
+        }
     }
 }
 
@@ -897,8 +949,42 @@ int minFeqrel(T,int rank)(NArray!(T,rank) a,T b=cast(T)0){
 
 /// return the square of the 2 norm of the array
 S norm2(T,int rank, S=T)(NArray!(T,rank)a){
-    S res=reduceAll!((ref S x,T y){ x+=cast(S)y*cast(S)y; },(ref S x,S y){ x+=y; }, (S x){return x;},
-        T,rank,S)(a,cast(S)0);
+    static if(is(T==cfloat)||is(T==cdouble)||is(T==creal)){
+        S res=reduceAllGen!((ref S x,T y){ x+=cast(S)y.re * cast(S)y.re + cast(S)y.im * cast(S)y.im; },
+            (ref S x,S y){ x+=y; }, (S x){return x;},T,rank,S)(a,cast(S)0);
+    } else {
+        S res=reduceAllGen!((ref S x,T y){ x+=cast(S)y*cast(S)y; },(ref S x,S y){ x+=y; }, (S x){return x;},
+            T,rank,S)(a,cast(S)0);
+    }
     return cast(S)sqrt(res);
 }
 
+/// makes the array hermitish (a==a.H)
+NArray!(T,rank)hermitize(T,int rank)(NArray!(T,rank)a){
+    static if (isComplex!(T)){
+        auto b=a.T;
+        mixin(pLoopPtr(rank,["a","b"],
+        "if (aPtr0<bPtr0) {T val=((*aPtr0).re+(*bPtr0).re+cast(T)1i*((*aPtr0).im-(*bPtr0).im))/cast(T)2; *aPtr0=val; *bPtr0=val.re-cast(T)1i*val.im;}","i"));
+        return a;
+    } else static if (isImaginary!(T)){
+        return antiSymmetrize(a);
+    } else {
+        return symmetrize(a);
+    }
+}
+
+/// symmetrizes the array
+NArray!(T,rank)symmetrize(T,int rank)(NArray!(T,rank)a){
+    auto b=a.T;
+    mixin(pLoopPtr(rank,["a","b"],
+    "if (aPtr0<bPtr0) {T val=(*aPtr0+*bPtr0)/cast(T)2; *aPtr0=val; *bPtr0=val;}","i"));
+    return a;
+}
+
+/// anti symmetrizes the array
+NArray!(T,rank)antiSymmetrize(T,int rank)(NArray!(T,rank)a){
+    auto b=a.T;
+    mixin(pLoopPtr(rank,["a","b"],
+    "if (aPtr0<bPtr0) {T val=(*aPtr0-*bPtr0)/cast(T)2; *aPtr0=val; *bPtr0=-val;}","i"));
+    return a;
+}

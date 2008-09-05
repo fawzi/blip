@@ -1,21 +1,17 @@
 /*******************************************************************************
     Basic linear algebra on NArrays
     at the moment only dot is available without blas/lapack
-     norm       --- Vector or matrix norm
      inv        --- Inverse of a square matrix
      solve      --- Solve a linear system of equations
      det        --- Determinant of a square matrix
-     lstsq      --- Solve linear least-squares problem
-     pinv       --- Pseudo-inverse (Moore-Penrose) using lstsq
-    
-    Eigenvalues and Decompositions:
-    
      eig        --- Eigenvalues and vectors of a square matrix
      eigh       --- Eigenvalues and eigenvectors of a Hermitian matrix
-     eigvals    --- Eigenvalues of a square matrix
-     eigvalsh   --- Eigenvalues of a Hermitian matrix.
      svd        --- Singular value decomposition of a matrix
+     
+     nice to add:
+     dgesvx/zgesvx (advanced linear solvers)
      cholesky   --- Cholesky decomposition of a matrix
+     optimize lapack based calls for contiguous inputs
     
     copyright:      Copyright (c) 2008. Fawzi Mohamed
     license:        BSD style: $(LICENSE)
@@ -23,9 +19,12 @@
     author:         Fawzi Mohamed
 *******************************************************************************/
 module frm.narray.LinAlg;
-import tango.io.Stdout;
+//import tango.io.Stdout;
 import frm.narray.BasicTypes;
 import frm.narray.BasicOps;
+import tango.math.Math:min,max;
+import frm.TemplateFu:isComplex,isImaginary,realType,complexType;
+
 version(darwin){
     version=blas;
     version=lapack;
@@ -114,9 +113,9 @@ body {
     if ((a.flags|b.flags)&ArrayFlags.Zero){
         if (scaleC==0){
             static if(rank3>0){
-                c[]=cast(T)0;
+                c[]=cast(S)0;
             } else {
-                c=cast(T)0;
+                c=cast(S)0;
             }
         } else {
             c *= scaleC;
@@ -257,6 +256,38 @@ body {
     return c;
 }
 
+/// structure to request a subrange of eigenvalues
+struct EigRange{
+    char kind;
+    f_int fromI, toI;
+    real fromV,toV;
+    static EigRange opCall(){
+        EigRange res;
+        res.kind='A';
+        return res;
+    }
+    static EigRange opCall(f_int from, f_int to){
+        EigRange res;
+        res.kind='I';
+        res.fromI=from;
+        res.toI=to;
+        return res;
+    }
+    static EigRange opCall(real from, real to){
+        EigRange res;
+        res.kind='V';
+        res.fromV=from;
+        res.toV=to;
+        return res;
+    }
+}
+
+/// storage of the matrix (upper or lower triangular)
+enum MStorage{
+    up=1,
+    lo=2
+}
+
 version (lapack){
     /// finds x for which dot(a,x)==b for a square matrix a
     /// not so efficient (copies a)
@@ -272,20 +303,23 @@ version (lapack){
     }
     body {
         a=a.dup(true);
-        scope ipiv=NArray!(f_int,1).empty(a.shape[0]);
+        scope ipiv=NArray!(f_int,1).empty([a.shape[0]]);
         f_int info;
-        if (x is null) x=b.dup(true);
-        if (!(x.bStrides[0]==cast(index_type)T.sizeof && x.bStrides[1]>0 || x.bStrides[1]==cast(index_type)T.sizeof && x.bStrides[0]>0)){
+        if (x is null) x=empty!(T)(b.shape,true);
+        if (!(x.bStrides[0]==cast(index_type)T.sizeof && x.bStrides[1]>0)){
             scope NArray!(T,2) xx=b.dup(true);
             DLapack.gesv(a.shape[0], b.shape[1], a.startPtrArray, a.bStrides[1]/cast(index_type)T.sizeof, ipiv.startPtrArray,
-                xx.startPtrArray, xx.shape[1], info);
-            x[]=xx;
+                xx.startPtrArray, xx.shape[0], info);
+            x[]=xx; // avoid and return xx?
         } else {
+            x[]=b;
             DLapack.gesv(a.shape[0], b.shape[1], a.startPtrArray, a.bStrides[1]/cast(index_type)T.sizeof, ipiv.startPtrArray,
-                x.startPtrArray, x.shape[1], info);
+                x.startPtrArray, x.bStrides[1]/cast(index_type)T.sizeof, info);
         }
         if (info > 0)
             throw new LinAlgException("Singular matrix");
+        if (info < 0)
+            throw new LinAlgException("Illegal input to Fortran routine gesv");
         return x;
     }
     /// ditto
@@ -298,9 +332,12 @@ version (lapack){
     }
     body {
         scope NArray!(T,2) b1=repeat(b,1,-1);
-        if (x is null) x=b.dup(true);
+        if (x is null) x=zeros!(T)(b.shape,true);
         scope NArray!(T,2) x1=repeat(x,1,-1);
-        solve(a,b1,x1);
+        auto res=solve(a,b1,x1);
+        if (res.startPtrArray!=x.startPtrArray) {
+            x[]=reshape(res,[-1]); // avoid and return res??
+        }
         return x;
     }
     
@@ -319,13 +356,13 @@ version (lapack){
     T det(T)(NArray!(T,2)a)
     in {
         static assert(isBlasType!(T),"implemented only for blas types");
-        assert(a.shape[0]==b.shape[1],"a has to be square");
+        assert(a.shape[0]==a.shape[1],"a has to be square");
     }
     body {
-        scope NArray!(f_int,1) pivots = NArray!(f_int,1).zeros();
+        scope NArray!(f_int,1) pivots = NArray!(f_int,1).zeros([a.shape[0]]);
         f_int info;
         auto a2=a.dup(true);
-        results = getrf(a2, pivots, info);
+        auto results = getrf(a2, pivots, info);
         if (info > 0)
             return cast(T)0;
         int sign=0;
@@ -353,73 +390,63 @@ version (lapack){
     }
     body {
         DLapack.getrf(a.shape[0], a.shape[1], a.startPtrArray, a.bStrides[1]/cast(index_type)T.sizeof,
-            pivots.startPtrArray, info);
+            ipiv.startPtrArray, info);
         if (info < 0)
             throw new LinAlgException("Illegal input to Fortran routine");
         return a;
     }
     
-    /// complex type for the given type
-    template complexType(T){
-        static if(is(T==float)|| is(T==ifloat)|| is(T==cfloat)){
-            alias cfloat complexType;
-        } else static if(is(T==double)|| is(T==idouble)|| is(T==cdouble)){
-            alias cdouble complexType;
-        } else static if(is(T==real)|| is(T==ireal)|| is(T==creal)){
-            alias creal complexType;
-        } else static assert(0,"unsupported type in complexType "~T.stringof);
-    }
-    
-    /// real type for the given type
-    template realType(T){
-        static if(is(T==float)|| is(T==ifloat)|| is(T==cfloat)){
-            alias float realType;
-        } else static if(is(T==double)|| is(T==idouble)|| is(T==cdouble)){
-            alias double realType;
-        } else static if(is(T==real)|| is(T==ireal)|| is(T==creal)){
-            alias real realType;
-        } else static assert(0,"unsupported type in realType "~T.stringof);
-    }
-    
     /// calculates eigenvalues and (if not null) the  right (and left) eigenvectors
     /// of the given matrix
+    /// dot(a,rightEVect)==repeat(ev,n,0)*rightEVect
+    /// dot(leftEVect.H,a)==leftEVect.H*repeat(ev,n,-1)
+    /// note: it could be relaxed and accept all matrixes with .bStrides[0]=T.sizeof
+    /// without copying
     NArray!(complexType!(T),1) eig(T)(NArray!(T,2)a,NArray!(complexType!(T),1) ev=null,
         NArray!(complexType!(T),2)leftEVect=null,NArray!(complexType!(T),2)rightEVect=null)
     in {
         static assert(isBlasType!(T),"only blas types accepted");
         assert(a.shape[0]==a.shape[1],"matrix a has to be square");
-        assert(a.shape[0]==ev.shape[1],"ev has an incorrect size");
+        if (ev !is null) {
+            assert(a.shape[0]==ev.shape[0],"ev has an incorrect size");
+        }
         if (rightEVect !is null) {
-            assert(a.shape[0]==rightEVect[0],"invalid size for rightEVect");
-            assert(a.shape[0]==rightEVect[1],"invalid size for rightEVect");
+            assert(a.shape[0]==rightEVect.shape[0],"invalid size for rightEVect");
+            assert(a.shape[0]==rightEVect.shape[1],"invalid size for rightEVect");
         }
         if (leftEVect !is null) {
-            assert(a.shape[0]==leftEVect[0],"invalid size for leftEVect");
-            assert(a.shape[0]==leftEVect[1],"invalid size for leftEVect");
+            assert(a.shape[0]==leftEVect.shape[0],"invalid size for leftEVect");
+            assert(a.shape[0]==leftEVect.shape[1],"invalid size for leftEVect");
         }
     }
     body {
         scope NArray!(T,2) a1=a.dup(true);
-        NArray!(complexType!(T),2) lE=leftEVect,rE=rightEVect;
+        NArray!(T,2) lE,rE;
         T* lEPtr=null,rEPtr=null;
-        f_int lELd,rELd;
+        f_int lELd=1,rELd=1;
         if (leftEVect !is null){
-            if (leftEVect.bStrides[0]!=cast(index_type)T.sizeof || leftEVect.bStrides[1]<leftEVect.shape[0]*cast(index_type)T.sizeof) {
-                lE=leftEVect.dup(true);
+            if (leftEVect.flags & ArrayFlags.Fortran) {
+                lE=NArray!(T,2)([T.sizeof,T.sizeof*a.shape[0]],leftEVect.shape,
+                    cast(T*)leftEVect.startPtrArray,leftEVect.newFlags,leftEVect.newBase);
+            } else {
+                lE=NArray!(T,2).empty(leftEVect.shape,true);
             }
             lEPtr=lE.startPtrArray;
             lELd=lE.bStrides[1]/cast(index_type)T.sizeof;
         }
         if (rightEVect !is null){
-            if (rightEVect.bStrides[0]!=cast(index_type)T.sizeof || rightEVect.bStrides[1]<rightEVect.shape[0]*cast(index_type)T.sizeof) {
-                rE=rightEVect.dup(true);
+            if (rightEVect.flags & ArrayFlags.Fortran) {
+                rE=NArray!(T,2)([T.sizeof,T.sizeof*a.shape[0]],rightEVect.shape,
+                    cast(T*)rightEVect.startPtrArray,rightEVect.newFlags,rightEVect.newBase);
+            } else {
+                rE=empty!(T)(rightEVect.shape,true);
             }
             rEPtr=rE.startPtrArray;
             rELd=rE.bStrides[1]/cast(index_type)T.sizeof;
         }
         NArray!(complexType!(T),1) eigenval=ev;
-        if (eigenval is null || eigenval.bStrides[0]!=cast(index_type)T.sizeof || eigenval.bStrides[1]<=eigenval.shape[0]*cast(index_type)T.sizeof) {
-            eigenval = zeros!(complexType!(T))(n);
+        if (eigenval is null || is(T==complexType!(T)) && (!(eigenval.flags&ArrayFlags.Fortran))) {
+            eigenval = zeros!(complexType!(T))(a.shape[0]);
         }
         f_int n=a.shape[0],info;
         f_int lwork = -1;
@@ -427,34 +454,258 @@ version (lapack){
         static if(is(complexType!(T)==T)){
             scope NArray!(realType!(T),1) rwork = empty!(realType!(T))(2*n);
             DLapack.geev(((lEPtr is null)?'N':'V'),((rEPtr is null)?'N':'V'),n,
-                a1.startPtrArray, a1.bStrides[1]/cast(index_type)T.sizeof, w.startPtrArray, lEPtr, lELd, rEPtr, rELd,
+                a1.startPtrArray, a1.bStrides[1]/cast(index_type)T.sizeof, eigenval.startPtrArray, lEPtr, lELd, rEPtr, rELd,
                 &workTmp, lwork, rwork.startPtrArray, info);
-            lwork = cast(int)abs(work[0])+1;
+            lwork = cast(int)abs(workTmp)+1;
             scope NArray!(T,1) work = empty!(T)(lwork);
             DLapack.geev(((lEPtr is null)?'N':'V'),((rEPtr is null)?'N':'V'),n,
-                a1.startPtrArray, a1.bStrides[1]/cast(index_type)T.sizeof, w.startPtrArray, lEPtr, lELd, rEPtr, rELd,
-                work, work.bStrides[1]/cast(index_type)T.sizeof, rwork.startPtrArray, info);
+                a1.startPtrArray, a1.bStrides[1]/cast(index_type)T.sizeof, eigenval.startPtrArray, lEPtr, lELd, rEPtr, rELd,
+                work.startPtrArray, lwork, rwork.startPtrArray, info);
             
+            if (leftEVect ! is null && leftEVect.startPtrArray != lE.startPtrArray) leftEVect[]=lE;
+            if (rightEVect !is null && rightEVect.startPtrArray != rE.startPtrArray) rightEVect[]=rE;
+            if (ev !is null && ev.startPtrArray != eigenval.startPtrArray) ev[]=eigenval;
         } else {
             scope NArray!(realType!(T),1) wr = empty!(realType!(T))(n);
             scope NArray!(realType!(T),1) wi = empty!(realType!(T))(n);
             DLapack.geev(((lEPtr is null)?'N':'V'),((rEPtr is null)?'N':'V'),n,
-                a1.startPtrArray, a1.bStrides[1]/cast(index_type)T.sizeof, wr.ptr, wi.ptr, lEPtr, lELd, rEPtr, rELd,
+                a1.startPtrArray, a1.bStrides[1]/cast(index_type)T.sizeof, wr.startPtrArray, wi.startPtrArray, lEPtr, lELd, rEPtr, rELd,
                 &workTmp, lwork, info);
-            lwork = cast(int)abs(work[0])+1;
+            lwork = cast(int)abs(workTmp)+1;
             scope NArray!(T,1) work = empty!(T)(lwork);
             DLapack.geev(((lEPtr is null)?'N':'V'),((rEPtr is null)?'N':'V'),n,
-                a1.ptr, a1.bStrides[1]/cast(index_type)T.sizeof, wr.startPtrArray, wi.startPtrArray, lEPtr, lELd, rEPtr, rELd,
-                work.startPtrArray, work.bStrides[1]/cast(index_type)T.sizeof, info);
+                a1.startPtrArray, a1.bStrides[1]/cast(index_type)T.sizeof, wr.startPtrArray, wi.startPtrArray, lEPtr, lELd, rEPtr, rELd,
+                work.startPtrArray, lwork, info);
             for (int i=0;i<n;++i)
-                eigenval[i]=wr[i]+wi[i]*1i;
+                eigenval[i]=cast(complexType!(T))(wr[i]+wi[i]*1i);
+            if (rEPtr !is null){
+                index_type i=n-1;
+                while(i>=0) {
+                    if (wi[i]==0){
+                        for (index_type j=n-1;j>=0;--j){
+                            rightEVect[j,i]=cast(complexType!(T))(rE[j,i]);
+                        }
+                        --i;
+                    } else {
+                        for (index_type j=n-1;j>=0;--j){
+                            rightEVect[j,i-1]=cast(complexType!(T))(rE[j,i-1]+1i*rE[j,i]);
+                            rightEVect[j,i]=cast(complexType!(T))(rE[j,i-1]-1i*rE[j,i]);
+                        }
+                        i-=2;
+                    }
+                }
+            }
+            if (lEPtr !is null){
+                index_type i=n-1;
+                while(i>=0) {
+                    if (wi[i]==0){
+                        for (index_type j=n-1;j>=0;--j){
+                            leftEVect[j,i]=cast(complexType!(T))lE[j,i];
+                        }
+                        --i;
+                    } else {
+                        for (index_type j=n-1;j>=0;--j){
+                            leftEVect[j,i-1]=cast(complexType!(T))(lE[j,i-1]+1i*lE[j,i]);
+                            leftEVect[j,i]=cast(complexType!(T))(lE[j,i-1]-1i*lE[j,i]);
+                        }
+                        i-=2;
+                    }
+                }
+            }
         }
-        if (leftEVect !is lE) leftEVect[]=lE;
-        if (rightEVect !is rE) rightEVect[]=rE;
-        if (ev !is eigenval) ev[]=eigenval;
         if (info<0) throw new LinAlgException("Illegal input to Fortran routine");
         if (info>0) throw new LinAlgException("Eigenvalues did not converge");
         return eigenval;
+    }
+    
+    /// singular value decomposition
+    ///  a=dot(u[Range(0,-1),Range(0,vt.shape[0])],repeat(s,vt.shape[0],-1)*vt) if vt.shape[0]<=u.shape[0]
+    ///  a=dot(u*repeat(s,u.shape[0],0),vt[Range(0,u.shape[0])]) if vt.shape[0]>=u.shape[0]
+    /// with square orthogonal u,v and singular values s, the larger of u,vt can be reduced to rectangular
+    /// (as the other vectors are not really well defined)
+    /// to do: switch to 'O' method, to spare a matrix
+    NArray!(realType!(T),1) svd(T,S=realType!(T))(NArray!(T,2)a,NArray!(T,2)u=null,
+        NArray!(S,1)s=null,NArray!(T,2)vt=null)
+    in{
+        static assert(is(realType!(T)==S),"singular values are real");
+        index_type mn=min(a.shape[0],a.shape[1]);
+        if (u !is null){
+            assert(u.shape[0]==a.shape[0],"invalid shape[0] for u");
+            assert(u.shape[1]==a.shape[0] || u.shape[1]==mn,"invalid shape[1] for u");
+        }
+        if (vt !is null){
+            assert(vt.shape[0]==a.shape[1] || vt.shape[0]==mn,"invalid shape[0] for vt");
+            assert(vt.shape[1]==a.shape[1],"invalid shape[1] for vt");
+        }
+        if (s !is null){
+            assert(s.shape[0]==mn,"invalid shape for s");
+        }
+    }
+    body{
+        index_type m=a.shape[0],n=a.shape[1],mn=min(m,n);
+        a=a.dup(true);
+        auto myS=s;
+        if (s is null || s.bStrides[0]!=cast(index_type)realType!(T).sizeof){
+            myS=empty!(realType!(T))(mn,true);
+        }
+        if (mn==cast(index_type)0) return s;
+        char jobz='N';
+        T * uPtr=null,vtPtr=null;
+        auto myU=u,myVt=vt;
+        f_int lda= cast(f_int)(a.bStrides[1]/cast(index_type)T.sizeof);
+        if (lda==1) lda=a.shape[0];
+        f_int ldu= cast(f_int)1;
+        f_int ldvt=cast(f_int)1;
+        if (u !is null || vt !is null){
+            if (u is null || u.bStrides[0]!=cast(index_type)T.sizeof || u.bStrides[1]<=0 ){
+                index_type[2] uShape=m;
+                if (u !is null) uShape[1]=mn;
+                myU=empty!(T)(uShape,true);
+            }
+            uPtr=myU.startPtrArray;
+            if (vt is null || vt.bStrides[0]!=cast(index_type)T.sizeof || vt.bStrides[1]<=0){
+                index_type[2] vtShape=n;
+                if (vt !is null) vtShape[0]=mn;
+                myVt=empty!(T)(vtShape,true);
+            }
+            vtPtr=myVt.startPtrArray;
+            jobz='A';
+            if (myU.shape[1]!=m) jobz='S';
+            if (myVt.shape[0]!=n) jobz='S';
+            ldu= cast(f_int)(myU.bStrides[1]/cast(index_type)T.sizeof);
+            ldvt=cast(f_int)(myVt.bStrides[1]/cast(index_type)T.sizeof);
+            if (ldu==1) ldu=myU.shape[0];
+            if (ldvt==1) ldvt=myVt.shape[0];
+        }
+        f_int info;
+        T tmpWork;
+        scope NArray!(f_int,1) iwork=empty!(f_int)(8*mn);
+        static if (isComplex!(T)){
+            scope NArray!(realType!(T),1) rwork=empty!(realType!(T))(jobz=='N'?7*mn:5*(mn*mn+mn));
+            DLapack.gesdd(jobz, cast(f_int) m, cast(f_int) n,
+                a.startPtrArray, lda, myS.startPtrArray, uPtr, ldu,
+                vtPtr, ldvt, &tmpWork, cast(f_int)-1,
+                rwork.startPtrArray, iwork.startPtrArray, info);
+            if (info==0){
+                f_int lwork=cast(f_int)tmpWork.re+cast(f_int)1;
+                scope NArray!(T,1) work=empty!(T)(lwork);
+                DLapack.gesdd(jobz, cast(f_int) m, cast(f_int) n,
+                    a.startPtrArray, lda, myS.startPtrArray, uPtr, ldu,
+                    vtPtr, ldvt, work.startPtrArray, lwork,
+                    rwork.startPtrArray, iwork.startPtrArray, info);
+            }            
+        } else {
+            DLapack.gesdd(jobz, cast(f_int)m, cast(f_int)n, a.startPtrArray, lda,
+                myS.startPtrArray, uPtr, ldu, vtPtr, ldvt,
+                &tmpWork, cast(f_int)(-1), iwork.startPtrArray, cast(f_int)info);
+            if (info==0){
+                f_int lwork=cast(f_int)tmpWork.re+cast(f_int)1;
+                scope NArray!(T,1) work=empty!(T)(lwork);
+                DLapack.gesdd(jobz, cast(f_int)m, cast(f_int) n, a.startPtrArray, lda,
+                    myS.startPtrArray, uPtr, ldu, vtPtr, ldvt,
+                    work.startPtrArray, lwork, iwork.startPtrArray, info);
+            }
+        }
+        if (u !is null && u.startPtrArray!=myU.startPtrArray) u[]=myU;
+        if (vt !is null && vt.startPtrArray!=myVt.startPtrArray) vt[]=myVt;
+        if (info<0) throw new LinAlgException("Illegal input to Fortran routine gesdd");
+        if (info>0) throw new LinAlgException("svd decomposition did not converge");
+        return myS;
+    }
+    
+    /// eigenvaules for hermitian matrix
+    NArray!(realType!(T),1)eigh(T)(NArray!(T,2)a,MStorage storage=MStorage.up,
+        NArray!(realType!(T),1)ev=null,NArray!(T,2)eVect=null,
+        EigRange range=EigRange(),NArray!(f_int,2)supportEVect=null,
+        realType!(T) abstol=cast(realType!(T))0)
+    in {
+        assert(a.shape[0]==a.shape[1],"a has to be square");
+        assert(ev is null || ev.shape[0]==a.shape[0],"ev has incorret shape");
+        if (eVect !is null){
+            index_type m=a.shape[0];
+            if (range.kind=='I') m=range.toI-range.fromI+1;
+            assert(eVect.shape[0]==a.shape[0] && (eVect.shape[1]<=a.shape[0] && eVect.shape[1]>=m),
+                "eVect has invalid shape");
+        }
+        assert(supportEVect is null || supportEVect.shape[0]==2 && supportEVect.shape[1]==a.shape[0],
+            "supportEVect has incorrect shape");
+    }
+    body {
+        index_type n=a.shape[0];
+        f_int m=cast(f_int)n;
+        if (range.kind=='I') m=cast(f_int)(range.toI-range.fromI+1);
+        auto myEv=ev;
+        if (ev is null || myEv.bStrides[0]!=cast(index_type)realType!(T).sizeof){
+            myEv=empty!(realType!(T))(n);
+        }
+        if (n==0) return myEv;
+        a=a.dup(true);
+        f_int lda=a.bStrides[1]/cast(index_type)T.sizeof;
+        T* eVectPtr=null;
+        auto myEVect=eVect;
+        f_int ldEVect=cast(f_int)1;
+        if (eVect !is null) {
+            if (eVect.bStrides[0]!=T.sizeof || eVect.bStrides[1]<=cast(index_type)0){
+                myEVect=empty!(T)(eVect.shape);
+            }
+            eVectPtr=myEVect.startPtrArray;
+            ldEVect=cast(f_int)(myEVect.bStrides[1]/cast(index_type)T.sizeof);
+            if (ldEVect==cast(f_int)1) ldEVect=cast(f_int)myEVect.shape[0];
+        }
+        auto isuppz=supportEVect;
+        if (supportEVect is null || (!(supportEVect.flags&ArrayFlags.Fortran))){
+            isuppz=empty!(f_int)([2,max(1,cast(index_type)m)],true);
+        }
+        T tmpWork;
+        f_int tmpIWork;
+        f_int info=0;
+        static if (isComplex!(T)){
+            realType!(T) tmpRWork;
+            DLapack.heevr((eVectPtr is null)?'N':'V', range.kind,(storage==MStorage.up)?'U':'L', 
+                cast(f_int)n, a.startPtrArray, lda, cast(realType!(T))range.fromV,
+                cast(realType!(T))range.toV, cast(f_int)range.fromI, cast(f_int)range.toI,
+                abstol, m, myEv.startPtrArray, eVectPtr, ldEVect, 
+                isuppz.startPtrArray, &tmpWork, cast(f_int)(-1),  &tmpRWork, cast(f_int)(-1),
+                &tmpIWork, cast(f_int)(-1), info);
+            if (info==0){
+                f_int lwork=cast(f_int)abs(tmpWork)+cast(f_int)1;
+                f_int lrwork=cast(f_int)abs(tmpRWork)+cast(f_int)1;
+                f_int liwork=cast(f_int)abs(tmpIWork)+cast(f_int)1;
+                scope iwork=empty!(f_int)(liwork);
+                scope work=empty!(T)(lwork);
+                scope rwork=empty!(realType!(T))(lrwork);
+                DLapack.heevr((eVectPtr is null)?'N':'V', range.kind,(storage==MStorage.up)?'U':'L', 
+                    cast(f_int)n, a.startPtrArray, lda, cast(realType!(T))range.fromV,
+                    cast(realType!(T))range.toV, cast(f_int)range.fromI, cast(f_int)range.toI,
+                    abstol, m, myEv.startPtrArray, eVectPtr, ldEVect, 
+                    isuppz.startPtrArray, work.startPtrArray, lwork,  rwork.startPtrArray, lrwork,
+                    iwork.startPtrArray, liwork, info);
+            }
+        } else {
+            DLapack.syevr((eVectPtr is null)?'N':'V', range.kind, (storage==MStorage.up)?'U':'L',
+                cast(f_int) n, a.startPtrArray,
+                lda, cast(T)range.fromV, cast(T)range.toV, cast(f_int)range.fromI, cast(f_int)range.toI,
+                abstol, m, myEv.startPtrArray, eVectPtr, ldEVect, isuppz.startPtrArray,
+                &tmpWork, cast(f_int)(-1), &tmpIWork, cast(f_int)(-1), info);
+            if (info==0){
+                f_int lwork=cast(f_int)abs(tmpWork)+cast(f_int)1;
+                f_int liwork=cast(f_int)abs(tmpIWork)+cast(f_int)1;
+                scope iwork=empty!(f_int)(liwork);
+                scope work=empty!(T)(lwork);
+                DLapack.syevr((eVectPtr is null)?'N':'V', range.kind, (storage==MStorage.up)?'U':'L',
+                    cast(f_int) n, a.startPtrArray,
+                    lda, cast(T)range.fromV, cast(T)range.toV, cast(f_int)range.fromI, cast(f_int)range.toI,
+                    abstol, m, myEv.startPtrArray, eVectPtr, ldEVect, isuppz.startPtrArray,
+                    work.startPtrArray, lwork, iwork.startPtrArray, liwork, info);
+            }
+        }
+        if (ev !is null && ev.startPtrArray!=myEv.startPtrArray) ev[]=myEv; // avoid?
+        if (eVect !is null && myEVect.startPtrArray!=eVect.startPtrArray) eVect[]=myEVect;
+        if (supportEVect !is null && supportEVect.startPtrArray!=isuppz.startPtrArray) supportEVect[]=isuppz;
+        if (m!=cast(f_int)n) myEv=myEv[Range(m)];
+        if (info<0) throw new LinAlgException("Illegal input to Fortran routine syevr/heevr");
+        if (info>0) throw new LinAlgException("eigenvalue decomposition did not converge");
+        return myEv;
     }
     
 }

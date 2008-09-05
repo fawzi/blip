@@ -46,6 +46,7 @@ import tango.io.stream.FormatStream: FormatOutput;
 import tango.io.Buffer: GrowBuffer;
 import tango.math.Math: abs;
 import frm.rtest.RTest;
+//import tango.io.Stdout;
 
 /// flags for fast checking of 
 enum ArrayFlags {
@@ -221,11 +222,12 @@ else {
                     sz*=shape[i];
                 }
                 bSize=sz;
-                sz=cast(index_type)V.sizeof;
-                if (sz==0){
+                if (bSize==0){
                     contiguos=true;
                     fortran=true;
                 } else {
+                    contiguos=true;
+                    sz=cast(index_type)V.sizeof;
                     for (int i=rank-1;i>=0;i--){
                         if (strides[i]!=sz && shape[i]!=1)
                             contiguos=false;
@@ -432,7 +434,9 @@ else {
             static assert(rank>=nArgs!(S),"too many argumens in indexing operation");
             static if(rank==reductionFactor!(S)){
                 foreach (i,v;idx_tup){
-                    assert(0<=v && v<shape[i],"index "~ctfe_i2a(i)~" out of bounds");
+                    if (0>v || v>=shape[i]){
+                        assert(false,"index "~ctfe_i2a(i)~" out of bounds");
+                    }
                 }
             } else {
                 foreach(i,TT;S){
@@ -531,7 +535,7 @@ else {
             S idx_tup)
         in{
             assert(!(flags&Flags.ReadOnly),"ReadOnly array cannot be assigned");
-            static assert(is(U==NArray!(V,rank-reductionFactor!(S)))||is(U==V),"invalid value type <"~U.stringof~"> in opIndexAssign");
+            static assert(is(U==NArray!(V,rank-reductionFactor!(S)))||is(U==V),"invalid value type <"~U.stringof~"> in opIndexAssign ot type "~V.stringof);
             static assert(rank>=nArgs!(S),"too many argumens in indexing operation");
             static if (rank==reductionFactor!(S)){
                 foreach(i,TT;S){
@@ -741,7 +745,7 @@ else {
                     return view;
                 }
                 int opApply( int delegate(ref NArray!(V,rank-1)) loop_body ) {
-                    for (index_type i=iPos;i<iDim-1;i++){
+                    for (index_type i=iPos;i<iDim;i++){
                         if (auto r=loop_body(view)) return r;
                         view.startPtrArray=cast(V*)(cast(size_t)view.startPtrArray+stride);
                     }
@@ -779,7 +783,7 @@ else {
             NArray baseArray;
             index_type [rank] left;
             index_type [rank] adds;
-            static FlatIterator opCall(ref NArray baseArray){
+            static FlatIterator opCall(NArray baseArray){
                 FlatIterator res;
                 res.baseArray=baseArray;
                 for (int i=0;i<rank;++i)
@@ -792,8 +796,10 @@ else {
                     }
                 }
                 res.adds[0]=baseArray.bStrides[rank-1];
+                index_type toRm=0;
                 for(int i=1;i<rank;i++){
-                    res.adds[i]=baseArray.bStrides[rank-1-i]-baseArray.bStrides[rank-i]*(baseArray.shape[rank-i]-1);
+                   toRm+=baseArray.bStrides[rank-i]*(baseArray.shape[rank-i]-1);
+                   res.adds[i]=baseArray.bStrides[rank-1-i]-toRm;
                 }
                 return res;
             }
@@ -1069,7 +1075,8 @@ else {
         }
 
         /// Add this array and another one and return a new array.
-        NArray!(typeof(V.init+S.init),rank) opAdd(S)(NArray!(S,rank) o) { 
+        NArray!(typeof(V.init+S.init),rank) opAdd(S,int rank2)(NArray!(S,rank2) o) { 
+            static assert(rank2==rank,"opAdd only on equally shaped arrays");
             NArray!(typeof(V.init+S.init),rank) res=NArray!(typeof(V.init+S.init),rank).empty(shape);
             ternaryOpStr!("*cPtr0=(*aPtr0)+(*bPtr0);",rank,V,S,typeof(V.init+S.init))(this,o,res);
             return res;
@@ -1085,9 +1092,10 @@ else {
         }
         static if (is(typeof(V.init+V.init)==V)) {
             /// Add another array onto this one in place.
-            NArray opAddAssign(S)(NArray!(S,rank) o)
+            NArray opAddAssign(S,int rank2)(NArray!(S,rank2) o)
             in { assert(!(flags&Flags.ReadOnly),"ReadOnly array cannot be assigned"); }
             body { 
+                static assert(rank==rank2,"opAddAssign accepts only identically shaped arrays");
                 binaryOpStr!("*aPtr0 += cast("~V.stringof~")*bPtr0;",rank,V,S)(this,o);
                 return this;
             }
@@ -1102,14 +1110,15 @@ else {
         }
 
         /// Subtract this array and another one and return a new array.
-        NArray!(typeof(V.init-S.init),rank) opSub(S)(NArray!(S,rank) o) { 
+        NArray!(typeof(V.init-S.init),rank) opSub(S,int rank2)(NArray!(S,rank2) o) { 
+            static assert(rank2==rank,"suptraction only on equally shaped arrays");
             NArray!(typeof(V.init-S.init),rank) res=NArray!(typeof(V.init-S.init),rank).empty(shape);
             ternaryOpStr!("*cPtr0=(*aPtr0)-(*bPtr0);",rank,V,S,typeof(V.init-S.init))(this,o,res);
             return res;
         }
         static if (is(typeof(V.init-V.init))) {
             /// Subtract a scalar from this array and return a new array with the result.
-            final NArray opSub()(V o) { 
+            NArray opSub()(V o) { 
                 NArray res=empty(shape);
                 mixin binaryOpStr!("*bPtr0=(*aPtr0)-o;",rank,V,V);
                 binaryOpStr(this,res);
@@ -1118,10 +1127,11 @@ else {
         }
         static if (is(typeof(V.init-V.init)==V)) {
             /// Subtract another array from this one in place.
-            NArray opSubAssign(S)(NArray!(S,rank) o)
+            NArray opSubAssign(S,int rank2)(NArray!(S,rank2) o)
             in { assert(!(flags&Flags.ReadOnly),"ReadOnly array cannot be assigned"); }
             body { 
-                binaryOpStr!("*aPtr0 -= cast("~V.stringof~")*bPtr0;",rank,V,V)(this,o);
+                static assert(rank2==rank,"opSubAssign supports only arrays of the same shape");
+                binaryOpStr!("*aPtr0 -= cast("~V.stringof~")*bPtr0;",rank,V,S)(this,o);
                 return this;
             }
             /// Subtract a scalar from this array in place.
@@ -1136,14 +1146,15 @@ else {
 
         /// Element-wise multiply this array and another one and return a new array.
         /// For matrix multiply, use the non-member dot(a,b) function.
-        NArray!(typeof(V.init*S.init),rank) opMul(S)(NArray!(S,rank) o) { 
-            NArray res=NArray!(typeof(V.init*S.init),rank).empty(shape);
+        NArray!(typeof(V.init*S.init),rank) opMul(S,int rank2)(NArray!(S,rank2) o) { 
+            static assert(rank2==rank);
+            auto res=NArray!(typeof(V.init*S.init),rank).empty(shape);
             ternaryOpStr!("*cPtr0=(*aPtr0)*(*bPtr0);",rank,V,S,typeof(V.init*S.init))(this,o,res);
             return res;
         }
         static if (is(typeof(V.init*V.init))) {
             /// Multiplies this array by a scalar and returns a new array.
-            final NArray!(typeof(V.init*V.init),rank) opMul()(V o) { 
+            NArray!(typeof(V.init*V.init),rank) opMul()(V o) { 
                 NArray!(typeof(V.init*V.init),rank) res=NArray!(typeof(V.init*V.init),rank).empty(shape);
                 mixin binaryOpStr!("*bPtr0=(*aPtr0)*o;",rank,V,typeof(V.init*V.init));
                 binaryOpStr(this,res);
@@ -1154,10 +1165,11 @@ else {
         static if (is(typeof(V.init*V.init)==V)) {
             /// Element-wise multiply this array by another in place.
             /// For matrix multiply, use the non-member dot(a,b) function.
-            NArray opMulAssign(S)(NArray!(S,rank) o)
+            NArray opMulAssign(S,int rank2)(NArray!(S,rank2) o)
             in { assert(!(flags&Flags.ReadOnly),"ReadOnly array cannot be assigned"); }
             body { 
-                binaryOpStr!("*aPtr0 *= cast("~V.stringof~")*bPtr0;",rank,V,typeof(V.init*V.init))(this,o);
+                static assert(rank2==rank,"opMulAssign supports only arrays of the same shape");
+                binaryOpStr!("*aPtr0 *= cast("~V.stringof~")*bPtr0;",rank,V,S)(this,o);
                 return this;
             }
             /// scales the current array.
@@ -1173,7 +1185,8 @@ else {
         /// Element-wise divide this array by another one and return a new array.
         /// To solve linear equations like A * x = b for x, use the nonmember linsolve
         /// function.
-        NArray!(typeof(V.init/S.init),rank) opDiv(S)(NArray!(S,rank) o) { 
+        NArray!(typeof(V.init/S.init),rank) opDiv(S,rank2)(NArray!(S,rank2) o) {
+            static assert(rank2==rank,"opDiv on equally shaped array");
             NArray!(typeof(V.init/S.init),rank) res=NArray!(typeof(V.init/S.init),rank).empty(shape);
             ternaryOpStr!("*cPtr0=(*aPtr0)/(*bPtr0);",rank,V,S,typeof(V.init/S.init))(this,o,res);
             return res;
@@ -1191,9 +1204,10 @@ else {
             /// Element-wise divide this array by another in place.
             /// To solve linear equations like A * x = b for x, use the nonmember linsolve
             /// function.
-            NArray opDivAssign(S)(NArray!(S,rank) o)
+            NArray opDivAssign(S,int rank2)(NArray!(S,rank2) o)
             in { assert(!(flags&Flags.ReadOnly),"ReadOnly array cannot be assigned"); }
             body { 
+                static assert(rank2==rank,"opDivAssign supports only arrays of the same shape");
                 binaryOpStr!("*aPtr0 /= cast("~V.stringof~")*bPtr0;",rank,V,S)(this,o);
                 return this;
             }
@@ -1241,7 +1255,11 @@ else {
             static if(rank==1) {
                 index_type lastI=shape[0]-1;
                 foreach(index_type i,V v;SubView(this)){
-                    s.format(formatEl,v);
+                    static if (isComplex!(V)){
+                        s.format(formatEl,v.re)("+1i*").format(formatEl,v.im);
+                    } else {
+                        s.format(formatEl,v);
+                    }
                     if (i!=lastI){
                         s(",");
                         if (i%elPerLine==elPerLine-1){
@@ -1330,6 +1348,46 @@ else {
                 newstrides[i]=bStrides[rank-1-i];
             }
             return NArray(newstrides,newshape,startPtrArray,newFlags,newBase);
+        }
+        
+        static if(isComplex!(V)){
+            /// conjugates the array in place
+            /// WARNING modifies the array!!!
+            NArray conj1(){
+                unaryOpStr!("*aPtr0=cast(T)((*aPtr0).re-(*aPtr0).im*1i);",rank,V)(this);
+                return this;
+            }
+            /// returns a conjugated copy of the array
+            NArray conj(){
+                NArray res=NArray.empty(shape);
+                binaryOpStr!("*aPtr0=cast(T)((*bPtr0).re-(*bPtr0).im*1i);",rank,V,V)(res,this);
+                return res;
+            }
+        } else static if (isImaginary!(V)){
+            /// conjugates the array in place
+            /// WARNING modifies the array!!!
+            NArray conj1(){
+                unaryOpStr!("*aPtr0=-(*aPtr0);",rank,V)(this);
+                return this;
+            }
+            /// returns a conjugated copy of the array
+            NArray conj(){
+                NArray res=NArray.empty(shape);
+                binaryOpStr!("*aPtr0=-(*bPtr0);",rank,V,V)(res,this);
+                return res;
+            }
+        } else {
+            NArray conj1() { return this; }
+            NArray conj() { return this; }
+        }
+        /// returns a hermitian copy of the array
+        NArray H(){
+            return this.T().conj();
+        }
+        /// returns a hermitian view of this array
+        /// WARNING modifies the array (it conjugates it)!!!
+        NArray H1(){
+            return this.conj1().T();
         }
         
         /// returns an array that loops over the elements in the best possible way
@@ -1931,7 +1989,7 @@ template randomNArray(T){
         return randomizeNArray(r,res);
     }
 }
-/// returns a random array of the given size with normal (signed values)
+/// returns the array a after having randomized its contens with normal (signed values)
 /// or exp (unsigned values) distribued numbers.
 NArray!(T,rank) randNArray(T,int rank)(Rand r, NArray!(T,rank) a){
     static if (is(T==float)|| is(T==double)||is(T==real)){

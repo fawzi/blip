@@ -17,15 +17,11 @@ import frm.random.Random: rand;
 private mixin testInit!() autoInitTst2;
 
 void main(){
-    Stdout(arange(3.51))(arange(4.0))(arange(4.49)).newline;
-    auto a=reverse(arange(3.5));
-    auto b=ones!(double)([4]);
-    a.desc(Stdout("a:")).newline;
-    a.printData(Stdout).newline;
-    b.desc(Stdout("b:")).newline;
-    Stdout(dot(a,b)).newline;
+    // change this to true to track bugs that crash or stop the program without throwing an exception
+    bool trace=false;
     Stdout(rand.toString()).newline;
-    SingleRTest.defaultTestController=new TextController(TextController.OnFailure.StopAllTests,
-        TextController.PrintLevel.AllShort,Stdout,Stdout,1,true);
-    doNArrayTests();
+    SingleRTest.defaultTestController=new TextController(//TextController.OnFailure.StopAllTests,
+        TextController.OnFailure.StopTest,
+        TextController.PrintLevel.AllShort,Stdout,Stdout,1,trace);
+    doNArrayTests(10);
 }
