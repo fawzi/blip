@@ -19,6 +19,42 @@ template nArgs(T,S...){
 /// identity function
 T Id(T)(T a) { return a; }
 
+/// is T is a real floating point number
+template isReal(T){
+    const isReal=is(T==float)||is(T==double)||is(T==real);
+}
+/// if T is a complex number
+template isComplex(T){
+    const isComplex=is(T==cfloat)||is(T==creal)||is(T==cdouble);
+}
+
+/// if T is a purely imaginary number
+template isImaginary(T){
+    const isImaginary=is(T==ifloat)|| is(T==idouble)|| is(T==ireal);
+}
+
+/// complex type for the given type
+template complexType(T){
+    static if(is(T==float)||is(T==ifloat)||is(T==cfloat)){
+        alias cfloat complexType;
+    } else static if(is(T==double)|| is(T==idouble)|| is(T==cdouble)){
+        alias cdouble complexType;
+    } else static if(is(T==real)|| is(T==ireal)|| is(T==creal)){
+        alias creal complexType;
+    } else static assert(0,"unsupported type in complexType "~T.stringof);
+}
+
+/// real type for the given type
+template realType(T){
+    static if(is(T==float)|| is(T==ifloat)|| is(T==cfloat)){
+        alias float realType;
+    } else static if(is(T==double)|| is(T==idouble)|| is(T==cdouble)){
+        alias double realType;
+    } else static if(is(T==real)|| is(T==ireal)|| is(T==creal)){
+        alias real realType;
+    } else static assert(0,"unsupported type in realType "~T.stringof);
+}
+
 template isAtomicType(T)
 {
     static if( is( T == bool )
