@@ -573,7 +573,7 @@ final class RandomG(SourceT=KissCmwc_default): IWritable, IReadable
         }
     }
     body {
-        static if (is(T==uint)||is(T==ulong)){
+        static if (is(T==int)||is(T==long)||is(T==uint)||is(T==ulong)){
             return from+uniformR(to-from);
         } else if (is(T==char) || is(T==byte) || is(T==ubyte)){
             int d=cast(int)to-cast(int)from;
