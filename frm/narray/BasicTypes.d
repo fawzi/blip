@@ -554,11 +554,11 @@ else {
                     pos=cast(V*)(cast(size_t)pos+cast(index_type)idx_tup[i]*bStrides[i]);
                 }
                 *pos=val;
-                return val;
             } else {
                 auto subArr=opIndex(idx_tup);
                 subArr[]=val;
             }
+            return val;
         }
                 
         /// static array indexing (separted from opIndex as potentially less efficient)
@@ -2041,7 +2041,11 @@ NArray!(T,rank) randLayout(T,int rank)(Rand r, NArray!(T,rank)a){
         }
     }
     res[]=a;
-    res.flags|=(a.flags&ArrayFlags.ReadOnly);
+    if (a.flags&ArrayFlags.ReadOnly){
+        res=NArray!(T,rank)(newStrides,cast(index_type[rank])a.shape,cast(T*)
+            (cast(size_t)base.startPtrArray+newStartIdx),
+            (a.newFlags&~ArrayFlags.ReadOnly)|ArrayFlags.ReadOnly,base.newBase);
+    }
     return res;
 }
 /+ ------------------------------------------------- +/

@@ -25,10 +25,6 @@ import frm.narray.BasicOps;
 import tango.math.Math:min,max;
 import frm.TemplateFu:isComplex,isImaginary,realType,complexType;
 
-version(darwin){
-    version=blas;
-    version=lapack;
-}
 version(blas){
     import DBlas=gobo.blas.DBlas;
     public import gobo.blas.Types;
@@ -259,18 +255,18 @@ body {
 /// structure to request a subrange of eigenvalues
 struct EigRange{
     char kind;
-    f_int fromI, toI;
+    index_type fromI, toI;
     real fromV,toV;
     static EigRange opCall(){
         EigRange res;
         res.kind='A';
         return res;
     }
-    static EigRange opCall(f_int from, f_int to){
+    static EigRange opCall(long from, long to){
         EigRange res;
         res.kind='I';
-        res.fromI=from;
-        res.toI=to;
+        res.fromI=cast(index_type)from;
+        res.toI=cast(index_type)to;
         return res;
     }
     static EigRange opCall(real from, real to){

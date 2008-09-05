@@ -197,7 +197,7 @@ template rkOfShape(T){
         const int rkOfShape = cast(int)staticArraySize!(T);
     } else {
         static assert(is(T==int)||is(T==uint)||is(T==long)||is(T==ulong),
-            "only integer types supported as dimensions");
+            "only integer types (and static arrays of them) supported as dimensions");
         const int rkOfShape = 1;
     }
 }

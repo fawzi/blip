@@ -453,192 +453,193 @@ void testDot2x2(T,S)(Dottable!(T,2,S,2,true,true) d){
     auto v=dot(d.a,d.b,d.axis1,d.axis2);
     assert(checkResDot(refVal,v),"value too different from reference");
 }
-
-void testSolve2x2(T)(Dottable!(T,2,T,2,false,true,true,0,0) d,Rand r){
-    int tol=9;
-    auto x=randLayout(r,empty!(T)([d.a.shape[1],d.b.shape[1]]));
-    try{
-        x=solve(d.a,d.b,x);
-        auto b2=dot(d.a,x);
-        auto err=minFeqrel2(d.b,b2);
-        if (err<2*T.mant_dig/3-tol) {
-            assert(err>=1,"error too big");
-            // check other side
-            auto x2=solve(d.a,b2);
-            assert(checkResDot(x,x2,tol),"error too big (even in the x space)");
+version(lapack){
+    void testSolve2x2(T)(Dottable!(T,2,T,2,false,true,true,0,0) d,Rand r){
+        int tol=9;
+        auto x=randLayout(r,empty!(T)([d.a.shape[1],d.b.shape[1]]));
+        try{
+            x=solve(d.a,d.b,x);
+            auto b2=dot(d.a,x);
+            auto err=minFeqrel2(d.b,b2);
+            if (err<2*T.mant_dig/3-tol) {
+                assert(err>=1,"error too big");
+                // check other side
+                auto x2=solve(d.a,b2);
+                assert(checkResDot(x,x2,tol),"error too big (even in the x space)");
+            }
+        } catch (LinAlgException l) {
+            assert(feqrel2(det(d.a),cast(T)0)>T.mant_dig/2,"solve failed with non 0 det");
         }
-    } catch (LinAlgException l) {
-        assert(feqrel2(det(d.a),cast(T)0)>T.mant_dig/2,"solve failed with non 0 det");
-    }
-    try{
-        x=solve(d.a,d.b);
-        auto b2=dot(d.a,x);
-        auto err=minFeqrel2(d.b,b2);
-        if (err<2*T.mant_dig/3-tol) {
-            assert(err>=1,"error too big2");
-            // check other side
-            auto x2=solve(d.a,b2);
-            assert(checkResDot(x,x2,tol),"error too big (even in the x space)2");
+        try{
+            x=solve(d.a,d.b);
+            auto b2=dot(d.a,x);
+            auto err=minFeqrel2(d.b,b2);
+            if (err<2*T.mant_dig/3-tol) {
+                assert(err>=1,"error too big2");
+                // check other side
+                auto x2=solve(d.a,b2);
+                assert(checkResDot(x,x2,tol),"error too big (even in the x space)2");
+            }
+        } catch (LinAlgException l) {
+            assert(feqrel2(det(d.a),cast(T)0)>T.mant_dig/2,"solve 2 failed with non 0 det");
         }
-    } catch (LinAlgException l) {
-        assert(feqrel2(det(d.a),cast(T)0)>T.mant_dig/2,"solve 2 failed with non 0 det");
     }
-}
 
-void testSolve2x1(T)(Dottable!(T,2,T,1,false,true,true,0,0) d,Rand r){
-    int tol=9;
-    auto x=randLayout(r,zeros!(T)([d.a.shape[1]]));
-    try{
-        x=solve(d.a,d.b,x);
-        auto b2=dot(d.a,x);
-        auto err=minFeqrel2(d.b,b2);
-        if (err<2*T.mant_dig/3-tol) {
-            assert(err>=1,"error too big");
-            // check other side
-            auto x2=solve(d.a,b2);
-            assert(checkResDot(x,x2,tol),"error too big (even in the x space)");
+    void testSolve2x1(T)(Dottable!(T,2,T,1,false,true,true,0,0) d,Rand r){
+        int tol=9;
+        auto x=randLayout(r,zeros!(T)([d.a.shape[1]]));
+        try{
+            x=solve(d.a,d.b,x);
+            auto b2=dot(d.a,x);
+            auto err=minFeqrel2(d.b,b2);
+            if (err<2*T.mant_dig/3-tol) {
+                assert(err>=1,"error too big");
+                // check other side
+                auto x2=solve(d.a,b2);
+                assert(checkResDot(x,x2,tol),"error too big (even in the x space)");
+            }
+        } catch (LinAlgException l) {
+            assert(feqrel2(det(d.a),cast(T)0)>T.mant_dig/2,"solve failed with non 0 det");
         }
-    } catch (LinAlgException l) {
-        assert(feqrel2(det(d.a),cast(T)0)>T.mant_dig/2,"solve failed with non 0 det");
-    }
-    try{
-        x=solve(d.a,d.b);
-        auto b2=dot(d.a,x);
-        auto err=minFeqrel2(d.b,b2);
-        if (err<2*T.mant_dig/3-tol) {
-            assert(err>=1,"error too big2");
-            // check other side
-            auto x2=solve(d.a,b2);
-            assert(checkResDot(x,x2,tol),"error too big (even in the x space)2");
+        try{
+            x=solve(d.a,d.b);
+            auto b2=dot(d.a,x);
+            auto err=minFeqrel2(d.b,b2);
+            if (err<2*T.mant_dig/3-tol) {
+                assert(err>=1,"error too big2");
+                // check other side
+                auto x2=solve(d.a,b2);
+                assert(checkResDot(x,x2,tol),"error too big (even in the x space)2");
+            }
+        } catch (LinAlgException l) {
+            assert(feqrel2(det(d.a),cast(T)0)>T.mant_dig/2,"solve 2 failed with non 0 det");
         }
-    } catch (LinAlgException l) {
-        assert(feqrel2(det(d.a),cast(T)0)>T.mant_dig/2,"solve 2 failed with non 0 det");
     }
-}
 
-void testEig(T)(Dottable!(T,2,T,1,false,true,true,0,0) d){
-    int tol=6;
-    index_type n=d.k;
-    auto ev=zeros!(complexType!(T))(n);
-    auto leftEVect=zeros!(complexType!(T))([n,n],true);
-    auto rightEVect=zeros!(complexType!(T))([n,n],true);
-    auto ev2=eig!(T)(d.a, ev,leftEVect,rightEVect);
-    auto m1=dot(d.a,rightEVect);
-    auto m2=repeat(ev2,n,0)*rightEVect;
-    auto diff1=norm2!(complexType!(T),2,real)(m1-m2)/n;
-    m1=dot(leftEVect.H1,d.a);
-    m2=leftEVect.T*repeat(ev2,n,-1);
-    auto diff2=norm2!(complexType!(T),2,real)(m1-m2)/n;
-    auto err1=feqrel(diff1+1.0L,1.0L);
-    auto err2=feqrel(diff2+1.0L,1.0L);
-    assert(norm2!(complexType!(T),2,real)(rightEVect)>0.5,"rightEVect too small");
-    assert(norm2!(complexType!(T),2,real)(leftEVect)>0.5,"leftEVect too small");
-    if (err1<T.mant_dig*2/3-tol){
-        ev2.printData(Stdout("ev:"),"{:F8,10}").newline;
-        leftEVect.printData(Stdout("leftEVect:"),"{:F8,10}").newline;
-        rightEVect.printData(Stdout("rightEVect:"),"{:F8,10}").newline;
-        Stdout("error")(err1)("/")(T.mant_dig).newline;
-        assert(false,"rightEVect error too large");
+    void testEig(T)(Dottable!(T,2,T,1,false,true,true,0,0) d){
+        int tol=6;
+        index_type n=d.k;
+        auto ev=zeros!(complexType!(T))(n);
+        auto leftEVect=zeros!(complexType!(T))([n,n],true);
+        auto rightEVect=zeros!(complexType!(T))([n,n],true);
+        auto ev2=eig!(T)(d.a, ev,leftEVect,rightEVect);
+        auto m1=dot(d.a,rightEVect);
+        auto m2=repeat(ev2,n,0)*rightEVect;
+        auto diff1=norm2!(complexType!(T),2,real)(m1-m2)/n;
+        m1=dot(leftEVect.H1,d.a);
+        m2=leftEVect.T*repeat(ev2,n,-1);
+        auto diff2=norm2!(complexType!(T),2,real)(m1-m2)/n;
+        auto err1=feqrel(diff1+1.0L,1.0L);
+        auto err2=feqrel(diff2+1.0L,1.0L);
+        assert(norm2!(complexType!(T),2,real)(rightEVect)>0.5,"rightEVect too small");
+        assert(norm2!(complexType!(T),2,real)(leftEVect)>0.5,"leftEVect too small");
+        if (err1<T.mant_dig*2/3-tol){
+            ev2.printData(Stdout("ev:"),"{:F8,10}").newline;
+            leftEVect.printData(Stdout("leftEVect:"),"{:F8,10}").newline;
+            rightEVect.printData(Stdout("rightEVect:"),"{:F8,10}").newline;
+            Stdout("error")(err1)("/")(T.mant_dig).newline;
+            assert(false,"rightEVect error too large");
+        }
+        if (err2<T.mant_dig*2/3-tol){
+            Stdout("error")(err2)("/")(T.mant_dig).newline;
+            assert(false,"leftEVect error too large");
+        }
+        auto ev3=eig(d.a);
+        auto diff3=norm2!(complexType!(T),1,real)(ev2-ev3)/sqrt(cast(real)n);
+        auto err3=feqrel(diff3+1.0L,1.0L);
+        if (err3<T.mant_dig*2/3-tol){
+            Stdout("error")(err2)("/")(T.mant_dig).newline;
+            assert(false,"eigenvalues changed too much (from eval+evect)");
+        }
     }
-    if (err2<T.mant_dig*2/3-tol){
-        Stdout("error")(err2)("/")(T.mant_dig).newline;
-        assert(false,"leftEVect error too large");
-    }
-    auto ev3=eig(d.a);
-    auto diff3=norm2!(complexType!(T),1,real)(ev2-ev3)/sqrt(cast(real)n);
-    auto err3=feqrel(diff3+1.0L,1.0L);
-    if (err3<T.mant_dig*2/3-tol){
-        Stdout("error")(err2)("/")(T.mant_dig).newline;
-        assert(false,"eigenvalues changed too much (from eval+evect)");
-    }
-}
 
-void testSvd(T)(Dottable!(T,2,T,1,false,true,false,0,0) d){
-    int tol=6;
-    index_type m=d.a.shape[0],n=d.a.shape[1],mn=min(n,m);
-    auto u=empty!(T)([m,mn]);
-    auto vt=empty!(T)([mn,n]);
-    auto s=empty!(realType!(T))(mn);
-    auto s2=svd(d.a,u,s,vt);
-    NArray!(T,2) a2;
-    if (n<=m){
-        a2=dot(u[Range(0,-1),Range(0,n)],repeat(s2,n,-1)*vt);
-    } else {
-        a2=dot(u*repeat(s2,m,0),vt[Range(0,m)]);
-    }
-    auto diff1=norm2!(T,2,real)(d.a-a2)/n;
+    void testSvd(T)(Dottable!(T,2,T,1,false,true,false,0,0) d){
+        int tol=6;
+        index_type m=d.a.shape[0],n=d.a.shape[1],mn=min(n,m);
+        auto u=empty!(T)([m,mn]);
+        auto vt=empty!(T)([mn,n]);
+        auto s=empty!(realType!(T))(mn);
+        auto s2=svd(d.a,u,s,vt);
+        NArray!(T,2) a2;
+        if (n<=m){
+            a2=dot(u[Range(0,-1),Range(0,n)],repeat(s2,n,-1)*vt);
+        } else {
+            a2=dot(u*repeat(s2,m,0),vt[Range(0,m)]);
+        }
+        auto diff1=norm2!(T,2,real)(d.a-a2)/n;
     
-    auto m1=dot(u.H,u);
-    diag(m1)-=cast(T)1;
-    auto diff2=norm2!(T,2,real)(m1)/n;
+        auto m1=dot(u.H,u);
+        diag(m1)-=cast(T)1;
+        auto diff2=norm2!(T,2,real)(m1)/n;
     
-    auto m2=dot(vt,vt.H);
-    diag(m2)-=cast(T)1;
-    auto diff3=norm2!(T,2,real)(m1)/n;
+        auto m2=dot(vt,vt.H);
+        diag(m2)-=cast(T)1;
+        auto diff3=norm2!(T,2,real)(m1)/n;
     
-    auto err1=feqrel(diff1+1.0L,1.0L);
-    auto err2=feqrel(diff2+1.0L,1.0L);
-    auto err3=feqrel(diff3+1.0L,1.0L);
-    if (err1<T.mant_dig*2/3-tol){
-        d.a.printData(Stdout("a:"),"{:F8}").newline;
-        u.printData(Stdout("u:"),"{:F8}").newline;
-        s.printData(Stdout("s:"),"{:F8}").newline;
-        vt.printData(Stdout("vt:"),"{:F8}").newline;
-        Stdout("error1 ")(err1)("/")(T.mant_dig).newline;
-        assert(false,"svd does not recover a");
+        auto err1=feqrel(diff1+1.0L,1.0L);
+        auto err2=feqrel(diff2+1.0L,1.0L);
+        auto err3=feqrel(diff3+1.0L,1.0L);
+        if (err1<T.mant_dig*2/3-tol){
+            d.a.printData(Stdout("a:"),"{:F8}").newline;
+            u.printData(Stdout("u:"),"{:F8}").newline;
+            s.printData(Stdout("s:"),"{:F8}").newline;
+            vt.printData(Stdout("vt:"),"{:F8}").newline;
+            Stdout("error1 ")(err1)("/")(T.mant_dig).newline;
+            assert(false,"svd does not recover a");
+        }
+        if (err2<T.mant_dig*2/3-tol){
+            Stdout("error2 ")(err2)("/")(T.mant_dig).newline;
+            assert(false,"u non orthogonal");
+        }
+        if (err3<T.mant_dig*2/3-tol){
+            Stdout("error3 ")(err2)("/")(T.mant_dig).newline;
+            assert(false,"vt non orthogonal");
+        }
+        auto s3=svd(d.a);
+        auto diff4=norm2!(realType!(T),1,real)(s2-s3)/sqrt(cast(real)n);
+        auto err4=feqrel(diff4+1.0L,1.0L);
+        if (err3<T.mant_dig*2/3-tol){
+            Stdout("error4 ")(err2)("/")(T.mant_dig).newline;
+            assert(false,"singular values changed too much (from svd(u,s,vt))");
+        }
     }
-    if (err2<T.mant_dig*2/3-tol){
-        Stdout("error2 ")(err2)("/")(T.mant_dig).newline;
-        assert(false,"u non orthogonal");
-    }
-    if (err3<T.mant_dig*2/3-tol){
-        Stdout("error3 ")(err2)("/")(T.mant_dig).newline;
-        assert(false,"vt non orthogonal");
-    }
-    auto s3=svd(d.a);
-    auto diff4=norm2!(realType!(T),1,real)(s2-s3)/sqrt(cast(real)n);
-    auto err4=feqrel(diff4+1.0L,1.0L);
-    if (err3<T.mant_dig*2/3-tol){
-        Stdout("error4 ")(err2)("/")(T.mant_dig).newline;
-        assert(false,"singular values changed too much (from svd(u,s,vt))");
-    }
-}
 
-void testEigh(T)(Dottable!(T,2,T,1,false,true,true,0,0) d){
-    ///  a=dot(u[Range(0,-1),Range(0,vt.shape[0])],repeat(s,vt.shape[0],0)*vt) if vt.shape[0]<=u.shape[0]
-    ///  a=dot(u*repeat(s,u.shape[0],-1),vt[Range(0,u.shape[0])]) if vt.shape[0]>=u.shape[0]
-    int tol=6;
-    index_type n=d.k;
-    d.a=hermitize(d.a);
-    auto ev=zeros!(realType!(T))(n);
-    auto eVect=zeros!(T)([n,n],true);
-    auto ev2=eigh!(T)(d.a, MStorage.up,ev,eVect);
-    auto m1=dot(d.a,eVect);
-    auto m2=repeat(ev2,n,0)*eVect;
-    auto diff1=norm2!(T,2,real)(m1-m2)/n;
-    auto m3=dot(eVect.H,eVect);
-    auto dd=diag(m3);
-    dd-=cast(T)1;
-    auto diff2=norm2!(T,2,real)(m3)/n;
-    auto err1=feqrel(diff1+1.0L,1.0L);
-    auto err2=feqrel(diff2+1.0L,1.0L);
-    if (err1<T.mant_dig*2/3-tol){
-        d.a.printData(Stdout("a:"),"{:F8}").newline;
-        ev.printData(Stdout("ev:"),"{:F8}").newline;
-        eVect.printData(Stdout("eVect:"),"{:F8}").newline;
-        Stdout("error1 ")(err1)("/")(T.mant_dig).newline;
-        assert(false,"diagonalization error too large");
-    }
-    if (err2<T.mant_dig*2/3-tol){
-        Stdout("error2 ")(err2)("/")(T.mant_dig).newline;
-        assert(false,"non orto eVect error too large");
-    }
-    auto ev3=eigh(d.a);
-    auto diff3=norm2!(realType!(T),1,real)(ev2-ev3)/sqrt(cast(real)n);
-    auto err3=feqrel(diff3+1.0L,1.0L);
-    if (err3<T.mant_dig*2/3-tol){
-        Stdout("error")(err2)("/")(T.mant_dig).newline;
-        assert(false,"hermitian eigenvalues changed too much (from eval+evect)");
+    void testEigh(T)(Dottable!(T,2,T,1,false,true,true,0,0) d){
+        ///  a=dot(u[Range(0,-1),Range(0,vt.shape[0])],repeat(s,vt.shape[0],0)*vt) if vt.shape[0]<=u.shape[0]
+        ///  a=dot(u*repeat(s,u.shape[0],-1),vt[Range(0,u.shape[0])]) if vt.shape[0]>=u.shape[0]
+        int tol=6;
+        index_type n=d.k;
+        d.a=hermitize(d.a);
+        auto ev=zeros!(realType!(T))(n);
+        auto eVect=zeros!(T)([n,n],true);
+        auto ev2=eigh!(T)(d.a, MStorage.up,ev,eVect);
+        auto m1=dot(d.a,eVect);
+        auto m2=repeat(ev2,n,0)*eVect;
+        auto diff1=norm2!(T,2,real)(m1-m2)/n;
+        auto m3=dot(eVect.H,eVect);
+        auto dd=diag(m3);
+        dd-=cast(T)1;
+        auto diff2=norm2!(T,2,real)(m3)/n;
+        auto err1=feqrel(diff1+1.0L,1.0L);
+        auto err2=feqrel(diff2+1.0L,1.0L);
+        if (err1<T.mant_dig*2/3-tol){
+            d.a.printData(Stdout("a:"),"{:F8}").newline;
+            ev.printData(Stdout("ev:"),"{:F8}").newline;
+            eVect.printData(Stdout("eVect:"),"{:F8}").newline;
+            Stdout("error1 ")(err1)("/")(T.mant_dig).newline;
+            assert(false,"diagonalization error too large");
+        }
+        if (err2<T.mant_dig*2/3-tol){
+            Stdout("error2 ")(err2)("/")(T.mant_dig).newline;
+            assert(false,"non orto eVect error too large");
+        }
+        auto ev3=eigh(d.a);
+        auto diff3=norm2!(realType!(T),1,real)(ev2-ev3)/sqrt(cast(real)n);
+        auto err3=feqrel(diff3+1.0L,1.0L);
+        if (err3<T.mant_dig*2/3-tol){
+            Stdout("error")(err2)("/")(T.mant_dig).newline;
+            assert(false,"hermitian eigenvalues changed too much (from eval+evect)");
+        }
     }
 }
 
@@ -672,17 +673,19 @@ TestCollection narrayRTst1(T,int rank)(TestCollection superColl){
             __LINE__,__FILE__,TestSize(),coll);
         autoInitTst.testNoFail("testDot2x2",(Dottable!(T,2,T,2,true,true) d){ testDot2x2!(T,T)(d); },
             __LINE__,__FILE__,TestSize(),coll);
-        static if (isBlasType!(T)){
-            autoInitTst.testNoFail("testSolve2x1",(Dottable!(T,2,T,1,false,true,true,0,0) d,Rand r)
-                { testSolve2x1!(T)(d,r); },__LINE__,__FILE__,TestSize(),coll);
-            autoInitTst.testNoFail("testSolve2x2",(Dottable!(T,2,T,2,false,true,true,0,0) d,Rand r)
-                { testSolve2x2!(T)(d,r); },__LINE__,__FILE__,TestSize(),coll);
-            autoInitTst.testNoFail("testEig",(Dottable!(T,2,T,1,false,true,true) d){ testEig!(T)(d); },
-                __LINE__,__FILE__,TestSize(),coll);
-            autoInitTst.testNoFail("testEigh",(Dottable!(T,2,T,1,false,true,true) d){ testEigh!(T)(d); },
-                __LINE__,__FILE__,TestSize(),coll);
-            autoInitTst.testNoFail("testSvd",(Dottable!(T,2,T,1,false,true,false) d){ testSvd!(T)(d); },
-                __LINE__,__FILE__,TestSize(),coll);
+        version(lapack){
+            static if (isBlasType!(T)){
+                autoInitTst.testNoFail("testSolve2x1",(Dottable!(T,2,T,1,false,true,true,0,0) d,Rand r)
+                    { testSolve2x1!(T)(d,r); },__LINE__,__FILE__,TestSize(),coll);
+                autoInitTst.testNoFail("testSolve2x2",(Dottable!(T,2,T,2,false,true,true,0,0) d,Rand r)
+                    { testSolve2x2!(T)(d,r); },__LINE__,__FILE__,TestSize(),coll);
+                autoInitTst.testNoFail("testEig",(Dottable!(T,2,T,1,false,true,true) d){ testEig!(T)(d); },
+                    __LINE__,__FILE__,TestSize(),coll);
+                autoInitTst.testNoFail("testEigh",(Dottable!(T,2,T,1,false,true,true) d){ testEigh!(T)(d); },
+                    __LINE__,__FILE__,TestSize(),coll);
+                autoInitTst.testNoFail("testSvd",(Dottable!(T,2,T,1,false,true,false) d){ testSvd!(T)(d); },
+                    __LINE__,__FILE__,TestSize(),coll);
+            }
         }
     }
     return coll;
