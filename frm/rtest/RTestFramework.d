@@ -627,7 +627,7 @@ template testInit(char[] checkInit="", char[] manualInit=""){
                 return TestResult.Skip;
             } catch (Exception e){
                 test.failureLog("test`")(test.testName)("` failed with exception").newline;
-                test.failureLog(e).newline;
+                test.failureLog(e)(" at ")(e.file)(":")(e.line).newline;
                 mixin(printArgs(nArgs!(S),"test.failureLog"));
                 return TestResult.Fail;
             }
