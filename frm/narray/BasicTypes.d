@@ -135,6 +135,8 @@ template reductionFactor(T,S...){
 const int manualAllocThreshold=200*1024;
 
 /// the template class that represent a rank-dimensional dense rectangular array of type T
+/// WARNING the fields of the array (bStrides,shape,nElArray,flags,mBase) should not be changed
+/// they are public for performance reason (and to have static arrays)
 template NArray(V=double,int rank=1){
 static if (rank<1)
     alias V NArray;
