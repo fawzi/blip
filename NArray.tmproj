@@ -1,9 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>currentDocument</key>
-	<string>test.d</string>
 	<key>documents</key>
 	<array>
 		<dict>
@@ -20,52 +18,34 @@
 			<key>filename</key>
 			<string>test.d</string>
 			<key>lastUsed</key>
-			<date>2008-08-18T19:53:10Z</date>
-			<key>selected</key>
-			<true/>
+			<date>2008-09-05T16:53:29Z</date>
+		</dict>
+		<dict>
+			<key>filename</key>
+			<string>perf_tests.d</string>
+			<key>lastUsed</key>
+			<date>2008-09-05T16:53:30Z</date>
+		</dict>
+		<dict>
+			<key>filename</key>
+			<string>dsss.conf</string>
+			<key>lastUsed</key>
+			<date>2008-09-05T16:53:29Z</date>
+		</dict>
+		<dict>
+			<key>filename</key>
+			<string>INSTALL.txt</string>
+			<key>lastUsed</key>
+			<date>2008-09-05T16:53:28Z</date>
 		</dict>
 	</array>
 	<key>fileHierarchyDrawerWidth</key>
-	<integer>191</integer>
+	<integer>192</integer>
 	<key>metaData</key>
-	<dict>
-		<key>frm/narray/LinAlg.d</key>
-		<dict>
-			<key>caret</key>
-			<dict>
-				<key>column</key>
-				<integer>18</integer>
-				<key>line</key>
-				<integer>70</integer>
-			</dict>
-			<key>firstVisibleColumn</key>
-			<integer>0</integer>
-			<key>firstVisibleLine</key>
-			<integer>42</integer>
-		</dict>
-		<key>test.d</key>
-		<dict>
-			<key>caret</key>
-			<dict>
-				<key>column</key>
-				<integer>9</integer>
-				<key>line</key>
-				<integer>98</integer>
-			</dict>
-			<key>firstVisibleColumn</key>
-			<integer>0</integer>
-			<key>firstVisibleLine</key>
-			<integer>84</integer>
-		</dict>
-	</dict>
-	<key>openDocuments</key>
-	<array>
-		<string>test.d</string>
-		<string>frm/narray/LinAlg.d</string>
-	</array>
+	<dict/>
 	<key>showFileHierarchyDrawer</key>
 	<true/>
 	<key>windowFrame</key>
-	<string>{{232, 0}, {847, 746}}</string>
+	<string>{{358, 30}, {848, 747}}</string>
 </dict>
 </plist>

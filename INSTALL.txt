@@ -11,7 +11,7 @@ If you have git you can
 
 otherwise you can download http://homepage.mac.com/fmohamed/dCode.zip
 
-to install:
+to install
 
     cd rtest
     dsss build
@@ -31,13 +31,16 @@ to activate it you need
     -version=lapack     // activates lapack derived LinAlg routines (solve,eig,eigh,svd,...)
 
 other useful flags are
-    -version=TestNArray // activates extra internal consistency checks in NArray
+    -debug=TestNArray   // activates extra internal consistency checks in NArray
     -version=multiarray // in perf_test times also multiarray performace (that you need to install separately)
 
 To have maximum speed compile with -release -O, but as it is quite new you might want to first compile it with checks.
 
-The code has a comprehensive battery of test. The tests are quite stringent, and with random generation they might be numerically difficult.
-I did not want to reduce too much the accuracy of the tests, and so in some cases they might fail (especially without blas, or with very agressive blas), it this is the case look at the error that they have, probably everything is still ok.
+The code has a comprehensive battery of test. The tests are quite stringent, and with random generation 
+they might be numerically difficult.
+I did not want to reduce too much the accuracy of the tests, and so in some cases they might fail 
+(especially without blas, or with very agressive blas), it this is the case look at the error that 
+they have, probably everything is still ok.
 
 To test there are test executables, or one can also 
     dsss build -debug=UnitTest -g --test
