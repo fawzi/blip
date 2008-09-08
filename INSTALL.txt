@@ -1,4 +1,4 @@
-NArray a multidimensional array in d.
+NArray a multidimensional array in D.
 
 Git repositories is available at
     http://github.com/fawzi/

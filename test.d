@@ -17,11 +17,14 @@ import frm.random.Random: rand;
 private mixin testInit!() autoInitTst2;
 
 void main(){
-    // change this to true to track bugs that crash or stop the program without throwing an exception
-    bool trace=false;
-    Stdout(rand.toString()).newline;
-    SingleRTest.defaultTestController=new TextController(//TextController.OnFailure.StopAllTests,
-        TextController.OnFailure.StopTest,
-        TextController.PrintLevel.AllShort,Stdout,Stdout,1,trace);
-    doNArrayTests(10);
+    version(NoTests){}
+    else {
+        // change this to true to track bugs that crash or stop the program without throwing an exception
+        bool trace=false;
+        Stdout(rand.toString()).newline;
+        SingleRTest.defaultTestController=new TextController(//TextController.OnFailure.StopAllTests,
+            TextController.OnFailure.StopTest,
+            TextController.PrintLevel.AllShort,Stdout,Stdout,1,trace);
+        doNArrayTests(10);
+    }
 }
