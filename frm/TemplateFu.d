@@ -55,6 +55,14 @@ template realType(T){
     } else static assert(0,"unsupported type in realType "~T.stringof);
 }
 
+/// if the type is a normal number
+template isNumber(T){
+    const isNumber=is(T==int)||is(T==uint)||is(T==long)||is(T==ulong)
+        ||is(T==float)||is(T==ifloat)||is(T==cfloat)
+        ||is(T==double)||is(T==idouble)||is(T==cdouble)
+        ||is(T==real)||is(T==ireal)||is(T==creal);
+}
+
 template isAtomicType(T)
 {
     static if( is( T == bool )

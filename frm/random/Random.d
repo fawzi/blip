@@ -141,6 +141,7 @@ import frm.random.engines.URandom;
 import frm.random.engines.KISS;
 import frm.random.engines.CMWC;
 import frm.random.engines.KissCmwc;
+import frm.random.engines.ArraySource;
 import frm.random.NormalSource;
 import frm.random.ExpSource;
 import frm.TemplateFu: ctfe_powI;
@@ -148,10 +149,9 @@ import frm.TemplateFu: ctfe_powI;
 version (Win32)
          private extern(Windows) int QueryPerformanceCounter (ulong *);
 
-version (Posix)
-        {
-        private import tango.stdc.posix.sys.time;
-        }
+version (Posix) {
+    private import tango.stdc.posix.sys.time;
+}
 
 version(darwin) { version=has_urandom; }
 version(linux)  { version=has_urandom; }
@@ -1160,7 +1160,8 @@ static this ()
     }
 }
 
-debug(UnitTest){
+version(NoTests){}
+else debug(UnitTest){
     import tango.stdc.stdio:printf;
     import tango.io.protocol.Writer;
     import tango.io.protocol.Reader;
