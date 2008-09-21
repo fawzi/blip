@@ -738,15 +738,15 @@ else {
         checkeq(a3[1],[1,0,2,0,3,0]);
         checkeq(a3[2],[0,0,0,0,0,0]);
         checkeq(a4[0,Range(1,3),Range(1,4,2)],[5,7,9,11]);
-        // Stdout("`")(getString(a4.printData((new Stringify)("a4:"),"{,6}",10,"   ").newline))("`").newline;
+        //Stdout("`")(getString(a4.printData((new Stringify)("a4:"),"{,6}",10,"   ").newline))("`").newline;
         assert(getString(a4.printData((new Stringify)("a4:"),"{,6}",10,"   ").newline)==
-    `a4:[[[     0,     1,     2,     3],
-         [     4,     5,     6,     7],
-         [     8,     9,    10,    11]],
-        [[    12,    13,    14,    15],
-         [    16,    17,    18,    19],
-         [    20,    21,    22,    23]]]
-    `,"NArray.printData wrote unexpected value");
+`a4:[[[     0,     1,     2,     3],
+     [     4,     5,     6,     7],
+     [     8,     9,    10,    11]],
+    [[    12,    13,    14,    15],
+     [    16,    17,    18,    19],
+     [    20,    21,    22,    23]]]
+`,"NArray.printData wrote unexpected value");
         arangeTests;
         test_iter;
         auto a6=a4.dup;

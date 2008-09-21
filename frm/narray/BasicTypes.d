@@ -1590,10 +1590,12 @@ char [] arrayNameDot(char[] baseName){
 }
 /++
 + general sequential index based loop character mixin
-+ guarantted to loop in order, and to make valid indexes (ivarStr~XX) available
++ guarantted to loop in order, and to make valid indexes available
++ (ivarStr~_XX_, X=dimension, starting with 0) 
 + pointers to the actual elements are also available (arrayName~"Ptr0")
 +/
-char [] sLoopGenIdx(int rank,char[][] arrayNames,char[] loop_body,char[]ivarStr,char[]indent="    "){
+char [] sLoopGenIdx(int rank,char[][] arrayNames,char[] loop_body,char[]ivarStr,char[]indent="    ",
+    char[][] idxPre=[], char[][] idxPost=[]){
     char[] res="".dup;
     char[] indentInc="    ";
     char[] indent2=indent~indentInc;
@@ -1614,6 +1616,7 @@ char [] sLoopGenIdx(int rank,char[][] arrayNames,char[] loop_body,char[]ivarStr,
         char[] ivar=ivarStr.dup~"_"~ctfe_i2a(idim)~"_";
         res~=indent~"for (index_type "~ivar~"=0;"
             ~ivar~"<"~ivarStr~"Shape"~ctfe_i2a(idim)~";++"~ivar~"){\n";
+        if (idxPre.length>idim) res~=idxPre[idim];
         if (idim<rank-1) {
             foreach(arrayName;arrayNames){
                 res~=indent2~arrayNameDot(arrayName)~"dtype * "~arrayName~"Ptr"~ctfe_i2a(rank-2-idim)~"="~arrayName~"Ptr"~ctfe_i2a(rank-1-idim)~";\n";
@@ -1625,6 +1628,7 @@ char [] sLoopGenIdx(int rank,char[][] arrayNames,char[] loop_body,char[]ivarStr,
     res~=indent~loop_body~"\n";
     for (int idim=rank-1;idim>=0;idim--){
         indent2=indent[0..indent.length-indentInc.length];
+        if (idxPost.length>idim) res~=idxPost[idim]; // move after increment??
         foreach(arrayName;arrayNames){
             res~=indent~arrayName~"Ptr"~ctfe_i2a(rank-1-idim)~" = "
                 ~"cast("~arrayNameDot(arrayName)~"dtype*)(cast(size_t)"~arrayName~"Ptr"~ctfe_i2a(rank-1-idim)
@@ -1682,10 +1686,15 @@ char [] sLoopGenPtr(int rank,char[][] arrayNames,
 
 /++
 + possibly parallel Index based loop that never compacts.
-+ All indexes (flat and in each dimension) are defined.
++ All indexes in each dimension (ivarStr~_X_ , X=dimension, starting with 0) are available
++ pointers to the actual elements are also available (arrayName~"Ptr0")
++ hooks for each loop level are available
++ array might be split in sub pieces, each with its loop, and looping might be in a
++ different order, but the indexes are the correct ones
 +/
 char [] pLoopIdx(int rank,char[][] arrayNames,
-        char[] loopBody,char[]ivarStr,char[][] arrayNamesDot=[],int[] optAccess=[],char[] indent="    "){
+        char[] loopBody,char[]ivarStr,char[][] arrayNamesDot=[],int[] optAccess=[],char[] indent="    ",
+        char[][] idxPre=[], char[][] idxPost=[]){
     if (arrayNames.length==0)
         return "".dup;
     char[] res="".dup;
@@ -1757,7 +1766,7 @@ char [] pLoopIdx(int rank,char[][] arrayNames,
         res~=indent~"}";
     }
     res~=" else {\n";+/
-    res~=sLoopGenIdx(rank,arrayNames,loopBody,ivarStr,indent2);
+    res~=sLoopGenIdx(rank,arrayNames,loopBody,ivarStr,indent2,idxPre,idxPost);
 //    res~=indent~"}";
     return res;
 }

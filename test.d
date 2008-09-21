@@ -13,6 +13,7 @@ import frm.rtest.RTest;
 import frm.narray.NArray;
 import frm.narray.Test;
 import frm.random.Random: rand;
+import frm.narray.Convolve;
 
 private mixin testInit!() autoInitTst2;
 

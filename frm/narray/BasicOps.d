@@ -10,7 +10,6 @@ module frm.narray.BasicOps;
 import frm.narray.BasicTypes;
 import frm.TemplateFu;
 import tango.math.Math: round,sqrt,min;
-import frm.rtest.RTest;
 import tango.math.IEEE: feqrel;
 
 template nullNArray(T,int rank){
