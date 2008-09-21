@@ -4,13 +4,13 @@
         version:        Initial release: July 2008
         author:         Fawzi Mohamed
 *******************************************************************************/
-module frm.random.NormalSource;
+module blip.random.NormalSource;
 import tango.io.protocol.model.IWriter:IWritable,IWriter;
 import tango.io.protocol.model.IReader:IReadable,IReader;
 private import Integer = tango.text.convert.Integer;
 import tango.math.Math:exp,sqrt,log,PI;
 import tango.math.ErrorFunction:erfc;
-import frm.random.Ziggurat;
+import blip.random.Ziggurat;
 
 /// class that returns gaussian (normal) distributed numbers (f=exp(-0.5*x*x)/sqrt(2*pi))
 class NormalSource(RandG,T){

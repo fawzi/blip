@@ -132,23 +132,20 @@
         author:         Fawzi Mohamed
 
 *******************************************************************************/
-module frm.random.Random;
+module blip.random.Random;
 import tango.io.protocol.model.IWriter:IWritable,IWriter;
 import tango.io.protocol.model.IReader:IReadable,IReader;
-// import tango.math.Math:exp,sqrt,log,PI,abs;
-//import tango.stdc.stdio:printf;
-import frm.random.engines.URandom;
-import frm.random.engines.KISS;
-import frm.random.engines.CMWC;
-import frm.random.engines.KissCmwc;
-import frm.random.engines.ArraySource;
-import frm.random.NormalSource;
-import frm.random.ExpSource;
-import frm.TemplateFu: ctfe_powI;
+import blip.random.engines.URandom;
+import blip.random.engines.KissCmwc;
+import blip.random.engines.ArraySource;
+import blip.random.engines.Sync;
+import blip.random.NormalSource;
+import blip.random.ExpSource;
+import blip.TemplateFu: ctfe_powI;
 
-version (Win32)
+version (Win32) {
          private extern(Windows) int QueryPerformanceCounter (ulong *);
-
+}
 version (Posix) {
     private import tango.stdc.posix.sys.time;
 }
@@ -176,6 +173,9 @@ template arrayBaseT(T)
     }
 }
 
+/// The default engine, a reasonably collision free, with good statistical properties
+/// not easy to invert, and with a relatively small key (but not too small)
+alias KissCmwc_32_1 DefaultEngine;
 
 /// Class that represents a random number generator.
 /// Normally you should get random numbers either with call-like interface:
@@ -187,7 +187,7 @@ template arrayBaseT(T)
 ///   auto r2=r.NormalSource!(float)(); r2(i)(j)(k);
 /// there are utility methods within random for the cases in which you do not
 /// want to build a special distribution for just a few numbers
-final class RandomG(SourceT=KissCmwc_default): IWritable, IReadable
+final class RandomG(SourceT=DefaultEngine): IWritable, IReadable
 {
     // uniform random source
     SourceT source;
@@ -238,7 +238,7 @@ final class RandomG(SourceT=KissCmwc_default): IWritable, IReadable
         return uniformR2!(uint)(from,to);
     }
     /// ditto
-    static RandomG!(Kiss99Sync) shared(){
+    static RandomG!(Sync!(DefaultEngine)) shared(){
         return rand;
     }
     //-------- Utility functions to quickly get a uniformly distributed random number -----------
@@ -1133,7 +1133,7 @@ final class RandomG(SourceT=KissCmwc_default): IWritable, IReadable
 /// you can safely expect a new instance of this to be indipendent from all the others
 alias RandomG!() Random;
 /// default threadsafe random number generator type
-alias RandomG!(Kiss99Sync) RandomSync;
+alias RandomG!(Sync!(DefaultEngine)) RandomSync;
 
 /// shared locked (threadsafe) random number generator
 /// initialized with urandom if available, with time otherwise
@@ -1160,8 +1160,9 @@ static this ()
     }
 }
 
-version(NoTests){}
-else debug(UnitTest){
+debug(UnitTest){
+    import blip.random.engines.KISS;
+    import blip.random.engines.CMWC;
     import tango.stdc.stdio:printf;
     import tango.io.protocol.Writer;
     import tango.io.protocol.Reader;
@@ -1380,9 +1381,10 @@ else debug(UnitTest){
 
     unittest {
         testRandSource!(Kiss99)();
-        testRandSource!(Kiss99Sync)();
         testRandSource!(CMWC_default)();
         testRandSource!(KissCmwc_default)();
+        testRandSource!(DefaultEngine)();
+        testRandSource!(Sync!(DefaultEngine))();
     }
 
 }

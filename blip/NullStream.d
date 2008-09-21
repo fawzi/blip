@@ -5,7 +5,7 @@
         version:        Initial release: July 2008
         author:         Fawzi Mohamed
 *******************************************************************************/
-module frm.NullStream;
+module blip.NullStream;
 import tango.io.device.Conduit;
 
 /// a conduit that discards its input

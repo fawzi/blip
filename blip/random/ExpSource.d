@@ -4,12 +4,12 @@
         version:        Initial release: July 2008
         author:         Fawzi Mohamed
 *******************************************************************************/
-module frm.random.ExpSource;
+module blip.random.ExpSource;
 import tango.io.protocol.model.IWriter:IWritable,IWriter;
 import tango.io.protocol.model.IReader:IReadable,IReader;
 private import Integer = tango.text.convert.Integer;
 import tango.math.Math:exp,log;
-import frm.random.Ziggurat;
+import blip.random.Ziggurat;
 
 /// class that returns exponential distributed numbers (f=exp(-x) for x>0, 0 otherwise)
 final class ExpSource(RandG,T){

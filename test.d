@@ -1,10 +1,10 @@
 /// quick test file
 module test;
 import tango.io.Stdout;
-import frm.rtest.RTest;
-import frm.NullStream;
+import blip.rtest.RTest;
+import blip.NullStream;
 import tango.io.stream.FormatStream;
-import frm.TemplateFu;
+import blip.TemplateFu;
 
 private int[4] specialNrs=[0,2,5,8];
 

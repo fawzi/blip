@@ -6,7 +6,7 @@
         version:        Initial release: July 2008
         author:         Fawzi Mohamed
 *******************************************************************************/
-module frm.Stringify;
+module blip.Stringify;
 import tango.io.Print;
 import tango.io.Buffer;
 import tango.text.convert.Format;

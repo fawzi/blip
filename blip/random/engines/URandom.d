@@ -4,7 +4,7 @@
         version:        Initial release: July 2008
         author:         Fawzi Mohamed
 *******************************************************************************/
-module frm.random.engines.URandom;
+module blip.random.engines.URandom;
 version(darwin) { version=has_urandom; }
 version(linux)  { version=has_urandom; }
 

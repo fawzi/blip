@@ -26,8 +26,8 @@
         version:        Initial release: July 2008
         author:         Fawzi Mohamed
 *******************************************************************************/
-module frm.rtest.BasicGenerators;
-import frm.rtest.RTestFramework: Rand;
+module blip.rtest.BasicGenerators;
+import blip.rtest.RTestFramework: Rand;
 
 
 /// returns a positive number, most likely mean+hardMin, in [hardMin,hardMax]

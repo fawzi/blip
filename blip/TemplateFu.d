@@ -6,7 +6,7 @@
         version:        Initial release: July 2008
         author:         Fawzi Mohamed
 *******************************************************************************/
-module frm.TemplateFu;
+module blip.TemplateFu;
 /// returns the number of arguments in the tuple (its length)
 template nArgs(){
     const int nArgs=0;

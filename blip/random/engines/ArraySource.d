@@ -4,7 +4,7 @@
         version:        Initial release: July 2008
         author:         Fawzi Mohamed
 *******************************************************************************/
-module frm.random.engines.ArraySource;
+module blip.random.engines.ArraySource;
 
 /// very simple array based source (use with care, some methods in non uniform distributions
 /// expect a random source with correct statistics, and could loop forever with such a source)

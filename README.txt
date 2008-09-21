@@ -1,4 +1,4 @@
-// this readme is taken from the comments in the source frm.rtest.RTest
+// this readme is taken from the comments in the source blip.rtest.RTest
 = RTest
 == RTest a random testing framework
 
@@ -25,7 +25,7 @@ and a fast one, and you want to be sure they are the same.
 
 For simplicity here we use really simple tests, in this case a possible use is:
 {{{
-    import frm.rtest.RTest;
+    import blip.rtest.RTest;
 
     private mixin testInit!() autoInitTst; 
 
@@ -121,7 +121,7 @@ If you end up using custom generators much probably you should define a
 struct/class/typedef, and use that as input to your testing function and define
 T generateRandom(T:YourType)(Rand r,int idx,ref int nEl, ref bool acceptable)
 or implement the RandGen interface so that you can use the default automatic generation.
-For a description of generateRandom and RandGen see the module frm.rtest.BasicGenerators.
+For a description of generateRandom and RandGen see the module blip.rtest.BasicGenerators.
 
 enjoy
 

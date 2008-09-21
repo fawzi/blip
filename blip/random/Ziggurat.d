@@ -4,7 +4,7 @@
         version:        Initial release: July 2008
         author:         Fawzi Mohamed
 *******************************************************************************/
-module frm.random.Ziggurat;
+module blip.random.Ziggurat;
 import tango.math.Bracket:findRoot;
 import tango.math.Math:abs;
 import tango.math.ErrorFunction:erfc;

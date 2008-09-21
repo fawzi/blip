@@ -4,21 +4,24 @@
         version:        Initial release: July 2008
         author:         Fawzi Mohamed
 *******************************************************************************/
-module frm.random.engines.CMWC;
+module blip.random.engines.KissCmwc;
 import tango.io.protocol.model.IWriter:IWritable,IWriter;
 import tango.io.protocol.model.IReader:IReadable,IReader;
-private import Integer=tango.text.convert.Integer;
+private import Integer = tango.text.convert.Integer;
 
-/+ CMWC a random number generator,
+/+ CMWC and KISS random number generators combined, for extra security wrt. plain CMWC and
 + Marisaglia, Journal of Modern Applied Statistical Methods (2003), vol.2,No.1,p 2-13
-+ a simple and fast RNG that passes all statistical tests, has a large seed, and is very fast
-+ By default ComplimentaryMultiplyWithCarry with r=1024, a=987769338, b=2^32-1, period a*b^r>10^9873
++ a simple safe and fast RNG that passes all statistical tests, has a large seed, and is reasonably fast
 + This is the engine, *never* use it directly, always use it though a RandomG class
 +/
-struct CMWC(uint cmwc_r=1024U,ulong cmwc_a=987769338UL){
+struct KissCmwc(uint cmwc_r=1024U,ulong cmwc_a=987769338UL){
     uint[cmwc_r] cmwc_q=void;
     uint cmwc_i=cmwc_r-1u;
     uint cmwc_c=123;
+    private uint kiss_x = 123456789;
+    private uint kiss_y = 362436000;
+    private uint kiss_z = 521288629;
+    private uint kiss_c = 7654321;
     uint nBytes = 0;
     uint restB  = 0;
 
@@ -55,7 +58,13 @@ struct CMWC(uint cmwc_r=1024U,ulong cmwc_a=987769338UL){
         if (x<cmwc_c) {
             ++x; ++cmwc_c;
         }
-        return (cmwc_q[cmwc_i]=m-x);
+        const ulong a = 698769069UL;
+        ulong k_t;
+        kiss_x = 69069*kiss_x+12345;
+        kiss_y ^= (kiss_y<<13); kiss_y ^= (kiss_y>>17); kiss_y ^= (kiss_y<<5);
+        k_t = a*kiss_z+kiss_c; kiss_c = (k_t>>32);
+        kiss_z=cast(uint)k_t;
+        return (cmwc_q[cmwc_i]=m-x)+kiss_x+kiss_y+kiss_z; // xor to avoid overflow?
     }
     
     ulong nextL(){
@@ -86,11 +95,22 @@ struct CMWC(uint cmwc_r=1024U,ulong cmwc_a=987769338UL){
             } else return;
         }
         cmwc_c=1;
+        kiss_x = rSeed();
+        for (int i=0;i<100;++i){
+            kiss_y=rSeed();
+            if (kiss_y!=0) break;
+        }
+        if (kiss_y==0) kiss_y=362436000;
+        kiss_z=rSeed();
+        /* Don’t really need to seed c as well (is reset after a next),
+           but doing it allows to completely restore a given internal state */
+        kiss_c = rSeed() % 698769069; /* Should be less than 698769069 */
     }
     ///  IWritable implementation
     void write (IWriter input){
         uint[] q=cmwc_q[];
         input(cmwc_a)(cmwc_r)(q)(cmwc_i)(cmwc_c)(nBytes)(restB);
+        input(kiss_x)(kiss_y)(kiss_z)(kiss_c);
     }
     /// IReadable implementation
     void read (IReader input){
@@ -98,16 +118,17 @@ struct CMWC(uint cmwc_r=1024U,ulong cmwc_a=987769338UL){
         uint r;
         uint[] q;
         input(a)(r)(q)(cmwc_i)(cmwc_c)(nBytes)(restB);
+        input(kiss_x)(kiss_y)(kiss_z)(kiss_c);
         cmwc_q[]=q;
         assert(a==cmwc_a,"unexpected value for cmwc_a");
         assert(r==cmwc_r,"unexpected value for cmwc_r");
     }
     /// writes the current status in a string
     char[] toString(){
-        char[] res=new char[4+16+(cmwc_r+5)*9];
+        char[] res=new char[11+16+(cmwc_r+9)*9];
         int i=0;
-        res[i..i+4]="CMWC";
-        i+=4;
+        res[i..i+11]="CMWC+KISS99";
+        i+=11;
         Integer.format(res[i..i+16],cmwc_a,"x16");
         i+=16;
         res[i]='_';
@@ -120,7 +141,7 @@ struct CMWC(uint cmwc_r=1024U,ulong cmwc_a=987769338UL){
             Integer.format(res[i..i+8],val,"x8");
             i+=8;
         }
-        foreach (val;[cmwc_i,cmwc_c,nBytes,restB]){
+        foreach (val;[cmwc_i,cmwc_c,nBytes,restB,kiss_x,kiss_y,kiss_z,kiss_c]){
             res[i]='_';
             ++i;
             Integer.format(res[i..i+8],val,"x8");
@@ -134,8 +155,8 @@ struct CMWC(uint cmwc_r=1024U,ulong cmwc_a=987769338UL){
     uint fromString(char[] s){
         char[16] tmpC;
         uint i=0;
-        assert(s[i..i+4]=="CMWC","unexpected kind, expected CMWC");
-        i+=4;
+        assert(s[i..i+11]=="CMWC+KISS99","unexpected kind, expected CMWC+KISS99");
+        i+=11;
         assert(s[i..i+16]==Integer.format(tmpC,cmwc_a,"x16"),"unexpected cmwc_a");
         i+=16;
         assert(s[i]=='_',"unexpected format, expected _");
@@ -150,7 +171,7 @@ struct CMWC(uint cmwc_r=1024U,ulong cmwc_a=987769338UL){
             assert(ate==8,"unexpected read size");
             i+=8;
         }
-        foreach (val;[&cmwc_i,&cmwc_c,&nBytes,&restB]){
+        foreach (val;[&cmwc_i,&cmwc_c,&nBytes,&restB,&kiss_x,&kiss_y,&kiss_z,&kiss_c]){
             assert(s[i]=='_',"no separator _ found");
             ++i;
             uint ate;
@@ -162,27 +183,28 @@ struct CMWC(uint cmwc_r=1024U,ulong cmwc_a=987769338UL){
     }
 }
 
-/// some variations, the first has a period of ~10^39461, the first number (r) is basically the size of the seed
-/// (and all bit patterns of that size are guarenteed to crop up in the period), the period is 2^(32*r)*a
-alias CMWC!(4096U,18782UL)     CMWC_4096_1;
-alias CMWC!(2048U,1030770UL)   CMWC_2048_1;
-alias CMWC!(2048U,1047570UL)   CMWC_2048_2;
-alias CMWC!(1024U,5555698UL)   CMWC_1024_1;
-alias CMWC!(1024U,987769338UL) CMWC_1024_2;
-alias CMWC!(512U,123462658UL)  CMWC_512_1;
-alias CMWC!(512U,123484214UL)  CMWC_512_2;
-alias CMWC!(256U,987662290UL)  CMWC_256_1;
-alias CMWC!(256U,987665442UL)  CMWC_256_2;
-alias CMWC!(128U,987688302UL)  CMWC_128_1;
-alias CMWC!(128U,987689614UL)  CMWC_128_2;
-alias CMWC!(64U ,987651206UL)  CMWC_64_1;
-alias CMWC!(64U ,987657110UL)  CMWC_64_2;
-alias CMWC!(32U ,987655670UL)  CMWC_32_1;
-alias CMWC!(32U ,987655878UL)  CMWC_32_2;
-alias CMWC!(16U ,987651178UL)  CMWC_16_1;
-alias CMWC!(16U ,987651182UL)  CMWC_16_2;
-alias CMWC!(8U  ,987651386UL)  CMWC_8_1;
-alias CMWC!(8U  ,987651670UL)  CMWC_8_2;
-alias CMWC!(4U  ,987654366UL)  CMWC_4_1;
-alias CMWC!(4U  ,987654978UL)  CMWC_4_2;
-alias CMWC_1024_2 CMWC_default;
+/// some variations of the CMWC part, the first has a period of ~10^39461
+/// the first number (r) is basically the size of the seed and storage (and all bit patterns
+/// of that size are guarenteed to crop up in the period), the period is (2^32-1)^r*a
+alias KissCmwc!(4096U,18782UL)     KissCmwc_4096_1;
+alias KissCmwc!(2048U,1030770UL)   KissCmwc_2048_1;
+alias KissCmwc!(2048U,1047570UL)   KissCmwc_2048_2;
+alias KissCmwc!(1024U,5555698UL)   KissCmwc_1024_1;
+alias KissCmwc!(1024U,987769338UL) KissCmwc_1024_2;
+alias KissCmwc!(512U,123462658UL)  KissCmwc_512_1;
+alias KissCmwc!(512U,123484214UL)  KissCmwc_512_2;
+alias KissCmwc!(256U,987662290UL)  KissCmwc_256_1;
+alias KissCmwc!(256U,987665442UL)  KissCmwc_256_2;
+alias KissCmwc!(128U,987688302UL)  KissCmwc_128_1;
+alias KissCmwc!(128U,987689614UL)  KissCmwc_128_2;
+alias KissCmwc!(64U ,987651206UL)  KissCmwc_64_1;
+alias KissCmwc!(64U ,987657110UL)  KissCmwc_64_2;
+alias KissCmwc!(32U ,987655670UL)  KissCmwc_32_1;
+alias KissCmwc!(32U ,987655878UL)  KissCmwc_32_2;
+alias KissCmwc!(16U ,987651178UL)  KissCmwc_16_1;
+alias KissCmwc!(16U ,987651182UL)  KissCmwc_16_2;
+alias KissCmwc!(8U  ,987651386UL)  KissCmwc_8_1;
+alias KissCmwc!(8U  ,987651670UL)  KissCmwc_8_2;
+alias KissCmwc!(4U  ,987654366UL)  KissCmwc_4_1;
+alias KissCmwc!(4U  ,987654978UL)  KissCmwc_4_2;
+alias KissCmwc_1024_2 KissCmwc_default;

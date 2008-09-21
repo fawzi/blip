@@ -27,7 +27,7 @@
 
     For simplicity here we use really simple tests, in this case a possible use is:
     {{{
-        import frm.rtest.RTest;
+        import blip.rtest.RTest;
 
         private mixin testInit!() autoInitTst; 
 
@@ -123,7 +123,7 @@
     struct/class/typedef, and use that as input to your testing function and define
     T generateRandom(T:YourType)(Rand r,int idx,ref int nEl, ref bool acceptable)
     or implement the RandGen interface so that you can use the default automatic generation.
-    For a description of generateRandom and RandGen see the module frm.rtest.BasicGenerators.
+    For a description of generateRandom and RandGen see the module blip.rtest.BasicGenerators.
 
     enjoy
 
@@ -134,14 +134,14 @@
         version:        Initial release: July 2008
         author:         Fawzi Mohamed
 *******************************************************************************/
-module frm.rtest.RTest;
-public import frm.rtest.BasicGenerators;
-public import frm.rtest.RTestFramework;
+module blip.rtest.RTest;
+public import blip.rtest.BasicGenerators;
+public import blip.rtest.RTestFramework;
 
 debug(UnitTest){
-    import frm.NullStream;
+    import blip.NullStream;
     import tango.io.stream.FormatStream;
-    import frm.rtest.BasicGenerators;
+    import blip.rtest.BasicGenerators;
     
     private int[4] specialNrs=[0,2,5,8];
 

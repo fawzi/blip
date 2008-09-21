@@ -5,10 +5,10 @@
         version:        Initial release: July 2008
         author:         Fawzi Mohamed
 *******************************************************************************/
-module frm.rtest.RTestFramework;
-import frm.random.Random: RandomG;
-import frm.random.engines.CMWC: CMWC_32_1;
-public import frm.TemplateFu: nArgs,ctfe_i2a,ctfe_hasToken, ctfe_replaceToken;
+module blip.rtest.RTestFramework;
+import blip.random.Random: Random;
+import blip.random.engines.CMWC: CMWC_32_1;
+public import blip.TemplateFu: nArgs,ctfe_i2a,ctfe_hasToken, ctfe_replaceToken;
 public import tango.io.Print:Print;
 import tango.io.Stdout: Stdout;
 public import tango.core.Variant: Variant;
@@ -20,7 +20,7 @@ class SkipException: Exception{
 }
 
 // a reasonably collision free, fast and small (seedwise) rng
-alias RandomG!(CMWC_32_1) Rand;
+alias Random Rand;
 
 /// replaces arg0,... with arg[0]...
 char[] replaceArgI(S...)(char[] manualInit){
