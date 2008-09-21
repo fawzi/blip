@@ -6,9 +6,9 @@
         version:        Initial release: July 2008
         author:         Fawzi Mohamed
 *******************************************************************************/
-module frm.narray.BasicOps;
-import frm.narray.BasicTypes;
-import frm.TemplateFu;
+module blip.narray.BasicOps;
+import blip.narray.BasicTypes;
+import blip.TemplateFu;
 import tango.math.Math: round,sqrt,min;
 import tango.math.IEEE: feqrel;
 

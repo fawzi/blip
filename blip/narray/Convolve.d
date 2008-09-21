@@ -6,10 +6,10 @@
         version:        Initial release: July 2008
         author:         Fawzi Mohamed
 *******************************************************************************/
-module frm.narray.Convolve;
-import frm.narray.BasicTypes;
-import frm.narray.BasicOps;
-import frm.TemplateFu;
+module blip.narray.Convolve;
+import blip.narray.BasicTypes;
+import blip.narray.BasicOps;
+import blip.TemplateFu;
 /+ --------- convolution --------- +/
 // convolution base in 2d: 3 streams (minus,zero,plus), kernel[imin..imax,jmin..jmax] in aij
 // i setup is: (vertical bar read, horizontal write, columns are the three streams)

@@ -36,16 +36,16 @@
     version:        Initial release: July 2008
     author:         Fawzi Mohamed
 *******************************************************************************/
-module frm.narray.BasicTypes;
+module blip.narray.BasicTypes;
 import tango.stdc.stdlib: calloc,free,realloc;
 import tango.core.Array: sort;
 import tango.stdc.string: memset,memcpy,memcmp;
-import frm.TemplateFu;
+import blip.TemplateFu;
 import tango.io.Print: Print;
 import tango.io.stream.FormatStream: FormatOutput;
 import tango.io.Buffer: GrowBuffer;
 import tango.math.Math: abs;
-import frm.rtest.RTest;
+import blip.rtest.RTest;
 //import tango.io.Stdout;
 
 /// flags for fast checking of 

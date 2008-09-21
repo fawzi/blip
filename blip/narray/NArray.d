@@ -6,7 +6,7 @@
         version:        Initial release: July 2008
         author:         Fawzi Mohamed
 *******************************************************************************/
-module frm.narray.NArray;
-public import frm.narray.BasicTypes;
-public import frm.narray.BasicOps;
-public import frm.narray.LinAlg;
+module blip.narray.NArray;
+public import blip.narray.BasicTypes;
+public import blip.narray.BasicOps;
+public import blip.narray.LinAlg;

@@ -18,12 +18,12 @@
     version:        Initial release: July 2008
     author:         Fawzi Mohamed
 *******************************************************************************/
-module frm.narray.LinAlg;
+module blip.narray.LinAlg;
 //import tango.io.Stdout;
-import frm.narray.BasicTypes;
-import frm.narray.BasicOps;
+import blip.narray.BasicTypes;
+import blip.narray.BasicOps;
 import tango.math.Math:min,max;
-import frm.TemplateFu:isComplex,isImaginary,realType,complexType;
+import blip.TemplateFu:isComplex,isImaginary,realType,complexType;
 
 version(blas){
     import DBlas=gobo.blas.DBlas;

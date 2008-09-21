@@ -8,17 +8,17 @@
 			<key>expanded</key>
 			<true/>
 			<key>name</key>
-			<string>frm</string>
+			<string>blip</string>
 			<key>regexFolderFilter</key>
 			<string>!.*/(\.[^/]*|CVS|_darcs|_MTN|\{arch\}|blib|.*~\.nib|.*\.(framework|app|pbproj|pbxproj|xcode(proj)?|bundle))$</string>
 			<key>sourceDirectory</key>
-			<string>frm</string>
+			<string>blip</string>
 		</dict>
 		<dict>
 			<key>filename</key>
 			<string>test.d</string>
 			<key>lastUsed</key>
-			<date>2008-09-05T16:53:29Z</date>
+			<date>2008-09-21T14:29:41Z</date>
 		</dict>
 		<dict>
 			<key>filename</key>
@@ -30,13 +30,15 @@
 			<key>filename</key>
 			<string>dsss.conf</string>
 			<key>lastUsed</key>
-			<date>2008-09-05T16:53:29Z</date>
+			<date>2008-09-21T14:29:41Z</date>
+			<key>selected</key>
+			<true/>
 		</dict>
 		<dict>
 			<key>filename</key>
 			<string>INSTALL.txt</string>
 			<key>lastUsed</key>
-			<date>2008-09-05T16:53:28Z</date>
+			<date>2008-09-05T17:13:02Z</date>
 		</dict>
 	</array>
 	<key>fileHierarchyDrawerWidth</key>
@@ -46,6 +48,6 @@
 	<key>showFileHierarchyDrawer</key>
 	<true/>
 	<key>windowFrame</key>
-	<string>{{358, 30}, {848, 747}}</string>
+	<string>{{387, 31}, {848, 747}}</string>
 </dict>
 </plist>

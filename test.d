@@ -7,13 +7,13 @@
         author:         Fawzi Mohamed
 *******************************************************************************/
 module test;
-import frm.narray.BasicTypes;
+import blip.narray.BasicTypes;
 import tango.io.Stdout;
-import frm.rtest.RTest;
-import frm.narray.NArray;
-import frm.narray.Test;
-import frm.random.Random: rand;
-import frm.narray.Convolve;
+import blip.rtest.RTest;
+import blip.narray.NArray;
+import blip.narray.Test;
+import blip.random.Random: rand;
+import blip.narray.Convolve;
 
 private mixin testInit!() autoInitTst2;
 

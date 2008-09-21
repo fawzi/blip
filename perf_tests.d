@@ -3,7 +3,7 @@ import tango.io.Stdout;
 import tango.core.Exception;
 import tango.time.StopWatch;
 import tango.math.Math;
-import frm.narray.NArray;
+import blip.narray.NArray;
 
 version(multiarray){
     import murray.multiarray: ndarray,ones,zeros;

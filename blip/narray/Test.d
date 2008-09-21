@@ -5,13 +5,13 @@
         version:        Initial release: July 2008
         author:         Fawzi Mohamed
 *******************************************************************************/
-module frm.narray.Test;
-import frm.narray.NArray;
-import frm.TemplateFu;
+module blip.narray.Test;
+import blip.narray.NArray;
+import blip.TemplateFu;
 import tango.io.Stdout;
-import frm.Stringify;
+import blip.Stringify;
 import tango.math.Math: abs,min,max;
-import frm.rtest.RTest;
+import blip.rtest.RTest;
 
 /// creates arrays that can be dotted with each other along the given axis
 /// useful mainly for random tests
