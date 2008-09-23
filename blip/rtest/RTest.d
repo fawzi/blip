@@ -138,11 +138,10 @@ module blip.rtest.RTest;
 public import blip.rtest.BasicGenerators;
 public import blip.rtest.RTestFramework;
 
+import blip.NullStream;
+import tango.io.stream.FormatStream;
+
 debug(UnitTest){
-    import blip.NullStream;
-    import tango.io.stream.FormatStream;
-    import blip.rtest.BasicGenerators;
-    
     private int[4] specialNrs=[0,2,5,8];
 
     private mixin testInit!() autoInitTst; 

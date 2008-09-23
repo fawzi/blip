@@ -13,6 +13,7 @@ public import tango.io.Print:Print;
 import tango.io.Stdout: Stdout;
 public import tango.core.Variant: Variant;
 import tango.core.Array: find,remove;
+import tango.core.sync.Mutex: Mutex;
 
 /// exception that causes a test to skip
 class SkipException: Exception{
@@ -125,12 +126,15 @@ enum TestResult : int{
 
 /// a test controller that writes out text to the given Print!(char) stream
 class TextController: TestControllerI{
+    Mutex _writeLock;
     Print!(char) progressLog;
     Print!(char) errorLog;
     bool _isStopping,trace;
     enum PrintLevel:int{ Error, Skip, AllShort, AllVerbose}
     PrintLevel printLevel;
     Rand r;
+    
+    Mutex writeLock(){ return _writeLock; }
     /// what to do upon failure
     enum OnFailure : int{
         Continue, /// do no stop
@@ -143,6 +147,7 @@ class TextController: TestControllerI{
     this(OnFailure onFailure=OnFailure.Throw,PrintLevel printLevel=PrintLevel.Skip,
         Print!(char) progressLog=Stdout,Print!(char) errorLog=Stdout,int testFactor=1,
         bool trace=false,Rand r=null){
+        this._writeLock=new Mutex();
         this.progressLog=progressLog;
         this.errorLog=errorLog;
         this.onFailure=onFailure;
@@ -180,15 +185,17 @@ class TextController: TestControllerI{
             } else {
                 state=test.initialState;
             }
-            progressLog(test.testName).newline;
-            progressLog("initial rng state: ")(state).newline;
-            progressLog(" counter: [");
-            foreach (i,c;test.counter){
-                if (i!=0) progressLog(", ");
-                progressLog(c);
+            synchronized(_writeLock){
+                progressLog(test.testName).newline;
+                progressLog("initial rng state: ")(state).newline;
+                progressLog(" counter: [");
+                foreach (i,c;test.counter){
+                    if (i!=0) progressLog(", ");
+                    progressLog(c);
+                }
+                progressLog("]").newline;
+                progressLog.flush;
             }
-            progressLog("]").newline;
-            progressLog.flush;
         }
         if (printLevel==PrintLevel.AllVerbose) progressLog.format("{,-20} ",test.testName)();
         return !isStopping;
@@ -199,10 +206,12 @@ class TextController: TestControllerI{
             test.stat.failedTests>0 || test.stat.passedTests==0 ||
             (printLevel==PrintLevel.Skip && test.stat.skippedTests>0);
         if (shouldPrint) {
-            if (printLevel!=PrintLevel.AllVerbose || test.stat.failedTests>0)
-                progressLog.format("test`{,-50}",test.testName~"`");
-            progressLog.format(" {,3}-{,3}/{,3}({,3})",test.stat.failedTests,
-                test.stat.passedTests,test.stat.nTests,test.stat.nCombTest).newline;
+            synchronized(_writeLock){
+                if (printLevel!=PrintLevel.AllVerbose || test.stat.failedTests>0)
+                    progressLog.format("test`{,-50}",test.testName~"`");
+                progressLog.format(" {,3}-{,3}/{,3}({,3})",test.stat.failedTests,
+                    test.stat.passedTests,test.stat.nTests,test.stat.nCombTest).newline;
+            }
         }
         test.testSize.nCombTestMax=test.testSize.nCombTestMax/testFactor;
         test.testSize.nSetupMax=test.testSize.nSetupMax/testFactor;
@@ -210,34 +219,42 @@ class TextController: TestControllerI{
     }
     /// test will run a test
     bool willRunTest(SingleRTest test) {
-        if (printLevel==PrintLevel.AllVerbose) progressLog(".")();
+        if (printLevel==PrintLevel.AllVerbose) {
+            synchronized(_writeLock){ progressLog(".")(); }
+        }
         return !isStopping;
     }
     /// test has skipped one test, should return wether the testing should continue
     bool testSkipped(SingleRTest test) {
-        if (printLevel==PrintLevel.AllVerbose) progressLog("-")();
+        if (printLevel==PrintLevel.AllVerbose) {
+            synchronized(_writeLock) { progressLog("-")(); }
+        }
         return !isStopping;
     }
     /// test has passed one test, should return wether the testing should continue
     bool testPassed(SingleRTest test) {
-        if (printLevel==PrintLevel.AllVerbose) progressLog("+")();
+        if (printLevel==PrintLevel.AllVerbose) {
+            synchronized(_writeLock) { progressLog("+")(); }
+        }
         return !isStopping;
     }
     /// test has failed one test, should return wether the testing should continue
     bool testFailed(SingleRTest test){
-        progressLog.newline;
-        progressLog("To reproduce:").newline;
-        progressLog(" testCollection").newline;
-        progressLog(" .findTest(`")(test.testName)("`)").newline;
-        progressLog(" .runTests(1,`")(test.initialState)("`,[");
-        foreach (i,c;test.counter){
-            if (i!=0) progressLog(", ");
-            progressLog(c);
+        synchronized(_writeLock) {
+            progressLog.newline;
+            progressLog("To reproduce:").newline;
+            progressLog(" testCollection").newline;
+            progressLog(" .findTest(`")(test.testName)("`)").newline;
+            progressLog(" .runTests(1,`")(test.initialState)("`,[");
+            foreach (i,c;test.counter){
+                if (i!=0) progressLog(", ");
+                progressLog(c);
+            }
+            progressLog("]);").newline;
+            progressLog("ERROR test `")(test.testName)("` from `")(test.sourceFile)(":")(test.sourceLine)("` FAILED!!").newline;
+            progressLog("-----------------------------------------------------------").newline;
+            progressLog.flush; // guarantee flush on file log
         }
-        progressLog("]);").newline;
-        progressLog("ERROR test `")(test.testName)("` from `")(test.sourceFile)(":")(test.sourceLine)("` FAILED!!").newline;
-        progressLog("-----------------------------------------------------------").newline;
-        progressLog.flush; // guaratee flush on file log
         switch (onFailure){
         case OnFailure.StopTest:
             return false;
@@ -273,6 +290,8 @@ interface TestControllerI{
     bool testFailed(SingleRTest test);
     /// if the testing is stopping
     bool isStopping();
+    /// write locking (nicer output in parallel)
+    Mutex writeLock();
 }
 
 /// structure describing the number of tests to perform
@@ -457,12 +476,15 @@ class SingleRTest{
 class TestCollection: SingleRTest, TestControllerI {
     /// the tests in this collection
     SingleRTest[] subTests;
+    /// lock for stats
+    Mutex statLock;
     /// constructor
     this(char[]testName,long sourceLine,char[]sourceFile,TestControllerI testController=null,
         SingleRTest[] subTests=[],Print!(char)failureLog=null, Rand r=null)
     {
         super(testName,sourceLine,sourceFile,1,null,TestSize(1,1,1.5), testController,
             failureLog, r, Variant(null));
+        statLock=new Mutex();
         subTests=[];
         this.addSubtests(subTests);
     }
@@ -475,15 +497,19 @@ class TestCollection: SingleRTest, TestControllerI {
         }
     }
     SingleRTest findTest(char[] name){
+        if (name==testName) return this;
+        SingleRTest res=null;
         foreach(subT;subTests){
-            if (subT.testName==name){
-                return subT;
-            } else if (auto coll=cast(TestCollection)subT){
-                SingleRTest res=coll.findTest(name);
-                if (res !is null) return res;
+            SingleRTest rTmp=subT.findTest(name);
+            if (rTmp !is null){
+                if (res !is null && res !is rTmp){
+                    Stdout("WARNING findTest found several tests with the same name, returning first").newline;
+                    return res;
+                }
+                res=rTmp;
             }
         }
-        return null;
+        return res;
     }
     // runs the tests possibly restarting them with the given rngState/counterVal
     SingleRTest runTests(int testFactor=1,char[] rngState=null,int[] counterVal=null){
@@ -491,7 +517,9 @@ class TestCollection: SingleRTest, TestControllerI {
         assert(testFactor>0,"testFactor should be positive");
         scope(exit) testController.didRunTests(this);
         if (!testController.willRunTests(this)) return this;
-        budgetLeft=testSize.budgetMax;
+        synchronized(statLock){
+            budgetLeft=testSize.budgetMax;
+        }
         if (r is null) r=new Rand();
         if (failureLog is null) failureLog=Stdout; // use Stderr ?
         if (rngState !is null){
@@ -504,7 +532,9 @@ class TestCollection: SingleRTest, TestControllerI {
             t.runTests(testFactor);
             if (testController.isStopping) break;
         }
-        stat.nCombTest++;
+        synchronized(statLock){
+            stat.nCombTest++;
+        }
         return this;
     }
     /// test has the object as controller
@@ -533,13 +563,15 @@ class TestCollection: SingleRTest, TestControllerI {
     }
     /// test did run all its tests
     void didRunTests(SingleRTest test){
-        stat.nTests++;
-        if (test.stat.failedTests>0){
-            stat.failedTests++;
-        } else if (test.stat.passedTests>0) {
-            stat.passedTests++;
-        } else {
-            stat.skippedTests++;
+        synchronized(statLock){
+            stat.nTests++;
+            if (test.stat.failedTests>0){
+                stat.failedTests++;
+            } else if (test.stat.passedTests>0) {
+                stat.passedTests++;
+            } else {
+                stat.skippedTests++;
+            }
         }
         testController.didRunTests(test);
     }
@@ -557,12 +589,15 @@ class TestCollection: SingleRTest, TestControllerI {
     }
     /// test has failed one test, should return werether the testing should continue
     bool testFailed(SingleRTest test){
-        test.failureLog.format("test failed in collection`{}` created at `{}:{}`",testName,sourceFile,sourceLine).newline;
+        synchronized(testController.writeLock()){
+            test.failureLog.format("test failed in collection`{}` created at `{}:{}`",testName,sourceFile,sourceLine).newline;
+        }
         return testController.testFailed(test);
     }
     bool isStopping(){
         return testController.isStopping;
     }
+    Mutex writeLock(){ return testController.writeLock(); }
 }
 
 /// template that checks that the initialization arguments of testInit (checkInit and manualInit)
@@ -626,9 +661,11 @@ template testInit(char[] checkInit="", char[] manualInit=""){
             } catch (SkipException s){
                 return TestResult.Skip;
             } catch (Exception e){
-                test.failureLog("test`")(test.testName)("` failed with exception").newline;
-                test.failureLog(e)(" at ")(e.file)(":")(e.line).newline;
-                mixin(printArgs(nArgs!(S),"test.failureLog"));
+                synchronized(test.testController.writeLock()){
+                    test.failureLog("test`")(test.testName)("` failed with exception").newline;
+                    test.failureLog(e)(" at ")(e.file)(":")(e.line).newline;
+                    mixin(printArgs(nArgs!(S),"test.failureLog"));
+                }
                 return TestResult.Fail;
             }
             return TestResult.Pass;
@@ -654,8 +691,10 @@ template testInit(char[] checkInit="", char[] manualInit=""){
             } catch (Exception e){
                 return TestResult.Pass;
             }
-            test.failureLog("test`")(test.testName)("` failed (no exception thrown and one expected)").newline;
-            mixin(printArgs(nArgs!(S),"test.failureLog"));
+            synchronized(test.testController.writeLock){
+                test.failureLog("test`")(test.testName)("` failed (no exception thrown and one expected)").newline;
+                mixin(printArgs(nArgs!(S),"test.failureLog"));
+            }
             return TestResult.Fail;
         }
         return new SingleRTest(testName,sourceLine,sourceFile,nArgs!(S),&doTest,
@@ -677,16 +716,20 @@ template testInit(char[] checkInit="", char[] manualInit=""){
                 if (callRes){
                     return TestResult.Pass;
                 } else {
-                    test.failureLog("test`")(test.testName)("` failed (returned false instead of true)").newline;
-                    mixin(printArgs(nArgs!(S),"test.failureLog"));
+                    synchronized(test.testController.writeLock){
+                        test.failureLog("test`")(test.testName)("` failed (returned false instead of true)").newline;
+                        mixin(printArgs(nArgs!(S),"test.failureLog"));
+                    }
                     return TestResult.Fail;
                 }
             } catch (SkipException s){
                 return TestResult.Skip;
             } catch (Exception e){
-                test.failureLog("test`")(test.testName)("` failed with exception").newline;
-                test.failureLog(e).newline;
-                mixin(printArgs(nArgs!(S),"test.failureLog"));
+                synchronized(test.testController.writeLock){
+                    test.failureLog("test`")(test.testName)("` failed with exception").newline;
+                    test.failureLog(e).newline;
+                    mixin(printArgs(nArgs!(S),"test.failureLog"));
+                }
                 return TestResult.Fail;
             }
         }
@@ -708,8 +751,10 @@ template testInit(char[] checkInit="", char[] manualInit=""){
             try{
                 bool callRes=test.baseDelegate.get!(bool delegate(S))()(arg);
                 if (callRes){
-                    test.failureLog("test`")(test.testName)("` failed (returned true instead of false)").newline;
-                    mixin(printArgs(nArgs!(S),"test.failureLog"));
+                    synchronized(test.testController.writeLock){
+                        test.failureLog("test`")(test.testName)("` failed (returned true instead of false)").newline;
+                        mixin(printArgs(nArgs!(S),"test.failureLog"));
+                    }
                     return TestResult.Fail;
                 } else {
                     return TestResult.Pass;
@@ -717,9 +762,11 @@ template testInit(char[] checkInit="", char[] manualInit=""){
             } catch (SkipException s){
                 return TestResult.Skip;
             } catch (Exception e){
-                test.failureLog("test`")(test.testName)("` unexpectedly failed with exception").newline;
-                test.failureLog(e).newline;
-                mixin(printArgs(nArgs!(S),"test.failureLog"));
+                synchronized(test.testController.writeLock){
+                    test.failureLog("test`")(test.testName)("` unexpectedly failed with exception").newline;
+                    test.failureLog(e).newline;
+                    mixin(printArgs(nArgs!(S),"test.failureLog"));
+                }
                 return TestResult.Fail;
             }
         }
