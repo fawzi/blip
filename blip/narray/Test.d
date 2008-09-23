@@ -5,8 +5,9 @@
         version:        Initial release: July 2008
         author:         Fawzi Mohamed
 *******************************************************************************/
-module blip.narray.Test;
+module NArrayTests;
 import blip.narray.NArray;
+import blip.narray.Convolve;
 import blip.TemplateFu;
 import tango.io.Stdout;
 import blip.Stringify;
@@ -106,8 +107,55 @@ class Dottable(T,int rank1,S,int rank2,bool scanAxis=false, bool randomLayout=fa
     }
 }
 
-version(NoTests){}
-else {
+class SizedRandomNArray(T,int i): RandGen{
+    static const int rank=1;
+    NArray!(T,rank) arr;
+    this(){
+        arr=zeros!(T)([i]);
+    }
+    static SizedRandomNArray randomGenerate(Rand r,int idx,ref int nEl,ref bool acceptable){
+        auto res=new SizedRandomNArray();
+        randNArray(r,res.arr);
+        return res;
+    }
+    char[] toString(){
+        return arr.toString();
+    }
+}
+
+class SizedRandomNArray(T,int i,int j): RandGen{
+    static const int rank=2;
+    NArray!(T,rank) arr;
+    this(){
+        arr=zeros!(T)([i,j]);
+    }
+    static SizedRandomNArray randomGenerate(Rand r,int idx,ref int nEl,ref bool acceptable){
+        auto res=new SizedRandomNArray();
+        randNArray(r,res.arr);
+        return res;
+    }
+    char[] toString(){
+        return arr.toString();
+    }
+}
+
+class SizedRandomNArray(T,int i,int j,int k): RandGen{
+    static const int rank=3;
+    NArray!(T,rank) arr;
+    this(){
+        arr=zeros!(T)([i,j,k]);
+    }
+    static SizedRandomNArray randomGenerate(Rand r,int idx,ref int nEl,ref bool acceptable){
+        auto res=new SizedRandomNArray();
+        randNArray(r,res.arr);
+        return res;
+    }
+    char[] toString(){
+        return arr.toString();
+    }
+}
+
+debug(UnitTest){
     /// returns a NArray indexed with the variables of a pLoopIdx or sLoopGenIdx
     char[] NArrayInLoop(char[] arrName,int rank,char[] ivarStr){
         char[] res="".dup;
@@ -644,6 +692,15 @@ else {
             }
         }
     }
+    
+    void testConvolveNN(T,int rank,Border border)(NArray!(T,rank)inA,NArray!(T,rank)kernel){
+        auto refVal=convolveNNRef!(T,rank,border)(kernel,inA);
+        auto v=convolveNN!(T,rank,border)(kernel,inA);
+        assert(checkResDot(refVal,v),"value too different from reference");
+        refVal=convolveNNRef!(T,rank,border)(kernel,inA,refVal);
+        v=convolveNN!(T,rank,border)(kernel,inA,v);
+        assert(checkResDot(refVal,v),"value too different from reference2");
+    }
 
     private mixin testInit!() autoInitTst;
 
@@ -664,6 +721,32 @@ else {
             __LINE__,__FILE__,TestSize(),coll);
         autoInitTst.testNoFail("testAxisFilter",(NArray!(T,rank) d,NArray!(index_type,1) idxs){ testAxisFilter!(T,rank)(d,idxs); },
             __LINE__,__FILE__,TestSize(),coll);
+        static if (is(T==int) && rank<4){
+            autoInitTst.testNoFail("testConvolveNN1b0",(NArray!(T,rank)a){
+                index_type[rank] kShape=3; testConvolveNN!(T,rank,Border.Same)(a,ones!(T)(kShape)); },
+                __LINE__,__FILE__,TestSize(100/rank),coll);
+            autoInitTst.testNoFail("testConvolveNNb0",
+                (NArray!(T,rank)a,SizedRandomNArray!(int,ctfe_powI(3,rank)) flatK){
+                    index_type[rank] kShape=3; auto kernel=reshape(flatK.arr,kShape);
+                    testConvolveNN!(T,rank,Border.Same)(a,kernel);
+                },__LINE__,__FILE__,TestSize(100/rank),coll);
+            autoInitTst.testNoFail("testConvolveNN1b+",(NArray!(T,rank)a){
+                index_type[rank] kShape=3; testConvolveNN!(T,rank,Border.Increase)(a,ones!(T)(kShape)); },
+                __LINE__,__FILE__,TestSize(100/rank),coll);
+            autoInitTst.testNoFail("testConvolveNNb+",
+                (NArray!(T,rank)a,SizedRandomNArray!(int,ctfe_powI(3,rank)) flatK){
+                    index_type[rank] kShape=3; auto kernel=reshape(flatK.arr,kShape);
+                    testConvolveNN!(T,rank,Border.Increase)(a,kernel);
+                },__LINE__,__FILE__,TestSize(100/rank),coll);
+            autoInitTst.testNoFail("testConvolveNN1b-",(NArray!(T,rank)a){
+                index_type[rank] kShape=3; testConvolveNN!(T,rank,Border.Decrease)(a,ones!(T)(kShape)); },
+                __LINE__,__FILE__,TestSize(100/rank),coll);
+            autoInitTst.testNoFail("testConvolveNNb-",
+                (NArray!(T,rank)a,SizedRandomNArray!(int,ctfe_powI(3,rank)) flatK){
+                    index_type[rank] kShape=3; auto kernel=reshape(flatK.arr,kShape);
+                    testConvolveNN!(T,rank,Border.Decrease)(a,kernel);
+                },__LINE__,__FILE__,TestSize(100/rank),coll);
+        }
         static if (rank==1){
             autoInitTst.testNoFail("testDot1x1",(Dottable!(T,1,T,1,true,true) d){ testDot1x1!(T,T)(d); },
                 __LINE__,__FILE__,TestSize(),coll);
@@ -789,9 +872,7 @@ else {
         .runTests(nTests);
     }
 
-    debug(UnitTest){
-        unittest{
-            doNArrayTests();
-        }
+    unittest{
+        doNArrayTests();
     }
 }

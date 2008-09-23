@@ -317,8 +317,8 @@ else {
                 } else {
                     maxIndex+=strides[i]*(shape[i]-1);
                 }
-                assert(size==0|| data.ptr!is null,"null data allowed only for empty arrays"); // allow?
             }
+            assert(size==0|| data.ptr!is null,"null data allowed only for empty arrays"); // allow?
             if (size!=0 && data !is null){
                 assert(minIndex>=0,"minimum real internal index negative in NArray construction");
                 assert(maxIndex<data.length*cast(index_type)V.sizeof,"data array too small in NArray construction");

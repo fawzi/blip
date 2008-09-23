@@ -113,23 +113,25 @@ body {
 /// if the present array is not 1D or contiguous this operation returns a copy.
 /// fortran returns fortran ordering wrt. to flat iterator (i.e. to C-style looping)
 /// thus fortran=true with a fortran matrix a returns a fortran ordered transpose of it.
-NArray!(T,newRank) reshape(T,int rank,int newRank)(NArray!(T,rank) a,int[newRank] newshape,bool fortran=false) {
+NArray!(T,newRank) reshape(T,int rank,S,int newRank)(NArray!(T,rank) a,S[newRank] newshape,bool fortran=false) {
+    static assert(is(S==int)|| is(S==long)|| is(S==uint) || is(S==ulong),"newshape must be a static array of integer types");
     static if (newRank==rank) {
-        if (newshape == m_shape) return this;
+        if (newshape == a.shape) return a;
     }
     index_type newsize = 1;
     index_type aSize = a.nElArray;
     int autosize = -1;
     index_type[newRank] newstrides;
+    index_type[newRank] ns;
     foreach(i,val; newshape) {
         if (val<0) {
             assert(autosize==-1,"Only one shape dimension can be automatic");
             autosize = i;
         } else {
-            newsize *= val;
+            newsize *= cast(index_type)val;
         }
+        ns[i]=cast(index_type)val;
     }
-    index_type[newRank] ns=newshape;
     if (autosize!=-1) {
         ns[autosize] = aSize/newsize;
         newsize *= ns[autosize];
