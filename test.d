@@ -15,7 +15,7 @@ private mixin testInit!("acceptable= 10>arg0 && arg0>-10;") smallIntSkipTst; // 
 private mixin testInit!("",`arg0=specialNrs[arg0_i]; arg0_nEl=specialNrs.length;
 arg1=specialNrs[arg1_i]; arg1_nEl=specialNrs.length;`) combNrTst; // combinatorial cases
 
-void main(){
+void main(char[][]argv){
     Print!(char) nullPrt=new FormatOutput(nullStream());
     nullPrt=Stdout;
     SingleRTest.defaultTestController=new TextController(TextController.OnFailure.StopTest,
@@ -57,13 +57,13 @@ void main(){
     smallIntSkipTst.testNoFail("assert(x*x<100)",(int x){ assert(x*x<100);},
         __LINE__,__FILE__),
     autoInitTst.testFail("assert((2*x)%2!=0)",(int x){ assert((2*x)%2!=0,"error");},
-        __LINE__,__FILE__,TestSize(),failTests),
+        __LINE__,__FILE__,failTests),
     autoInitTst.testFail("assert((2*x)%4==0) (should fail)",(int x){ assert((2*x)%4==0,"error");},
-        __LINE__,__FILE__,TestSize(),failTests),
+        __LINE__,__FILE__,failTests),
     smallIntTst.testFail("assert(x*x>100)",(int x){ assert(x*x>100);},
-        __LINE__,__FILE__,TestSize(),failTests),
+        __LINE__,__FILE__,failTests),
     smallIntSkipTst.testFail("assert(x*x>100)",(int x){ assert(x*x>100);},
-        __LINE__,__FILE__,TestSize(),failTests),
+        __LINE__,__FILE__,failTests),
     combNrTst.testTrue("(x!=2)||(y!=1)",(int x, int y){ return (x!=2)||(y!=1); },
         __LINE__,__FILE__),
     combNrTst.testTrue("(x!=8)||(y!=5) (should fail)",(int x, int y){ return (x!=8)||(y!=5); },
@@ -79,5 +79,7 @@ void main(){
         if(t.stat.failedTests!=expectedFailures[i])
             throw new Exception("test `"~t.testName~"` had "~ctfe_i2a(t.stat.failedTests)~" failures, expected "~ctfe_i2a(expectedFailures[i]));
     }
+    Stdout("\n=============================================================\n").newline;
+    mainTestFun(argv,failTests);
 }
 

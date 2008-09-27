@@ -251,6 +251,17 @@ class TextController: TestControllerI{
                 progressLog(c);
             }
             progressLog("]);").newline;
+            progressLog("or").newline;
+            progressLog("./test --test='")(test.testName)("'");
+            progressLog(" --counter='[");
+            foreach (i,c;test.counter){
+                if (i!=0) progressLog(", ");
+                progressLog(c);
+            }
+            progressLog("]'");
+            progressLog(" --seed='")(test.initialState)("'").newline;
+            
+            
             progressLog("ERROR test `")(test.testName)("` from `")(test.sourceFile)(":")(test.sourceLine)("` FAILED!!").newline;
             progressLog("-----------------------------------------------------------").newline;
             progressLog.flush; // guarantee flush on file log
@@ -646,8 +657,8 @@ template testInit(char[] checkInit="", char[] manualInit=""){
 
     /// creates a test that executes the given function and fails if it throws an exception
     SingleRTest testNoFail(S...)(char[] testName, void delegate(S) testF,long sourceLine=-1,
-        char[] sourceFile="unknown",TestSize testSize=TestSize(),
-        TestControllerI testController=null,Print!(char)failureLog=null,Rand r=null)
+        char[] sourceFile="unknown",TestControllerI testController=null,
+        TestSize testSize=TestSize(),Print!(char)failureLog=null,Rand r=null)
     {
         mixin checkTestInitArgs!(S);
         TestResult doTest(SingleRTest test){
@@ -676,8 +687,8 @@ template testInit(char[] checkInit="", char[] manualInit=""){
     
     /// creates a test that executes the given function and fails if no exception is raised
     SingleRTest testFail(S...)(char[] testName, void delegate(S) testF,long sourceLine=-1L,
-        char[] sourceFile="unknown",TestSize testSize=TestSize(),
-        TestControllerI testController=null,Print!(char)failureLog=null,Rand r=null)
+        char[] sourceFile="unknown",TestControllerI testController=null,
+        TestSize testSize=TestSize(),Print!(char)failureLog=null,Rand r=null)
     {
         mixin checkTestInitArgs!(S);
         TestResult doTest(SingleRTest test){
@@ -703,8 +714,8 @@ template testInit(char[] checkInit="", char[] manualInit=""){
     
     /// creates a test that checks that the given function returns true
     SingleRTest testTrue(S...)(char[] testName, bool delegate(S) testF,long sourceLine=-1L,
-        char[] sourceFile="unknown",TestSize testSize=TestSize(),
-        TestControllerI testController=null,Print!(char)failureLog=null,Rand r=null)
+        char[] sourceFile="unknown",TestControllerI testController=null,
+        TestSize testSize=TestSize(),Print!(char)failureLog=null,Rand r=null)
     {
         mixin checkTestInitArgs!(S);
         TestResult doTest(SingleRTest test){
@@ -739,8 +750,8 @@ template testInit(char[] checkInit="", char[] manualInit=""){
 
     /// creates a test that checks that the given function returns false
     SingleRTest testFalse(S...)(char[] testName, bool delegate(S) testF,long sourceLine=-1L,
-        char[] sourceFile="unknown",TestSize testSize=TestSize(),
-        TestControllerI testController=null,Print!(char)failureLog=null,Rand r=null)
+        char[] sourceFile="unknown",TestControllerI testController=null,
+        TestSize testSize=TestSize(),Print!(char)failureLog=null,Rand r=null)
     {
         mixin checkTestInitArgs!(S);
         int nargs=nArgs!(S);
@@ -774,4 +785,3 @@ template testInit(char[] checkInit="", char[] manualInit=""){
             testSize, testController, failureLog, r,Variant(testF));
     }
 }
-
