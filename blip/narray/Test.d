@@ -708,68 +708,68 @@ debug(UnitTest){
         TestCollection coll=new TestCollection("NArray!("~T.stringof~","~ctfe_i2a(rank)~")",
             __LINE__,__FILE__,superColl);
         autoInitTst.testNoFail("loopCheck1",(NArray!(T,rank) x){checkLoop1!(T,rank)(x);},
-            __LINE__,__FILE__,TestSize(),coll);
+            __LINE__,__FILE__,coll);
         autoInitTst.testNoFail("testSumAll",(NArray!(T,rank) d){ testSumAll!(T,rank)(d); },
-            __LINE__,__FILE__,TestSize(),coll);
+            __LINE__,__FILE__,coll);
         autoInitTst.testNoFail("testSumAxis",(NArray!(T,rank) d,Rand r){ testSumAxis!(T,rank)(d,r); },
-            __LINE__,__FILE__,TestSize(),coll);
+            __LINE__,__FILE__,coll);
         autoInitTst.testNoFail("testMultAll",(NArray!(T,rank) d){ testMultAll!(T,rank)(d); },
-            __LINE__,__FILE__,TestSize(),coll);
+            __LINE__,__FILE__,coll);
         autoInitTst.testNoFail("testMultAxis",(NArray!(T,rank) d,Rand r){ testMultAxis!(T,rank)(d,r); },
-            __LINE__,__FILE__,TestSize(),coll);
+            __LINE__,__FILE__,coll);
         autoInitTst.testNoFail("testFilterMask",(NArray!(T,rank) d,Rand r){ testFilterMask!(T,rank)(d,r); },
-            __LINE__,__FILE__,TestSize(),coll);
+            __LINE__,__FILE__,coll);
         autoInitTst.testNoFail("testAxisFilter",(NArray!(T,rank) d,NArray!(index_type,1) idxs){ testAxisFilter!(T,rank)(d,idxs); },
-            __LINE__,__FILE__,TestSize(),coll);
+            __LINE__,__FILE__,coll);
         static if (is(T==int) && rank<4){
             autoInitTst.testNoFail("testConvolveNN1b0",(NArray!(T,rank)a){
                 index_type[rank] kShape=3; testConvolveNN!(T,rank,Border.Same)(a,ones!(T)(kShape)); },
-                __LINE__,__FILE__,TestSize(100/rank),coll);
+                __LINE__,__FILE__,coll,TestSize(100/rank));
             autoInitTst.testNoFail("testConvolveNNb0",
                 (NArray!(T,rank)a,SizedRandomNArray!(int,ctfe_powI(3,rank)) flatK){
                     index_type[rank] kShape=3; auto kernel=reshape(flatK.arr,kShape);
                     testConvolveNN!(T,rank,Border.Same)(a,kernel);
-                },__LINE__,__FILE__,TestSize(100/rank),coll);
+                },__LINE__,__FILE__,coll,TestSize(100/rank));
             autoInitTst.testNoFail("testConvolveNN1b+",(NArray!(T,rank)a){
                 index_type[rank] kShape=3; testConvolveNN!(T,rank,Border.Increase)(a,ones!(T)(kShape)); },
-                __LINE__,__FILE__,TestSize(100/rank),coll);
+                __LINE__,__FILE__,coll,TestSize(100/rank));
             autoInitTst.testNoFail("testConvolveNNb+",
                 (NArray!(T,rank)a,SizedRandomNArray!(int,ctfe_powI(3,rank)) flatK){
                     index_type[rank] kShape=3; auto kernel=reshape(flatK.arr,kShape);
                     testConvolveNN!(T,rank,Border.Increase)(a,kernel);
-                },__LINE__,__FILE__,TestSize(100/rank),coll);
+                },__LINE__,__FILE__,coll,TestSize(100/rank));
             autoInitTst.testNoFail("testConvolveNN1b-",(NArray!(T,rank)a){
                 index_type[rank] kShape=3; testConvolveNN!(T,rank,Border.Decrease)(a,ones!(T)(kShape)); },
-                __LINE__,__FILE__,TestSize(100/rank),coll);
+                __LINE__,__FILE__,coll,TestSize(100/rank));
             autoInitTst.testNoFail("testConvolveNNb-",
                 (NArray!(T,rank)a,SizedRandomNArray!(int,ctfe_powI(3,rank)) flatK){
                     index_type[rank] kShape=3; auto kernel=reshape(flatK.arr,kShape);
                     testConvolveNN!(T,rank,Border.Decrease)(a,kernel);
-                },__LINE__,__FILE__,TestSize(100/rank),coll);
+                },__LINE__,__FILE__,coll,TestSize(100/rank));
         }
         static if (rank==1){
             autoInitTst.testNoFail("testDot1x1",(Dottable!(T,1,T,1,true,true) d){ testDot1x1!(T,T)(d); },
-                __LINE__,__FILE__,TestSize(),coll);
+                __LINE__,__FILE__,coll);
             autoInitTst.testNoFail("testDot1x2",(Dottable!(T,1,T,2,true,true) d){ testDot1x2!(T,T)(d); },
-                __LINE__,__FILE__,TestSize(),coll);
+                __LINE__,__FILE__,coll);
         }
         static if (rank==2){
             autoInitTst.testNoFail("testDot2x1",(Dottable!(T,2,T,1,true,true) d){ testDot2x1!(T,T)(d); },
-                __LINE__,__FILE__,TestSize(),coll);
+                __LINE__,__FILE__,coll);
             autoInitTst.testNoFail("testDot2x2",(Dottable!(T,2,T,2,true,true) d){ testDot2x2!(T,T)(d); },
-                __LINE__,__FILE__,TestSize(),coll);
+                __LINE__,__FILE__,coll);
             version(lapack){
                 static if (isBlasType!(T)){
                     autoInitTst.testNoFail("testSolve2x1",(Dottable!(T,2,T,1,false,true,true,0,0) d,Rand r)
-                        { testSolve2x1!(T)(d,r); },__LINE__,__FILE__,TestSize(),coll);
+                        { testSolve2x1!(T)(d,r); },__LINE__,__FILE__,coll);
                     autoInitTst.testNoFail("testSolve2x2",(Dottable!(T,2,T,2,false,true,true,0,0) d,Rand r)
-                        { testSolve2x2!(T)(d,r); },__LINE__,__FILE__,TestSize(),coll);
+                        { testSolve2x2!(T)(d,r); },__LINE__,__FILE__,coll);
                     autoInitTst.testNoFail("testEig",(Dottable!(T,2,T,1,false,true,true) d){ testEig!(T)(d); },
-                        __LINE__,__FILE__,TestSize(),coll);
+                        __LINE__,__FILE__,coll);
                     autoInitTst.testNoFail("testEigh",(Dottable!(T,2,T,1,false,true,true) d){ testEigh!(T)(d); },
-                        __LINE__,__FILE__,TestSize(),coll);
+                        __LINE__,__FILE__,coll);
                     autoInitTst.testNoFail("testSvd",(Dottable!(T,2,T,1,false,true,false) d){ testSvd!(T)(d); },
-                        __LINE__,__FILE__,TestSize(),coll);
+                        __LINE__,__FILE__,coll);
                 }
             }
         }
@@ -799,7 +799,7 @@ debug(UnitTest){
         return coll;
     }
 
-    void doNArrayTests(int nTests=1){
+    void doNArrayFixTests(int nTests=1){
         NArray!(int,1) a1=a2NA([1,2,3,4,5,6]);
         NArray!(int,1) a2=NArray!(int,1).zeros([6]);
         auto a3=NArray!(int,2).zeros([5,6]);
@@ -863,16 +863,15 @@ debug(UnitTest){
         }
         NArray!(double,2) a=NArray!(double,2).ones([3,4]);
         auto b=axisFilter(a,2,[3,2,1,1,0]);
-    
-        // random tests
-        // SingleRTest.defaultTestController=new TextController(TextController.OnFailure.StopAllTests,
-        //     TextController.PrintLevel.AllShort);
-        TestCollection narrayTsts=rtestNArray();
-        narrayTsts
-        .runTests(nTests);
     }
 
     unittest{
         doNArrayTests();
+        // random tests
+        //SingleRTest.defaultTestController=new TextController(TextController.OnFailure.StopAllTests,
+        //     TextController.PrintLevel.AllShort);
+        TestCollection narrayTsts=rtestNArray();
+        narrayTsts
+        .runTests(nTests);
     }
 }
