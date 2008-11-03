@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
 	<key>documents</key>
@@ -16,30 +16,36 @@
 		</dict>
 		<dict>
 			<key>filename</key>
+			<string>PriQueueTest.d</string>
+			<key>lastUsed</key>
+			<date>2008-11-03T13:01:32Z</date>
+		</dict>
+		<dict>
+			<key>filename</key>
 			<string>test.d</string>
 			<key>lastUsed</key>
-			<date>2008-09-09T09:28:15Z</date>
+			<date>2008-11-03T13:01:32Z</date>
 		</dict>
 		<dict>
 			<key>filename</key>
 			<string>dsss.conf</string>
 			<key>lastUsed</key>
-			<date>2008-09-20T21:10:09Z</date>
+			<date>2008-11-03T13:01:33Z</date>
 		</dict>
 		<dict>
 			<key>filename</key>
 			<string>README.txt</string>
 			<key>lastUsed</key>
-			<date>2008-09-21T09:22:04Z</date>
+			<date>2008-09-26T20:58:02Z</date>
 		</dict>
 	</array>
 	<key>fileHierarchyDrawerWidth</key>
-	<integer>191</integer>
+	<integer>192</integer>
 	<key>metaData</key>
 	<dict/>
 	<key>showFileHierarchyDrawer</key>
 	<true/>
 	<key>windowFrame</key>
-	<string>{{382, 30}, {828, 744}}</string>
+	<string>{{244, 191}, {828, 578}}</string>
 </dict>
 </plist>
