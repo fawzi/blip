@@ -63,6 +63,17 @@ template isNumber(T){
         ||is(T==real)||is(T==ireal)||is(T==creal);
 }
 
+/// type with maximum precision
+template maxPrecT(T){
+    static if (isComplex!(T)){
+        alias creal maxPrecT;
+    } else static if (isImaginary!(T)){
+        alias ireal maxPrecT;
+    } else {
+        alias real maxPrecT;
+    }
+}
+
 template isAtomicType(T)
 {
     static if( is( T == bool )
