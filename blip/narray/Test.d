@@ -430,7 +430,7 @@ debug(UnitTest){
     void testDot1x1(T,S)(Dottable!(T,1,S,1,true,true) d){
         int tol=8;
         alias typeof(T.init*S.init) U;
-        real refValT=0.0L;
+        maxPrecT!(U) refValT=cast(maxPrecT!(U))0;
         index_type nEl=d.a.shape[0];
         for (index_type i=0;i<nEl;++i){
             refValT+=d.a[i]*d.b[i];
@@ -456,10 +456,10 @@ debug(UnitTest){
         alias typeof(T.init*S.init) U;
         auto a=d.a;
         if (d.axis1==0 || d.axis1==-2) a=d.a.T;
-        auto refValT=zeros!(real)(a.shape[0]);
+        auto refValT=zeros!(maxPrecT!(U))(a.shape[0]);
         for (index_type j=0;j<a.shape[0];++j){
             for (index_type i=0;i<d.k;++i){
-                refValT[j]=refValT[j]+cast(real)(a[j,i]*d.b[i]);
+                refValT[j]=refValT[j]+cast(maxPrecT!(U))(a[j,i]*d.b[i]);
             }
         }
         auto refVal=refValT.asType!(U)();
@@ -474,10 +474,10 @@ debug(UnitTest){
         auto b=d.b;
         ++iCall;
         if (d.axis2==1 || d.axis2==-1) b=d.b.T;
-        auto refValT=zeros!(real)(b.shape[1]);
+        auto refValT=zeros!(maxPrecT!(U))(b.shape[1]);
         for (index_type j=0;j<b.shape[1];++j){
             for (index_type i=0;i<d.k;++i){
-                refValT[j]=refValT[j]+cast(real)(a[i]*b[i,j]);
+                refValT[j]=refValT[j]+cast(maxPrecT!(U))(a[i]*b[i,j]);
             }
         }
         auto refVal=refValT.asType!(U)();
@@ -491,11 +491,11 @@ debug(UnitTest){
         if (d.axis1==0 || d.axis1==-2) a=d.a.T;
         auto b=d.b;
         if (d.axis2==1 || d.axis2==-1) b=d.b.T;
-        auto refValT=zeros!(real)([a.shape[0],b.shape[1]]);
+        auto refValT=zeros!(maxPrecT!(U))([a.shape[0],b.shape[1]]);
         for (index_type i=0;i<a.shape[0];++i){
             for (index_type j=0;j<d.k;++j){
                 for (index_type k=0;k<b.shape[1];++k){
-                    refValT[i,k]=refValT[i,k]+cast(real)(a[i,j]*b[j,k]);
+                    refValT[i,k]=refValT[i,k]+cast(maxPrecT!(U))(a[i,j]*b[j,k]);
                 }
             }
         }
@@ -799,7 +799,7 @@ debug(UnitTest){
         return coll;
     }
 
-    void doNArrayFixTests(int nTests=1){
+    void doNArrayFixTests(){
         NArray!(int,1) a1=a2NA([1,2,3,4,5,6]);
         NArray!(int,1) a2=NArray!(int,1).zeros([6]);
         auto a3=NArray!(int,2).zeros([5,6]);
@@ -866,12 +866,12 @@ debug(UnitTest){
     }
 
     unittest{
-        doNArrayTests();
+        doNArrayFixTests();
         // random tests
         //SingleRTest.defaultTestController=new TextController(TextController.OnFailure.StopAllTests,
         //     TextController.PrintLevel.AllShort);
         TestCollection narrayTsts=rtestNArray();
         narrayTsts
-        .runTests(nTests);
+        .runTests(1);
     }
 }

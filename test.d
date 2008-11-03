@@ -15,6 +15,8 @@ import blip.narray.Test;
 import blip.random.Random: rand;
 import blip.narray.Convolve;
 import blip.TemplateFu;
+import blip.parallel.WorkManager;
+import tango.util.log.Config;
 
 private mixin testInit!() autoInitTst2;
 
