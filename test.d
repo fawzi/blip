@@ -5,6 +5,8 @@ import blip.rtest.RTest;
 import blip.NullStream;
 import tango.io.stream.FormatStream;
 import blip.TemplateFu;
+import blip.parallel.WorkManager;
+import tango.util.log.Config;
 
 private int[4] specialNrs=[0,2,5,8];
 
@@ -73,7 +75,7 @@ void main(char[][]argv){
     ];
 
     auto expectedFailures=[0,0,0,1,1,0,0,0,0,1,0,0,0,1,0,0,0,2,0,0,0,1,1];
-    failTests.runTests();
+    failTests.runTestsTask().submit().wait();
     foreach (i,t;tests){
         t.runTests();
         if(t.stat.failedTests!=expectedFailures[i])
@@ -81,5 +83,6 @@ void main(char[][]argv){
     }
     Stdout("\n=============================================================\n").newline;
     mainTestFun(argv,failTests);
+    Stdout("test finished!").newline;
 }
 

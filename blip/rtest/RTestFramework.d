@@ -11,9 +11,11 @@ import blip.random.engines.CMWC: CMWC_32_1;
 public import blip.TemplateFu: nArgs,ctfe_i2a,ctfe_hasToken, ctfe_replaceToken;
 public import tango.io.Print:Print;
 import tango.io.Stdout: Stdout;
-public import tango.core.Variant: Variant;
+public import tango.core.Variant:Variant;
 import tango.core.Array: find,remove;
 import tango.core.sync.Mutex: Mutex;
+import blip.parallel.WorkManager;
+import tango.core.Thread;
 
 /// exception that causes a test to skip
 class SkipException: Exception{
@@ -326,6 +328,28 @@ struct TestSize{
     }
 }
 
+/// explicit closure for test's runTests
+class RunTestsArgs{
+    SingleRTest test;
+    int testFactor;
+    char[] rngState;
+    int[] counterVal;
+    bool mightYield;
+    this(SingleRTest test,bool mightYield=true, int testFactor=1,char[] rngState=null,int[] counterVal=null){
+        this.test=test;
+        this.testFactor=testFactor;
+        this.rngState=rngState;
+        this.counterVal=counterVal;
+        this.mightYield=mightYield;
+    }
+    YieldableCall yieldableCall(){
+        return YieldableCall(&exec,mightYield,1024*1024);
+    }
+    void exec(){
+        test.runTests(testFactor,rngState,counterVal);
+    }
+}
+
 /// class describing a single random test
 /// you are not supposed to instantiate it directly, use one of the
 /// test* functions in the testInit template
@@ -453,7 +477,11 @@ class SingleRTest{
         }
         return this;
     }
-        
+    /// task that executes runTests
+    Task runTestsTask(int testFactor=1,char[] rngState=null,int[] counterVal=null){
+        auto closure=new RunTestsArgs(this,false,testFactor,rngState,counterVal);
+        return (new Task(testName,closure.yieldableCall(),false)).appendVariant(Variant(closure));
+    }
     /// constructor
     this(char[]testName,long sourceLine,char[]sourceFile,
         int nargs,TestResult delegate(SingleRTest) testDlg,
@@ -481,6 +509,18 @@ class SingleRTest{
             return this;
         else
             return null;
+    }
+    
+    /// initializes the current rng from the given rng
+    void randomInit(Rand mR){
+        if (r is null){
+            r=mR.spawn();
+        } else {
+            assert(mR !is r);
+            synchronized(mR){
+                r.seed(& mR.uniform!(uint));
+            }
+        }
     }
 }
 
@@ -540,13 +580,32 @@ class TestCollection: SingleRTest, TestControllerI {
             counter[]=counterVal;
         }
         foreach (t;subTests){
-            t.runTests(testFactor);
+            t.randomInit(r);
+            version(SequentialTests){
+                t.runTests(testFactor);
+            } else {
+                t.runTestsTask(testFactor).submitYield();
+            }
             if (testController.isStopping) break;
         }
         synchronized(statLock){
             stat.nCombTest++;
         }
         return this;
+    }
+    /// increments the number of combinatorial runs
+    void incrNCombTest(){
+        synchronized(statLock){
+            stat.nCombTest++;
+        }
+    }
+    /// task that executes runTests
+    Task runTestsTask(int testFactor=1,char[] rngState=null,int[] counterVal=null){
+        auto closure=new RunTestsArgs(this,true,testFactor,rngState,counterVal);
+        auto res=new TaskSet(testName,closure.yieldableCall());
+        res.appendVariant(Variant(closure));
+        res.appendOnFinish(&incrNCombTest);
+        return res;
     }
     /// test has the object as controller
     void willControlTest(SingleRTest test){
@@ -568,7 +627,6 @@ class TestCollection: SingleRTest, TestControllerI {
     }
     /// test is about to run its tests
     bool willRunTests(SingleRTest test){
-        test.r=this.r;
         test.failureLog=this.failureLog;
         return testController.willRunTests(test);
     }

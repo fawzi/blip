@@ -142,6 +142,7 @@ import tango.util.Convert;
 import tango.util.Arguments;
 import tango.text.Util;
 import tango.io.Stdout;
+import blip.parallel.WorkManager;
 
 import blip.NullStream;
 import tango.io.stream.FormatStream;
@@ -160,18 +161,19 @@ int[] parseIArray(char[] str){
 }
 
 int mainTestFun(char[][] argStr,SingleRTest testSuite){
-    char[] helpStr=`test [--help] [--runs=n] [--trace] [--test='testName'] [--counter='[n,...]'] 
+    char[] cmdName="./test";
+    if (argStr.length>0 && argStr[0].length>0) cmdName=argStr[0];
+    char[] helpStr=cmdName~` [--help] [--runs=n] [--trace] [--test='testName'] [--counter='[n,...]'] 
         [--seed='seed'] [--on-failure=[continue|stop-test|stop-all|throw]]
         [--print-level=[error|skip|all-short|all-verbose]]
-     help print this message
-     runs defines the number of test runs (default 1)
-     trace writes the initial seed before each test group
-     test runs only the given test
-     counter sets the initial counter of the test
-     seed defines the seed for the test
-     initial-seed sets the seed of the root random number generator
-     on-failure sets the action to perform after a test fails (default stop-all)
-     print-level sets the print level (default all-short)`;
+     --help print this message
+     --runs defines the number of test runs (default 1)
+     --trace writes the initial seed before each test group
+     --test runs only the given test
+     --counter sets the initial counter of the test
+     --seed defines the seed for the test
+     --on-failure sets the action to perform after a test fails (default stop-all)
+     --print-level sets the print level (default all-short)`;
     Arguments args = new Arguments();
 
     char[] seed=null;
@@ -187,7 +189,7 @@ int mainTestFun(char[][] argStr,SingleRTest testSuite){
     args.define("on-failure").aliases(["onFailure"]).parameters(1);
     args.define("print-level").aliases(["print","printLevel"]).parameters(1);
     
-    args.parse(argStr);
+    args.parse(argStr[1..$]);
     
     if (args.contains("help")){
         Stdout(helpStr).newline;
@@ -235,15 +237,16 @@ int mainTestFun(char[][] argStr,SingleRTest testSuite){
     SingleRTest.defaultTestController=new TextController(
         onFailure, printLevel,Stdout,Stdout,1,trace);
     if (args["test"].length==0){
-        testSuite.runTests(runs,seed,counter);
-        
+        // testSuite.runTests(runs,seed,counter);
+        testSuite.runTestsTask(runs,seed,counter).submit().wait();
     } else{
         auto tst=testSuite.findTest(args["test"]);
         if (tst is null){
             Stdout("ERROR test '")(args["test"])("' not found!").newline;
             return -3;
         }
-        tst.runTests(runs,seed,counter);
+        //tst.runTests(runs,seed,counter);
+        tst.runTestsTask(runs,seed,counter).submit().wait();
         return tst.stat.failedTests;
     }
     return testSuite.stat.failedTests;
