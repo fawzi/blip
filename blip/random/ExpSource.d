@@ -9,11 +9,12 @@ import tango.io.protocol.model.IWriter:IWritable,IWriter;
 import tango.io.protocol.model.IReader:IReadable,IReader;
 private import Integer = tango.text.convert.Integer;
 import tango.math.Math:exp,log;
+import blip.TemplateFu: isReal;
 import blip.random.Ziggurat;
 
 /// class that returns exponential distributed numbers (f=exp(-x) for x>0, 0 otherwise)
 final class ExpSource(RandG,T){
-    static assert(isFloat!(T),T.stringof~" not acceptable, only floating point variables supported");
+    static assert(isReal!(T),T.stringof~" not acceptable, only floating point variables supported");
     /// probability distribution
     static real probDensityF(real x){ return exp(-x); }
     /// inverse probability distribution

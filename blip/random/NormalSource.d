@@ -10,11 +10,12 @@ import tango.io.protocol.model.IReader:IReadable,IReader;
 private import Integer = tango.text.convert.Integer;
 import tango.math.Math:exp,sqrt,log,PI;
 import tango.math.ErrorFunction:erfc;
+import blip.TemplateFu: isReal;
 import blip.random.Ziggurat;
 
 /// class that returns gaussian (normal) distributed numbers (f=exp(-0.5*x*x)/sqrt(2*pi))
 class NormalSource(RandG,T){
-    static assert(isFloat!(T),T.stringof~" not acceptable, only floating point variables supported");
+    static assert(isReal!(T),T.stringof~" not acceptable, only floating point variables supported");
     /// probability distribution (non normalized, should be divided by sqrt(2*PI))
     static real probDensityF(real x){ return exp(-0.5L*x*x); }
     /// inverse probability distribution

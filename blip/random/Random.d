@@ -363,6 +363,10 @@ final class RandomG(SourceT=DefaultEngine): IWritable, IReadable
                     }
                 }
             }
+        } else static if (is(T==cfloat)||is(T==cdouble)||is(T==creal)){
+            return cast(T)(uniform!(realType!(T))()+1i*uniform!(realType!(T))());
+        } else static if (is(T==ifloat)||is(T==idouble)||is(T==ireal)){
+            return cast(T)(1i*uniform!(realType!(T))());
         } else static assert(0,T.stringof~" unsupported type for uniform distribution");
     }
     
@@ -414,7 +418,7 @@ final class RandomG(SourceT=DefaultEngine): IWritable, IReadable
     ///
     /// In here there is probably one of the few cases where c handling of modulo of negative
     /// numbers is handy
-    T uniformRSymm(T,bool boundCheck=true, bool excludeZero=isFloat!(T))(T to)
+    T uniformRSymm(T,bool boundCheck=true, bool excludeZero=isFloat!(T))(T to,int iter=2000)
     in { assert(to>0,"empty range");}
     body {
         static if (is(T==int)|| is(T==byte)){
@@ -464,7 +468,8 @@ final class RandomG(SourceT=DefaultEngine): IWritable, IReadable
                 static if (boundCheck){
                     if (res!=to) return (1-2*cast(int)(nV&1u))*res;
                     // to due to rounding (~3.e-8), 0 impossible with normal to values
-                    return uniformRSymm(to);
+                    assert(iter>0,"error with the generator, probability < 10^(-8*2000)");
+                    return uniformRSymm(to,iter-1);
                 } else {
                     return (1-2*cast(int)(nV&1u))*res;
                 }
@@ -478,7 +483,8 @@ final class RandomG(SourceT=DefaultEngine): IWritable, IReadable
                 T res=(cast(T)nV+cast(T)nV2*fact32)*scale*to;
                 static if (excludeZero){
                     if (res!=cast(T)0) return (1-2*cast(int)(nV&1u))*res;
-                    return uniformRSymm(to); // 0 due to underflow (<1.e-38), 1 impossible
+                    assert(iter>0,"error with the generator, probability < 10^(-8*2000)");
+                    return uniformRSymm(to,iter-1); // 0 due to underflow (<1.e-38), 1 impossible
                 } else {
                     return (1-2*cast(int)(nV&1u))*res;
                 }
@@ -496,7 +502,8 @@ final class RandomG(SourceT=DefaultEngine): IWritable, IReadable
                     static if (boundCheck){
                         if (res!=to) return (1-2*cast(int)(nL&1UL))*res;
                         // 1 due to rounding (<1.e-16), 0 impossible with normal to values
-                        return uniformRSymm(to);
+                        assert(iter>0,"error with the generator, probability < 10^(-16*2000)");
+                        return uniformRSymm(to,iter-1);
                     } else {
                         return (1-2*cast(int)(nL&1UL))*res;
                     }
@@ -512,7 +519,8 @@ final class RandomG(SourceT=DefaultEngine): IWritable, IReadable
                     static if (excludeZero){
                         if (res!=cast(T)0) return (1-2*cast(int)(nL&1UL))*res;
                         // 0 due to underflow (<1.e-4932), 1 impossible
-                        return uniformRSymm(to);
+                        assert(iter>0,"error with the generator, probability < 10^(-16*2000)");
+                        return uniformRSymm(to,iter-1);
                     } else {
                         return (1-2*cast(int)(nL&1UL))*res;
                     }
@@ -529,7 +537,8 @@ final class RandomG(SourceT=DefaultEngine): IWritable, IReadable
                     static if (boundCheck){
                         if (res!=to) return (1-2*cast(int)(nV&1UL))*res;
                         // to due to rounding (<1.e-16), 0 impossible with normal to values
-                        return uniformRSymm(to);
+                        assert(iter>0,"error with the generator, probability < 10^(-16*2000)");
+                        return uniformRSymm(to,iter-1);
                     } else {
                         return (1-2*cast(int)(nV&1UL))*res;
                     }
@@ -551,7 +560,8 @@ final class RandomG(SourceT=DefaultEngine): IWritable, IReadable
                         static if (excludeZero){
                             if (res!=cast(T)0) return (1-2*cast(int)(nV2&1UL))*res;
                             // 0 due to underflow (<1.e-307)
-                            return uniformRSymm(to);
+                            assert(iter>0,"error with the generator, probability < 10^(-16*2000)");
+                            return uniformRSymm(to,iter-1);
                         } else {
                             return (1-2*cast(int)(nV2&1UL))*res;
                         }

@@ -8,27 +8,8 @@ module blip.random.Ziggurat;
 import tango.math.Bracket:findRoot;
 import tango.math.Math:abs;
 import tango.math.ErrorFunction:erfc;
+import blip.TemplateFu: isReal, isComplex, isImaginary, arrayBaseT;
 //import tango.stdc.stdio:printf;
-
-/// if T is a float
-template isFloat(T){
-    static if(is(T==float)||is(T==double)||is(T==real)){
-        const bool isFloat=true;
-    } else {
-        const bool isFloat=false;
-    }
-}
-
-/// Strips the []'s off of a type.
-template arrayBaseT(T)
-{
-    static if( is( T S : S[]) ) {
-        alias arrayBaseT!(S)  arrayBaseT;
-    }
-    else {
-        alias T arrayBaseT;
-    }
-}
 
 /// ziggurat method for decreasing distributions.
 /// Marsaglia, Tsang, Journal of Statistical Software, 2000
@@ -38,7 +19,7 @@ template arrayBaseT(T)
 /// in a class and not used directly).
 /// Call style initialization avoided on purpose (this is a big structure, you don't want to return it)
 struct Ziggurat(RandG,T,alias probDensityF,alias tailGenerator,bool hasNegative=true){
-    static assert(isFloat!(T),T.stringof~" not acceptable, only floating point variables supported");
+    static assert(isReal!(T),T.stringof~" not acceptable, only floating point variables supported");
     const int nBlocks=256;
     T[nBlocks+1] posBlock;
     T[nBlocks+1] fVal;
@@ -117,7 +98,7 @@ struct Ziggurat(RandG,T,alias probDensityF,alias tailGenerator,bool hasNegative=
     T getRandom() 
     {
         static if (hasNegative){
-            for (;;) 
+            for (int iter=1000;iter!=0;--iter) 
             { 
                 uint i=r.uniform!(ubyte);
                 T u = r.uniformRSymm!(T)(1);
@@ -129,7 +110,7 @@ struct Ziggurat(RandG,T,alias probDensityF,alias tailGenerator,bool hasNegative=
                 }
             }
         } else {
-            for (;;) 
+            for (int iter=1000;iter!=0;--iter) 
             { 
                 uint i=r.uniform!(ubyte);
                 T u = r.uniform!(T)();
@@ -141,6 +122,7 @@ struct Ziggurat(RandG,T,alias probDensityF,alias tailGenerator,bool hasNegative=
                 }
             }
         }
+        throw new Exception("max nr of iterations in Ziggurat, this should have probability<1.0e-1000");
     }
     /// initializes the argument with the probability distribution given and returns it
     /// for arrays this might potentially be faster than a naive loop
@@ -159,11 +141,24 @@ struct Ziggurat(RandG,T,alias probDensityF,alias tailGenerator,bool hasNegative=
     template randomizeOp2(alias op){
         U randomizeOp2(U)(ref U a){
             static if(is(U S:S[])){
+                alias arrayBaseT!(U) TT;
                 foreach (ref el;a){
-                    el=cast(arrayBaseT!(U))op(getRandom());
+                    static if(isComplex!(TT)) {
+                        el=cast(TT)(op(getRandom())+1i*op(getRandom()));
+                    } else static if (isImaginary!(TT)){
+                        el=cast(TT)(1i*op(getRandom()));
+                    } else {
+                        el=cast(TT)op(getRandom());
+                    }
                 }
             } else {
-                a=cast(U)op(getRandom());
+                static if(isComplex!(U)) {
+                    a=cast(U)(op(getRandom())+1i*op(getRandom()));
+                } else static if (isImaginary!(U)){
+                    el=cast(U)(1i*op(getRandom()));
+                } else {
+                    a=cast(U)op(getRandom());
+                }
             }
             return a;
         }
@@ -171,11 +166,24 @@ struct Ziggurat(RandG,T,alias probDensityF,alias tailGenerator,bool hasNegative=
     /// initializes the variable with the result of mapping op on the random numbers (of type T)
     U randomizeOp(U,S)(S delegate(T) op,ref U a){
         static if(is(U S:S[])){
+            alias arrayBaseT!(U) TT;
             foreach (ref el;a){
-                el=cast(arrayBaseT!(U))op(getRandom());
+                static if(isComplex!(TT)) {
+                    el=cast(TT)(op(getRandom())+1i*op(getRandom()));
+                } else static if (isImaginary!(TT)){
+                    el=cast(TT)(1i*op(getRandom()));
+                } else {
+                    el=cast(TT)op(getRandom());
+                }
             }
         } else {
-            a=cast(U)op(getRandom());
+            static if(isComplex!(U)) {
+                a=cast(U)(op(getRandom())+1i*op(getRandom()));
+            } else static if (isImaginary!(U)){
+                el=cast(U)(1i*op(getRandom()));
+            } else {
+                a=cast(U)op(getRandom());
+            }
         }
         return a;
     }
