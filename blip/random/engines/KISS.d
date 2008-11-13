@@ -5,10 +5,7 @@
         author:         Fawzi Mohamed
 *******************************************************************************/
 module blip.random.engines.KISS;
-import tango.io.protocol.model.IWriter:IWritable,IWriter;
-import tango.io.protocol.model.IReader:IReadable,IReader;
 private import Integer = tango.text.convert.Integer;
-import tango.core.sync.Mutex: Mutex;
 
 /+ Kiss99 random number generator, by Marisaglia
 + a simple RNG that passes all statistical tests
@@ -70,14 +67,6 @@ struct Kiss99{
         kiss_c = r() % 698769069; /* Should be less than 698769069 */
         nBytes = 0;
         restB=0;
-    }
-    ///  IWritable implementation
-    void write (IWriter input){
-        input(kiss_x)(kiss_y)(kiss_z)(kiss_c)(nBytes)(restB);
-    }
-    /// IReadable implementation
-    void read (IReader input){
-        input(kiss_x)(kiss_y)(kiss_z)(kiss_c)(nBytes)(restB);
     }
     /// writes the current status in a string
     char[] toString(){

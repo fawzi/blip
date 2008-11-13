@@ -5,8 +5,6 @@
         author:         Fawzi Mohamed
 *******************************************************************************/
 module blip.random.engines.Sync;
-import tango.io.protocol.model.IWriter:IWritable,IWriter;
-import tango.io.protocol.model.IReader:IReadable,IReader;
 private import Integer = tango.text.convert.Integer;
 import tango.core.sync.Mutex: Mutex;
 
@@ -46,18 +44,6 @@ struct Sync(E){
         if (!lock) lock=new Mutex();
         synchronized(lock){
             engine.seed(r);
-        }
-    }
-    ///  IWritable implementation
-    void write (IWriter input){
-        synchronized(lock){
-            engine.write(input);
-        }
-    }
-    /// IReadable implementation
-    void read (IReader input){
-        synchronized(lock){
-            engine.read(input);
         }
     }
     /// writes the current status in a string

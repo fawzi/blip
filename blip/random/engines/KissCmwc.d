@@ -5,8 +5,6 @@
         author:         Fawzi Mohamed
 *******************************************************************************/
 module blip.random.engines.KissCmwc;
-import tango.io.protocol.model.IWriter:IWritable,IWriter;
-import tango.io.protocol.model.IReader:IReadable,IReader;
 private import Integer = tango.text.convert.Integer;
 
 /+ CMWC and KISS random number generators combined, for extra security wrt. plain CMWC and
@@ -105,23 +103,6 @@ struct KissCmwc(uint cmwc_r=1024U,ulong cmwc_a=987769338UL){
         /* Don’t really need to seed c as well (is reset after a next),
            but doing it allows to completely restore a given internal state */
         kiss_c = rSeed() % 698769069; /* Should be less than 698769069 */
-    }
-    ///  IWritable implementation
-    void write (IWriter input){
-        uint[] q=cmwc_q[];
-        input(cmwc_a)(cmwc_r)(q)(cmwc_i)(cmwc_c)(nBytes)(restB);
-        input(kiss_x)(kiss_y)(kiss_z)(kiss_c);
-    }
-    /// IReadable implementation
-    void read (IReader input){
-        ulong a;
-        uint r;
-        uint[] q;
-        input(a)(r)(q)(cmwc_i)(cmwc_c)(nBytes)(restB);
-        input(kiss_x)(kiss_y)(kiss_z)(kiss_c);
-        cmwc_q[]=q;
-        assert(a==cmwc_a,"unexpected value for cmwc_a");
-        assert(r==cmwc_r,"unexpected value for cmwc_r");
     }
     /// writes the current status in a string
     char[] toString(){

@@ -133,12 +133,11 @@
 
 *******************************************************************************/
 module blip.random.Random;
-import tango.io.protocol.model.IWriter:IWritable,IWriter;
-import tango.io.protocol.model.IReader:IReadable,IReader;
 import blip.random.engines.URandom;
 import blip.random.engines.KissCmwc;
 import blip.random.engines.ArraySource;
 import blip.random.engines.Sync;
+import blip.random.engines.Twister;
 import blip.random.NormalSource;
 import blip.random.ExpSource;
 import blip.TemplateFu: ctfe_powI;
@@ -187,7 +186,7 @@ alias KissCmwc_32_1 DefaultEngine;
 ///   auto r2=r.NormalSource!(float)(); r2(i)(j)(k);
 /// there are utility methods within random for the cases in which you do not
 /// want to build a special distribution for just a few numbers
-final class RandomG(SourceT=DefaultEngine): IWritable, IReadable
+final class RandomG(SourceT=DefaultEngine)
 {
     // uniform random source
     SourceT source;
@@ -1103,14 +1102,6 @@ final class RandomG(SourceT=DefaultEngine): IWritable, IReadable
     }
     // ---------------
     
-    ///  IWritable implementation
-    void write (IWriter input){
-        source.write(input);
-    }
-    /// IReadable implementation
-    void read (IReader input){
-        source.read(input);
-    }
     /// writes the current status in a string
     char[] toString(){
         return source.toString();
@@ -1174,9 +1165,6 @@ debug(UnitTest){
     import blip.random.engines.KISS;
     import blip.random.engines.CMWC;
     import tango.stdc.stdio:printf;
-    import tango.io.protocol.Writer;
-    import tango.io.protocol.Reader;
-    import tango.io.Buffer;
     import tango.io.Stdout;
 
     /// very simple statistal test, mean within maxOffset, and maximum/minimum at least minmax/maxmin
@@ -1250,12 +1238,8 @@ debug(UnitTest){
                 real rr=r.uniform!(real);
                 assert(0<rr && rr<1,"double out of bounds");
             }
-            // checkpoint status (str or writer)
+            // checkpoint status (str)
             char[] status=r.toString();
-            Buffer buf=new Buffer(16384);
-            auto reader = new Reader (buf);
-            auto writer = new Writer (buf);
-            writer(r);
             uint tVal=r.uniform!(uint);
             ubyte t2Val=r.uniform!(ubyte);
             ulong t3Val=r.uniform!(ulong);
@@ -1274,7 +1258,7 @@ debug(UnitTest){
             float[] farr2=farr[];
             double[]darr2=darr[];
             real[]  rarr2=rarr[];
-        
+            
             bool fail=false,gFail=false;
             if (allStats) Stdout("Uniform").newline;
             fail =doTests(r,-100.0L,100.0L,0.0L,20.0L,allStats,false,barr2);
@@ -1378,10 +1362,6 @@ debug(UnitTest){
             assert(r.uniform!(uint)==tVal,"restoring of status from str failed");
             assert(r.uniform!(ubyte)==t2Val,"restoring of status from str failed");
             assert(r.uniform!(ulong)==t3Val,"restoring of status from str failed");
-            reader(r);
-            assert(r.uniform!(uint)==tVal,"restoring of status from writer failed");
-            assert(r.uniform!(ubyte)==t2Val,"restoring of status from writer failed");
-            assert(r.uniform!(ulong)==t3Val,"restoring of status from writer failed");
             assert(!gFail,"Random.d failure");
         } catch(Exception e) {
             Stdout(initialState).newline;
@@ -1393,6 +1373,7 @@ debug(UnitTest){
         testRandSource!(Kiss99)();
         testRandSource!(CMWC_default)();
         testRandSource!(KissCmwc_default)();
+        testRandSource!(Twister)();
         testRandSource!(DefaultEngine)();
         testRandSource!(Sync!(DefaultEngine))();
     }

@@ -9,8 +9,6 @@ version(darwin) { version=has_urandom; }
 version(linux)  { version=has_urandom; }
 
 version(has_urandom) {
-    import tango.io.protocol.model.IWriter:IWritable,IWriter;
-    import tango.io.protocol.model.IReader:IReadable,IReader;
     private import Integer = tango.text.convert.Integer;
     import tango.core.sync.Mutex: Mutex;
     import tango.io.device.FileConduit; // use stdc read/write?
@@ -78,19 +76,8 @@ version(has_urandom) {
             }
             return el.l;
         }
-
+        /// does nothing
         void seed(uint delegate() r) { }
-        ///  IWritable implementation
-        void write (IWriter input){
-            char[] r="URandom";
-            input(r);
-        }
-        /// IReadable implementation
-        void read (IReader input){
-            char[] r;
-            input(r);
-            assert(r=="URandom","unexpected read");
-        }
         /// writes the current status in a string
         char[] toString(){
             return "URandom";
