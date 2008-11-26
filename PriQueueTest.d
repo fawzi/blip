@@ -1,5 +1,6 @@
 module PriQueueTest;
-import blip.parallel.WorkManager;
+import blip.parallel.BasicTasks;
+import blip.parallel.PriQueue;
 import tango.io.Stdout;
 
 void main(){

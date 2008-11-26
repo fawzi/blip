@@ -480,7 +480,8 @@ class SingleRTest{
     /// task that executes runTests
     Task runTestsTask(int testFactor=1,char[] rngState=null,int[] counterVal=null){
         auto closure=new RunTestsArgs(this,false,testFactor,rngState,counterVal);
-        return (new Task(testName,closure.yieldableCall(),false)).appendVariant(Variant(closure));
+        return (new Task(testName,closure.yieldableCall(),false))
+            .appendVariant(Variant(closure)); // variant should not be needed... to check
     }
     /// constructor
     this(char[]testName,long sourceLine,char[]sourceFile,
@@ -588,8 +589,8 @@ class TestCollection: SingleRTest, TestControllerI {
             }
             if (testController.isStopping) break;
         }
-        synchronized(statLock){
-            stat.nCombTest++;
+        version(SequentialTests){
+            incrNCombTest();
         }
         return this;
     }
@@ -603,7 +604,7 @@ class TestCollection: SingleRTest, TestControllerI {
     Task runTestsTask(int testFactor=1,char[] rngState=null,int[] counterVal=null){
         auto closure=new RunTestsArgs(this,true,testFactor,rngState,counterVal);
         auto res=new TaskSet(testName,closure.yieldableCall());
-        res.appendVariant(Variant(closure));
+        res.appendVariant(Variant(closure)); // should not be needed... check
         res.appendOnFinish(&incrNCombTest);
         return res;
     }

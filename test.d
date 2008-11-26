@@ -7,6 +7,7 @@ import tango.io.stream.FormatStream;
 import blip.TemplateFu;
 import blip.parallel.WorkManager;
 import tango.util.log.Config;
+import tango.util.log.Log;
 
 private int[4] specialNrs=[0,2,5,8];
 
@@ -18,6 +19,10 @@ private mixin testInit!("",`arg0=specialNrs[arg0_i]; arg0_nEl=specialNrs.length;
 arg1=specialNrs[arg1_i]; arg1_nEl=specialNrs.length;`) combNrTst; // combinatorial cases
 
 void main(char[][]argv){
+    Stdout("blip.parallel:")(Log.lookup("blip.parallel").level).newline;
+    Log.lookup("blip.parallel").info("pippo");
+    Stdout("blip.parallel.queue:")(Log.lookup("blip.parallel.queue").level).newline;
+    Log.lookup("blip.parallel.queue").info("pippo");
     Print!(char) nullPrt=new FormatOutput(nullStream());
     nullPrt=Stdout;
     SingleRTest.defaultTestController=new TextController(TextController.OnFailure.StopTest,
