@@ -6,8 +6,7 @@
         author:         Fawzi Mohamed
 *******************************************************************************/
 module blip.rtest.RTestFramework;
-import blip.random.Random: Random;
-import blip.random.engines.CMWC: CMWC_32_1;
+import tango.math.random.Random: Random;
 public import blip.TemplateFu: nArgs,ctfe_i2a,ctfe_hasToken, ctfe_replaceToken;
 public import tango.io.Print:Print;
 import tango.io.Stdout: Stdout;

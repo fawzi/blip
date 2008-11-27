@@ -319,9 +319,9 @@ debug(UnitTest){
         ];
 
         auto expectedFailures=[0,0,0,1,1,0,0,0,0,1,0,0,0,1,0,0,0,2,0,0,0,1,1];
-        failTests.runTests();
+        failTests.runTestsTask().submit(defaultTask).wait();
         foreach (i,t;tests){
-            t.runTests();
+            t.runTestsTask().submit(sequentialTask);
             if(t.stat.failedTests!=expectedFailures[i])
                 throw new Exception("test `"~t.testName~"` had "~ctfe_i2a(t.stat.failedTests)~" failures, expected "~ctfe_i2a(expectedFailures[i]));
         }
