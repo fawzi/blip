@@ -9,7 +9,7 @@ import tango.util.log.Log;
 import tango.util.container.LinkedList;
 import tango.io.Print;
 import blip.Stringify;
-import blip.parallel.NRMutex;
+import tango.core.sync.Semaphore;
 import blip.TemplateFu:ctfe_i2a;
 import blip.parallel.Models;
 
@@ -69,7 +69,7 @@ class Task:TaskI{
     TaskSchedulerI _scheduler; /// scheduer of the current task
     bool _mightSpawn; /// if the task might spawn other subtasks
     bool _mightYield; /// if the task might be yielded
-    NRMutex waitLock; /// lock to wait for task end
+    Semaphore waitSem; /// lock to wait for task end
     LinkedList!(Variant) variants; /// variants to help with full closures and gc
     
     /// it the task might be yielded (i.e. if it is a fiber)
@@ -158,8 +158,8 @@ class Task:TaskI{
     override int opEquals(Object o){ return (o is this); }
     /// executes the actual task (after all the required setup)
     void internalExe(){
-        taskOp();
         assert(taskOp !is null);
+        taskOp();
     }
     /// executes the task (called by the executing thread, performs all setups)
     /// be careful overriding this (probably you should override internalExe)
@@ -226,7 +226,7 @@ class Task:TaskI{
             synchronized(taskLock){
                 assert(status==TaskStatus.PostExec);
                 status=TaskStatus.Finished;
-                if (waitLock !is null) waitLock.unlock();
+                if (waitSem !is null) waitSem.notify();
             }
         }
         if (superTask !is null){
@@ -447,17 +447,16 @@ class Task:TaskI{
     }
     /// waits for the task to finish
     void wait(){
-        if (status!=TaskStatus.Finished && waitLock is null) {
+        if (status!=TaskStatus.Finished && waitSem is null) {
             synchronized(taskLock) {
-                 if (status!=TaskStatus.Finished && waitLock is null) {
-                     waitLock=new NRMutex();
-                     waitLock.lock();
+                 if (status!=TaskStatus.Finished && waitSem is null) {
+                     waitSem=new Semaphore();
                  }
             }
         }
         if (status!=TaskStatus.Finished) {
-            waitLock.lock();
-            waitLock.unlock();
+            waitSem.wait();
+            waitSem.notify();
         }
     }
 }

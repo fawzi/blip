@@ -10,7 +10,6 @@ import tango.util.log.Log;
 import tango.util.container.LinkedList;
 import tango.io.Print;
 import blip.Stringify;
-import blip.parallel.NRMutex;
 import blip.TemplateFu:ctfe_i2a;
 import blip.parallel.PriQueue;
 import blip.parallel.Models;

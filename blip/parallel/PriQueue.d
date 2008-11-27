@@ -1,13 +1,18 @@
 module blip.parallel.PriQueue;
 import tango.io.Print;
 import tango.core.sync.Mutex;
-import blip.parallel.NRMutex;
+import tango.core.sync.Semaphore;
 import tango.math.Math;
 import blip.Stringify;
 
 /// a simple priority queue optimized for adding high priority tasks
 /// the public interface consists of
 /// - insert (insert a new element )
+/// - popNext (remove the next element, keeping into account priority, blocking)
+/// - stop (stop queue, and return null to the waiting threads)
+/// the strange use of semaphore allows someone to lock queueLock, chang the queue, 
+/// nr of Els,... and release it by unlocking without any problem
+/// this means that task reorganizations are ok
 class PriQueue(T){
     /// stores all the elements with a given level
     class PriQLevel{
@@ -120,15 +125,14 @@ class PriQueue(T){
     Mutex queueLock;
     /// to make the threads wait when no tasks are available
     /// use a Condition instead? (on mac I should test them, I strongly suspect they don't work);
-    NRMutex zeroLock;
+    Semaphore zeroSem;
     /// creates a new piriority queue
     this(){
         nEntries=0;
         queue=null;
         shouldStop=false;
         queueLock=new Mutex();
-        zeroLock=new NRMutex();
-        zeroLock.lock();
+        zeroSem=new Semaphore();
         lPool=new PriQPool();
     }
     /// shuts down the priority queue
@@ -138,7 +142,7 @@ class PriQueue(T){
             shouldStop=true;
             if (nEntries==0) unlockZero=true;
         }
-        if (unlockZero) zeroLock.unlock;
+        if (unlockZero) zeroSem.notify();
     }
     /// adds the given task to the queue with the given level (threadsafe)
     void insert(int tLevel,T t){
@@ -163,7 +167,7 @@ class PriQueue(T){
             ++nEntries;
             //Stdout("XXX pushed ")(t.taskName)(nEntries).newline;
             // desc(Stdout("queue post insert:")).newline;
-            if (nEntries==1) zeroLock.unlock;
+            if (nEntries==1) zeroSem.notify;
         }
     }
     /// remove the next task from the queue and returns it
@@ -185,7 +189,6 @@ class PriQueue(T){
                         queue=nT;
                     }
                     --nEntries;
-                    if (nEntries==0) zeroLock.lock;
                     //Stdout("XXX popping ")(res.taskName)(nEntries).newline;
                     return res;
                 } else {
@@ -194,8 +197,11 @@ class PriQueue(T){
                 }
             }
             if (shouldLockZero) {
-                zeroLock.lock;
-                zeroLock.unlock;
+                zeroSem.wait();
+                synchronized(queueLock){
+                    if (nEntries>0)
+                        zeroSem.notify();
+                }
                 shouldLockZero=false;
             }
         }
@@ -235,13 +241,13 @@ class PriQueue(T){
                 s("locked by others");
             }
             s(",").newline;
-            bool zL=zeroLock.tryLock();
-            if (zL) zeroLock.unlock();
-            s(" zeroLock:");
+            bool zL=zeroSem.tryWait();
+            if (zL) zeroSem.notify();
+            s(" zeroSem:");
             if (zL){
-                s("unlocked by others");
+                s(">0");
             } else {
-                s("locked by others");
+                s("==0");
             }
             s.newline;
             s(" >").newline;
