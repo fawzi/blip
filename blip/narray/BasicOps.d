@@ -9,6 +9,7 @@
 module blip.narray.BasicOps;
 import blip.narray.BasicTypes;
 import blip.TemplateFu;
+import tango.core.Traits;
 import tango.math.Math: round,sqrt,min;
 import tango.math.IEEE: feqrel;
 
@@ -191,9 +192,9 @@ body {
 /// rank of NArray for the given shape (for empty,zeros,ones)
 /// more flexible than member function, accepts int/long, int/long static array
 template rkOfShape(T){
-    static if(isStaticArray!(T)){
-        static assert(is(arrayBaseT!(T)==int)||is(arrayBaseT!(T)==uint)||
-            is(arrayBaseT!(T)==long)||is(arrayBaseT!(T)==ulong),
+    static if(isStaticArrayType!(T)){
+        static assert(is(BaseTypeOfArrays!(T)==int)||is(BaseTypeOfArrays!(T)==uint)||
+            is(BaseTypeOfArrays!(T)==long)||is(BaseTypeOfArrays!(T)==ulong),
             "only integer types supported as shape dimensions");
         const int rkOfShape = cast(int)staticArraySize!(T);
     } else {
@@ -209,11 +210,11 @@ char[] freeFunMixin(char[] opName){
     res~="template "~opName~"(V){\n";
     res~="    template "~opName~"(T){\n";
     res~="        NArray!(V,rkOfShape!(T))"~opName~"(T shape, bool fortran=false){\n";
-    res~="            static if (isStaticArray!(T)){\n";
-    res~="                static if(is(arrayBaseT!(T)==index_type)) {\n";
+    res~="            static if (isStaticArrayType!(T)){\n";
+    res~="                static if(is(BaseTypeOfArrays!(T)==index_type)) {\n";
     res~="                    return NArray!(V,rkOfShape!(T))."~opName~"(shape,fortran);\n";
     res~="                } else {\n";
-    res~="                    index_type[arrayRank!(T)] s;\n";
+    res~="                    index_type[rankOfArray!(T)] s;\n";
     res~="                    for (int i=0;i<shape;++i)\n";
     res~="                        s[i]=cast(index_type)shape[i];\n";
     res~="                    return NArray!(V,rkOfShape!(T))."~opName~"(s,fortran);\n";
@@ -279,23 +280,23 @@ NArray!(T,2)eye(T)(index_type dim){
 + The array has to be rectangular.
 + note: this put all the indexes of the array arr in the inner loop, not so efficient with many dimensions
 +/
-NArray!(arrayBaseT!(T),cast(int)arrayRank!(T))a2NA(T)(T arr,bool fortran=false){
-    return a2NAof!(arrayBaseT!(T))(arr,fortran);
+NArray!(BaseTypeOfArrays!(T),cast(int)rankOfArray!(T))a2NA(T)(T arr,bool fortran=false){
+    return a2NAof!(BaseTypeOfArrays!(T))(arr,fortran);
 }
 /// converts the given array to an NArray of the given type copying
 template a2NAof(V){
     template a2NAof(T){
-        NArray!(V,cast(int)arrayRank!(T))a2NAof(T arr,bool fortran=false)
+        NArray!(V,cast(int)rankOfArray!(T))a2NAof(T arr,bool fortran=false)
         in {
-            index_type[arrayRank!(T)] shape;
-            calcShapeArray!(T,arrayRank!(T))(arr,shape);
-            checkShape!(T,arrayRank!(T))(arr,shape);
+            index_type[rankOfArray!(T)] shape;
+            calcShapeArray!(T,rankOfArray!(T))(arr,shape);
+            checkShape!(T,rankOfArray!(T))(arr,shape);
         }
         body{
-            const int rank=arrayRank!(T);
+            const int rank=rankOfArray!(T);
             index_type[rank] shape;
-            calcShapeArray!(T,arrayRank!(T))(arr,shape);
-            auto res=NArray!(V,cast(int)arrayRank!(T)).empty(shape,fortran);
+            calcShapeArray!(T,rankOfArray!(T))(arr,shape);
+            auto res=NArray!(V,cast(int)rankOfArray!(T)).empty(shape,fortran);
             const char[] loop_body="*resPtr0=cast(V)"~arrayInLoop("arr",rank,"i")~";";
             mixin(pLoopIdx(rank,["res"],loop_body,"i"));
             return res;
@@ -312,11 +313,11 @@ NArray!(T,1)a2NA2(T)(T[] arr,bool shouldFree=false){
 
 /// returns a into shape the shape of the nested D array T (for a2NA)
 void calcShapeArray(T,uint rank)(T arr,index_type[] shape){
-    static assert(rank==arrayRank!(T),"inconsistent rank/shape");
+    static assert(rank==rankOfArray!(T),"inconsistent rank/shape");
     assert(shape.length==rank,"shape array has wrong size");
-    static if (arrayRank!(T)>0) {
+    static if (rankOfArray!(T)>0) {
         shape[0]=arr.length;
-        static if (arrayRank!(T)>1){
+        static if (rankOfArray!(T)>1){
             calcShapeArray!(typeof(arr[0]),rank-1)(arr[0],shape[1..$]);
         }
     }
@@ -324,11 +325,11 @@ void calcShapeArray(T,uint rank)(T arr,index_type[] shape){
 
 /// checks that the D array arr is rectangular and has the shape in shape (for a2NA)
 private void checkShape(T,uint rank)(T arr,index_type[] shape){
-    static assert(rank==arrayRank!(T),"inconsistent rank/shape");
+    static assert(rank==rankOfArray!(T),"inconsistent rank/shape");
     assert(shape.length==rank,"shape array has wrong size");
-    static if (arrayRank!(T)>0) {
+    static if (rankOfArray!(T)>0) {
         assert(shape[0]==arr.length,"array does not match shape (non rectangular?)");
-        static if (arrayRank!(T)>1){
+        static if (rankOfArray!(T)>1){
             foreach(subArr;arr)
                 calcShapeArray!(typeof(arr[0]),rank-1)(subArr,shape[1..$]);
         }
@@ -807,7 +808,7 @@ char[] axisFilterLoop(T,int rank,V,S...)(char[] loopBody)
             res~=indent~"for(index_type i"~ctfe_i2a(i)~"=j"~ctfe_i2a(i)~"_1;i"~ctfe_i2a(i)~"!=0;--i"~ctfe_i2a(i)~"){\n";
             ++ii;
         } else static if (is(U:int[])||is(U:long[])||is(U:uint[])||is(U:ulong[])){
-            res~=indent~arrayBaseT!(U).stringof~"* idx"~ctfe_i2a(i)~"=idx_tup["~ctfe_i2a(i)~"].ptr;\n";
+            res~=indent~BaseTypeOfArrays!(U).stringof~"* idx"~ctfe_i2a(i)~"=idx_tup["~ctfe_i2a(i)~"].ptr;\n";
             res~=indent~"T* bPtr"~ctfe_i2a(rank2-ii-1)~"=bPtr"~ctfe_i2a(rank2-ii)~";\n";
             res~=indent~"for(index_type i"~ctfe_i2a(i)~"=0;i"~ctfe_i2a(i)~"!=j"~ctfe_i2a(i)~"_1;++i"~ctfe_i2a(i)~"){\n";
             res~=indent2~"T* aPtr"~ctfe_i2a(rank-i-1)~"=cast(T*)(cast(size_t)aPtr"~ctfe_i2a(rank-i)~
@@ -917,7 +918,7 @@ NArray!(T,rank) axisUnfilter1(T,int rank,V,int rank2,S...)
 /// To guarantee T.epsilon absolute error one should use shift=1.0, here we are more stingent
 /// and we use T.mant_dig/4 digits more when close to 0.
 int feqrel2(T)(T x,T y){
-    static if(isComplex!(T)){
+    static if(isComplexType!(T)){
         return min(feqrel2(x.re,y.re),feqrel2(x.im,y.im));
     } else {
         const T shift=ctfe_powI(0.5,T.mant_dig/4);
@@ -962,12 +963,12 @@ S norm2(T,int rank, S=T)(NArray!(T,rank)a){
 
 /// makes the array hermitish (a==a.H)
 NArray!(T,rank)hermitize(T,int rank)(NArray!(T,rank)a){
-    static if (isComplex!(T)){
+    static if (isComplexType!(T)){
         auto b=a.T;
         mixin(pLoopPtr(rank,["a","b"],
         "if (aPtr0<bPtr0) {T val=((*aPtr0).re+(*bPtr0).re+cast(T)1i*((*aPtr0).im-(*bPtr0).im))/cast(T)2; *aPtr0=val; *bPtr0=val.re-cast(T)1i*val.im;}","i"));
         return a;
-    } else static if (isImaginary!(T)){
+    } else static if (isImaginaryType!(T)){
         return antiSymmetrize(a);
     } else {
         return symmetrize(a);

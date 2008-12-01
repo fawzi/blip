@@ -41,6 +41,7 @@ import tango.stdc.stdlib: calloc,free,realloc;
 import tango.core.Array: sort;
 import tango.stdc.string: memset,memcpy,memcmp;
 import blip.TemplateFu;
+import tango.core.Traits;
 import tango.io.Print: Print;
 import tango.io.stream.FormatStream: FormatOutput;
 import tango.io.Buffer: GrowBuffer;
@@ -566,7 +567,7 @@ else {
         /// static array indexing (separted from opIndex as potentially less efficient)
         NArray!(V,rank-cast(int)staticArraySize!(S))arrayIndex(S)(S index){
             static assert(is(S:int[])||is(S:long[])||is(S:uint[])||is(S:ulong[]),"only arrays of indexes supported");
-            static assert(isStaticArray!(S),"arrayIndex needs *static* arrays as input");
+            static assert(isStaticArrayType!(S),"arrayIndex needs *static* arrays as input");
             const char[] loopBody=("auto res=opIndex("~arrayToSeq("index",cast(int)staticArraySize!(S))~");");
             mixin(loopBody);
             return res;
@@ -575,7 +576,7 @@ else {
         /// static array indexAssign (separted from opIndexAssign as potentially less efficient)
         NArray!(V,rank-cast(int)staticArraySize!(S))arrayIndexAssign(S,U)(U val,S index){
             static assert(is(S:int[])||is(S:long[])||is(S:uint[])||is(S:ulong[]),"only arrays of indexes supported");
-            static assert(isStaticArray!(S),"arrayIndex needs *static* arrays as input");
+            static assert(isStaticArrayType!(S),"arrayIndex needs *static* arrays as input");
             mixin("NArray!(V,rank-cast(int)staticArraySize!(S)) res=opIndexAssign(val,"~arrayToSeq("index",staticArraySize!(S))~");");
             return res;
         }
@@ -1257,7 +1258,7 @@ else {
             static if(rank==1) {
                 index_type lastI=shape[0]-1;
                 foreach(index_type i,V v;SubView(this)){
-                    static if (isComplex!(V)){
+                    static if (isComplexType!(V)){
                         s.format(formatEl,v.re)("+1i*").format(formatEl,v.im);
                     } else {
                         s.format(formatEl,v);
@@ -1352,7 +1353,7 @@ else {
             return NArray(newstrides,newshape,startPtrArray,newFlags,newBase);
         }
         
-        static if(isComplex!(V)){
+        static if(isComplexType!(V)){
             /// conjugates the array in place
             /// WARNING modifies the array!!!
             NArray conj1(){
@@ -1365,7 +1366,7 @@ else {
                 binaryOpStr!("*aPtr0=cast(T)((*bPtr0).re-(*bPtr0).im*1i);",rank,V,V)(res,this);
                 return res;
             }
-        } else static if (isImaginary!(V)){
+        } else static if (isImaginaryType!(V)){
             /// conjugates the array in place
             /// WARNING modifies the array!!!
             NArray conj1(){
@@ -1989,7 +1990,7 @@ NArray!(T,rank) randomizeNArray(RandG,T,int rank)(RandG r,NArray!(T,rank)a){
 /// returns a random array of the given size with the given distribution
 template randomNArray(T){
     NArray!(T,rkOfShape!(S))randomNArray(RandG,S)(RandG r,S dim){
-        static if (arrayElT!(S)==index_type){
+        static if (ElementTypeOfArray!(S)==index_type){
             alias dim mdim;
         } else {
             index_type[rkOfShape!(S)] mdim;

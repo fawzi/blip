@@ -9,8 +9,6 @@ If you have git you can
     git clone git://github.com/fawzi/rtest.git
     git clone git://github.com/fawzi/narray.git
 
-otherwise you can download http://homepage.mac.com/fmohamed/dCode.zip
-
 to install
 
     cd rtest
