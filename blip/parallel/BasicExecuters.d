@@ -98,7 +98,9 @@ class SExecuter:ExecuterI,TaskSchedulerI{
     /// returns the executer for this task
     ExecuterI executer() { return this; }
     /// returns the executer for this task
-    void executer(ExecuterI e) { throw new Exception("cannot set executer of SExecuter"); }
+    void executer(ExecuterI e) {
+        throw new ParaException("cannot set executer of SExecuter",__FILE__,__LINE__);
+    }
     /// logger for task/scheduling messages
     Logger logger() { return log; }
     /// yields the current fiber if the scheduler is not sequential

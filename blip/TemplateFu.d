@@ -7,6 +7,8 @@
         author:         Fawzi Mohamed
 *******************************************************************************/
 module blip.TemplateFu;
+import tango.core.Traits;
+
 /// returns the number of arguments in the tuple (its length)
 template nArgs(){
     const int nArgs=0;
@@ -19,55 +21,11 @@ template nArgs(T,S...){
 /// identity function
 T Id(T)(T a) { return a; }
 
-/// is T is a real floating point number
-template isReal(T){
-    const isReal=is(T==float)||is(T==double)||is(T==real);
-}
-/// if T is a complex number
-template isComplex(T){
-    const isComplex=is(T==cfloat)||is(T==creal)||is(T==cdouble);
-}
-
-/// if T is a purely imaginary number
-template isImaginary(T){
-    const isImaginary=is(T==ifloat)|| is(T==idouble)|| is(T==ireal);
-}
-
-/// complex type for the given type
-template complexType(T){
-    static if(is(T==float)||is(T==ifloat)||is(T==cfloat)){
-        alias cfloat complexType;
-    } else static if(is(T==double)|| is(T==idouble)|| is(T==cdouble)){
-        alias cdouble complexType;
-    } else static if(is(T==real)|| is(T==ireal)|| is(T==creal)){
-        alias creal complexType;
-    } else static assert(0,"unsupported type in complexType "~T.stringof);
-}
-
-/// real type for the given type
-template realType(T){
-    static if(is(T==float)|| is(T==ifloat)|| is(T==cfloat)){
-        alias float realType;
-    } else static if(is(T==double)|| is(T==idouble)|| is(T==cdouble)){
-        alias double realType;
-    } else static if(is(T==real)|| is(T==ireal)|| is(T==creal)){
-        alias real realType;
-    } else static assert(0,"unsupported type in realType "~T.stringof);
-}
-
-/// if the type is a normal number
-template isNumber(T){
-    const isNumber=is(T==int)||is(T==uint)||is(T==long)||is(T==ulong)
-        ||is(T==float)||is(T==ifloat)||is(T==cfloat)
-        ||is(T==double)||is(T==idouble)||is(T==cdouble)
-        ||is(T==real)||is(T==ireal)||is(T==creal);
-}
-
 /// type with maximum precision
 template maxPrecT(T){
-    static if (isComplex!(T)){
+    static if (isComplexType!(T)){
         alias creal maxPrecT;
-    } else static if (isImaginary!(T)){
+    } else static if (isImaginaryType!(T)){
         alias ireal maxPrecT;
     } else {
         alias real maxPrecT;
@@ -106,62 +64,20 @@ template isArray(T)
 
 template staticArraySize(T)
 {
-    static assert(isStaticArray!(T),"staticArraySize needs a static array as type");
-    static assert(arrayRank!(T)==1,"implemented only for 1d arrays...");
+    static assert(isStaticArrayType!(T),"staticArraySize needs a static array as type");
+    static assert(rankOfArray!(T)==1,"implemented only for 1d arrays...");
     const size_t staticArraySize=(T).sizeof / typeof(T.init).sizeof;
 }
 
-template isStaticArray(T)
-{
-    const bool isStaticArray=is( typeof(T.init)[(T).sizeof / typeof(T.init).sizeof] == T );
-}
-
 /// returns a dynamic array
-template dynArray(T)
+template DynamicArrayType(T)
 {
-    static if( isStaticArray!(T) )
-        alias typeof(T.dup) dynArray;
+    static if( isStaticArrayType!(T) )
+        alias typeof(T.dup) DynamicArrayType;
     else static if (isArray!(T))
-        alias T dynArray;
+        alias T DynamicArrayType;
     else
-        alias T[] dynArray;
-}
-
-/// transform eventual static arrays to dynamic ones
-template noStaticArray(T)
-{
-    static if( isStaticArray!(T) )
-        alias typeof(T.dup) noStaticArray;
-    else
-        alias T noStaticArray;
-}
-
-/// Strips the []'s off of a type.
-template arrayBaseT(T)
-{
-    static if( is( T S : S[]) ) {
-        alias arrayBaseT!(S)  arrayBaseT;
-    }
-    else {
-        alias T arrayBaseT;
-    }
-}
-
-/// strips one [] off a type
-template arrayElT(T:T[])
-{
-    static if( is( T S : S[]) ) {
-        alias arrayBaseT!(S)  arrayBaseT;
-    }
-}
-
-/// Count the []'s on an array type
-template arrayRank(T) {
-    static if(is(T S : S[])) {
-        const uint arrayRank = 1 + arrayRank!(S);
-    } else {
-        const uint arrayRank = 0;
-    }
+        alias T[] DynamicArrayType;
 }
 
 // ------- CTFE -------

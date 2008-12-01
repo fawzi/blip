@@ -112,3 +112,10 @@ interface SubmittingI:BasicObjectI {
     /// spawns the task t from the present task
     void spawnTask(TaskI t);
 }
+
+/// exception for parallelization problems
+class ParaException: Exception{
+    this(char[] msg, char[] file, size_t line, Exception next = null){
+        super(msg,file,line,next);
+    }
+}

@@ -566,8 +566,10 @@ class TestCollection: SingleRTest, TestControllerI {
     SingleRTest runTests(int testFactor=1,char[] rngState=null,int[] counterVal=null){
         if (this is null) throw new Exception("TestCollection run on null collection");
         assert(testFactor>0,"testFactor should be positive");
-        scope(exit) testController.didRunTests(this);
         if (!testController.willRunTests(this)) return this;
+        version(SequentialTests){
+            scope(exit)incrNCombTest();
+        }
         synchronized(statLock){
             budgetLeft=testSize.budgetMax;
         }
@@ -588,15 +590,13 @@ class TestCollection: SingleRTest, TestControllerI {
             }
             if (testController.isStopping) break;
         }
-        version(SequentialTests){
-            incrNCombTest();
-        }
         return this;
     }
     /// increments the number of combinatorial runs
     void incrNCombTest(){
         synchronized(statLock){
             stat.nCombTest++;
+            testController.didRunTests(this);
         }
     }
     /// task that executes runTests

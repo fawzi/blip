@@ -360,11 +360,14 @@ class Task:TaskI{
     /// needs a Fiber or Yieldable task
     TaskI submitYield(TaskI superTask=null){
         submit(superTask);
-        if ((cast(RootTask)this.superTask)is null && !this.superTask.mightYield){
-            throw new Exception(taskName~" submitYield called with non yieldable supertask ("~this.superTask.taskName~")"); // allow?
-        }
-        if ((cast(RootTask)this.superTask)is null)
+        auto tAtt=taskAtt.val;
+        if (tAtt.mightYield)
             scheduler.yield();
+        else if ((cast(RootTask)tAtt)is null){
+            throw new ParaException(taskName
+                ~" submitYield called with non yieldable executing task ("~tAtt.taskName~")",
+                __FILE__,__LINE__); // allow?
+        }
         return this;
     }
     /// description (for debugging)
@@ -456,6 +459,7 @@ class Task:TaskI{
         }
         if (status!=TaskStatus.Finished) {
             waitSem.wait();
+            assert(status==TaskStatus.Finished,"unexpected status after wait");
             waitSem.notify();
         }
     }

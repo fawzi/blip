@@ -238,7 +238,7 @@ int mainTestFun(char[][] argStr,SingleRTest testSuite){
         onFailure, printLevel,Stdout,Stdout,1,trace);
     if (args["test"].length==0){
         // testSuite.runTests(runs,seed,counter);
-        testSuite.runTestsTask(runs,seed,counter).submit(defaultScheduler.rootTask()).wait();
+        testSuite.runTestsTask(runs,seed,counter).submit(defaultTask).wait();
     } else{
         auto tst=testSuite.findTest(args["test"]);
         if (tst is null){
@@ -246,7 +246,7 @@ int mainTestFun(char[][] argStr,SingleRTest testSuite){
             return -3;
         }
         //tst.runTests(runs,seed,counter);
-        tst.runTestsTask(runs,seed,counter).submit(defaultScheduler.rootTask()).wait();
+        tst.runTestsTask(runs,seed,counter).submit(defaultTask).wait();
         return tst.stat.failedTests;
     }
     return testSuite.stat.failedTests;

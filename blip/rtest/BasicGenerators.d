@@ -75,13 +75,13 @@ T generateRandom(T:double)(Rand r,int idx,ref int nEl, ref bool acceptable) { re
 /// ditto                                                
 T generateRandom(T:real)  (Rand r,int idx,ref int nEl, ref bool acceptable) { return r.normalSigma(1.5L); }
 /// ditto
-dynArray!(T) generateRandom(T:T[])(Rand r,int idx, ref int nEl, ref bool acceptable) {
-    static if (isStaticArray!(T)){
+DynamicArrayType!(T) generateRandom(T:T[])(Rand r,int idx, ref int nEl, ref bool acceptable) {
+    static if (isStaticArrayType!(T)){
         int size=staticArraySize!(T);
     } else {
         int size=generateSize(10);
     }
-    dynArray!(T) res=new dynArray!(T)(size);
+    DynamicArrayType!(T) res=new DynamicArrayType!(T)(size);
     return mkRandomArray(res,idx,nEl,acceptable);
 }
 
