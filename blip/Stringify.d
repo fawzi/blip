@@ -13,25 +13,6 @@ import tango.text.convert.Format;
 import tango.text.convert.Layout;
 import blip.TemplateFu: nArgs;
 
-/// interface of an object that can describe itself
-interface BasicObjectI{
-    Print!(char) desc(Print!(char) s);
-}
-
-/// description of an object, safe even if null
-Print!(char) writeDesc(T,S...)(T obj, Print!(char) s,S args){
-    if (obj is null) {
-        return s("<")(T.stringof)(" *NULL*>").newline;
-    } else {
-        static if(is(typeof(obj.desc(s,args)))){
-            return obj.desc(s,args);
-        } else {
-            static assert(nArgs!(S)==0,"did not find method desc(Print!(char),"~S.stringof~") in "~T.stringof);
-            return s(obj);
-        }
-    }
-}
-
 /// Layout singleton, allocated only upon usage
 class defaultFormatter(T){
     static Layout!(T) formatter;

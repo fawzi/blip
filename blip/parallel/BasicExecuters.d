@@ -11,6 +11,7 @@ import blip.parallel.Models;
 import blip.parallel.BasicSchedulers;
 import blip.parallel.BasicTasks;
 import blip.parallel.PriQueue;
+import blip.BasicModels;
 
 class SExecuter:ExecuterI,TaskSchedulerI{
     /// logger for problems/info

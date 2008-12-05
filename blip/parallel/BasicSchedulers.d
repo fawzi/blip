@@ -14,6 +14,7 @@ import blip.TemplateFu:ctfe_i2a;
 import blip.parallel.PriQueue;
 import blip.parallel.Models;
 import blip.parallel.BasicTasks;
+import blip.BasicModels;
 
 /// task scheduler that tries to perform a depth first reduction of the task
 /// using the maximum parallelization available.
@@ -21,10 +22,9 @@ import blip.parallel.BasicTasks;
 /// tasks, it can be seen as a parallelization of eager evaluation.
 /// Just as eager evaulation it has the great advantage of being relatively easy
 /// to understand and to have good performance.
-/// I (fawzi) think that this is the correct default evaluation sequence,
-/// it is quite natural, and efficient and recursive functions are easily mapped to it.
-/// Yet all the automatic parallelization schemes that I have seen get it wrong,
-/// so I built this.
+/// This is closely related to work stealing, and you can implement
+/// a work stealing approach based on this (I am thinking about it)
+/// this would have more tasks, but a better cpu affinity, so it might be better
 ///
 /// integrate PriQueue in this? it would be slighly more efficient, and already now
 /// depends on its implementation details, or they should be better separated

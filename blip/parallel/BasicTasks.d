@@ -12,6 +12,7 @@ import blip.Stringify;
 import tango.core.sync.Semaphore;
 import blip.TemplateFu:ctfe_i2a;
 import blip.parallel.Models;
+import blip.BasicModels;
 
 /// a fiber if work manager is parallel, a simple delegate call if not
 /// this allows to easily remove the depenedence of fibers in most cases

@@ -1,7 +1,7 @@
 /// interfaces for tasks, schedulers and executers
 module blip.parallel.Models;
 import tango.util.log.Log;
-import blip.Stringify;
+import blip.BasicModels;
 import tango.io.Print;
 
 enum TaskStatus:int{

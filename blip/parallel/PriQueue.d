@@ -4,6 +4,7 @@ import tango.core.sync.Mutex;
 import tango.core.sync.Semaphore;
 import tango.math.Math;
 import blip.Stringify;
+import blip.BasicModels;
 
 /// a simple priority queue optimized for adding high priority tasks
 /// the public interface consists of
