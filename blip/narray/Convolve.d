@@ -616,6 +616,7 @@ body{
         //pragma(msg,"convolveNN("~T.stringof~","~ctfe_i2a(rank)~","~ctfe_i2a(cast(int)border)~")");
         //pragma(msg,loopBody);
         //pragma(msg,"------");
+        index_type optimalChunkSize_ii=NArray!(T,rank).defaultOptimalChunkSize;
         mixin(pLoopIdx(1,["partialInA","partialOutA"],loopBody,"ii"));
     }
     return outA;

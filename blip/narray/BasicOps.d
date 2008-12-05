@@ -10,7 +10,7 @@ module blip.narray.BasicOps;
 import blip.narray.BasicTypes;
 import blip.TemplateFu;
 import tango.core.Traits;
-import tango.math.Math: round,sqrt,min;
+import tango.math.Math: round,sqrt,min,ceil;
 import tango.math.IEEE: feqrel;
 
 template nullNArray(T,int rank){
@@ -298,6 +298,7 @@ template a2NAof(V){
             calcShapeArray!(T,rankOfArray!(T))(arr,shape);
             auto res=NArray!(V,cast(int)rankOfArray!(T)).empty(shape,fortran);
             const char[] loop_body="*resPtr0=cast(V)"~arrayInLoop("arr",rank,"i")~";";
+            index_type optimalChunkSize_i=NArray!(V,cast(int)rankOfArray!(T)).defaultOptimalChunkSize;
             mixin(pLoopIdx(rank,["res"],loop_body,"i"));
             return res;
         }
@@ -440,6 +441,7 @@ body  {
                 a.newFlags,a.newBase);
             index_type axisStride=a.bStrides[axis];
             index_type axisDim=a.shape[axis];
+            index_type optimalChunkSize_i=(NArray!(T,rank).defaultOptimalChunkSize+axisDim-1)/axisDim;
             mixin(pLoopPtr(rank-1,["res","tmp"],
                 "myFold(*resPtr0,tmpPtr0,axisStride,axisDim);\n","i"));
         }
@@ -485,8 +487,12 @@ NArray!(S,rank-1) multiplyAxis(T,int rank,S=T)(NArray!(T,rank)a,int axis=-1,NArr
 /// basically this is a generalized dot product of tensors
 /// implements a simple streaming algorithm (some blocking in the x direction would 
 /// be a natural extension)
+/// should look into something like "A Cache Oblivious Algorithm for Matrix 
+/// Multiplication Based on Peano’s Space Filling Curve" by Michael Bader and Christoph Zenger
+/// or other kinds of recursive refinements
 void fuse1(alias fuseOp,alias inOp, alias outOp, T,int rank1,S,int rank2,U)(NArray!(T,rank1) a,
-    NArray!(S,rank2) b, inout NArray!(U,rank1+rank2-2) c, int axis1=-1, int axis2=0)
+    NArray!(S,rank2) b, inout NArray!(U,rank1+rank2-2) c, int axis1=-1, int axis2=0,
+    index_type optimalChunkSize=NArray!(U,rank1+rank2-1).defaultOptimalChunkSize)
 in {
     static assert(rank1>0,"rank1 should be at least 1");
     static assert(rank2>0,"rank2 should be at least 1");
@@ -552,6 +558,16 @@ in {
         const char [] innerLoop=pLoopPtr(rank2-1,["tmp2","c2"],
                 "myFuse(cast(U*)(cast(size_t)c2Ptr0+cast(size_t)c1Ptr0),tmp1Ptr0,a.bStrides[axis1],tmp2Ptr0,\n"~
                 "            b.bStrides[axis2],a.shape[axis1]);\n","j");
+    }
+    
+    index_type oChunk=(optimalChunkSize+a.shape[axis1]-1)/a.shape[axis1];
+    index_type oChunk2=cast(index_type)ceil(sqrt(cast(real)oChunk));
+    index_type optimalChunkSize_i=oChunk2;
+    index_type optimalChunkSize_j=oChunk2;
+    if (a.size()/a.shape[axis1]<oChunk2){
+        optimalChunkSize_j=cast(index_type)(oChunk2*(cast(real)oChunk2/cast(real)(a.size()/a.shape[axis1])));
+    } else if (b.size()/a.shape[axis1]<oChunk2){
+        optimalChunkSize_i=cast(index_type)(oChunk2*(cast(real)oChunk2/cast(real)(b.size()/a.shape[axis1])));
     }
     
     static if (rank1==1) {
@@ -961,10 +977,11 @@ S norm2(T,int rank, S=T)(NArray!(T,rank)a){
     return cast(S)sqrt(res);
 }
 
-/// makes the array hermitish (a==a.H)
+/// makes the array hermitish (a==a.H) should use a recursive algorithm
 NArray!(T,rank)hermitize(T,int rank)(NArray!(T,rank)a){
     static if (isComplexType!(T)){
         auto b=a.T;
+        index_type optimalChunkSize_i=NArray!(T,rank).defaultOptimalChunkSize;
         mixin(pLoopPtr(rank,["a","b"],
         "if (aPtr0<bPtr0) {T val=((*aPtr0).re+(*bPtr0).re+cast(T)1i*((*aPtr0).im-(*bPtr0).im))/cast(T)2; *aPtr0=val; *bPtr0=val.re-cast(T)1i*val.im;}","i"));
         return a;
@@ -978,6 +995,7 @@ NArray!(T,rank)hermitize(T,int rank)(NArray!(T,rank)a){
 /// symmetrizes the array
 NArray!(T,rank)symmetrize(T,int rank)(NArray!(T,rank)a){
     auto b=a.T;
+    index_type optimalChunkSize_i=NArray!(T,rank).defaultOptimalChunkSize;
     mixin(pLoopPtr(rank,["a","b"],
     "if (aPtr0<bPtr0) {T val=(*aPtr0+*bPtr0)/cast(T)2; *aPtr0=val; *bPtr0=val;}","i"));
     return a;
@@ -986,6 +1004,7 @@ NArray!(T,rank)symmetrize(T,int rank)(NArray!(T,rank)a){
 /// anti symmetrizes the array
 NArray!(T,rank)antiSymmetrize(T,int rank)(NArray!(T,rank)a){
     auto b=a.T;
+    index_type optimalChunkSize_i=NArray!(T,rank).defaultOptimalChunkSize;
     mixin(pLoopPtr(rank,["a","b"],
     "if (aPtr0<bPtr0) {T val=(*aPtr0-*bPtr0)/cast(T)2; *aPtr0=val; *bPtr0=-val;}","i"));
     return a;

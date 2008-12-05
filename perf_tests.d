@@ -269,6 +269,7 @@ void tst()
         double *resPtr=res.ptr;
         for (int i=0;i<ndim;i++){
             NArray!(double,2) d1i=d1[i];
+            index_type optimalChunkSize_j=NArray!(double,2).defaultOptimalChunkSize;
             mixin(pLoopPtr(2,["d1i","sc3"],"*resPtr+=(*d1iPtr0)*(*sc3Ptr0);","j"));
             ++resPtr;
         }
@@ -284,6 +285,7 @@ void tst()
         NArray!(double,2) sc3=d2[0];
         for (int i=0;i<ndim;i++){
             NArray!(double,2) d1i=d1[i];
+            index_type optimalChunkSize_k=NArray!(double,2).defaultOptimalChunkSize;
             mixin(pLoopIdx(2,["d1i","sc3"],
                 "res[i]+=(*d1iPtr0)*(*sc3Ptr0);","k"));
         }

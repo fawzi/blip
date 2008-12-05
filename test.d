@@ -36,6 +36,7 @@ char[] NArrayInLoop(char[] arrName,int rank,char[] ivarStr){
 
 void checkLoop1(T,int rank)(NArray!(T,rank) a){
     {
+        index_type optimalChunkSize_i=NArray!(T,rank).defaultOptimalChunkSize;
         mixin(pLoopIdx(rank,["a"],
         "assert(*aPtr0=="~NArrayInLoop("a",rank,"i")~",\"pLoopIdx looping1 failed\");","i"));
     }

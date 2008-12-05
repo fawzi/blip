@@ -47,6 +47,7 @@ import tango.io.stream.FormatStream: FormatOutput;
 import tango.io.Buffer: GrowBuffer;
 import tango.math.Math: abs;
 import blip.rtest.RTest;
+import blip.BasicModels;
 //import tango.io.Stdout;
 
 /// flags for fast checking of 
@@ -142,8 +143,10 @@ template NArray(V=double,int rank=1){
 static if (rank<1)
     alias V NArray;
 else {
-    final class NArray : RandGen
+    final class NArray : RandGen, CopiableObjectI
     {
+        // default optimal chunk size for parallel looping
+        static index_type defaultOptimalChunkSize=200*1024/V.sizeof;
         /// pointer to the element 0,...0 (not necessarily the start of the slice)
         V* startPtrArray;
         /// strides multiplied by V.sizeof (can be negative)
@@ -949,9 +952,11 @@ else {
 
         struct PFlatLoop{
             NArray a;
-            static PFlatLoop opCall(NArray a){
+            index_type optimalChunkSize;
+            static PFlatLoop opCall(NArray a,index_type optimalChunkSize=defaultOptimalChunkSize){
                 PFlatLoop res;
                 res.a=a;
+                res.optimalChunkSize=optimalChunkSize;
                 return res;
             }
             int opApply( int delegate(ref V) loop_body ) 
@@ -960,6 +965,7 @@ else {
                 int ret=loop_body(*aPtr0);
                 if (ret) return ret;
                 `;
+                index_type optimalChunkSize_i=optimalChunkSize;
                 mixin(pLoopPtr(rank,["a"],loopBody,"i"));
                 return 0;
             }
@@ -971,8 +977,8 @@ else {
                 ++iPos;
                 `;
                 index_type iPos=0;
-                // this should be changed if pLoopPtr becomes really parallel
-                mixin(sLoopPtr(rank,["a"],loopBody,"i"));
+                index_type optimalChunkSize_i=optimalChunkSize;
+                mixin(pLoopPtr(rank,["a"],loopBody,"i"));
                 return 0;
             }
             static if (rank>1){
@@ -1019,16 +1025,150 @@ else {
         PFlatLoop pFlat(){
             return PFlatLoop(this);
         }
+
+        /// forward iterator compatible class on the adresses (FIteratorI!(V*))
+        class FIterator:FIteratorI!(V*){
+            FlatIterator it;
+            bool parallel;
+            index_type optimalChunkSize;
+            this(NArray a){
+                it=FlatIterator(a);
+                parallel=false;
+                optimalChunkSize=defaultOptimalChunkSize;
+            }
+            V *next(){
+                it.next();
+                return it.p;
+            }
+            bool atEnd() {
+                return it.end();
+            }
+            int opApply(int delegate(V* x) loop_body){
+                NArray a=it.baseArray;
+                const char[] loopBody=`
+                int ret=loop_body(aPtr0);
+                if (ret) return ret;
+                `;
+                index_type iPos=0;
+                index_type optimalChunkSize_i=optimalChunkSize;
+                if (parallel){
+//                    mixin(pLoopPtr(rank,["a"],loopBody,"i"));
+                } else {
+//                    mixin(sLoopPtr(rank,["a"],loopBody,"i"));
+                }
+                return 0;
+            }
+            int opApply(int delegate(size_t i,V* x) loop_body){
+                NArray a=it.baseArray;
+                index_type optimalChunkSize_i=optimalChunkSize;
+                size_t iPos=0;
+                const char[] loopBody=`
+                int ret=loop_body(iPos,aPtr0);
+                if (ret) return ret;
+                ++iPos;
+                `;
+                if (parallel){
+                    /// should use the pLoopIdx with one initial fixup
+                    mixin(sLoopPtr(rank,["a"],loopBody,"i"));
+                } else {
+                    mixin(sLoopPtr(rank,["a"],loopBody,"i"));
+                }
+                return 0;
+            }
+            /// might make opApply parallel (if the work amount is larger than
+            /// pThreshold. chunks are, if possible, optimalChunkSize)
+            /// might modify the current iterator or return a new one
+            FIterator parallelLoop(size_t myOptimalChunkSize){
+                optimalChunkSize=cast(index_type)myOptimalChunkSize;
+                parallel=true;
+                return this;
+            }
+            /// might make opApply parallel.
+            /// might modify the current iterator or return a new one
+            FIterator parallelLoop(){
+                parallel=true;
+                return this;
+            }
+        }
+        /// forward iterator compatible class on the values (FIteratorI!(V))
+        class FIteratorVals:FIteratorI!(V){
+            FlatIterator it;
+            bool parallel;
+            index_type optimalChunkSize;
+            this(NArray a){
+                it=FlatIterator(a);
+                parallel=false;
+                optimalChunkSize=defaultOptimalChunkSize;
+            }
+            V next(){
+                it.next();
+                return *it.p;
+            }
+            bool atEnd() {
+                return it.end();
+            }
+            int opApply(int delegate(V x) loop_body){
+                NArray a=it.baseArray;
+                const char[] loopBody=`
+                int ret=loop_body(*aPtr0);
+                if (ret) return ret;
+                `;
+                index_type iPos=0;
+                if (parallel){
+                    index_type optimalChunkSize_i=optimalChunkSize;
+                    mixin(pLoopPtr(rank,["a"],loopBody,"i"));
+                } else {
+                    mixin(sLoopPtr(rank,["a"],loopBody,"i"));
+                }
+                return 0;
+            }
+            int opApply(int delegate(size_t i,V x) loop_body){
+                NArray a=it.baseArray;
+                const char[] loopBody=`
+                int ret=loop_body(iPos,*aPtr0);
+                if (ret) return ret;
+                ++iPos;
+                `;
+                size_t iPos=0;
+                if (parallel){
+                    index_type optimalChunkSize_i=optimalChunkSize;
+                    /// needs pLoopIdx with initial fixup
+                    mixin(sLoopPtr(rank,["a"],loopBody,"i"));
+                } else {
+                    mixin(sLoopPtr(rank,["a"],loopBody,"i"));
+                }
+                return 0;
+            }
+            /// makes opApply parallel (if the work amount is larger than
+            /// optimalChunkSize)
+            FIteratorVals parallelLoop(size_t myOptimalChunkSize){
+                optimalChunkSize=cast(index_type)myOptimalChunkSize;
+                parallel=true;
+                return this;
+            }
+            /// makes opApply parallel.
+            FIteratorVals parallelLoop(){
+                parallel=true;
+                return this;
+            }
+        }
         
+        /// forward iterator on adresses compatible interface (FIteratorI!(V*))
+        FIterator fiterator(){
+            return new FIterator(this);
+        }
+        
+        /// forward iterator on values compatible interface (FIteratorI!(V))
+        FIteratorVals fiteratorVals(){
+            return new FIteratorVals(this);
+        }
         /+ --------------------------------------------------- +/
         
-        /// Return a deep copy of the array
+        /// Return a shallow copy of the array
+        /// (but as normally one stores values this is often equivalent to a deep copy)
         /// fortran ordering in the copy can be requested.
-        NArray dup(bool fortran=false)
+        NArray dup(bool fortran)
         {
-            void cpVal(V a,out V b){
-                b=a;
-            }
             NArray res=empty(this.shape,fortran);
             if ( flags & res.flags & (Flags.Fortran | Flags.Contiguous) ) 
             {
@@ -1040,6 +1180,33 @@ else {
             }
             return res;
         }
+        /// ditto
+        NArray dup() { return dup(false); }
+
+        /// Return a deep copy of the array
+        /// (but as normally one stores values this is often equivalent to dup)
+        /// fortran ordering in the copy can be requested.
+        NArray deepdup(bool fortran)
+        {
+            NArray res=empty(this.shape,fortran);
+            static if (is(typeof(V.init.deepdup()))){
+                binaryOpStr!("*aPtr0=(*bPtr0).deepdup();",rank,V,V)(res,this);
+            } else static if (is(typeof(V.init.dup()))){
+                binaryOpStr!("*aPtr0=(*bPtr0).dup();",rank,V,V)(res,this);
+            } else{
+                if ( flags & res.flags & (Flags.Fortran | Flags.Contiguous) ) 
+                {
+                    memcpy(res.startPtrArray, startPtrArray, cast(index_type)V.sizeof * nElArray);
+                }
+                else
+                {
+                    binaryOpStr!("*aPtr0=*bPtr0;",rank,V,V)(res,this);
+                }
+            }
+            return res;
+        }
+        /// ditto
+        NArray deepdup() { return deepdup(false); }
         
         /// Returns a copy of the given type (if the type is the same return itself)
         NArray!(S,rank)asType(S)(){
@@ -1542,40 +1709,52 @@ else {
 
 /// applies an operation on all elements of the array. The looping order is arbitrary
 /// and might be concurrent
-void unaryOp(alias op,int rank,T)(NArray!(T,rank) a){
+void unaryOp(alias op,int rank,T)(NArray!(T,rank) a,
+        index_type optimalChunkSize=NArray!(T,rank).defaultOptimalChunkSize){
+    index_type optimalChunkSize_i=optimalChunkSize;
     mixin(pLoopPtr(rank,["a"],"op(*aPtr0);\n","i"));
 }
 /// ditto
-void unaryOpStr(char[] op,int rank,T)(NArray!(T,rank) a){
+void unaryOpStr(char[] op,int rank,T)(NArray!(T,rank) a,
+        index_type optimalChunkSize=NArray!(T,rank).defaultOptimalChunkSize){
+    index_type optimalChunkSize_i=optimalChunkSize;
     mixin(pLoopPtr(rank,["a"],op,"i"));
 }
 
 /// applies an operation combining the corresponding elements of two arrays.
 /// The looping order is arbitrary and might be concurrent.
-void binaryOp(alias op,int rank,T,S)(NArray!(T,rank) a, NArray!(S,rank) b)
+void binaryOp(alias op,int rank,T,S)(NArray!(T,rank) a, NArray!(S,rank) b,
+    index_type optimalChunkSize=NArray!(T,rank).defaultOptimalChunkSize)
 in { assert(a.shape==b.shape,"incompatible shapes in binaryOp"); }
 body {
+    index_type optimalChunkSize_i=optimalChunkSize;
     mixin(pLoopPtr(rank,["a","b"],"op(*aPtr0,*bPtr0);\n","i"));
 }
 /// ditto
-void binaryOpStr(char[] op,int rank,T,S)(NArray!(T,rank) a, NArray!(S,rank) b)
+void binaryOpStr(char[] op,int rank,T,S)(NArray!(T,rank) a, NArray!(S,rank) b,
+    index_type optimalChunkSize=NArray!(T,rank).defaultOptimalChunkSize)
 in { assert(a.shape==b.shape,"incompatible shapes in binaryOp"); }
 body {
+    index_type optimalChunkSize_i=optimalChunkSize;
     mixin(pLoopPtr(rank,["a","b"],op,"i"));
 }
 
 /// applies an operation combining the corresponding elements of three arrays .
 /// The looping order is arbitrary and might be concurrent.
-void ternaryOp(alias op, int rank, T, S, U)(NArray!(T,rank) a, NArray!(S,rank) b, NArray!(U,rank) c)
+void ternaryOp(alias op, int rank, T, S, U)(NArray!(T,rank) a, NArray!(S,rank) b, NArray!(U,rank) c,
+    index_type optimalChunkSize=NArray!(T,rank).defaultOptimalChunkSize)
 in { assert(a.shape==b.shape && a.shape==c.shape,"incompatible shapes in ternaryOp"); }
 body {
+    index_type optimalChunkSize_i=optimalChunkSize;
     mixin(pLoopPtr(rank,["a","b","c"],
         "op(*aPtr0,*bPtr0,*cPtr0);\n","i"));
 }
 /// ditto
-void ternaryOpStr(char[] op, int rank, T, S, U)(NArray!(T,rank) a, NArray!(S,rank) b, NArray!(U,rank) c)
+void ternaryOpStr(char[] op, int rank, T, S, U)(NArray!(T,rank) a, NArray!(S,rank) b, NArray!(U,rank) c,
+    index_type optimalChunkSize=NArray!(T,rank).defaultOptimalChunkSize)
 in { assert(a.shape==b.shape && a.shape==c.shape,"incompatible shapes in ternaryOp"); }
 body {
+    index_type optimalChunkSize_i=optimalChunkSize;
     mixin(pLoopPtr(rank,["a","b","c"],op,"i"));
 }
 
@@ -1702,6 +1881,7 @@ char [] pLoopIdx(int rank,char[][] arrayNames,
     char[] indent2=indent~"    ";
     char[] indent3=indent2~"    ";
     bool hasNamesDot=true;
+    res~=indent~"size_t dummy"~ivarStr~"=optimalChunkSize_"~ivarStr~";\n";
     if (arrayNamesDot.length==0){
         hasNamesDot=false;
         arrayNamesDot=[];
@@ -1790,10 +1970,12 @@ char [] pLoopPtr(int rank,char[][] arrayNames,
             arrayNamesDot~=[arrayNameDot(arrayName)];
     }
     assert(arrayNamesDot.length==arrayNames.length);
-    if(hasNamesDot)
+    if(hasNamesDot){
         res~=indent~"commonFlags"~ivarStr~"=";
-    else
+    } else{
+        res~=indent~"size_t dummy"~ivarStr~"=optimalChunkSize_"~ivarStr~";\n";
         res~=indent~"uint commonFlags"~ivarStr~"=";
+    }
     foreach (i,arrayNameD;arrayNamesDot){
         res~=arrayNameD~"flags";
         if (i!=arrayNamesDot.length-1) res~=" & ";
@@ -1909,6 +2091,7 @@ char[] opApplyIdxAll(int rank,char[] arrayName,bool sequential){
     if (sequential) {
         res~=sLoopGenIdx(rank,["a"],loopBody,"i");
     } else {
+        res~=indent~"index_type optimalChunkSize_i=optimalChunkSize;\n";
         res~=pLoopIdx(rank,["a"],loopBody,"i");
     }
     res~="    return 0;";
