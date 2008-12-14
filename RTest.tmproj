@@ -18,19 +18,25 @@
 			<key>filename</key>
 			<string>PriQueueTest.d</string>
 			<key>lastUsed</key>
-			<date>2008-11-03T13:01:32Z</date>
+			<date>2008-11-26T11:25:16Z</date>
+		</dict>
+		<dict>
+			<key>filename</key>
+			<string>testSerial.d</string>
+			<key>lastUsed</key>
+			<date>2008-12-14T18:41:32Z</date>
 		</dict>
 		<dict>
 			<key>filename</key>
 			<string>test.d</string>
 			<key>lastUsed</key>
-			<date>2008-11-03T13:01:32Z</date>
+			<date>2008-12-14T18:41:32Z</date>
 		</dict>
 		<dict>
 			<key>filename</key>
 			<string>dsss.conf</string>
 			<key>lastUsed</key>
-			<date>2008-11-03T13:01:33Z</date>
+			<date>2008-12-14T18:41:33Z</date>
 		</dict>
 		<dict>
 			<key>filename</key>
@@ -40,12 +46,12 @@
 		</dict>
 	</array>
 	<key>fileHierarchyDrawerWidth</key>
-	<integer>192</integer>
+	<integer>193</integer>
 	<key>metaData</key>
 	<dict/>
 	<key>showFileHierarchyDrawer</key>
 	<true/>
 	<key>windowFrame</key>
-	<string>{{244, 191}, {828, 578}}</string>
+	<string>{{246, 0}, {937, 778}}</string>
 </dict>
 </plist>
