@@ -4,8 +4,8 @@ import tango.core.Thread;
 import tango.math.Math;
 import tango.io.Stdout;
 import tango.util.log.Log;
-import tango.io.Print;
-import blip.Stringify;
+import tango.io.stream.Format;
+import blip.text.Stringify;
 import blip.TemplateFu:ctfe_i2a;
 import blip.parallel.Models;
 import blip.parallel.BasicSchedulers;
@@ -45,11 +45,11 @@ class SExecuter:ExecuterI,TaskSchedulerI{
         return getString(desc(new Stringify()).newline);
     }
     /// description (for debugging)
-    Print!(char) desc(Print!(char)s){ return desc(s,false); }
+    FormatOutput!(char) desc(FormatOutput!(char)s){ return desc(s,false); }
     /// description (for debugging)
     /// (might not be a snapshot if other threads modify it while printing)
     /// non threadsafe
-    Print!(char) desc(Print!(char)s,bool shortVersion){
+    FormatOutput!(char) desc(FormatOutput!(char)s,bool shortVersion){
         s.format("<SExecuter@{} ",cast(void*)this)(name);
         if (shortVersion) {
             s(" >");
@@ -188,11 +188,11 @@ class PExecuter:ExecuterI{
         return getString(desc(new Stringify()).newline);
     }
     /// description (for debugging)
-    Print!(char) desc(Print!(char)s){ return desc(s,false); }
+    FormatOutput!(char) desc(FormatOutput!(char)s){ return desc(s,false); }
     /// description (for debugging)
     /// (might not be a snapshot if other threads modify it while printing)
     /// non threadsafe
-    Print!(char) desc(Print!(char)s,bool shortVersion){
+    FormatOutput!(char) desc(FormatOutput!(char)s,bool shortVersion){
         s.format("<PExecuter@{}",cast(void*)this);
         if (shortVersion) {
             s(" >");

@@ -2,7 +2,7 @@
 module blip.parallel.Models;
 import tango.util.log.Log;
 import blip.BasicModels;
-import tango.io.Print;
+import tango.io.stream.Format;
 
 enum TaskStatus:int{
     Building=-1,
@@ -54,7 +54,7 @@ interface TaskSchedulerI:BasicObjectI {
     /// root task, the easy way to add tasks to this scheduler
     TaskI rootTask();
     /// possibly short description
-    Print!(char) desc(Print!(char) s,bool shortVersion);
+    FormatOutput!(char) desc(FormatOutput!(char) s,bool shortVersion);
     /// if there are many queued tasks (and one should try not to queue too many of them)
     bool manyQueued();
 }
@@ -85,7 +85,7 @@ interface TaskI:SubtaskNotificationsI,SubmittingI{
     /// name of the task
     char[] taskName();
     /// possibly short description
-    Print!(char) desc(Print!(char) s,bool shortVersion);
+    FormatOutput!(char) desc(FormatOutput!(char) s,bool shortVersion);
     /// if this task might spawn
     bool mightSpawn();
     /// if this task might Yield

@@ -1,9 +1,9 @@
 module blip.parallel.PriQueue;
-import tango.io.Print;
+import tango.io.stream.Format;
 import tango.core.sync.Mutex;
 import tango.core.sync.Semaphore;
 import tango.math.Math;
-import blip.Stringify;
+import blip.text.Stringify;
 import blip.BasicModels;
 
 /// a simple priority queue optimized for adding high priority tasks
@@ -58,7 +58,7 @@ class PriQueue(T){
             return getString(desc(new Stringify()).newline);
         }
         /// description (for debugging)
-        Print!(char) desc(Print!(char)s){
+        FormatOutput!(char) desc(FormatOutput!(char)s){
             s.format("<PriQLevel@{} level={} entries=[",cast(void*)this,level);
             if (nEl>entries.length){
                 s("*ERROR* nEl=")(nEl);
@@ -98,7 +98,7 @@ class PriQueue(T){
             return getString(desc(new Stringify()).newline);
         }
         /// description (for debugging)
-        Print!(char) desc(Print!(char)s){
+        FormatOutput!(char) desc(FormatOutput!(char)s){
             if (this is null){
                 s("<PriQPool *NULL*>").newline;
             } else {
@@ -215,7 +215,7 @@ class PriQueue(T){
     /// description (for debugging)
     /// (might not be a snapshot if other thread modify it while printing)
     /// non threadsafe
-    Print!(char) desc(Print!(char)s){
+    FormatOutput!(char) desc(FormatOutput!(char)s){
         if (this is null){
             s("<PriQueue *NULL*>").newline;
         } else {

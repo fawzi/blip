@@ -8,8 +8,8 @@ import tango.math.Math;
 import tango.io.Stdout;
 import tango.util.log.Log;
 import tango.util.container.LinkedList;
-import tango.io.Print;
-import blip.Stringify;
+import tango.io.stream.Format;
+import blip.text.Stringify;
 import blip.TemplateFu:ctfe_i2a;
 import blip.parallel.PriQueue;
 import blip.parallel.Models;
@@ -144,11 +144,11 @@ class PriQTaskScheduler:TaskSchedulerI {
         return _executer;
     }
     /// description (for debugging)
-    Print!(char) desc(Print!(char)s){ return desc(s,false); }
+    FormatOutput!(char) desc(FormatOutput!(char)s){ return desc(s,false); }
     /// description (for debugging)
     /// (might not be a snapshot if other threads modify it while printing)
     /// non threadsafe
-    Print!(char) desc(Print!(char)s,bool shortVersion){
+    FormatOutput!(char) desc(FormatOutput!(char)s,bool shortVersion){
         if (this is null){
             s("<PriQTaskScheduler *NULL*>").newline;
         } else {

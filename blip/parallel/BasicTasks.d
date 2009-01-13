@@ -7,8 +7,8 @@ import tango.math.Math;
 import tango.io.Stdout;
 import tango.util.log.Log;
 import tango.util.container.LinkedList;
-import tango.io.Print;
-import blip.Stringify;
+import tango.io.stream.Format;
+import blip.text.Stringify;
 import tango.core.sync.Semaphore;
 import blip.TemplateFu:ctfe_i2a;
 import blip.parallel.Models;
@@ -377,13 +377,13 @@ class Task:TaskI{
         return getString(desc(new Stringify()).newline);
     }
     /// description (for debugging)
-    Print!(char) desc(Print!(char)s){
+    FormatOutput!(char) desc(FormatOutput!(char)s){
         return desc(s,false);
     }
     /// description (for debugging)
     /// (might not be a snapshot if other threads modify it while printing)
     /// non threadsafe
-    Print!(char) desc(Print!(char)s,bool shortVersion){
+    FormatOutput!(char) desc(FormatOutput!(char)s,bool shortVersion){
         if (this is null){
             s("<Task *NULL*>").newline;
         } else {
@@ -400,7 +400,7 @@ class Task:TaskI{
         return s;
     }
     /// prints the fields (superclasses can override this an call it through super)
-    Print!(char) fieldsDesc(Print!(char)s){
+    FormatOutput!(char) fieldsDesc(FormatOutput!(char)s){
         s("  level=")(level)(",").newline;
         s("  taskOp:");
         if (taskOp is null)
