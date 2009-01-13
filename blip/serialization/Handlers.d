@@ -2,10 +2,11 @@ module blip.serialization.Handlers;
 import tango.core.Tuple;
 import tango.io.protocol.Writer;
 import tango.io.protocol.Reader;
-import tango.io.Print;
+import tango.io.stream.Format;
 import tango.text.json.JsonEscape: escape;
-import tango.io.encode.Base64: encode;
+import tango.io.encode.Base64: encode,decode;
 import tango.core.Variant;
+import blip.text.TextParser;
 
 /// the non array core types
 template isBasicCoreType(T){
@@ -25,8 +26,6 @@ template isCoreType(T){
      ||is(T==dchar[])||is(T==ubyte[]);
 }
 
-alias Tuple!(bool,byte,ubyte,short,ushort,int,uint,long,ulong,
-    float,double,real,ifloat,idouble,ireal,cfloat,cdouble,creal) BasicTypes;
 alias Tuple!(bool,byte,ubyte,short,ushort,int,uint,long,ulong,
     float,double,real,ifloat,idouble,ireal,cfloat,cdouble,creal,ubyte[],
     char[],wchar[],dchar[]) CoreTypes;
@@ -81,32 +80,6 @@ class CoreHandlers{
     }
 }
 
-/// struct that helps the reading of an array and dictionaries
-struct PosCounter{
-    size_t pos,length;
-    Variant data;
-    static PosCounter opCall(size_t length){
-        PosCounter ac;
-        ac.length=length;
-        ac.pos=0;
-        return ac;
-    }
-    void next(){
-        assert(pos<length || length==size_t.max);
-        ++pos;
-    }
-    void end(){
-        assert(pos==length || length==size_t.max);
-    }
-    size_t size_hint(){
-        if (length==size_t.max){
-            return 0; // change?
-        } else {
-            return length;
-        }
-    }
-}
-
 /// handlers for writing
 class WriteHandlers: CoreHandlers{
     this(){}
@@ -123,52 +96,6 @@ class WriteHandlers: CoreHandlers{
     void rawWriteStr(char[]data){
         assert(0,"unimplemented");
     }
-/+    /// writes the start of an array of the given size
-    PosCounter writeArrayStart(size_t length){
-        return PosCounter(length);
-    }
-    /// writes a separator of the array
-    void writeArrayEl(ref PosCounter ac, lazy void delegate() writeEl) {
-        ac.next();
-        writeEl();
-    }
-    /// writes the end of the array
-    void writeArrayEnd(ref PosCounter ac){
-        ac.end();
-    }
-    /// start of a dictionary
-    PosCounter writeDictStart(size_t nkeys,bool stringKeys=false) {
-        return PosCounter(nkeys);
-    }
-    /// writes an entry of the dictionary
-    void writeEntry(ref PosCounter ac, lazy void delegate() writeKey,lazy void delegate() writeVal) {
-        ac.next();
-        writeKey();
-        writeVal();
-    }
-    /// end of dictionary
-    void writeDictEnd() {
-        ac.end();
-    }
-    /// writes an Object
-    void writeObject(ClassMetaInfo *metaInfo,FieldMetaInfo *field, size_t objId,
-        lazy void delegate() realWrite, Object o){
-        realWrite();
-    }
-    /// write ObjectProxy
-    void writeObjectProxy(ClassMetaInfo *metaInfo,FieldMetaInfo *field, size_t objId, Object o){
-        assert(0,"unimplemented");
-    }
-    /// write Struct
-    void writeStruct(ClassMetaInfo *metaInfo,FieldMetaInfo *field, size_t objId,
-        lazy void delegate() realWrite){
-        realWrite();
-    }
-    /// writes a core type
-    void writeCoreType(ClassMetaInfo *metaInfo,FieldMetaInfo *field, size_t objId,
-        lazy void delegate() realWrite){
-        realWrite();
-    }+/
 }
 
 /// handlers for reading
@@ -177,13 +104,13 @@ class ReadHandlers: CoreHandlers{
     /// returns if the current protocol is binary or not
     bool binary(){
         assert(0,"unimplemented");
-        return true;
+        return false;
     }
-    /// writes a raw sequence of bytes
+    /// reads a raw sequence of bytes
     ubyte[] rawRead(size_t amount){
         assert(0,"unimplemented");
     }
-    /// writes a raw string
+    /// reads a raw string
     char[] rawReadStr(size_t amount){
         assert(0,"unimplemented");
     }
@@ -407,8 +334,8 @@ final class BinaryReadHandlers:ReadHandlers{
 
 /// write handlers for formatted writing
 final class FormattedWriteHandlers: WriteHandlers{
-    Print!(char) writer;
-    this(Print!(char) w){
+    FormatOutput!(char) writer;
+    this(FormatOutput!(char) w){
         writer=w;
         setCoreHandlersFrom_basicWrite();
     }
@@ -445,4 +372,85 @@ final class FormattedWriteHandlers: WriteHandlers{
     void rawWriteStr(char[]data){
         writer(data);
     }
+}
+
+/// read handlers build on the top of tango Reader (could be faster)
+final class FormattedReadHandlers(T):ReadHandlers{
+    TextParser!(T)       reader;
+    
+    this (TextParser!(T) reader)
+    {
+        this.reader=reader;
+        setCoreHandlersFrom_basicRead();
+    }
+    
+    /// returns if the current protocol is binary or not
+    bool binary(){
+        return false;
+    }
+    /// reads a basic type
+    void basicRead(U)(ref U t){
+        static assert(isCoreType!(U),"invalid non core type "~U.stringof);
+        static if (is(U==ubyte[])){
+            T[]str;
+            reader(str);
+            t=decode(str);
+        } else {
+            reader(t);
+        }
+    }
+    
+    mixin(coreHandlerSetFromTemplateMixinStr("basicRead"));
+
+    /// reads a raw sequence of bytes
+    ubyte[] rawRead(size_t amount){
+        ubyte[] data;
+        basicRead(data);
+        return data;
+    }
+    /// reads a raw string
+    T[] rawReadStr(size_t amount){
+        return reader.readNCodePoints(amount);
+    }
+    /// skips the given string
+    bool skipStr(T[] str){
+        return reader.skipString(str);
+    }
+/+    override PosCounter readArrayStart(){
+        ulong res = 0;
+        bool cont = true;
+        for (int i = 0; cont; ++i) {
+            ubyte part;
+            reader(part);
+            //Stdout.formatln(`part: {}`, part);
+            cont = (part & 0b10000000) != 0;
+            res |= (part & 0b01111111) << (i * 7);
+        }
+        return PosCounter(cast(size_t)res);
+    }
+    /// writes out a dictionary prepended by its compressed length
+    final class DictionaryCmptLengthReader:ReadHandlers.DictionaryReader{
+        size_t pos,length;
+        /// start of a dictionary
+        override void readDictStart(size_t length) {
+            assert(pos==length,"recursive use not supported");
+        }
+        /// returns true if there is a next entry
+        override bool nextEntry() {
+            if (pos!=length){
+                ++pos;
+                return true;
+            }
+            return false;
+        }
+        /// middle of entry (between key and value)
+        override void readEntryMid() {}
+        /// hint on the size of the dictionary
+        override size_t sizeHint(){ length; }
+        this() { super(); }
+    }
+    /// object that helps the writing of an associative array
+    override DictionaryCmptLengthReader dictionaryReader(){
+        return new DictionaryCmptLengthReader();
+    }+/
 }
