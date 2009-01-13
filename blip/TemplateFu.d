@@ -62,6 +62,14 @@ template isArray(T)
     const bool isArray=is( T U : U[] );
 }
 
+template KeyTypeOfAA(T){
+    alias typeof(T.init.keys[0]) KeyTypeOfAA;
+}
+
+template ValTypeOfAA(T){
+    alias typeof(T.init.values[0]) ValTypeOfAA;
+}
+
 template staticArraySize(T)
 {
     static assert(isStaticArrayType!(T),"staticArraySize needs a static array as type");
@@ -102,6 +110,55 @@ char [] ctfe_i2a(int i){
         return '-'~res;
     else
         return res;
+}
+/// ditto
+char [] ctfe_i2a(long i){
+    char[] digit="0123456789";
+    char[] res="".dup;
+    if (i==0){
+        return "0".dup;
+    }
+    bool neg=false;
+    if (i<0){
+        neg=true;
+        i=-i;
+    }
+    while (i>0) {
+        res=digit[i%10]~res;
+        i/=10;
+    }
+    if (neg)
+        return '-'~res;
+    else
+        return res;
+}
+/// ditto
+char [] ctfe_i2a(uint i){
+    char[] digit="0123456789";
+    char[] res="".dup;
+    if (i==0){
+        return "0".dup;
+    }
+    bool neg=false;
+    while (i>0) {
+        res=digit[i%10]~res;
+        i/=10;
+    }
+    return res;
+}
+/// ditto
+char [] ctfe_i2a(ulong i){
+    char[] digit="0123456789";
+    char[] res="".dup;
+    if (i==0){
+        return "0".dup;
+    }
+    bool neg=false;
+    while (i>0) {
+        res=digit[i%10]~res;
+        i/=10;
+    }
+    return res;
 }
 
 /// checks is c is a valid token char (also at compiletime), assumes a-z A-Z 1-9 sequences in collation
