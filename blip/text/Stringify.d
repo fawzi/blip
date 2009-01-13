@@ -1,14 +1,14 @@
 /*******************************************************************************
-    Various utilities to convert methods that write to Print!(T),
+    Various utilities to convert methods that write to FormatOutput!(T),
     stream and writers to strings
         copyright:      Copyright (c) 2008. Fawzi Mohamed
         license:        BSD style: $(LICENSE)
         version:        Initial release: July 2008
         author:         Fawzi Mohamed
 *******************************************************************************/
-module blip.Stringify;
-import tango.io.Print;
-import tango.io.Buffer;
+module blip.text.Stringify;
+import tango.io.stream.Format;
+import tango.io.device.Array;
 import tango.text.convert.Format;
 import tango.text.convert.Layout;
 import blip.TemplateFu: nArgs;
@@ -26,12 +26,13 @@ class defaultFormatter(T){
     }
 }
 
-/// A Print!(T) instance that collects all the writes into a string
-class StringIO(T=char): Print!(T){
-    private GrowBuffer buf;
+/// A FormatOutput!(T) instance that collects all the writes into a string
+class StringIO(T=char): FormatOutput!(T){
+    private Array buf;
     /// creates a Stringify object
     this(bool flush=false,uint size = 1024, uint increment = 1024){
-        buf=new GrowBuffer(size,increment);
+        //buf=new GrowBuffer(size,increment);
+        buf=new Array(size,increment);
         super(defaultFormatter!(T).formatter,buf);
         super.flush = flush;
     }
@@ -54,10 +55,10 @@ class StringIO(T=char): Print!(T){
 alias StringIO!() Stringify;
 
 /// to build expressions hiding the cast needed by non covariant return type
-/// (Print!(T) instead of StringIO!(T))
-T[] getString(T)(Print!(T) p){
+/// (FormatOutput!(T) instead of StringIO!(T))
+T[] getString(T)(FormatOutput!(T) p){
     StringIO!(T) s=cast(StringIO!(T))p;
-    assert(s,"Print!(T) not castable to StringIO");
+    assert(s,"FormatOutput!(T) not castable to StringIO");
     return s.getString();
 }
 
@@ -68,13 +69,13 @@ debug(UnitTest){
     }
 }
 
-T[] printToString(T)(void delegate(Print!(T))w){
+T[] printToString(T)(void delegate(FormatOutput!(T))w){
     StringIO!(T) s=new StringIO!(T)();
     w(s);
     return s.getString();
 }
 
-T[] printToString(T)(Print!(T) delegate(Print!(T))w){
+T[] printToString(T)(FormatOutput!(T) delegate(FormatOutput!(T))w){
     StringIO!(T) s=new StringIO!(T)();
     w(s);
     return s.getString();
