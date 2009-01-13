@@ -122,8 +122,12 @@
 
     If you end up using custom generators much probably you should define a 
     struct/class/typedef, and use that as input to your testing function and define
+    one of the 
+    randomGenerate(Rand r,int idx,ref int nEl, ref bool acceptable),
+    randomGenerate(Rand r, ref bool acceptable),  randomGenerate(Rand r) static generators
+    or a specialization of
     T generateRandom(T:YourType)(Rand r,int idx,ref int nEl, ref bool acceptable)
-    or implement the RandGen interface so that you can use the default automatic generation.
+    so that you can use the default automatic generation.
     For a description of generateRandom and RandGen see the module blip.rtest.BasicGenerators.
 
     enjoy
@@ -145,7 +149,7 @@ import tango.io.Stdout;
 import blip.parallel.WorkManager;
 
 import blip.NullStream;
-import tango.io.stream.FormatStream;
+import tango.io.stream.Format;
 
 private mixin testInit!() autoInitTst; 
 
@@ -262,7 +266,7 @@ debug(UnitTest){
     arg1=specialNrs[arg1_i]; arg1_nEl=specialNrs.length;`) combNrTst; // combinatorial cases
 
     unittest{
-        Print!(char) nullPrt=new FormatOutput(nullStream());
+        FormatOutput!(char) nullPrt=new FormatOutput!(char)(nullStream());
         // nullPrt=Stdout;
         SingleRTest.defaultTestController=new TextController(TextController.OnFailure.StopTest,
             TextController.PrintLevel.AllShort,nullPrt,nullPrt);

@@ -3,7 +3,7 @@ module test;
 import tango.io.Stdout;
 import blip.rtest.RTest;
 import blip.NullStream;
-import tango.io.stream.FormatStream;
+import tango.io.stream.Format;
 import blip.TemplateFu;
 import blip.parallel.WorkManager;
 import tango.util.log.Config;
@@ -23,7 +23,7 @@ void main(char[][]argv){
     Log.lookup("blip.parallel").info("pippo");
     Stdout("blip.parallel.queue:")(Log.lookup("blip.parallel.queue").level).newline;
     Log.lookup("blip.parallel.queue").info("pippo");
-    Print!(char) nullPrt=new FormatOutput(nullStream());
+    FormatOutput!(char) nullPrt=new FormatOutput!(char)(nullStream());
     nullPrt=Stdout;
     SingleRTest.defaultTestController=new TextController(TextController.OnFailure.StopTest,
         TextController.PrintLevel.AllShort,nullPrt,nullPrt,1,false);
