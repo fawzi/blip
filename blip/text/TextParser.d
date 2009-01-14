@@ -173,19 +173,27 @@ size_t scanCodePoints(T)(T[] str,size_t nn){
         T* p=str.ptr;
         size_t l=str.length;
         size_t n=0;
-        bool charLoop(T* pEnd){
+        void invalidUtfError(long line){
+            throw new Exception("invalid UTF-8",__FILE__,line);
+        }
+        bool charLoop(T* pEnd,long line){
+            assert(p<=pEnd,"ppp");
             while (p!=pEnd && n!=nn){
                 if ((*p)&0x80){ // use the stride table instead?
                     switch ((*p)&0xF0){
                     case 0xF0:
-                        if ((*p)&0x08!=0 || ++p==pEnd || (*p & 0xC0)!=0x80) return true; 
+                        if ((*p)&0x08!=0) invalidUtfError(line);
+                        if (++p==pEnd) return true;
+                        if ((*p & 0xC0)!=0x80) invalidUtfError(line);
                     case 0xE0:
-                        if (++p==pEnd || (*p & 0xC0)!=0x80) return true; 
+                        if (++p==pEnd) return true;
+                        if ((*p & 0xC0)!=0x80) invalidUtfError(line);
                     case 0xC0,0xD0:
-                        if (++p==pEnd || (*p & 0xC0)!=0x80) return true; 
+                        if (++p==pEnd) return true;
+                        if ((*p & 0xC0)!=0x80) invalidUtfError(line);
                         break;
                     default:
-                        return true;
+                        invalidUtfError(line);
                     }
                 }
                 ++p;
@@ -193,16 +201,21 @@ size_t scanCodePoints(T)(T[] str,size_t nn){
             }
             return false;
         }
-        bool charLoop2(T* pEnd){
+        bool charLoop2(T* pEnd,long line){
+            assert(p<=pEnd,"ppp");
             while (p!=pEnd && n!=nn){
                 if ((*p)&0x80){
                     switch ((*p)&0xF0){
                     case 0xF0:
-                        if ((*p)&0x08!=0 || ++p==pEnd || (*p & 0xC0)!=0x80) return true; 
+                        if ((*p)&0x08!=0) invalidUtfError(line);
+                        if (++p==pEnd) return true;
+                        if ((*p & 0xC0)!=0x80) invalidUtfError(line);
                     case 0xE0:
-                        if (++p==pEnd || (*p & 0xC0)!=0x80) return true; 
+                        if (++p==pEnd) return true;
+                        if ((*p & 0xC0)!=0x80) invalidUtfError(line);
                     case 0xC0,0xD0:
-                        if (++p==pEnd || (*p & 0xC0)!=0x80) return true; 
+                        if (++p==pEnd) return true;
+                        if ((*p & 0xC0)!=0x80) invalidUtfError(line);
                         break;
                     default:
                         return true;
@@ -214,45 +227,50 @@ size_t scanCodePoints(T)(T[] str,size_t nn){
             }
             return false;
         }
-        if (l<8){
-            if (charLoop(p+l)) throw new Exception("invalid UTF-8",__FILE__,__LINE__);
+        if (l<8 || nn<4){
+            if (charLoop(p+l,__LINE__)) return IOStream.Eof;
         } else {
             T* pEnd=cast(T*)((cast(size_t)(str.ptr+l))&(~cast(size_t)7));
-            if (charLoop2(pEnd)) throw new Exception("invalid UTF-8",__FILE__,__LINE__);
-            while (p<pEnd){
+            nn-=3;
+            if (charLoop2(pEnd,__LINE__)) return IOStream.Eof;
+            while (p<pEnd && n<nn){
                 if ((*(cast(int*)p))&0x80808080 ==0){
                     p+=4;
                     n+=4;
-                    if(n>=nn){
-                        return cast(size_t)((p-str.ptr)-n+nn);
-                    }
                 } else {
-                    if (charLoop2(pEnd)) throw new Exception("invalid UTF-8",__FILE__,__LINE__);
+                    if (charLoop2(pEnd,__LINE__)) return IOStream.Eof;
                 }
             }
-            if (charLoop(str.ptr+l)) throw new Exception("invalid UTF-8",__FILE__,__LINE__);
+            nn+=3;
+            if (charLoop(str.ptr+l,__LINE__)) return IOStream.Eof;
+            
         }
         if (n<nn) return IOStream.Eof;
         return cast(size_t)(p-str.ptr);
     } else static if (is(T==wchar)){
         T* p=str.ptr;
         size_t n=0;
-        bool charLoop(T*pEnd){
+        void invalidUtfError(long line){
+            throw new Exception("invalid UTF-16",__FILE__,line);
+        }
+        bool charLoop(T*pEnd,long line){
             while(p!=pEnd && n!=nn){
                 if ((*p)&0xF800==0xD800){
-                    if ((*p)&0x0400) return true;
-                    if (++p==pEnd || ((*p)&0xFC00)!=0xDC00) return true;
+                    if ((*p)&0x0400) invalidUtfError(line);
+                    if (++p==pEnd) return true;
+                    if (((*p)&0xFC00)!=0xDC00) invalidUtfError(line);
                 }
                 ++p;
                 ++n;
             }
             return false;
         }
-        bool charLoop2(T*pEnd){
+        bool charLoop2(T*pEnd,long line){
             while(p!=pEnd && ((cast(size_t)p)&7)!=0 && n!=nn){
                 if ((*p)&0xF800==0xD800){
-                    if ((*p)&0x0400) return true;
-                    if (++p==pEnd || ((*p)&0xFC00)!=0xDC00) return true;
+                    if ((*p)&0x0400) invalidUtfError(line);
+                    if (++p==pEnd) return true;
+                    if (((*p)&0xFC00)!=0xDC00) invalidUtfError(line);
                 }
                 ++p;
                 ++n;
@@ -260,24 +278,23 @@ size_t scanCodePoints(T)(T[] str,size_t nn){
             return false;
         }
         size_t l=str.length;
-        if (l<4){
-            if (charLoop(p+l)) throw new Exception("invalid UTF-16",__FILE__,__LINE__);
+        if (l<4 || n<1){
+            if (charLoop(p+l,__LINE__)) return Eof;
         } else {
             T*pEnd=cast(T*)((cast(size_t)(p+l))&(~(cast(size_t)7)));
-            if (charLoop2(pEnd)) throw new Exception("invalid UTF-16",__FILE__,__LINE__);
-            while (p!=pEnd){
+            if (charLoop2(pEnd,__LINE__)) return Eof;
+            --nn;
+            while (p!=pEnd && nn<nn){
                 int i= *(cast(int*)p);
                 if ((i&0xF800_0000) != 0xD800_0000 && (i&0xF800) != 0xD800){
                     p+=2;
                     n+=2;
-                    if(n>=nn){
-                        return ((n>nn)?p-str.ptr-1:p-str.ptr);
-                    }
                 } else {
-                    if (charLoop2(pEnd)) throw new Exception("invalid UTF-16",__FILE__,__LINE__);
+                    if (charLoop2(pEnd,__LINE__)) return Eof;
                 }
             }
-            if (charLoop(str.ptr+l)) throw new Exception("invalid UTF-16",__FILE__,__LINE__);
+            ++n;
+            if (charLoop(str.ptr+l,__LINE__)) return Eof;
         }
         if (n<nn) return IOStream.Eof;
         return p-str.ptr;
@@ -297,16 +314,20 @@ enum SliceExtent{ Partial, Maximal, ToEnd }
 /// The source stream with which you initialize this is supposed to be valid UTF in
 /// the native encoding of type T
 /// this is quite geared toward the need of json deserialization
+/// it is not really a parser but can be used to build one
+/// regexp could be used to represent most scan functions, unfortunately it does not work
 class TextParser(T) : InputFilter 
 {
     private InputBuffer     source;
     protected T[]           slice;
     size_t maxTranscodingOverhead;
-    bool skipMore;
     bool skippedWhitespace;
     T[] delims;
     long line,col;
     long oldLine,oldCol;
+    enum CommentType{ None, Whitespace, Line } // add nested comments?
+    CommentType inComment;
+    bool skipComments;
     
     /// position of the parsed token
     FormatOutput!(T) parserPos(FormatOutput!(T)s){
@@ -479,17 +500,39 @@ class TextParser(T) : InputFilter
     
     /// scans whitespace (for skipWhitespace)
     protected size_t scanWhitespace (T[] data,SliceExtent se){
-        skipMore=false;
-        for(size_t i=0;i!=data.length;++i){
+        size_t i=0;
+        if (inComment==CommentType.Line){
+            for(;i!=data.length;++i){
+                auto c=data[i];
+                if (c=='\n'||c=='\r'){
+                    inComment=CommentType.None;
+                    break;
+                }
+            }
+        }
+        for(;i!=data.length;++i){
             auto c=data[i];
             if (!(c==' '||c=='\t'||c=='\r'||c=='\n')){
-                return i;
+                if (skipComments && c=='#'){
+                    inComment=CommentType.Line;
+                    ++i;
+                    for(;i!=data.length;++i){
+                        c=data[i];
+                        if (c=='\n'||c=='\r') {
+                            inComment=CommentType.None;
+                            break;
+                        }
+                    }
+                } else{
+                    inComment=CommentType.None;
+                    return i;
+                }
             }
         }
         switch(se){
             case SliceExtent.Partial : return Eof;
             case SliceExtent.Maximal :
-                skipMore=true;
+                if (inComment==CommentType.None) inComment=CommentType.Whitespace;
             case SliceExtent.ToEnd :
                 return data.length;
         }
@@ -503,15 +546,18 @@ class TextParser(T) : InputFilter
             if (next(&scanWhitespace) && source.slice.length!=0) {
                 didSkip=true;
             }
-        } while (skipMore);
+        } while (inComment!=CommentType.None);
         skippedWhitespace=true;
         return didSkip;
     }
     /// reads n codepoints
-    T[] readNCodePoints(size_t n){
+    T[] readNCodePoints(size_t n,bool skipSpace=true){
+        if (!skipSpace){
+            skippedWhitespace=true;
+        }
         if (!next(delegate size_t(T[] data,SliceExtent se){
             return scanCodePoints(data,n);
-        }))
+        })) parseError("could not read n codepoints",__FILE__,__LINE__);
         return slice;
     }
     /// scans an int string (base 10, accept also hex?)
@@ -537,7 +583,25 @@ class TextParser(T) : InputFilter
     /// scans a float string
     protected size_t scanFloat(T[] data,SliceExtent se){
         size_t i=0;
-        if (data.length>0 && data[i]=='+' || data[i]=='-') ++i;
+        if (data.length==0) return Eof;
+        T c=data[i];
+        if (c=='n'||c=='N'){ // nan
+            if (++i==data.length) return Eof;
+            if (data[i]!='a' && data[i]!='A') return 0;
+            if (++i==data.length) return Eof;
+            if (data[i]!='n' && data[i]!='N') return 0;
+            return ++i;
+        }
+        if (c=='+' || c=='-') ++i;
+        if (i==data.length) return Eof;
+        c=data[i];
+        if (c=='i'||c=='I'){ // inf 
+            if (++i==data.length) return Eof;
+            if (data[i]!='n' && data[i]!='N') return 0;
+            if (++i==data.length) return Eof;
+            if (data[i]!='f' && data[i]!='F') return 0;
+            return ++i;
+        }
         for(;i!=data.length;++i){
             if (data[i]<'0'||data[i]>'9') break;
         }
@@ -597,6 +661,7 @@ class TextParser(T) : InputFilter
                 for (size_t j=0;j!=delims.length;++j){
                     if (delims[j]==c) return i;
                 }
+                if (skipComments && c=='#') return i;
             }
             switch(se){
                 case SliceExtent.Partial : return Eof;
@@ -643,11 +708,14 @@ class TextParser(T) : InputFilter
             readValue(a);
             if (!next(delegate size_t(T[] data,SliceExtent se)
                 {
-                    if(data.length>0 && (data[0]=='i'||data[0]=='I')){
+                    if (data.length==0) return Eof;
+                    if (data[0]=='i'||data[0]=='I'){
                         return 1;
                     } else if (data.length<3){
                         return Eof;
-                    } else if (data[0..3]==cast(T[])"*1i")
+                    } else if (data[0..3]==cast(T[])"*1i"){
+                        return 3;
+                    }
                     return Eof;
                 })) parseError("expected an i of *1i suffix for imaginary numbers",__FILE__,__LINE__);
             t=cast(U)(a*1i);
@@ -666,10 +734,12 @@ class TextParser(T) : InputFilter
                 parseError("expected real *plus* imaginary for complex number",
                     __FILE__,__LINE__);
             }
+            int signB=1;
+            if (slice=="-") signB=-1;
             skipWhitespace();
             ImaginaryTypeOf!(U) b;
             readValue(b);
-            t=cast(U)(a+b);
+            t=cast(U)(a+signB*b);
         } else static if(is(U==bool)) { // validation should be tighter?
             if (!next(&scanString)) parseError("error scanning bool",__FILE__,__LINE__);
             assert(slice.length>0,"error slice too small");
@@ -737,20 +807,28 @@ class TextParser(T) : InputFilter
         }
     }
     /// skips the given string from the input, which might be quoted or not in the text
+    /// but must be delimited (i.e. a does not skip aa)
     bool skipString2(T[]str,bool raise=true){
         if(next(delegate size_t(T[] data,SliceExtent se){
-            if (str.length>data.length){
+            if (str.length>=data.length){
                 switch(se){
                 case SliceExtent.Partial:
                     return Eof;
                 case SliceExtent.Maximal:
                     parseError("skipString2 string is larger than buffer window ("~Integer.toString(data.length)~"<"~Integer.toString(str.length)~")",__FILE__,__LINE__);
                 case SliceExtent.ToEnd:
+                    if (data.length==str.length &&data==str) return str.length;
                     return 0;
                 }
             }
             if (str == data[0..str.length]){
-                return str.length;
+                T c=data[str.length];
+                if (c==' '|| c=='\t'|| c=='\r'|| c=='\n')
+                    return str.length;
+                for (size_t j=0;j!=delims.length;++j){
+                    if (delims[j]==c) return str.length;
+                }
+                return 0; // non delimited string
             } else {
                 if (data[0]=='"'){
                     auto str2=escape(str);
@@ -779,13 +857,15 @@ class TextParser(T) : InputFilter
     }
 
     /// Instantiate with a buffer
-    this(InputStream stream = null,T[]delims=cast(T[])",;:{}[]",size_t maxTranscodingOverhead=6)
+    this(InputStream stream = null,T[]delims=cast(T[])",;:{}[]",size_t maxTranscodingOverhead=6,
+        bool skipComments=true)
     {       
         super (stream);
         if (stream)
             set (stream);
         this.maxTranscodingOverhead=maxTranscodingOverhead;
         this.delims=delims;
+        this.skipComments=skipComments;
     }
 
     /// Set the provided stream as the scanning source
@@ -813,7 +893,7 @@ class TextParser(T) : InputFilter
 debug(UnitTest){
     import tango.io.device.Array;
     unittest{
-        auto p=new TextParser!(char)(new Array("12tz_rk tt 23.4 +7.2i \t6.4+3.2i \"a string with space\" \"escapedString\\\"\"\n"));
+        auto p=new TextParser!(char)(new Array("åbôdåbôåbôdåbôdåbôd 12tz_rk tt 23.4 +7.2i \t6.4+3.2i \"a string with space\" \"escapedString\\\"\"\na,b#comment\nc\n"));
         int i;
         real r;
         ireal ir;
@@ -821,6 +901,12 @@ debug(UnitTest){
         char[] s;
         wchar[] ws;
         dchar[] ds;
+        s=p.readNCodePoints(4);
+        assert(s=="åbôd");
+        s=p.readNCodePoints(3);
+        assert(s=="åbô");
+        s=p.readNCodePoints(12);
+        assert(s=="åbôdåbôdåbôd");
         p(i);
         assert(i==12);
         p(s)(ws);
@@ -833,6 +919,14 @@ debug(UnitTest){
         p(s)(ds);
         assert(s=="a string with space");
         assert(ds==`escapedString"`d);
+        p(s);
+        assert(s=="a");
+        s=p.getSeparator();
+        assert(s==",");
+        p(s);
+        assert(s=="b");
+        p(s);
+        assert(s=="c");
     }
 }
 

@@ -74,6 +74,8 @@ template staticArraySize(T)
 {
     static assert(isStaticArrayType!(T),"staticArraySize needs a static array as type");
     static assert(rankOfArray!(T)==1,"implemented only for 1d arrays...");
+    static assert(is(KeyTypeOfAA!(int[char[]])==char[]),"KeyTypeOfAA does not work");
+    static assert(is(ValTypeOfAA!(float[char[]])==float),"ValTypeOfAA does not work");
     const size_t staticArraySize=(T).sizeof / typeof(T.init).sizeof;
 }
 

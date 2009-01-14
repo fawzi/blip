@@ -31,7 +31,6 @@ class StringIO(T=char): FormatOutput!(T){
     private Array buf;
     /// creates a Stringify object
     this(bool flush=false,uint size = 1024, uint increment = 1024){
-        //buf=new GrowBuffer(size,increment);
         buf=new Array(size,increment);
         super(defaultFormatter!(T).formatter,buf);
         super.flush = flush;

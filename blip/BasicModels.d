@@ -43,7 +43,7 @@ interface FIteratorI(T): ForeachableI!(T){
 }
 
 /// description of an object, safe even if null
-FormatOutput!(char) writeDesc(T,S...)(T obj, FormatOutput!(char) s,S args){
+FormatOutput!(char) writeDesc(T,S...)(FormatOutput!(char) s,T obj, S args){
     static if (is(typeof(obj is null))){
         if (obj is null) {
             return s("<")(T.stringof)(" *NULL*>").newline;

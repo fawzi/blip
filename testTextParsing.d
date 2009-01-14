@@ -31,8 +31,12 @@ void main(){
     dchar[] ds;
     p(i);
     assert(i==12);
+    p(s);
+    assert(s=="tz");
+    s=p.getSeparator();
+    assert(s==",");
     p(s)(ws);
-    assert(s=="tz,rk");
+    assert(s=="rk");
     assert(ws=="tt"w);
     p(r)(ir)(cr);
     assert(abs(r-23.4)<1.e-10);

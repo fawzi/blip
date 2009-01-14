@@ -15,6 +15,7 @@ import blip.BasicModels;
 import tango.util.container.HashSet;
 import tango.text.Util;
 import blip.TemplateFu;
+import tango.core.Traits;
 
 version(SerializationTrace){
     version=STrace;
@@ -36,6 +37,7 @@ enum SerializationLevel{
 }
 /// meta informations for fields
 struct FieldMetaInfo {
+    bool pseudo; /// if true this is a pseudo field of array or dictionary
     char[] name; /// name of the propety
     ClassMetaInfo metaInfo; /// expected meta info (used if not class)
     SerializationLevel serializationLevel; /// when to serialize
@@ -51,6 +53,7 @@ struct FieldMetaInfo {
         res.doc=doc;
         res.serializationLevel=l;
         res.citationKeys=citationKeys;
+        res.pseudo=false;
         return res;
     }
     /// describes a field meta info
@@ -226,7 +229,7 @@ class ClassMetaInfo {
         s(" ci:")(ci is null ? "*NULL*" : ci.toString)("@")(cast(void*)ci).newline;
         s(" allocEl:")(allocEl is null ? "*NULL*" : "*ASSOCIATED*")("@")(cast(void*)allocEl).newline;
         foreach(field;fields){
-            writeDesc(field,s);
+            writeDesc(s,field);
             s.newline;
         }
         s(">").newline;
@@ -239,6 +242,7 @@ class ClassMetaInfo {
         FieldMetaInfo *f=fields.ptr;
         for(size_t i=fields.length;i!=0;--i){
             if (auto r=loopBody(f)) return r;
+            ++f;
         }
         return 0;
     }
@@ -578,7 +582,7 @@ class Serializer {
             }
             
             static if (is(T == class) || is(T==Serializable)) {
-                version(SerializationTrace) Stdout("class").newline;
+                version(SerializationTrace) Stdout("X serializing class").newline;
                 assert(SerializationRegistry().getMetaInfo(t.classinfo)!is null, 
                     "No class metaInfo registered for type '"
                     ~t.classinfo.name~"'("~T.stringof~")");
@@ -597,7 +601,7 @@ class Serializer {
                     metaInfo=sObj.getSerializationMetaInfo();
                     if (metaInfo.ci != t.classinfo){
                         version(SerializationTrace) {
-                            writeDesc(metaInfo,Stdout("X metaInfo:")).newline;
+                            writeDesc(Stdout("X metaInfo:"),metaInfo).newline;
                             Stdout("t.classinfo:")(t.classinfo.name)("@")(cast(void*)t.classinfo).newline;
                         }
                         assert(0,"No subclass metaInfo defined for type '"
@@ -606,7 +610,7 @@ class Serializer {
                     sObj.preSerialize(this);
                     scope(exit) sObj.postSerialize(this);
                     writeObject(fieldMeta,metaInfo,lastObjectId,
-                        { sObj.serialize(this); }, t);
+                        T.classinfo !is t.classinfo, { sObj.serialize(this); }, t);
                 } else {
                     if (metaInfo is null){
                         metaInfo = SerializationRegistry().getMetaInfo(t.classinfo);
@@ -615,7 +619,7 @@ class Serializer {
                     if (metaInfo.externalHandlers){
                         version(SerializationTrace) Stdout("X using extrnal handlers").newline;
                         ExternalSerializationHandlers *h=metaInfo.externalHandlers;
-                        writeObject(fieldMeta,metaInfo,lastObjectId,
+                        writeObject(fieldMeta,metaInfo,lastObjectId,T.classinfo !is t.classinfo, 
                             {
                                 if (metaInfo.externalHandlers.preSerialize){
                                     h.preSerialize(this,metaInfo,cast(void*)t);
@@ -631,7 +635,7 @@ class Serializer {
                     } else {
                         version(SerializationTrace) Stdout("X using serialize methods").newline;
                         static if(is(typeof(T.init.serialize(this)))){
-                            writeObject(fieldMeta,metaInfo,lastObjectId,
+                            writeObject(fieldMeta,metaInfo,lastObjectId,T.classinfo !is t.classinfo, 
                                 {
                                     static if(is(typeof(T.init.preSerialize(this)))){
                                         t.preSerialize(this);
@@ -808,7 +812,7 @@ class Serializer {
     }
     /// writes an Object
     void writeObject(FieldMetaInfo *field, ClassMetaInfo metaInfo, objectId objId,
-        void delegate() realWrite, Object o){
+        bool isSubclass, void delegate() realWrite, Object o){
         realWrite();
     }
     /// writes a Proxy
@@ -857,10 +861,12 @@ class Unserializer {
         void setMissingLabels(FieldMetaInfo *mismatchCheck=null){
             missingLabels=new HashSet!(char[])();
             int i=0;
+            --iFieldRead;
             foreach(f;metaInfo){
                 if (i>iFieldRead){
                     missingLabels.add(f.name);
                 } else if (i==iFieldRead){
+                    missingLabels.add(f.name);
                     assert(mismatchCheck is null || mismatchCheck is f,"field mismatch check failure");
                 }
                 ++i;
@@ -893,9 +899,9 @@ class Unserializer {
         stack[nStack].value=Variant(null);
     }
     
-    StackEntry top(){
+    StackEntry *top(){
         assert(nStack>0);
-        return stack[nStack-1];
+        return &(stack[nStack-1]);
     }
     
     this(ReadHandlers h=null) {
@@ -937,8 +943,10 @@ class Unserializer {
                 auto lab=stackTop.labelToRead;
                 if (lab.length>0){
                     if (lab!=fieldMeta.name) {
-                        version(UnserializationTrace) Stdout("Y skip (non selected)").newline;
+                        version(UnserializationTrace) Stdout("Y skip field (non selected)").newline;
                         return;
+                    } else {
+                        version(UnserializationTrace) Stdout("Y selected field").newline;
                     }
                 }
                 ++stackTop.iFieldRead;
@@ -946,7 +954,7 @@ class Unserializer {
         }
         static if (isCoreType!(T)){
             readCoreType(fieldMeta, { handlers.handle(t); });
-            version(UnserializationTrace) Stdout("read:")(t).newline;
+            version(UnserializationTrace) Stdout("Y readValue:")(t).newline;
         } else static if (is(T == interface) && !is(T==Serializable)) {
             field!(Object)(fieldMeta,cast(Object)t);
             version(UnserializationTrace) Stdout("Y readInterfaceObject").newline;
@@ -970,8 +978,20 @@ class Unserializer {
                 version(UnserializationTrace) Stdout("Y read no proxy").newline;
             }
             static if (is(T == class) || is(T==Serializable)) {
+                if (metaInfo is null){
+                    if (fieldMeta) {
+                        metaInfo=fieldMeta.metaInfo;
+                        assert(metaInfo);
+                    } else {
+                        if (is(T==Serializable)){
+                            serializationError("read no class name, and object is only known by interface",
+                                __FILE__,__LINE__);
+                        }
+                        metaInfo = SerializationRegistry().getMetaInfo(T.classinfo);
+                    }
+                }
                 t=cast(T)readAndInstantiateClass(fieldMeta,metaInfo,oid,t);
-                version(UnserializationTrace) Stdout("Y instantiated object at ")(cast(void*)t).newline;
+                version(UnserializationTrace) Stdout("Y instantiated object of class ")(metaInfo.className)(" ("~T.stringof~") at ")(cast(void*)t).newline;
                 assert(metaInfo!is null,
                     "metaInfo not set by readAndInstantiateClass ("~T.stringof~")");
                 assert(t!is null," object not allocated by readAndInstantiateClass ("
@@ -1051,14 +1071,13 @@ class Unserializer {
                 version(UnserializationTrace) Stdout("Y reading struct").newline;
                 if (!readStructProxy){
                     void *v;
+                    version(UnserializationTrace) Stdout("Y will try proxy").newline;
                     if (maybeReadProxy(fieldMeta,metaInfo,oid,v)){
                         serializationError("read proxy for non pointer struct",__FILE__,__LINE__);
                         // simply copy it if non null?
                     }
-                    version(UnserializationTrace) Stdout("tried proxy").newline;
+                    version(UnserializationTrace) Stdout("Y tried proxy").newline;
                 }
-                auto handle=push(t,metaInfo);
-                scope(exit) voidPop(handle);
                 if (metaInfo is null){
                     if (fieldMeta) {
                         metaInfo=fieldMeta.metaInfo;
@@ -1067,6 +1086,8 @@ class Unserializer {
                         metaInfo = SerializationRegistry().getMetaInfo(typeid(T));
                     }
                 }
+                auto handle=push(t,metaInfo);
+                scope(exit) voidPop(handle);
                 assert (metaInfo !is null, 
                     "No metaInfo registered for struct '"
                     ~typeid(T).toString~"'("~T.stringof~")");
@@ -1082,11 +1103,12 @@ class Unserializer {
                         }
                     }
                     assert(h.unserialize!is null,"externalHandlers without valid unserialize");
-                    readStruct(fieldMeta,metaInfo,oid,
+                    readStruct(fieldMeta,metaInfo,
                         {
                             h.unserialize(this,metaInfo,cast(void*)&t);
                         }, &t);
                 } else {
+                    version(UnserializationTrace) Stdout("Y using serialization methods").newline;
                     static if(is(typeof(T.init.preUnserialize(this)))){
                         t.preUnserialize(this);
                     }
@@ -1096,7 +1118,7 @@ class Unserializer {
                         }
                     }
                     static if (is(typeof(T.init.unserialize(this)))){
-                        readStruct(fieldMeta,metaInfo,oid,
+                        readStruct(fieldMeta,metaInfo,
                             {
                                 t.unserialize(this);
                             },&t);
@@ -1143,7 +1165,7 @@ class Unserializer {
                             t[key]=value;
                         }
                     },{
-                        this.field(null, value);
+                        this.field!(V)(null, value);
                         if(++iPartial==2){
                             iPartial=0;
                             t[key]=value;

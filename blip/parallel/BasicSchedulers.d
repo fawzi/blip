@@ -167,11 +167,11 @@ class PriQTaskScheduler:TaskSchedulerI {
             bool nonFirst=false;
             foreach (t,r;activeTasks){
                 if (nonFirst) { s(",").newline; nonFirst=true; }
-                writeDesc(t,s("    ")(r),true);
+                writeDesc(s("    ")(r),t,true);
             }
             s.newline;
             s("  ],").newline;
-            writeDesc(rootTask,s("  rootTask:")).newline;
+            writeDesc(s("  rootTask:"),rootTask).newline;
             s(" >").newline;
         }
         return s;

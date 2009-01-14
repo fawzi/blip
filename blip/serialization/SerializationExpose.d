@@ -80,41 +80,95 @@ template NewSerializationExpose_mix1() {
         if (target.length==0) target=`UnrefType!(typeof(this))`;
         return
         `
-        static if (is(`~target~` == class)) {
-            alias typeof(super) SuperType;
-            static if (!is(typeof(SuperType.init.preSerialize(Serializer.init)))) {
-                void preSerialize(Serializer s){ }
-            }
-            static if (!is(typeof(SuperType.init.postSerialize(Serializer.init)))) {
-                void postSerialize(Serializer s){ }
-            }
-            void serialize(Serializer s){
-                static if (is(`~target~` T==super)){
-                    static if (is(typeof(T.init.serialize(s)))){
-                        static assert(`~target~`==UnrefType!(typeof(this)),"serialization in subclasses of types that implement methods to serialize have to be impemented inside the subclasses, not outside");
+        static if (is(`~target~` == UnrefType!(typeof(this)))) {
+            static if (is(`~target~` == class)){
+                alias typeof(super) SuperType;
+                static if (!is(typeof(SuperType.init.preSerialize(Serializer.init)))) {
+                    void preSerialize(Serializer s){ }
+                }
+                static if (!is(typeof(SuperType.init.postSerialize(Serializer.init)))) {
+                    void postSerialize(Serializer s){ }
+                }
+                static if (!is(typeof(SuperType.init.preUnserialize(Unserializer.init)))) {
+                    typeof(this) preUnserialize(Unserializer s){ return this; }
+                }
+                static if (!is(typeof(SuperType.init.postUnserialize(Unserializer.init)))) {
+                    typeof(this) postUnserialize(Unserializer s){ return this; }
+                }
+                void serialize(Serializer s){
+                    static if (is(typeof(SuperType.init.serialize(s)))){
                         super.serialize(s);
                     }
+                    serializeFunction(s,serializationMetaInfo,cast(void*)this);
                 }
-                serializeFunction(s,serializationMetaInfo,cast(void*)this);
+                void unserialize(Unserializer s){
+                    static if (is(typeof(SuperType.init.unserialize(s)))){
+                        super.unserialize(s);
+                    }
+                    unserializeFunction(s,serializationMetaInfo,cast(void*)this);
+                }
+            } else static if (is(`~target~` == struct)) {
+                void serialize(Serializer s){
+                    serializeFunction(s,serializationMetaInfo,cast(void*)this);
+                }
+                void unserialize(Unserializer s){
+                    unserializeFunction(s,serializationMetaInfo,cast(void*)this);
+                }
             }
-        } else static if (is(`~target~` == struct)) {
-            void serialize(Serializer s){
-                serializeFunction(s,serializationMetaInfo,cast(void*)this);
-            }
-        }
-        
-        static void serializeFunction(Serializer serializer, ClassMetaInfo metaInfo, void* _this) {
-            assert(metaInfo is serializationMetaInfo);
-            static if (is(`~target~` T==super)){
-                static if (!is(typeof(T.init.serialize(s)))){
-                    if (metaInfo.superMeta !is null &&
-                        metaInfo.superMeta.externalHandlers !is null){
-                        assert(metaInfo.superMeta.externalHandlers.serialize !is null,
-                            "null externalHandlers.serialize for class "~metaInfo.superMeta.className~"("~T.stringof~")");
-                        metaInfo.superMeta.externalHandlers.serialize(serializer,metaInfo.superMeta,_this);
+        } else static if (is(`~target~` == class)){
+            static if (is(`~target~` SuperTuple1==super)){
+                private void dummyFunctionToTest(){
+                    foreach(SuperType;SuperTuple1){
+                        static if (is(SuperType==class)){
+                            static if (is(typeof(SuperType.init.serialize(Serializer.init)))||
+                                is(typeof(SuperType.init.unserialize(Unserializer.init)))){
+                                    static assert(0,"serialization in subclasses of types that implement methods to serialize have to be impemented inside the subclasses, not outside");
+                            }
+                        }
                     }
                 }
             }
+        }
+                
+        static void serializeFunction(Serializer serializer, ClassMetaInfo metaInfo, void* _this) {
+            assert(metaInfo is serializationMetaInfo);
+            static if (is(`~target~` SuperTuple==super)){
+                foreach (SuperType;SuperTuple){
+                    static if (is(SuperType==class)){
+                        static if (!is(typeof(SuperType.init.serialize(serializer)))){
+                            if (metaInfo.superMeta !is null &&
+                                metaInfo.superMeta.externalHandlers !is null){
+                                assert(metaInfo.superMeta.externalHandlers.serialize !is null,
+                                    "null externalHandlers.serialize for class "~metaInfo.superMeta.className~"("~SuperType.stringof~")");
+                                metaInfo.superMeta.externalHandlers.serialize(serializer,metaInfo.superMeta,_this);
+                            }
+                        }
+                    }
+                }
+            }
+            serializeThis(serializer,metaInfo,_this);
+        }
+
+        static void unserializeFunction(Unserializer serializer, ClassMetaInfo metaInfo, void* _this) {
+            assert(metaInfo is serializationMetaInfo);
+            static if (is(`~target~` SuperTuple==super)){
+                foreach (SuperType;SuperTuple){
+                    static if (is(SuperType==class)){
+                        static if (!is(typeof(SuperType.init.unserialize(serializer)))){
+                            if (metaInfo.superMeta !is null &&
+                                metaInfo.superMeta.externalHandlers !is null){
+                                assert(metaInfo.superMeta.externalHandlers.unserialize !is null,
+                                    "null externalHandlers.unserialize for class "~metaInfo.superMeta.className~"("~SuperType.stringof~")");
+                                metaInfo.superMeta.externalHandlers.unserialize(serializer,metaInfo.superMeta,_this);
+                            }
+                        }
+                    }
+                }
+            }
+            serializeThis(serializer,metaInfo,_this);
+        }
+        
+        static void serializeThis(SerializerType)(SerializerType serializer, ClassMetaInfo metaInfo, void* _this){
             int fieldIndex=0;
 `;
     }

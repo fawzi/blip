@@ -431,13 +431,13 @@ class Task:TaskI{
                 s("associated");
         }
         s("],").newline;
-        writeDesc(superTask,s("  superTask="),true)(",").newline;
+        writeDesc(s("  superTask="),superTask,true)(",").newline;
         s("  resubmit:")(resubmit)(",").newline;
         s("  holdSubtasks:")(holdSubtasks)(",").newline;
         s("  holdedSubtasks:")(holdedSubtasks)(",").newline;
         s("  spawnTasks:")(spawnTasks)(",").newline;
         s("  finishedTasks:")(finishedTasks)(",").newline;
-        writeDesc(scheduler,s("  scheduler:"),true)(",").newline;
+        writeDesc(s("  scheduler:"),scheduler,true)(",").newline;
         bool lokD=taskLock.tryLock();
         if (lokD) taskLock.unlock();
         s("  taskLock:");

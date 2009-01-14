@@ -201,7 +201,7 @@ class PExecuter:ExecuterI{
         s.newline;
         s("  nproc:")(nproc)(",").newline;
         s("  workers:")(workers)(",").newline;
-        writeDesc(scheduler,s("  scheduler:"))(",").newline;
+        writeDesc(s("  scheduler:"),scheduler)(",").newline;
         s("  log:")(log)(",").newline;
         s(" >").newline;
         return s;

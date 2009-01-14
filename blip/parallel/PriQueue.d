@@ -65,7 +65,7 @@ class PriQueue(T){
             } else {
                 for (int i=0;i<nEl;++i){
                     if (i!=0) s(", ");
-                    writeDesc(entries[(start+i)%entries.length],s);
+                    writeDesc(s,entries[(start+i)%entries.length]);
                 }
             }
             s("] capacity=")(entries.length)(" >").newline;
@@ -220,14 +220,14 @@ class PriQueue(T){
             s("<PriQueue *NULL*>").newline;
         } else {
             s.format("<PriQueue@{} nEntries={},",cast(void*)this,nEntries).newline;
-            writeDesc(lPool,s("  lPool="))(",").newline;
+            writeDesc(s("  lPool="),lPool)(",").newline;
             if (queue is null) {
                 s("  queue=*NULL*,").newline;
             } else {
                 auto lAtt=queue;
                 s("  queue=[");
                 while(lAtt !is null){
-                    writeDesc(lAtt,s("   "))(",").newline;
+                    writeDesc(s("   "),lAtt)(",").newline;
                     lAtt=lAtt.subLevel;
                 }
                 s(" ],").newline;

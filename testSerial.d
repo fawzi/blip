@@ -5,6 +5,8 @@ import blip.serialization.Serialization;
 import blip.rtest.RTest;
 import tango.io.device.Array;
 import tango.io.model.IConduit;
+import blip.text.Stringify;
+import blip.BasicModels;
 
 class A: Serializable{
     int x;
@@ -53,6 +55,17 @@ class A: Serializable{
     }
 }
 
+/// returns true if the string representation of a and b is the same
+int eqStr(T)(T a,T b){
+    if (a is b) return 1;
+    auto aStr=getString(writeDesc!(T)(new Stringify(),a));
+    auto bStr=getString(writeDesc!(T)(new Stringify(),b));
+    if (aStr!=bStr){
+        Stdout("diff for type "~T.stringof)(" '")(aStr)("' vs '")(bStr)("'").newline;
+    }
+    return aStr==bStr;
+}
+
 class B:A{
     int a;
     uint b;
@@ -82,16 +95,20 @@ class B:A{
     	pragma(msg,NewSerializationExpose.handler!(0).end(``));
     }
     override int opEquals(Object other){
+        if (this.classinfo !is other.classinfo) return 0;
         if (auto oo=cast(B)other){
-            return a==oo.a && b==oo.b && c==oo.c && d==oo.d && e==oo.e && f==oo.f &&
-                g==oo.g && h==oo.h && i==oo.i && l==oo.l && m==oo.m && n==oo.n &&
-                o==oo.o && p==oo.p && q==oo.q && r==oo.r && s==oo.s && t==oo.t &&
+            return super.opEquals(other) &&
+                a==oo.a && b==oo.b && c==oo.c && d==oo.d && e==oo.e && f==oo.f &&
+                g==oo.g && eqStr(h,oo.h) && eqStr(i,oo.i) && eqStr(l,oo.l) && 
+                eqStr(m,oo.m) && eqStr(n,oo.n) && eqStr(o,oo.o) && eqStr(p,oo.p) &&
+                eqStr(q,oo.q) && eqStr(r,oo.r) && s==oo.s && t==oo.t &&
                 u==oo.u && v==oo.v && z==oo.z;
         }
         return 0;
     }
-    void randomize(Rand r,int idx,ref int nEl, ref bool acceptable){
-        Randomizer.init(r,idx,nEl,acceptable)(a)(b)(c)(d)(e)(f)(g)(h)(i)(l)
+    void randomize(Rand rr,int idx,ref int nEl, ref bool acceptable){
+        super.randomize(rr);
+        Randomizer.init(rr,idx,nEl,acceptable)(a)(b)(c)(d)(e)(f)(g)(h)(i)(l)
             (m)(n)(o)(p)(q)(r)(s)(t)(u)(v)(z).end(nEl,acceptable);
     }
     static B randomGenerate(Rand r,int idx,ref int nEl, ref bool acceptable){
@@ -109,7 +126,17 @@ class C{
     i
     next
     `));
-    
+    override int opEquals(Object o){
+        if (o.classinfo !is this.classinfo) return 0;
+        C oo=cast(C)o;
+        int res= i==oo.i;
+        if (next is null){
+            res = res && oo.next is null;
+        } else {
+            res = res && (oo.next !is null) && oo.next.i==next.i;
+        }
+        return res;
+    }
 }
 
 struct TestStruct{
@@ -136,9 +163,48 @@ struct TestStruct{
         res.randomize(r,idx,nEl,acceptable);
         return res;
     }
+    int opEquals(TestStruct s){
+        auto res= a==s.a && b==s.b && c.length==s.c.length && d.length==s.d.length && e==s.e;
+        if (res){
+            foreach(k,v;c){
+                auto v2=k in s.c;
+                if (v2 is null || (*v2)!=v) return 0;
+            }
+            foreach(k,v;d){
+                auto v2=k in s.d;
+                if (v2 is null || (*v2)!=v) return 0;
+            }
+            return 1;
+        }
+        return 0;
+    }
 }
 
-
+/// unserialization test
+void testUnserial(T)(T a){
+    version(UnserializationTrace) Stdout("testing unserialization of "~T.stringof).newline;
+    auto buf=new Array(1000,1000);
+    auto js=new JsonSerializer!()(new FormatOutput!(char)(buf));
+    js(a);
+    auto jus=new JsonUnserializer!()(buf);
+    T sOut;
+    version(UnserializationTrace) Stdout("XXXXXX Unserialization start").newline;
+    jus(sOut);
+    version(UnserializationTrace) {
+        auto js2=new JsonSerializer!()(Stdout);
+        Stdout("XXXXXX Unserialization end").newline;
+        Stdout("original:----").newline;
+        js2(a);
+        Stdout("unserialized:--").newline;
+        js2(sOut);
+        Stdout("in the buffer:-----").newline;
+        buf.seek(0,IOStream.Anchor.Begin);
+        Stdout(cast(char[])buf.slice).newline;
+        Stdout("-----").newline;
+    }
+    assert(a==sOut,"unserial error with "~T.stringof);
+    version(UnserializationTrace) Stdout("passed test of unserialization of "~T.stringof).newline;
+}
 
 void main(){
     CoreHandlers ch;
@@ -177,22 +243,74 @@ void main(){
     c.next=d;
     d.next=c;
     js(c);
-    auto buf=new Array(1000,1000);
-    auto js2=new JsonSerializer!()(new FormatOutput!(char)(buf));
-    js2(a);
-    auto jus=new JsonUnserializer!()(buf);
-    A sOut;
-    Stdout("XXXXXX Unserialization start").newline;
-    jus(sOut);
-    Stdout("XXXXXX Unserialization end").newline;
-    Stdout("-----").newline;
-    js(a);
-    Stdout("--").newline;
-    js(sOut);
-    Stdout("-----").newline;
-    buf.seek(0,IOStream.Anchor.Begin);
-    Stdout(cast(char[])buf.slice).newline;
-    Stdout("-----").newline;
-    assert(a==sOut,"unserial error 1");
+    b=bb;
     
+    testUnserial(a);
+    testUnserial(b);
+    testUnserial(c);
+    testUnserial(ts);
+    Stdout("passed identity tests").newline;
+
+    auto buf=new Array(`{ id:3,
+      x:36331662,
+      y:504414800,
+      a:-1894881897,
+      b:2942220189,
+      c:-8297515914883251209,
+      d:17869291317653118063,
+      e:",Oc0C	4-",
+      f:"Esdn	?a,uc&n[4c}k",
+      g:"FSP}N,'SgtA",
+      h:3.18,
+      i:0.28,
+      l:-1.00,
+      m:-1.39*1i,
+      n:-2.34*1i,
+      o:-0.91*1i,
+      p:-1.95-1.53*1i,
+      q:1.46+1.23*1i,
+      r:1.75+3.26*1i,
+      s:false,
+      t:-49,
+      u:185,
+      v:31268,
+      z:19578
+    }
+    
+    {
+      x:36331662,
+      y:504414800,
+      b:2942220189, # b has been moved
+      a:-1894881897,
+      c:-8297515914883251209,
+      d:17869291317653118063,
+      e:",Oc0C	4-",
+      f:"Esdn	?a,uc&n[4c}k",
+      g:"FSP}N,'SgtA",
+      h:3.18,
+      i:0.28, # l is missing
+      m:-1.39*1i,
+      n:-2.34*1i,
+      o:-0.91*1i,
+      p:-1.95-1.53*1i,
+      q:1.46+1.23*1i,
+      r:1.75+3.26*1i,
+      s:false,
+      t:-49,
+      u:185,
+      v:31268,
+      z:19578
+    }
+    `);
+    auto jus=new JsonUnserializer!()(buf);
+    B b1,b2;
+    version(UnserializationTrace) Stdout("XX unserial reference").newline;
+    jus(b1);
+    version(UnserializationTrace) Stdout("XX unserial reordered+comment+missing").newline;
+    jus(b2);
+    version(UnserializationTrace) Stdout("XX unserialization finished").newline;
+    b2.l=b1.l;
+    assert(b1==b2,"reordering+comments+missing failed");
+    Stdout("passed tests").newline;
 }
+
