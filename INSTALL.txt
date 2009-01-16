@@ -1,0 +1,48 @@
+NArray a multidimensional array in D.
+
+Git repositories is available at
+    http://github.com/fawzi/
+
+You need to take both rtest (the testing framework and basic utils) and narray (the actual multidimensional array library).
+If you have git you can
+
+    git clone git://github.com/fawzi/rtest.git
+    git clone git://github.com/fawzi/narray.git
+
+to install
+
+    cd rtest
+    dsss build
+    dsss install
+    cd ..
+    
+    cd narray
+    dsss build
+    dsss install
+    cd ..
+
+if you want to use blas/lapack you need the blas/lapack wrappers from multiarray/gobo
+http://dsource.org/projects/multiarray
+
+to activate it you need
+    -version=blas       // activates blas calling in dot product
+    -version=lapack     // activates lapack derived LinAlg routines (solve,eig,eigh,svd,...)
+
+other useful flags are
+    -debug=TestNArray   // activates extra internal consistency checks in NArray
+    -version=multiarray // in perf_test times also multiarray performace (that you need to install separately)
+
+To have maximum speed compile with -release -O, but as it is quite new you might want to first compile it with checks.
+
+The code has a comprehensive battery of test. The tests are quite stringent, and with random generation 
+they might be numerically difficult.
+I did not want to reduce too much the accuracy of the tests, and so in some cases they might fail 
+(especially without blas, or with very agressive blas), it this is the case look at the error that 
+they have, probably everything is still ok.
+
+To test there are test executables, or one can also 
+    dsss build -debug=UnitTest -g --test
+
+have fun!
+
+Fawzi
