@@ -11,7 +11,7 @@ import blip.narray.BasicTypes;
 import blip.narray.BasicOps;
 import blip.TemplateFu;
 import tango.io.Stdout;
-debug(ConvolveCheckAccess) import blip.Stringify;
+debug(ConvolveCheckAccess) import blip.text.Stringify;
 /+ --------- convolution --------- +/
 // convolution base in 2d: 3 streams (minus,zero,plus), kernel[imin..imax,jmin..jmax] in aij
 // i setup is: (vertical bar read, horizontal write, columns are the three streams)

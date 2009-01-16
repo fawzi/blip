@@ -11,7 +11,7 @@ import blip.narray.NArray;
 import blip.narray.Convolve;
 import blip.TemplateFu;
 import tango.io.Stdout;
-import blip.Stringify;
+import blip.text.Stringify;
 import tango.math.Math: abs,min,max;
 import blip.rtest.RTest;
 import blip.parallel.WorkManager;
@@ -21,7 +21,7 @@ import blip.parallel.WorkManager;
 /// startAxis1 defalt should be -1, but negative default values have a bug with gdc (#2291)
 /// the array are stored in the attributes .a and .b; .axis1 and .axis2 
 class Dottable(T,int rank1,S,int rank2,bool scanAxis=false, bool randomLayout=false,
-    bool square1=false,int startAxis1=0,int startAxis2=0): RandGen{
+    bool square1=false,int startAxis1=0,int startAxis2=0){
     static assert(rank1>0 && rank2>0,"ranks must be strictly positive");
     static assert(-rank1<=startAxis1 && startAxis1<rank1,"startAxis1 out of bounds");
     static assert(-rank2<=startAxis2 && startAxis2<rank2,"startAxis2 out of bounds");
@@ -95,7 +95,7 @@ class Dottable(T,int rank1,S,int rank2,bool scanAxis=false, bool randomLayout=fa
     char[] toString(){
         return getString(printData(new Stringify()));
     }
-    Print!(char) printData(Print!(char)s,char[] formatEl="{,10}", index_type elPerLine=10,
+    FormatOutput!(char) printData(FormatOutput!(char)s,char[] formatEl="{,10}", index_type elPerLine=10,
         char[] indent=""){
         s(indent)("Dottable{").newline;
         s(indent)("axis1=")(axis1).newline;
@@ -111,13 +111,13 @@ class Dottable(T,int rank1,S,int rank2,bool scanAxis=false, bool randomLayout=fa
 }
 
 /// a random 1D NArray type T and dimension i (in the arr attribute)
-class SizedRandomNArray(T,int i): RandGen{
+class SizedRandomNArray(T,int i){
     static const int rank=1;
     NArray!(T,rank) arr;
     this(){
         arr=zeros!(T)([i]);
     }
-    static SizedRandomNArray randomGenerate(Rand r,int idx,ref int nEl,ref bool acceptable){
+    static SizedRandomNArray randomGenerate(Rand r){
         auto res=new SizedRandomNArray();
         randNArray(r,res.arr);
         return res;
@@ -127,13 +127,13 @@ class SizedRandomNArray(T,int i): RandGen{
     }
 }
 /// a random 2D NArray type T and dimension i,j (in the arr attribute)
-class SizedRandomNArray(T,int i,int j): RandGen{
+class SizedRandomNArray(T,int i,int j){
     static const int rank=2;
     NArray!(T,rank) arr;
     this(){
         arr=zeros!(T)([i,j]);
     }
-    static SizedRandomNArray randomGenerate(Rand r,int idx,ref int nEl,ref bool acceptable){
+    static SizedRandomNArray randomGenerate(Rand r){
         auto res=new SizedRandomNArray();
         randNArray(r,res.arr);
         return res;
@@ -143,13 +143,13 @@ class SizedRandomNArray(T,int i,int j): RandGen{
     }
 }
 /// a random 3D NArray type T and dimension i,j,k (in the arr attribute)
-class SizedRandomNArray(T,int i,int j,int k): RandGen{
+class SizedRandomNArray(T,int i,int j,int k){
     static const int rank=3;
     NArray!(T,rank) arr;
     this(){
         arr=zeros!(T)([i,j,k]);
     }
-    static SizedRandomNArray randomGenerate(Rand r,int idx,ref int nEl,ref bool acceptable){
+    static SizedRandomNArray randomGenerate(Rand r){
         auto res=new SizedRandomNArray();
         randNArray(r,res.arr);
         return res;

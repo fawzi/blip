@@ -42,12 +42,12 @@ import tango.core.Array: sort;
 import tango.stdc.string: memset,memcpy,memcmp;
 import blip.TemplateFu;
 import tango.core.Traits;
-import tango.io.Print: Print;
-import tango.io.stream.FormatStream: FormatOutput;
-import tango.io.Buffer: GrowBuffer;
+import tango.io.stream.Format: FormatOutput;
 import tango.math.Math: abs;
 import blip.rtest.RTest;
 import blip.BasicModels;
+import blip.serialization.Serialization;
+import blip.text.Stringify;
 //import tango.io.Stdout;
 
 /// flags for fast checking of 
@@ -143,7 +143,7 @@ template NArray(V=double,int rank=1){
 static if (rank<1)
     alias V NArray;
 else {
-    final class NArray : RandGen, CopiableObjectI
+    final class NArray : CopiableObjectI, Serializable
     {
         // default optimal chunk size for parallel looping
         static index_type defaultOptimalChunkSize=200*1024/V.sizeof;
@@ -764,7 +764,7 @@ else {
                     }
                     return 0;
                 }
-                Print!(char)desc(Print!(char)s){
+                FormatOutput!(char)desc(FormatOutput!(char)s){
                     if (this is null){
                         return s("<SubView *null*>").newline;
                     }
@@ -905,7 +905,7 @@ else {
                 }
                 return 0;
             }
-            Print!(char)desc(Print!(char)s){
+            FormatOutput!(char)desc(FormatOutput!(char)s){
                 if (this is null){
                     return s("<FlatIterator *null*>").newline;
                 }
@@ -1411,15 +1411,10 @@ else {
         }
 
         char[] toString(){
-            GrowBuffer buf=new GrowBuffer(256);
-            Print!(char) stringIO=new FormatOutput(buf);
-            printData(stringIO);
-            stringIO.flush();
-            char[] res=cast(char[])buf.slice();
-            return res;
+            return getString(printData(new Stringify()));
         }
         
-        Print!(char) printData(Print!(char)s,char[] formatEl="{,10}", index_type elPerLine=10,
+        FormatOutput!(char) printData(FormatOutput!(char)s,char[] formatEl="{,10}", index_type elPerLine=10,
             char[] indent=""){
             s("[");
             static if(rank==1) {
@@ -1451,7 +1446,7 @@ else {
         }
             
         /// description of the NArray wrapper, not of the contents, for debugging purposes...
-        Print!(char) desc(Print!(char)s){
+        FormatOutput!(char) desc(FormatOutput!(char)s){
             if (this is null){
                 return s("<NArray *null*>").newline;
             }
@@ -1683,8 +1678,8 @@ else {
                 cast(V*)(cast(size_t)startPtrArray+newStartIdx),newFlags,newBase);
         }
         
-        /// returns a random array (here with randNArray & co due to bug 2246)
-        static NArray randomGenerate(Rand r,int idx,ref int nEl, ref bool acceptable){
+        /// returns a random array
+        static NArray randomGenerate(Rand r){
             const index_type maxSize=1_000_000;
             float mean=10.0f;
             index_type[rank] dims;
@@ -1701,7 +1696,80 @@ else {
             NArray res=NArray.empty(dims);
             return randNArray(r,res);
         }
-    }
+        // ---- Serialization ---
+        /// meta information for serialization
+        static ClassMetaInfo metaI;
+        /// registers this type into the serialization facilities
+        //static void registerSerialization(){
+        static this(){
+            synchronized{
+                if (metaI is null){
+                    metaI=ClassMetaInfo.createForType!(NArray)
+                        ("NArray!("~V.stringof~","~ctfe_i2a(rank)~")",
+                        function void *(ClassMetaInfo){
+                            index_type[rank] strid=0;
+                            index_type[rank] shap=0;
+                            auto res=new NArray(strid,shap, cast(V*)null, ArrayFlags.Zero ,null);
+                            return cast(void*)res;
+                        });
+                    metaI.addFieldOfType!(index_type[])("shape","shape of the array");
+                    metaI.addFieldOfType!(V[])("data","flattened data");
+                }
+            }
+        }
+        /// serialization meta informations
+        ClassMetaInfo getSerializationMetaInfo(){
+            //if (metaI is null) NArray.registerSerialization();
+            return metaI;
+        }
+        /// the actual serialization function;
+        void serialize(Serializer s){
+            index_type[] shp=shape;
+            s.field(metaI[0],shp);
+            s.customField(metaI[1],{
+                auto ac=s.writeArrayStart(null,size());
+                mixin(sLoopPtr(rank,[""],`s.writeArrayEl(ac,{ s.field(cast(FieldMetaInfo*)null, *Ptr0); } );`,"i"));
+                s.writeArrayEnd(ac);
+            });
+        }
+        /// unserialization function
+        void unserialize(Unserializer s){
+            index_type[] shp;
+            s.field(metaI[0],shp);
+            if (shp.length>0) {
+                shape[]=shp;
+                mBase=cast(void*)empty(shape,false);
+            }
+            void getData()
+            {
+                if (mBase is null) {
+                    s.serializationError("cannot read data befor knowing shape",__FILE__,__LINE__);
+                }
+                NArray a=cast(NArray)cast(Object)mBase;
+                auto ac=s.readArrayStart(null);
+                mixin(sLoopPtr(rank,["a"],`if (!s.readArrayEl(ac,{ s.field(cast(FieldMetaInfo*)null, *aPtr0); } )) s.serializationError("unexpected number of elements",__FILE__,`~ctfe_i2a(__LINE__)~`);`,"i"));
+                V dummy;
+                if (s.readArrayEl(ac,{ s.field(cast(FieldMetaInfo*)null, dummy); } ))
+                    s.serializationError("unexpected extra elements",__FILE__,__LINE__);
+            }
+            s.customField(metaI[1],&getData);
+        }
+        /// pre serializer hook, useful to (for example) lock the structure and guarantee a consistent snapshot
+        void preSerialize(Serializer s){ /+if (metaI is null) NArray.registerSerialization();+/ }
+        /// post serializer hook, useful to (for example) unlock the structure
+        /// guaranteed to be called if preSerialize ended sucessfully
+        void postSerialize(Serializer s){ }
+        /// pre unserializer hook, useful to (for example) lock or replace the object
+        typeof(this) preUnserialize(Unserializer s){ return this; }
+        /// post unserializer hook, useful to (for example) unlock the structure
+        /// or replace to unserialized object (for things that must be unique)
+        /// guaranteed to be called if preSerialize ended sucessfully
+        typeof(this) postUnserialize(Unserializer s){
+            auto res=cast(NArray)cast(Object)mBase;
+            mBase=null; // could also delete this...
+            return res;
+        }
+    } // end NArray class
 }// end static if
 }// end template NArray
 
@@ -2244,3 +2312,4 @@ NArray!(T,rank) randLayout(T,int rank)(Rand r, NArray!(T,rank)a){
     return res;
 }
 /+ ------------------------------------------------- +/
+NArray!(double,1) dummy;

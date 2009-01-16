@@ -365,7 +365,7 @@ S reduceAllGen(alias foldOp,alias mergeOp, alias dupInitial,T,int rank,S=T)(NArr
 }
 
 /// collects data on the whole array using the given folding operation
-/// if not given mergeOp is build from foldOp 
+/// if not given mergeOp is built from foldOp 
 S reduceAll(T,int rank,S=T)(S delegate(S,T)foldOp,NArray!(T,rank)a,S x0,S delegate(S,S)mergeOp=null){
     if (mergeOp is null){
         mergeOp=(S x,S y){ x=foldOp(x,cast(T)y); };

@@ -1,4 +1,5 @@
-module perf_tests;
+/// performace tests of NArray
+module testsNArrayPerf;
 import tango.io.Stdout;
 import tango.core.Exception;
 import tango.time.StopWatch;

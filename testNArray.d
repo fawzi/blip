@@ -1,12 +1,12 @@
 /*******************************************************************************
-    module that creates a test executable.
+    module that creates an executable that extensively tests NArray
     
         copyright:      Copyright (c) 2008. Fawzi Mohamed
         license:        BSD style: $(LICENSE)
         version:        Initial release: July 2008
         author:         Fawzi Mohamed
 *******************************************************************************/
-module test;
+module testNArray;
 import blip.narray.BasicTypes;
 import tango.io.Stdout;
 import blip.rtest.RTest;
@@ -17,9 +17,12 @@ import blip.narray.Convolve;
 import blip.TemplateFu;
 import blip.parallel.WorkManager;
 import tango.util.log.Config;
-import blip.Stringify;
+import blip.text.Stringify;
 import tango.math.Math: abs,min,max;
-
+import blip.serialization.Serialization;
+import tango.io.device.Array;
+import tango.io.stream.Format;
+import blip.BasicModels;
 
 /// returns a NArray indexed with the variables of a pLoopIdx or sLoopGenIdx
 char[] NArrayInLoop(char[] arrName,int rank,char[] ivarStr){
@@ -172,6 +175,20 @@ bool checkResDot(U,int rank3)(NArray!(U,rank3)refVal,NArray!(U,rank3)v,int tol=8
         Stdout("v=")(v).newline;
         Stdout("refVal=")(refVal).newline;
     }
+    return res;
+}
+
+/// checks if refVal == v, comparing their string representation 
+bool checkResStr(U,int rank3)(NArray!(U,rank3)refVal,NArray!(U,rank3)v,int tol=8){
+    bool res=true;
+    void checkSame(U a,U b){
+        if (res && !eqStr(a,b)) {
+            writeDesc!(U)(Stdout("'"),a);
+            writeDesc!(U)(Stdout("'!='"),b)("'").newline;
+            res=false;
+        }
+    }
+    binaryOp!(checkSame,rank3,U,U)(refVal, v);
     return res;
 }
 
@@ -568,6 +585,21 @@ void testConvolveNN(T,int rank,Border border)(NArray!(T,rank)inA,NArray!(T,rank)
     assert(checkResDot(refVal,v),"value too different from reference2");
 }
 
+void testSerial(T,int rank)(NArray!(T,rank)a){
+    auto buf=new Array(1000,1000);
+    auto s=new JsonSerializer!(char)(new FormatOutput!(char)(buf));
+    auto u=new JsonUnserializer!(char)(buf);
+    s(a);
+    NArray!(T,rank) b;
+    u(b);
+    if (!checkResStr(a,b)){
+        buf.seek(0,buf.Anchor.Begin);
+        writeDesc(Stdout("b:"),b).newline;
+        Stdout("buf:<<")(cast(char[])buf.slice)(">>").newline;
+        throw new Exception("different string values",__FILE__,__LINE__);
+    }
+}
+
 private mixin testInit!() autoInitTst;
 
 TestCollection narrayRTst1(T,int rank)(TestCollection superColl){
@@ -586,6 +618,8 @@ TestCollection narrayRTst1(T,int rank)(TestCollection superColl){
     autoInitTst.testNoFail("testFilterMask",(NArray!(T,rank) d,Rand r){ testFilterMask!(T,rank)(d,r); },
         __LINE__,__FILE__,coll);
     autoInitTst.testNoFail("testAxisFilter",(NArray!(T,rank) d,NArray!(index_type,1) idxs){ testAxisFilter!(T,rank)(d,idxs); },
+        __LINE__,__FILE__,coll);
+    autoInitTst.testNoFail("testSerial",(NArray!(T,rank) d){ testSerial!(T,rank)(d); },
         __LINE__,__FILE__,coll);
     static if (is(T==int) && rank<4){
         autoInitTst.testNoFail("testConvolveNN1b0",(NArray!(T,rank)a){
@@ -644,24 +678,31 @@ TestCollection narrayRTst1(T,int rank)(TestCollection superColl){
 
 TestCollection rtestNArray(){
     TestCollection coll=new TestCollection("NArray",__LINE__,__FILE__);
-    narrayRTst1!(int,1)(coll);
-    narrayRTst1!(int,2)(coll);
-    narrayRTst1!(int,3)(coll);
-    narrayRTst1!(float,1)(coll);
-    narrayRTst1!(float,2)(coll);
-    narrayRTst1!(float,3)(coll);
-    narrayRTst1!(double,1)(coll);
-    narrayRTst1!(double,2)(coll);
-    narrayRTst1!(double,3)(coll);
-    narrayRTst1!(real,1)(coll);
-    narrayRTst1!(real,2)(coll);
-    narrayRTst1!(real,3)(coll);
-    narrayRTst1!(cfloat,1)(coll);
-    narrayRTst1!(cfloat,2)(coll);
-    narrayRTst1!(cfloat,3)(coll);
-    narrayRTst1!(cdouble,1)(coll);
-    narrayRTst1!(cdouble,2)(coll);
-    narrayRTst1!(cdouble,3)(coll);
+    version(Windows){
+        pragma(msg,"WARNING on windows due to limitations on the number of symbols per module only a subset of the tests is performed "~__FILE__~":"~ctfe_i2a(__LINE__));
+        Stdout("WARNING\non windows due to limitations on the number of symbols per module only a subset of the tests is performed ")(__FILE__)(":")(__LINE__).newline;
+        narrayRTst1!(float,1)(coll);
+        narrayRTst1!(float,2)(coll);
+    } else {
+        narrayRTst1!(int,1)(coll);
+        narrayRTst1!(int,2)(coll);
+        narrayRTst1!(int,3)(coll);
+        narrayRTst1!(float,1)(coll);
+        narrayRTst1!(float,2)(coll);
+        narrayRTst1!(float,3)(coll);
+        narrayRTst1!(double,1)(coll);
+        narrayRTst1!(double,2)(coll);
+        narrayRTst1!(double,3)(coll);
+        narrayRTst1!(real,1)(coll);
+        narrayRTst1!(real,2)(coll);
+        narrayRTst1!(real,3)(coll);
+        narrayRTst1!(cfloat,1)(coll);
+        narrayRTst1!(cfloat,2)(coll);
+        narrayRTst1!(cfloat,3)(coll);
+        narrayRTst1!(cdouble,1)(coll);
+        narrayRTst1!(cdouble,2)(coll);
+        narrayRTst1!(cdouble,3)(coll);
+    }
     return coll;
 }
 
