@@ -18,31 +18,49 @@
 			<key>filename</key>
 			<string>PriQueueTest.d</string>
 			<key>lastUsed</key>
-			<date>2008-11-26T11:25:16Z</date>
+			<date>2009-01-13T15:38:08Z</date>
 		</dict>
 		<dict>
 			<key>filename</key>
 			<string>testSerial.d</string>
 			<key>lastUsed</key>
-			<date>2008-12-14T18:41:32Z</date>
+			<date>2009-01-16T16:22:07Z</date>
 		</dict>
 		<dict>
 			<key>filename</key>
-			<string>test.d</string>
+			<string>testRTest.d</string>
 			<key>lastUsed</key>
-			<date>2008-12-14T18:41:32Z</date>
+			<date>2009-01-16T16:22:05Z</date>
 		</dict>
 		<dict>
 			<key>filename</key>
 			<string>dsss.conf</string>
 			<key>lastUsed</key>
-			<date>2008-12-14T18:41:33Z</date>
+			<date>2009-01-16T16:22:10Z</date>
 		</dict>
 		<dict>
 			<key>filename</key>
 			<string>README.txt</string>
 			<key>lastUsed</key>
-			<date>2008-09-26T20:58:02Z</date>
+			<date>2009-01-13T15:38:11Z</date>
+		</dict>
+		<dict>
+			<key>filename</key>
+			<string>testTextParsing.d</string>
+			<key>lastUsed</key>
+			<date>2009-01-16T16:22:02Z</date>
+		</dict>
+		<dict>
+			<key>filename</key>
+			<string>testNArray.d</string>
+			<key>selected</key>
+			<true/>
+		</dict>
+		<dict>
+			<key>filename</key>
+			<string>testNArrayPerf.d</string>
+			<key>selected</key>
+			<true/>
 		</dict>
 	</array>
 	<key>fileHierarchyDrawerWidth</key>
@@ -52,6 +70,6 @@
 	<key>showFileHierarchyDrawer</key>
 	<true/>
 	<key>windowFrame</key>
-	<string>{{246, 0}, {937, 778}}</string>
+	<string>{{510, 15}, {796, 763}}</string>
 </dict>
 </plist>
