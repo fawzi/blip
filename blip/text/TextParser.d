@@ -415,7 +415,7 @@ class TextParser(T) : InputFilter
             }
             auto oldWriteable=buf.capacity-buf.limit;
             // read another chunk of data
-            if (buf.readMore() is Eof) {
+            if (buf.populate() is Eof) {
                 sliceE=SliceExtent.ToEnd;
             } else if (buf.capacity-buf.limit <= maxTranscodingOverhead) {
                 sliceE=SliceExtent.Maximal;
