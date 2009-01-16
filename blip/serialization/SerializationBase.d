@@ -24,7 +24,10 @@ version(SerializationTrace){
 } else version(SRegistryTrace){
     version=STrace;
 }
-
+// version PseudoFieldMetaInfo generates fields for arrays and associative arrays,
+// speeding up the getting of meta info if the elements are not subclasses, but seems to
+// give a compiler error when raising exceptions with gdc (the unwinding mechanism fails)
+// version=PseudoFieldMetaInfo
 alias Tuple!(bool,byte,ubyte,short,ushort,int,uint,long,ulong,
     float,double,real,ifloat,idouble,ireal,cfloat,cdouble,creal,ubyte[],
     char[],wchar[],dchar[]) CoreTypes2;
@@ -259,10 +262,13 @@ interface Serializable{
     /// guaranteed to be called if preSerialize ended sucessfully
     void postSerialize(Serializer s);
     /// pre unserialization hook
+    /// might substitute the object with a proxy used for the unserialization and acquire locks
     Serializable preUnserialize(Unserializer s);
     /// unserialize an object
     void unserialize(Unserializer s);
     /// post unserialization hook 
+    /// if a proxy was used it needs to reestablish the correct  object type and release any
+    /// lock acquired by preUnserialize
     Serializable postUnserialize(Unserializer s);
 }
 
@@ -535,9 +541,21 @@ class Serializer {
         return this;
     }
     
+    /// writes out a string identifying the protocol version
+    void writeProtocolVersion() { }
     void writeStartRoot() { }
     void writeEndRoot() { }
-        
+    
+    /// writes out a custom field
+    final void customField(FieldMetaInfo *fieldMeta, void delegate() realWrite){
+        version(SerializationTrace) {
+            Stdout("X customField(")(fieldMeta is null?"*NULL*":fieldMeta.name)(") starting").newline;
+            scope(exit) Stdout("X customField(")(fieldMeta is null?"*NULL*":fieldMeta.name)(") finished").newline;
+        }
+        if (fieldMeta !is null && fieldMeta.serializationLevel>serializationLevel) return;
+        writeCustomField(fieldMeta,realWrite);
+    }
+    /// writes out a field of type t
     void field(T)(FieldMetaInfo *fieldMeta, ref T t) {
         version(SerializationTrace) {
             Stdout("X field!("~T.stringof~")(")(fieldMeta is null?"*NULL*":fieldMeta.name)(",")(cast(void*)&t)(") starting").newline;
@@ -707,27 +725,41 @@ class Serializer {
             }
             else static if (isArrayType!(T)) {
                 version(SerializationTrace) Stdout.formatln("X serializing array").newline;
+                version(PseudoFieldMetaInfo){
+                    FieldMetaInfo elMetaInfo=FieldMetaInfo("el","",null);
+                    elMetaInfo.pseudo=true;
+                }
                 auto ac=writeArrayStart(fieldMeta,t.length);
                 foreach (ref x; t) {
                     version(SerializationTrace) Stdout.formatln("X serializing array element").newline;
-                    writeArrayEl(ac,{ this.field(cast(FieldMetaInfo*)null, x); } );
+                    version(PseudoFieldMetaInfo) writeArrayEl(ac,{ this.field(&elMetaInfo, x); } );
+                    else writeArrayEl(ac,{ this.field(cast(FieldMetaInfo*)null, x); } );
                 }
                 writeArrayEnd(ac);
             }
             else static if (isAssocArrayType!(T)) {
                 version(SerializationTrace) Stdout.formatln("X serializing associative array").newline;
                 alias KeyTypeOfAA!(T) K;
+                alias ValTypeOfAA!(T) V;
+                version(PseudoFieldMetaInfo){
+                    FieldMetaInfo keyMetaInfo=FieldMetaInfo("key","",getSerializationInfoForType!(K)());
+                    keyMetaInfo.pseudo=true;
+                    FieldMetaInfo valMetaInfo=FieldMetaInfo("val","",getSerializationInfoForType!(V)());
+                    valMetaInfo.pseudo=true;
+                }
                 auto ac=writeDictStart(fieldMeta,t.length,
                     is(K==char[])||is(K==wchar[])||is(K==dchar[]));
                 foreach (key, inout value; t) {
                     version(SerializationTrace) Stdout.formatln("X serializing associative array entry").newline;
-                    writeEntry(ac,{ this.field!(K)(cast(FieldMetaInfo*)null, key); },
-                        { this.field(cast(FieldMetaInfo*)null, value); });
+                    version(PseudoFieldMetaInfo){
+                        writeEntry(ac,{ this.field!(K)(&keyMetaInfo, key); },
+                            { this.field(&valMetaInfo, value); });
+                    } else {
+                        writeEntry(ac,{ this.field!(K)(cast(FieldMetaInfo*)null, key); },
+                            { this.field(cast(FieldMetaInfo*)null, value); });
+                    }
                 }
                 writeDictEnd(ac);
-            } else static if (is(T==void delegate())) { // custom write function
-                version(SerializationTrace) Stdout.formatln("X serializing custom field").newline;
-                writeCustomField(fieldMeta,t);
             } else static if (isPointerType!(T)) {
                 Stdout("X serializing pointer").newline;
                 if (t is null){
@@ -918,6 +950,11 @@ class Unserializer {
         lastObjectId=cast(objectId)1;
     }
     
+    /// reads the string identifying the protocol version, returns true if the present
+    /// unserializer handles the protocol, false if it can't or it did not recognize
+    /// the version string
+    bool readProtocolVersion() { return false; }
+
     /// writes the given root object
     /// you should only use the field method to write in the serialization methods
     typeof(this) opCall(T)(ref T o) {
@@ -926,6 +963,34 @@ class Unserializer {
         readEndRoot();
         return this;
     }
+    /// reads a custom field
+    final void customField(FieldMetaInfo *fieldMeta, void delegate() readOp){
+        version(SerializationTrace) {
+            Stdout("Y customField(")(fieldMeta is null?"*NULL*":fieldMeta.name)(") starting").newline;
+            scope(exit) Stdout("> customField(")(fieldMeta is null?"*NULL*":fieldMeta.name)(") finished").newline;
+        }
+        if (fieldMeta !is null) {
+            if (fieldMeta.serializationLevel>serializationLevel) {
+                version(UnserializationTrace) Stdout("Y skip (above serialization level)").newline;
+                return;
+            }
+            if (nStack>0){
+                auto stackTop=top;
+                auto lab=stackTop.labelToRead;
+                if (lab.length>0 && (!fieldMeta.pseudo)){
+                    if (lab!=fieldMeta.name) {
+                        version(UnserializationTrace) Stdout("Y skip field (non selected)").newline;
+                        return;
+                    } else {
+                        version(UnserializationTrace) Stdout("Y selected field").newline;
+                    }
+                }
+                ++stackTop.iFieldRead;
+            }
+        }
+        readCustomField(fieldMeta,readOp);
+    }
+    
     /// main method writes out an object with the given field info
     /// this method cannot be overridden, but call all other methods that can be
     void field(T)(FieldMetaInfo *fieldMeta, ref T t) {
@@ -941,7 +1006,7 @@ class Unserializer {
             if (nStack>0){
                 auto stackTop=top;
                 auto lab=stackTop.labelToRead;
-                if (lab.length>0){
+                if ( lab.length>0 && (!fieldMeta.pseudo)){
                     if (lab!=fieldMeta.name) {
                         version(UnserializationTrace) Stdout("Y skip field (non selected)").newline;
                         return;
@@ -1130,6 +1195,9 @@ class Unserializer {
             }
             else static if (isArrayType!(T)) {
                 version(UnserializationTrace) Stdout.formatln("Y unserializing array: {} {}", (fieldMeta?fieldMeta.name:"*NULL*"), typeid(T)).newline;
+                FieldMetaInfo elMetaInfo=FieldMetaInfo("el","",
+                    getSerializationInfoForType!(ElementTypeOfArray!(T))());
+                elMetaInfo.pseudo=true;
                 auto ac=readArrayStart(fieldMeta);
                 static if (!isStaticArrayType!(T)) {
                     t=new T(ac.sizeHint());
@@ -1144,7 +1212,7 @@ class Unserializer {
                                 t.length=t.length+t.length/2+1;
                             }
                         }
-                        this.field(cast(FieldMetaInfo*)null, t[pos]);
+                        this.field(&elMetaInfo, t[pos]);
                         ++pos;
                     } )) { }
                 t.length=pos;
@@ -1153,27 +1221,28 @@ class Unserializer {
                 version(UnserializationTrace) Stdout("Y unserializing associative array").newline;
                 alias KeyTypeOfAA!(T) K;
                 alias ValTypeOfAA!(T) V;
+                FieldMetaInfo keyMetaInfo=FieldMetaInfo("key","",getSerializationInfoForType!(K)());
+                keyMetaInfo.pseudo=true;
+                FieldMetaInfo valMetaInfo=FieldMetaInfo("val","",getSerializationInfoForType!(V)());
+                valMetaInfo.pseudo=true;
                 K key;
                 V value;
                 auto ac=readDictStart(fieldMeta,is(K==char[])||is(K==wchar[])||is(K==dchar[]));
                 int iPartial=0;
                 while (readEntry(ac,
                     {
-                        this.field!(K)(null, key);
+                        this.field!(K)(&keyMetaInfo, key);
                         if(++iPartial==2){
                             iPartial=0;
                             t[key]=value;
                         }
                     },{
-                        this.field!(V)(null, value);
+                        this.field!(V)(&valMetaInfo, value);
                         if(++iPartial==2){
                             iPartial=0;
                             t[key]=value;
                         }
                     })) { }
-            } else static if (is(T==void delegate())) { // custom read function
-                version(UnserializationTrace) Stdout("Y unserializing custom field").newline;
-                readCustomField(fieldMeta,t);
             } else static if (isPointerType!(T)) {
                 version(UnserializationTrace) Stdout("Y unserializing pointer").newline;
                 static if (is(typeof(*T.init)==struct)||is(isArrayType!(typeof(*T.init)))||is(typeof(*T.init)==class)){

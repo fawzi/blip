@@ -12,6 +12,7 @@ import tango.io.device.Array;
 import tango.text.convert.Format;
 import tango.text.convert.Layout;
 import blip.TemplateFu: nArgs;
+import blip.BasicModels;
 
 /// Layout singleton, allocated only upon usage
 class defaultFormatter(T){
@@ -78,4 +79,13 @@ T[] printToString(T)(FormatOutput!(T) delegate(FormatOutput!(T))w){
     StringIO!(T) s=new StringIO!(T)();
     w(s);
     return s.getString();
+}
+
+/// returns true if the string representation of a and b is the same
+/// useful for debugging and comparing read in floats to the one that were outputted
+bool eqStr(T)(T a,T b){
+    if (a is b) return 1;
+    auto aStr=getString(writeDesc!(T)(new Stringify(),a));
+    auto bStr=getString(writeDesc!(T)(new Stringify(),b));
+    return aStr==bStr;
 }

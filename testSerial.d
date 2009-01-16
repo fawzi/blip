@@ -55,17 +55,6 @@ class A: Serializable{
     }
 }
 
-/// returns true if the string representation of a and b is the same
-int eqStr(T)(T a,T b){
-    if (a is b) return 1;
-    auto aStr=getString(writeDesc!(T)(new Stringify(),a));
-    auto bStr=getString(writeDesc!(T)(new Stringify(),b));
-    if (aStr!=bStr){
-        Stdout("diff for type "~T.stringof)(" '")(aStr)("' vs '")(bStr)("'").newline;
-    }
-    return aStr==bStr;
-}
-
 class B:A{
     int a;
     uint b;

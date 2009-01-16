@@ -29,7 +29,7 @@ class JsonSerializer(T=char) : Serializer {
     }
     void writeField(FieldMetaInfo *field){
         ++writeCount;
-        if (field !is null){
+        if (field !is null && (!field.pseudo)){
             if (!atStart) {
                 writer(cast(T[])",");
                 atStart=false;
@@ -214,6 +214,10 @@ class JsonSerializer(T=char) : Serializer {
     override void writeEndRoot() {
         writer.newline;
     }
+    
+    override void writeProtocolVersion(){
+        writer("BLIP_JSON_1.0").newline;
+    }
 }
 
 class JsonUnserializer(T=char) : Unserializer {
@@ -247,7 +251,7 @@ class JsonUnserializer(T=char) : Unserializer {
         if(fieldRead){
             fieldRead=false;
         } else {
-            if (field !is null){
+            if (field !is null && (!field.pseudo)){
                 reader.skipString(cast(S)",",false);
                 if (!reader.skipString2(cast(S)field.name,false)){
                     char[] fieldRead;
@@ -494,4 +498,9 @@ class JsonUnserializer(T=char) : Unserializer {
     override void serializationError(char[]msg,char[]filename,long line){
         reader.parseError(msg,filename,line);
     }
+    
+    override bool readProtocolVersion(){
+        return reader.skipString("BLIP_JSON_1.0",false);
+    }
+    
 }
