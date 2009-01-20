@@ -95,67 +95,6 @@ V[K] addRandomEntriesToAA(V,K)(Rand r,V[K]a){
 // valid chars (restrict to alphanumeric chars?)
 private char[] valid_chars=
     "abcdefghijklmnopqrstuwxyzABCDEFGHIJKLMNOPQRSTUWXYZ0123456789_+-*%&/()=?!$`'\"\\[]{}<>.:;, \t\n";
-/// returns the actual random generator
-T generateRandom(T:Rand)   (Rand r,int idx,ref int nEl, ref bool acceptable) { return r; }
-/// generation of a random object
-T generateRandom(T:int)   (Rand r,int idx,ref int nEl, ref bool acceptable) { return r.uniform!(T); }
-/// ditto                                                
-T generateRandom(T:uint)  (Rand r,int idx,ref int nEl, ref bool acceptable) { return r.uniform!(T); }
-/// ditto                                                
-T generateRandom(T:short)  (Rand r,int idx,ref int nEl, ref bool acceptable) {
-    union U{short s; uint ui;}
-    U a;
-    a.ui=r.uniform!(uint);
-    return a.s;
-}
-/// ditto                                                
-T generateRandom(T:ushort)  (Rand r,int idx,ref int nEl, ref bool acceptable) {
-    union U{ushort us; uint ui;}
-    U a;
-    a.ui=r.uniform!(uint);
-    return a.us;
-}
-/// ditto                                                
-T generateRandom(T:long)  (Rand r,int idx,ref int nEl, ref bool acceptable) { return r.uniform!(T); }
-/// ditto                                                
-T generateRandom(T:ulong) (Rand r,int idx,ref int nEl, ref bool acceptable) { return r.uniform!(T); }
-/// ditto                                                
-T generateRandom(T:byte)  (Rand r,int idx,ref int nEl, ref bool acceptable) { return r.uniform!(T); }
-/// ditto                                                
-T generateRandom(T:ubyte) (Rand r,int idx,ref int nEl, ref bool acceptable) { return r.uniform!(T); }
-/// ditto                                                
-T generateRandom(T:bool)  (Rand r,int idx,ref int nEl, ref bool acceptable) { return r.uniform!(T); }
-/// ditto                                                
-T generateRandom(T:char)  (Rand r,int idx,ref int nEl, ref bool acceptable) { return r.uniformEl(valid_chars); }
-/// ditto                                                
-T generateRandom(T:wchar)  (Rand r,int idx,ref int nEl, ref bool acceptable) { return cast(T)r.uniformEl(valid_chars); }
-/// ditto                                                
-T generateRandom(T:dchar)  (Rand r,int idx,ref int nEl, ref bool acceptable) { return cast(T)r.uniformEl(valid_chars); }
-/// ditto                                                
-T generateRandom(T:float) (Rand r,int idx,ref int nEl, ref bool acceptable) { return r.normalSigma(1.5f); }
-/// ditto                                                
-T generateRandom(T:double)(Rand r,int idx,ref int nEl, ref bool acceptable) { return r.normalSigma(1.5); }
-/// ditto                                                
-T generateRandom(T:real)  (Rand r,int idx,ref int nEl, ref bool acceptable) { return r.normalSigma(1.5L); }
-/// ditto
-T generateRandom(T:ifloat) (Rand r,int idx,ref int nEl, ref bool acceptable) { return cast(T)(r.normalSigma(1.5f)*1i); }
-/// ditto                                                
-T generateRandom(T:idouble)(Rand r,int idx,ref int nEl, ref bool acceptable) { return cast(T)(r.normalSigma(1.5)*1i); }
-/// ditto                                                
-T generateRandom(T:ireal)  (Rand r,int idx,ref int nEl, ref bool acceptable) { return cast(T)(r.normalSigma(1.5L)*1i); }
-/// ditto
-T generateRandom(T:cfloat) (Rand r,int idx,ref int nEl, ref bool acceptable) { return cast(T)(r.normalSigma(1.5f)+1i*r.normalSigma(1.5f)); }
-/// ditto                                                
-T generateRandom(T:cdouble)(Rand r,int idx,ref int nEl, ref bool acceptable) { return cast(T)(r.normalSigma(1.5)+1i*r.normalSigma(1.5)); }
-/// ditto                                                
-T generateRandom(T:creal)  (Rand r,int idx,ref int nEl, ref bool acceptable) { return cast(T)(r.normalSigma(1.5L)+1i*r.normalSigma(1.5L)); }
-/// ditto
-T[] generateRandom(T:T[])(Rand r,int idx, ref int nEl, ref bool acceptable) {
-// unfortunately the specialization hides the type of T, and we cannot use the size of static arrays
-    int size=generateSize(r,10);
-    auto res=new T[size];
-    return mkRandomArray(r,res,acceptable);
-}
 
 /// utility method for random generation
 /// this is the main method, it checks things in the following order:
@@ -168,13 +107,39 @@ T genRandom(T)(Rand r,int idx,ref int nEl, ref bool acceptable){
         return T.randomGenerate(r,acceptable);
     } else static if (is(typeof(T.randomGenerate(r))==T)){
         return T.randomGenerate(r);
-    } else static if (is(typeof(generateRandom!(T)(r,idx,nEl,acceptable)))){
-        return generateRandom!(T)(r,idx,nEl,acceptable);
+    } else static if (is(T==Rand)||is(T U:RandomG!(U))) {
+        return r;
+    } else static if (is(T==int)||is(T==uint)||is(T==long)||is(T==ulong)||is(T==bool)||
+        is(T==byte)||is(T==ubyte)){
+        return r.uniform!(T);
+    } else static if (is(T==short)||is(T==ushort)){
+        union U{T s; uint ui;}
+        U a;
+        a.ui=r.uniform!(uint);
+        return a.s;
+    } else static if (is(T==char)||is(T==wchar)||is(T==dchar)){
+        return cast(T)r.uniformEl(valid_chars);
+    } else static if (is(T==float)||is(T==double)||is(T==real)){
+        return r.normalSigma(cast(T)1.5);
+    } else static if (is(T==ifloat)||is(T==idouble)||is(T==ireal)){
+        return cast(T)(r.normalSigma(cast(RealTypeOf!(T))1.5)*1i);
+    } else static if (is(T==cfloat)||is(T==cdouble)||is(T==creal)){
+        return cast(T)(r.normalSigma(cast(RealTypeOf!(T))1.5)+1i*r.normalSigma(cast(RealTypeOf!(T))1.5));
+    } else static if (is(T U:U[])){
+        static if (isStaticArrayType!(T)){
+            int size=staticArraySize!(T);
+        } else {
+            int size=generateSize(r,10);
+        }
+        auto res=new T[size];
+        return mkRandomArray(r,res,acceptable);
     } else static if (isAssocArrayType!(T)) {
         alias KeyTypeOfAA!(T) K;
         alias ValTypeOfAA!(T) V;
         T res;
         return addRandomEntriesToAA!(V,K)(r,res);
+    } else static if (is(typeof(generateRandom!(T)(r,idx,nEl,acceptable)))){
+        return generateRandom!(T)(r,idx,nEl,acceptable);
     } else {
         static assert(0,"cannot generate random object for type "~T.stringof
             ~" you should implement one of the static methods generateRandom, the RandGen interface or a specialization of generateRandom, unfortunately due to compiler limitations (or design choice) specializations external to this module are not picked up by this utility wrapper.");
