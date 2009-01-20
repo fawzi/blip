@@ -726,7 +726,8 @@ class Serializer {
             else static if (isArrayType!(T)) {
                 version(SerializationTrace) Stdout.formatln("X serializing array").newline;
                 version(PseudoFieldMetaInfo){
-                    FieldMetaInfo elMetaInfo=FieldMetaInfo("el","",null);
+                    FieldMetaInfo elMetaInfo=FieldMetaInfo("el","",
+                        getSerializationInfoForType!(ElementTypeOfArray!(T))());
                     elMetaInfo.pseudo=true;
                 }
                 auto ac=writeArrayStart(fieldMeta,t.length);
