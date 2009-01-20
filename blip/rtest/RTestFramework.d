@@ -55,10 +55,15 @@ char[] completeInitStr(S...)(char[] checks,char[] manualInit,char[] indent="    
     foreach (i,T;S){
         char[] argName="arg"~ctfe_i2a(i);
         if (!ctfe_hasToken(argName,manualInit)){
-            res~=indent1~"static assert(is(typeof(genRandom!(S["~ctfe_i2a(i)~"])(new Rand(),arg0_i,arg0_nEl,acceptable))),\n";
-            res~=indent1~"    \""~T.stringof~" cannot be automatically generated, missing one of the generateRandom static methods or a T generateRandom(T:"~T.stringof~")(Rand r,int idx,ref int nEl, ref bool acceptable) specialization, see blip.rtest.BasicGenerators.\");\n";
-            res~=indent1~"arg["~ctfe_i2a(i)~"]"~"=genRandom!(S["~ctfe_i2a(i)~"])(r,arg"~
+            res~=indent1~"static if(is(typeof(genRandom!(S["~ctfe_i2a(i)~"])(new Rand(),arg0_i,arg0_nEl,acceptable)))){\n";
+            res~=indent1~"    arg["~ctfe_i2a(i)~"]"~"=genRandom!(S["~ctfe_i2a(i)~"])(r,arg"~
                 ctfe_i2a(i)~"_i,arg"~ctfe_i2a(i)~"_nEl,acceptable);\n";
+            res~=indent1~"} else static if (is(typeof(generateRandom!(S["~ctfe_i2a(i)~"])(new Rand(),arg0_i,arg0_nEl,acceptable)))) {\n";
+            res~=indent1~"    arg["~ctfe_i2a(i)~"]"~"=generateRandom!(S["~ctfe_i2a(i)~"])(r,arg"~
+                ctfe_i2a(i)~"_i,arg"~ctfe_i2a(i)~"_nEl,acceptable);\n";
+            res~=indent1~"} else {\n";
+            res~=indent1~"    static assert(0,\""~T.stringof~" cannot be automatically generated, missing one of the generateRandom static methods or a T generateRandom(T:"~T.stringof~")(Rand r,int idx,ref int nEl, ref bool acceptable) specialization, see blip.rtest.BasicGenerators.\");\n";
+            res~=indent1~"}\n";
             res~=indent1~"acceptableAll=acceptableAll && acceptable;\n";
         }
     }

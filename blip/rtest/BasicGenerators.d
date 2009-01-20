@@ -177,7 +177,7 @@ T genRandom(T)(Rand r,int idx,ref int nEl, ref bool acceptable){
         return addRandomEntriesToAA!(V,K)(r,res);
     } else {
         static assert(0,"cannot generate random object for type "~T.stringof
-            ~" you should implement one of the static methods generateRandom, the RandGen interface or a specialization of generateRandom");
+            ~" you should implement one of the static methods generateRandom, the RandGen interface or a specialization of generateRandom, unfortunately due to compiler limitations (or design choice) specializations external to this module are not picked up by this utility wrapper.");
     }
 }
 T genRandom2(T)(Rand r,ref T t,int idx,ref int nEl, ref bool acceptable){
