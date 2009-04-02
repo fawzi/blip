@@ -478,33 +478,6 @@ template isBasicType(T) {
         is(T == char);
 }
 
-
-template isArrayType(T) {
-    const bool isArrayType = false;
-}
-
-
-template isArrayType(T : T[]) {
-    const bool isArrayType = true;
-}
-
-
-template isAssocArrayType(T) {
-    static if (is(typeof(T.keys)) && is(typeof(T.values))) {
-        static if (is(T == typeof(T.values[0])[typeof(T.keys[0])])) {
-            const bool isAssocArrayType = true;
-        } else const bool isAssocArrayType = false;
-    } else const bool isAssocArrayType = false;
-}
-
-static assert (isAssocArrayType!(char[char[]]));
-
-
-template isPointerType(T) {
-    static if (is(typeof(*T))) const isPointerType = true;
-    else const isPointerType = false;
-}
-
 /// serializer
 /// some methods have no classinfo for performance reasons, if you really need it file a ticket explaining why 
 class Serializer {

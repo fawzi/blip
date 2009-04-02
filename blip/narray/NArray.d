@@ -2,7 +2,7 @@
     Main module that exports multidimensional arrays.
     
         copyright:      Copyright (c) 2008. Fawzi Mohamed
-        license:        BSD style: $(LICENSE)
+        license:        Apache 2.0
         version:        Initial release: July 2008
         author:         Fawzi Mohamed
 *******************************************************************************/

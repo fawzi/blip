@@ -2,7 +2,7 @@
     Implements convolution on NArrays
     
         copyright:      Copyright (c) 2008. Fawzi Mohamed
-        license:        BSD style: $(LICENSE)
+        license:        Apache 2.0
         version:        Initial release: July 2008
         author:         Fawzi Mohamed
 *******************************************************************************/
@@ -10,6 +10,7 @@ module blip.narray.Convolve;
 import blip.narray.BasicTypes;
 import blip.narray.BasicOps;
 import blip.TemplateFu;
+import tango.core.Traits;
 import tango.io.Stdout;
 debug(ConvolveCheckAccess) import blip.text.Stringify;
 /+ --------- convolution --------- +/

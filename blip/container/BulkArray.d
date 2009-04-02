@@ -1,3 +1,8 @@
+/*******************************************************************************
+        copyright:      Copyright (c) 2009. Fawzi Mohamed
+        license:        Apache 2.0
+        author:         Fawzi Mohamed
+*******************************************************************************/
 module blip.container.BulkArray;
 
 enum BulkArrayFlags{

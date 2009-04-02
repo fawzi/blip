@@ -23,6 +23,7 @@ import blip.serialization.Serialization;
 import tango.io.device.Array;
 import tango.io.stream.Format;
 import blip.BasicModels;
+import tango.core.Traits;
 
 /// returns a NArray indexed with the variables of a pLoopIdx or sLoopGenIdx
 char[] NArrayInLoop(char[] arrName,int rank,char[] ivarStr){
@@ -313,7 +314,7 @@ void testAxisFilter(T,int rank)(NArray!(T,rank) a, NArray!(index_type,1)indexes)
 void testDot1x1(T,S)(Dottable!(T,1,S,1,true,true) d){
     int tol=8;
     alias typeof(T.init*S.init) U;
-    maxPrecT!(U) refValT=cast(maxPrecT!(U))0;
+    MaxPrecTypeOf!(U) refValT=cast(MaxPrecTypeOf!(U))0;
     index_type nEl=d.a.shape[0];
     for (index_type i=0;i<nEl;++i){
         refValT+=d.a[i]*d.b[i];
@@ -339,10 +340,10 @@ void testDot2x1(T,S)(Dottable!(T,2,S,1,true,true) d){
     alias typeof(T.init*S.init) U;
     auto a=d.a;
     if (d.axis1==0 || d.axis1==-2) a=d.a.T;
-    auto refValT=zeros!(maxPrecT!(U))(a.shape[0]);
+    auto refValT=zeros!(MaxPrecTypeOf!(U))(a.shape[0]);
     for (index_type j=0;j<a.shape[0];++j){
         for (index_type i=0;i<d.k;++i){
-            refValT[j]=refValT[j]+cast(maxPrecT!(U))(a[j,i]*d.b[i]);
+            refValT[j]=refValT[j]+cast(MaxPrecTypeOf!(U))(a[j,i]*d.b[i]);
         }
     }
     auto refVal=refValT.asType!(U)();
@@ -357,10 +358,10 @@ void testDot1x2(T,S)(Dottable!(T,1,S,2,true,true) d){
     auto b=d.b;
     ++iCall;
     if (d.axis2==1 || d.axis2==-1) b=d.b.T;
-    auto refValT=zeros!(maxPrecT!(U))(b.shape[1]);
+    auto refValT=zeros!(MaxPrecTypeOf!(U))(b.shape[1]);
     for (index_type j=0;j<b.shape[1];++j){
         for (index_type i=0;i<d.k;++i){
-            refValT[j]=refValT[j]+cast(maxPrecT!(U))(a[i]*b[i,j]);
+            refValT[j]=refValT[j]+cast(MaxPrecTypeOf!(U))(a[i]*b[i,j]);
         }
     }
     auto refVal=refValT.asType!(U)();
@@ -374,11 +375,11 @@ void testDot2x2(T,S)(Dottable!(T,2,S,2,true,true) d){
     if (d.axis1==0 || d.axis1==-2) a=d.a.T;
     auto b=d.b;
     if (d.axis2==1 || d.axis2==-1) b=d.b.T;
-    auto refValT=zeros!(maxPrecT!(U))([a.shape[0],b.shape[1]]);
+    auto refValT=zeros!(MaxPrecTypeOf!(U))([a.shape[0],b.shape[1]]);
     for (index_type i=0;i<a.shape[0];++i){
         for (index_type j=0;j<d.k;++j){
             for (index_type k=0;k<b.shape[1];++k){
-                refValT[i,k]=refValT[i,k]+cast(maxPrecT!(U))(a[i,j]*b[j,k]);
+                refValT[i,k]=refValT[i,k]+cast(MaxPrecTypeOf!(U))(a[i,j]*b[j,k]);
             }
         }
     }

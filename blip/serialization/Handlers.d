@@ -147,6 +147,18 @@ class BinaryWriteHandlers:WriteHandlers{
         writer_=writer;
         setCoreHandlersFrom_basicWrite();
     }
+    /+ /// guartees the given alignment
+    void alignStream(int i){
+        assert(i>0&&i<=32);
+        if (i==1) return;
+        auto pos=writer.seek(0,Anchor.Current);
+        if (pos==Eof) return;
+        auto rest=pos & (~((~0)<<i));
+        if (rest==0) return;
+        ubyte u=0;
+        for (int j=(1<<(i-1))-rest;j!=0;--j)
+            writer.handle(u);
+    }+/
 
     Writer writer ()
     {

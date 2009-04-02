@@ -1,5 +1,5 @@
 module blip.text.TextParser;
-import tango.io.stream.Buffer;
+import tango.io.stream.Buffered;
 import Integer=tango.text.convert.Integer;
 import Float=tango.text.convert.Float;
 protected import tango.io.device.Conduit : InputFilter, InputBuffer, InputStream;
@@ -21,7 +21,7 @@ size_t nCodePoints(T)(T[] str){
         size_t l=str.length;
         size_t n=0;
         bool charLoop(T* pEnd){
-            while (p!=pEnd){
+            while (p<pEnd){
                 if ((*p)&0x80){
                     switch ((*p)&0xF0){
                     case 0xF0:
@@ -41,7 +41,7 @@ size_t nCodePoints(T)(T[] str){
             return false;
         }
         bool charLoop2(T* pEnd){
-            while (p!=pEnd){
+            while (p<pEnd){
                 if ((*p)&0x80){
                     switch ((*p)&0xF0){
                     case 0xF0:
@@ -57,7 +57,7 @@ size_t nCodePoints(T)(T[] str){
                 }
                 ++p;
                 ++n;
-                if (((cast(size_t)p)&7)!=0) break;
+                if (((cast(size_t)p)&7)==0) break;
             }
             return false;
         }
@@ -81,7 +81,7 @@ size_t nCodePoints(T)(T[] str){
         T* p=str.ptr;
         size_t n=0;
         bool charLoop(T*pEnd){
-            while(p!=pEnd){
+            while(p<pEnd){
                 if ((*p)&0xF800==0xD800){
                     if ((*p)&0x0400) return true;
                     if (++p==pEnd || ((*p)&0xFC00)!=0xDC00) return true;
@@ -92,13 +92,14 @@ size_t nCodePoints(T)(T[] str){
             return false;
         }
         bool charLoop2(T*pEnd){
-            while(p!=pEnd && ((cast(size_t)p)&7)!=0){
+            while(p<pEnd){
                 if ((*p)&0xF800==0xD800){
                     if ((*p)&0x0400) return true;
                     if (++p==pEnd || ((*p)&0xFC00)!=0xDC00) return true;
                 }
                 ++p;
                 ++n;
+                if (((cast(size_t)p)&7)==0) break;
             }
             return false;
         }
@@ -108,7 +109,7 @@ size_t nCodePoints(T)(T[] str){
         } else {
             T*pEnd=cast(T*)((cast(size_t)(p+l))&(~(cast(size_t)7)));
             if (charLoop2(pEnd)) throw new Exception("invalid UTF-16",__FILE__,__LINE__);
-            while (p!=pEnd){
+            while (p<pEnd){
                 int i= *(cast(int*)p);
                 if ((i&0xF800_0000) != 0xD800_0000 && (i&0xF800) != 0xD800){
                     p+=2;
@@ -178,7 +179,7 @@ size_t scanCodePoints(T)(T[] str,size_t nn){
         }
         bool charLoop(T* pEnd,long line){
             assert(p<=pEnd,"ppp");
-            while (p!=pEnd && n!=nn){
+            while (p<pEnd && n<nn){
                 if ((*p)&0x80){ // use the stride table instead?
                     switch ((*p)&0xF0){
                     case 0xF0:
@@ -203,7 +204,7 @@ size_t scanCodePoints(T)(T[] str,size_t nn){
         }
         bool charLoop2(T* pEnd,long line){
             assert(p<=pEnd,"ppp");
-            while (p!=pEnd && n!=nn){
+            while (p<pEnd && n<nn){
                 if ((*p)&0x80){
                     switch ((*p)&0xF0){
                     case 0xF0:
@@ -223,7 +224,7 @@ size_t scanCodePoints(T)(T[] str,size_t nn){
                 }
                 ++p;
                 ++n;
-                if (((cast(size_t)p)&7)!=0) break;
+                if (((cast(size_t)p)&7)==0) break;
             }
             return false;
         }
@@ -254,7 +255,7 @@ size_t scanCodePoints(T)(T[] str,size_t nn){
             throw new Exception("invalid UTF-16",__FILE__,line);
         }
         bool charLoop(T*pEnd,long line){
-            while(p!=pEnd && n!=nn){
+            while(p<pEnd && n<nn){
                 if ((*p)&0xF800==0xD800){
                     if ((*p)&0x0400) invalidUtfError(line);
                     if (++p==pEnd) return true;
@@ -266,7 +267,7 @@ size_t scanCodePoints(T)(T[] str,size_t nn){
             return false;
         }
         bool charLoop2(T*pEnd,long line){
-            while(p!=pEnd && ((cast(size_t)p)&7)!=0 && n!=nn){
+            while(p<pEnd && n<nn){
                 if ((*p)&0xF800==0xD800){
                     if ((*p)&0x0400) invalidUtfError(line);
                     if (++p==pEnd) return true;
@@ -274,6 +275,7 @@ size_t scanCodePoints(T)(T[] str,size_t nn){
                 }
                 ++p;
                 ++n;
+                if (((cast(size_t)p)&7)==0) break;
             }
             return false;
         }
@@ -302,7 +304,7 @@ size_t scanCodePoints(T)(T[] str,size_t nn){
         if (str.length<nn) return IOStream.Eof;
         return nn;
     } else {
-        static assert(0,"unsexpected char type "~T.stringof);
+        static assert(0,"unexpected char type "~T.stringof);
     }
 }
 
@@ -378,7 +380,7 @@ class TextParser(T) : InputFilter
     {
         if (!skippedWhitespace) skipWhitespace();
         SliceExtent sliceE=SliceExtent.Partial;
-        BufferInput buf=cast(BufferInput)source;
+        BufferedInput buf=cast(BufferedInput)source;
         if (buf !is null){
             if (buf.position == 0 && buf.capacity-buf.limit <=maxTranscodingOverhead){
                 sliceE=SliceExtent.Maximal;
@@ -388,7 +390,7 @@ class TextParser(T) : InputFilter
         }
         size_t nonGrow=maxTranscodingOverhead;
         bool matchSuccess=false;
-        while (source.read(delegate size_t(void[] rawData)
+        while (source.reader(delegate size_t(void[] rawData)
                 {
                     T[] data=Utf.cropRight((cast(T*)rawData.ptr)[0..rawData.length/T.sizeof]);
                     auto res=scan(data,sliceE);
@@ -872,7 +874,7 @@ class TextParser(T) : InputFilter
     TextParser set (InputStream stream)
     {
         assert (stream);
-        source = BufferInput.create (stream);
+        source = BufferedInput.create (stream);
         super.source = source;
         slice=[];
         return this;
