@@ -327,13 +327,17 @@ class JsonUnserializer(T=char) : Unserializer {
     }
     /// reads an entry of the dictionary
     override bool readEntry(ref PosCounter ac, void delegate() readKey,void delegate() readVal) {
-        if (ac.length==ac.pos) return false;
+        if (ac.length==ac.pos) {
+            ac.end;
+            return false;
+        }
         if (!reader.skipString(cast(S)",",false)){
             if (reader.skipString(cast(S)"}",false)){
                 ac.end;
                 return false;
             }
         }
+        ac.next;
         if (ac.data.get!(bool)){
             readKey();
             reader.skipString(cast(S)":");

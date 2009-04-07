@@ -38,7 +38,7 @@ interface ForeachableI(T){
 interface FIteratorI(T): ForeachableI!(T){
     /// goes to the next element
     T next();
-    /// true if the iterator is at then
+    /// true if the iterator is at the end
     bool atEnd();
     /// might make opApply parallel (if the work amount is larger than
     /// optimalChunkSize, tries to subdivide it in chunks of that size)
