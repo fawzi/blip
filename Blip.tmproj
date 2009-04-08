@@ -8,6 +8,24 @@
 			<key>expanded</key>
 			<true/>
 			<key>name</key>
+			<string>gobo</string>
+			<key>regexFolderFilter</key>
+			<string>!.*/(\.[^/]*|CVS|_darcs|_MTN|\{arch\}|blib|.*~\.nib|.*\.(framework|app|pbproj|pbxproj|xcode(proj)?|bundle))$</string>
+			<key>sourceDirectory</key>
+			<string>gobo</string>
+		</dict>
+		<dict>
+			<key>name</key>
+			<string>xf</string>
+			<key>regexFolderFilter</key>
+			<string>!.*/(\.[^/]*|CVS|_darcs|_MTN|\{arch\}|blib|.*~\.nib|.*\.(framework|app|pbproj|pbxproj|xcode(proj)?|bundle))$</string>
+			<key>sourceDirectory</key>
+			<string>xf</string>
+		</dict>
+		<dict>
+			<key>expanded</key>
+			<true/>
+			<key>name</key>
 			<string>blip</string>
 			<key>regexFolderFilter</key>
 			<string>!.*/(\.[^/]*|CVS|_darcs|_MTN|\{arch\}|blib|.*~\.nib|.*\.(framework|app|pbproj|pbxproj|xcode(proj)?|bundle))$</string>
@@ -18,58 +36,62 @@
 			<key>filename</key>
 			<string>PriQueueTest.d</string>
 			<key>lastUsed</key>
-			<date>2009-01-13T15:38:08Z</date>
+			<date>2009-04-08T13:53:22Z</date>
+			<key>selected</key>
+			<true/>
 		</dict>
 		<dict>
 			<key>filename</key>
 			<string>testSerial.d</string>
 			<key>lastUsed</key>
-			<date>2009-01-16T16:22:07Z</date>
+			<date>2009-04-08T13:53:16Z</date>
 		</dict>
 		<dict>
 			<key>filename</key>
 			<string>testRTest.d</string>
 			<key>lastUsed</key>
-			<date>2009-01-16T16:22:05Z</date>
+			<date>2009-04-08T13:53:22Z</date>
 		</dict>
 		<dict>
 			<key>filename</key>
 			<string>dsss.conf</string>
 			<key>lastUsed</key>
-			<date>2009-01-16T16:22:10Z</date>
+			<date>2009-04-08T13:53:11Z</date>
 		</dict>
 		<dict>
 			<key>filename</key>
 			<string>README.txt</string>
 			<key>lastUsed</key>
-			<date>2009-01-13T15:38:11Z</date>
+			<date>2009-04-08T13:53:17Z</date>
 		</dict>
 		<dict>
 			<key>filename</key>
 			<string>testTextParsing.d</string>
 			<key>lastUsed</key>
-			<date>2009-01-16T16:22:02Z</date>
+			<date>2009-04-08T13:53:12Z</date>
 		</dict>
 		<dict>
 			<key>filename</key>
 			<string>testNArray.d</string>
-			<key>selected</key>
-			<true/>
+			<key>lastUsed</key>
+			<date>2009-04-08T13:53:21Z</date>
 		</dict>
 		<dict>
 			<key>filename</key>
 			<string>testNArrayPerf.d</string>
-			<key>selected</key>
-			<true/>
+		</dict>
+		<dict>
+			<key>filename</key>
+			<string>INSTALL.txt</string>
 		</dict>
 	</array>
 	<key>fileHierarchyDrawerWidth</key>
-	<integer>193</integer>
+	<integer>194</integer>
 	<key>metaData</key>
 	<dict/>
 	<key>showFileHierarchyDrawer</key>
 	<true/>
 	<key>windowFrame</key>
-	<string>{{510, 15}, {796, 763}}</string>
+	<string>{{330, 15}, {796, 763}}</string>
 </dict>
 </plist>
