@@ -15,16 +15,23 @@ to install
     dsss install
     cd ..
     
-if you want to use blas/lapack you need the blas/lapack wrappers from multiarray/gobo
-http://dsource.org/projects/multiarray
+blas/lapack are used by default, and are part of the distribution, they come from the 
+    http://dsource.org/projects/multiarray
+project.
 
-to activate it you need
-    -version=blas       // activates blas calling in dot product
-    -version=lapack     // activates lapack derived LinAlg routines (solve,eig,eigh,svd,...)
+to deactivate them you need
+    -version=no_blas       // deactivates blas calling in dot product
+    -version=no_lapack     // deactivates lapack derived LinAlg routines (solve,eig,eigh,svd,...)
 
 other useful flags are
     -debug=TestNArray   // activates extra internal consistency checks in NArray
     -version=multiarray // in perf_test times also multiarray performace (that you need to install separately)
+
+The serialization routine can use xpose to automatically define a serialization routine.
+Xpose comes from
+    http://h3.team0xf.com:1024/xf/file/38f8ec538442/xpose
+and its use can be deactivated with
+    -version=no_Xpose
 
 To have maximum speed compile with -release -O, but as it is quite new you might want to first compile it with checks.
 

@@ -3,7 +3,7 @@ Ancillary library to tango, oriented toward scientific applications.
 It has:
 
  * N-dimensional arrays (blip.narray) that have a nice interface to lapack
- * random and combinatorial(extensive) testing framework (blip.rtest), parallezied
+ * random and combinatorial(extensive) testing framework (blip.rtest), parallel
  * serialization (blip.serialization) that supports json format, and can be used also for input files.
  * SMP parallelization (blip.parallel) (should improve much soon for many cores, and reduce task/fiber creation cost)
 
