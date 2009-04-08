@@ -21,4 +21,5 @@ void main(){
     queue.desc(Stdout("xx6")).newline;
     queue.insert(0,t);    
     queue.desc(Stdout("xx7")).newline;
+    Stdout("done").newline;
 }

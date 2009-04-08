@@ -24,6 +24,7 @@ import tango.io.device.Array;
 import tango.io.stream.Format;
 import blip.BasicModels;
 import tango.core.Traits;
+import tango.core.stacktrace.TraceExceptions;
 
 /// returns a NArray indexed with the variables of a pLoopIdx or sLoopGenIdx
 char[] NArrayInLoop(char[] arrName,int rank,char[] ivarStr){
@@ -387,7 +388,8 @@ void testDot2x2(T,S)(Dottable!(T,2,S,2,true,true) d){
     auto v=dot(d.a,d.b,d.axis1,d.axis2);
     assert(checkResDot(refVal,v),"value too different from reference");
 }
-version(lapack){
+version(no_lapack){ }
+else {
     void testSolve2x2(T)(Dottable!(T,2,T,2,false,true,true,0,0) d,Rand r){
         int tol=9;
         auto x=randLayout(r,empty!(T)([d.a.shape[1],d.b.shape[1]]));
@@ -659,7 +661,8 @@ TestCollection narrayRTst1(T,int rank)(TestCollection superColl){
             __LINE__,__FILE__,coll);
         autoInitTst.testNoFail("testDot2x2",(Dottable!(T,2,T,2,true,true) d){ testDot2x2!(T,T)(d); },
             __LINE__,__FILE__,coll);
-        version(lapack){
+        version(no_lapack){ }
+        else {
             static if (isBlasType!(T)){
                 autoInitTst.testNoFail("testSolve2x1",(Dottable!(T,2,T,1,false,true,true,0,0) d,Rand r)
                     { testSolve2x1!(T)(d,r); },__LINE__,__FILE__,coll);

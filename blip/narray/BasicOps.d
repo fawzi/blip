@@ -983,7 +983,7 @@ NArray!(T,rank)hermitize(T,int rank)(NArray!(T,rank)a){
         auto b=a.T;
         index_type optimalChunkSize_i=NArray!(T,rank).defaultOptimalChunkSize;
         mixin(pLoopPtr(rank,["a","b"],
-        "if (aPtr0<bPtr0) {T val=((*aPtr0).re+(*bPtr0).re+cast(T)1i*((*aPtr0).im-(*bPtr0).im))/cast(T)2; *aPtr0=val; *bPtr0=val.re-cast(T)1i*val.im;}","i"));
+        "if (aPtr0<=bPtr0) {T val=((*aPtr0).re+(*bPtr0).re+cast(T)1i*((*aPtr0).im-(*bPtr0).im))/cast(T)2; *aPtr0=val; *bPtr0=val.re-cast(T)1i*val.im;}","i"));
         return a;
     } else static if (isImaginaryType!(T)){
         return antiSymmetrize(a);

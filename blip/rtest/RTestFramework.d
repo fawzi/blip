@@ -737,7 +737,8 @@ template testInit(char[] checkInit="", char[] manualInit=""){
             } catch (Exception e){
                 synchronized(test.testController.writeLock()){
                     test.failureLog("test`")(test.testName)("` failed with exception").newline;
-                    test.failureLog(e)(" at ")(e.file)(":")(e.line).newline;
+                    e.writeOut(delegate void(char[]s){test.failureLog(s);});
+                    test.failureLog.flush();
                     mixin(printArgs(nArgs!(S),"test.failureLog"));
                 }
                 return TestResult.Fail;
@@ -801,7 +802,8 @@ template testInit(char[] checkInit="", char[] manualInit=""){
             } catch (Exception e){
                 synchronized(test.testController.writeLock){
                     test.failureLog("test`")(test.testName)("` failed with exception").newline;
-                    test.failureLog(e).newline;
+                    e.writeOut(delegate void(char[]s){test.failureLog(s);});
+                    test.failureLog.flush();
                     mixin(printArgs(nArgs!(S),"test.failureLog"));
                 }
                 return TestResult.Fail;
@@ -838,7 +840,8 @@ template testInit(char[] checkInit="", char[] manualInit=""){
             } catch (Exception e){
                 synchronized(test.testController.writeLock){
                     test.failureLog("test`")(test.testName)("` unexpectedly failed with exception").newline;
-                    test.failureLog(e).newline;
+                    e.writeOut(delegate void(char[]s){test.failureLog(s);});
+                    test.failureLog.flush();
                     mixin(printArgs(nArgs!(S),"test.failureLog"));
                 }
                 return TestResult.Fail;

@@ -82,7 +82,8 @@ class SExecuter:ExecuterI,TaskSchedulerI{
             }
             catch(Exception e) {
                 log.error("exception in main thread ");
-                Stdout(e)(" at ")(e.file)(":")(e.line).newline;
+                e.writeOut(delegate void(char[]s){ Stdout(s); });
+                Stdout.flush();
                 runLevel=SchedulerRunLevel.Stopped;
             }
         }
@@ -176,7 +177,8 @@ class PExecuter:ExecuterI{
             }
             catch(Exception e) {
                 log.error("exception in working thread ");
-                Stdout(e)(" at ")(e.file)(":")(e.line).newline;
+                e.writeOut(delegate void(char[]s){ Stdout(s); });
+                Stdout.flush();
                 scheduler.raiseRunlevel(SchedulerRunLevel.Stopped);
             }
         }

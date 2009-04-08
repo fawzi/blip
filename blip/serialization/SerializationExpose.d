@@ -1,7 +1,8 @@
 /// adds serialization support using xpose magic
 module blip.serialization.SerializationExpose;
 import blip.serialization.SerializationBase;
-version(Xpose) {
+version(no_Xpose) { }
+else {
     import xf.xpose.Expose;
     public alias xf.xpose.Expose.expose expose;
     public alias xf.xpose.Expose.attribsContain attribsContain;

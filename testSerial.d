@@ -54,7 +54,8 @@ class A: Serializable{
         return 0;
     }
 }
-version(Xpose){
+version(no_Xpose){}
+else {
     class B:A{
         int a;
         uint b;
@@ -80,8 +81,8 @@ version(Xpose){
         mixin(expose!(NewSerializationExpose)(`a|b|c|d|e|f|g|h|i|l|m|n|o|p|q|r|s|t|u|v|z`));
         version(SerializationTrace){
             pragma(msg,NewSerializationExpose.handler!(0).begin(``));
-        	pragma(msg,NewSerializationExpose.handler!(0).field(``, `a`, `a`, false, ``));
-        	pragma(msg,NewSerializationExpose.handler!(0).end(``));
+            pragma(msg,NewSerializationExpose.handler!(0).field(``, `a`, `a`, false, ``));
+            pragma(msg,NewSerializationExpose.handler!(0).end(``));
         }
         override int opEquals(Object other){
             if (this.classinfo !is other.classinfo) return 0;
@@ -136,11 +137,11 @@ version(Xpose){
         A[] e;
         version(SerializationTrace){
             pragma(msg,NewSerializationExpose.handler!(0).begin(``));
-        	pragma(msg,NewSerializationExpose.handler!(0).field(``, `a`, `a`, false, ``));
-        	pragma(msg,NewSerializationExpose.handler!(0).end(``));
+            pragma(msg,NewSerializationExpose.handler!(0).field(``, `a`, `a`, false, ``));
+            pragma(msg,NewSerializationExpose.handler!(0).end(``));
             pragma(msg,NewSerializationExpose.handler!(1).begin(``));
-        	pragma(msg,NewSerializationExpose.handler!(1).field(``, `a`, `a`, false, ``));
-        	pragma(msg,NewSerializationExpose.handler!(1).end(``));
+            pragma(msg,NewSerializationExpose.handler!(1).field(``, `a`, `a`, false, ``));
+            pragma(msg,NewSerializationExpose.handler!(1).end(``));
         }
         mixin(expose!(NewSerializationExpose)(`a|b|c|d|e`));
     
@@ -249,8 +250,8 @@ void main(){
           b:2942220189,
           c:-8297515914883251209,
           d:17869291317653118063,
-          e:",Oc0C	4-",
-          f:"Esdn	?a,uc&n[4c}k",
+          e:",Oc0C  4-",
+          f:"Esdn   ?a,uc&n[4c}k",
           g:"FSP}N,'SgtA",
           h:3.18,
           i:0.28,
@@ -275,8 +276,8 @@ void main(){
           a:-1894881897,
           c:-8297515914883251209,
           d:17869291317653118063,
-          e:",Oc0C	4-",
-          f:"Esdn	?a,uc&n[4c}k",
+          e:",Oc0C  4-",
+          f:"Esdn   ?a,uc&n[4c}k",
           g:"FSP}N,'SgtA",
           h:3.18,
           i:0.28, # l is missing

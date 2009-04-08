@@ -25,12 +25,17 @@ import blip.narray.BasicOps;
 import tango.math.Math:min,max;
 import tango.core.Traits:isComplexType,isImaginaryType,ComplexTypeOf,RealTypeOf;
 
-version(blas){
+version(no_blas){ 
+    version(no_lapack){ }
+    else {
+        static assert(false,"lapack needs blas");
+    }
+} else {
     import DBlas=gobo.blas.DBlas;
     public import gobo.blas.Types;
 }
-version(lapack){
-    static assert(is(typeof(f_float)),"lapack needs blas");
+version(no_lapack){ }
+else {
     import DLapack=gobo.lapack.DLapack;
 }
 
@@ -118,7 +123,8 @@ body {
         }
         return c;
     }
-    version(blas){
+    version(no_blas){ }
+    else {
         static if ((is(T==U) && isBlasType!(T)) && (rank1==1 || rank1==2)&&(rank2==1 || rank2==2)){
             // call blas
             // negative incremented vector in blas loops backwards on a[0..n], not on a[-n+1..1]
@@ -284,7 +290,8 @@ enum MStorage{
     lo=2
 }
 
-version (lapack){
+version(no_lapack){ }
+else {
     /// finds x for which dot(a,x)==b for a square matrix a
     /// not so efficient (copies a)
     NArray!(T,2) solve(T)(NArray!(T,2)a,NArray!(T,2)b,NArray!(T,2)x=null)

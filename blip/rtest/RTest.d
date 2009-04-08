@@ -176,7 +176,7 @@ int mainTestFun(char[][] argStr,SingleRTest testSuite){
      --test runs only the given test
      --counter sets the initial counter of the test
      --seed defines the seed for the test
-     --on-failure sets the action to perform after a test fails (default stop-all)
+     --on-failure sets the action to perform after a test fails (default stop-test)
      --print-level sets the print level (default all-short)`;
     Arguments args = new Arguments();
 
@@ -209,7 +209,7 @@ int mainTestFun(char[][] argStr,SingleRTest testSuite){
     if (args.contains("runs")){
         runs=to!(int)(args["runs"]);
     }
-    TextController.OnFailure onFailure=TextController.OnFailure.StopAllTests;
+    TextController.OnFailure onFailure=TextController.OnFailure.StopTest;
     if (args.contains("on-failure"))
     switch(args["on-failure"]){
         case "Continue","continue" : onFailure=TextController.OnFailure.Continue; break;

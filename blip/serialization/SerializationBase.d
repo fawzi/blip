@@ -15,7 +15,7 @@ import blip.BasicModels;
 import tango.util.container.HashSet;
 import tango.text.Util;
 import blip.TemplateFu;
-import tango.core.Traits;
+public import tango.core.Traits;
 
 version(SerializationTrace){
     version=STrace;

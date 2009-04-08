@@ -131,8 +131,8 @@ T genRandom(T)(Rand r,int idx,ref int nEl, ref bool acceptable){
         } else {
             int size=generateSize(r,10);
         }
-        auto res=new T[size];
-        return mkRandomArray(r,res,acceptable);
+        auto res=new U[size];
+        return mkRandomArray!(U)(r,res,acceptable);
     } else static if (isAssocArrayType!(T)) {
         alias KeyTypeOfAA!(T) K;
         alias ValTypeOfAA!(T) V;
