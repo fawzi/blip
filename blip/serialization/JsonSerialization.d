@@ -8,6 +8,7 @@ import tango.io.model.IConduit:IOStream;
 import tango.core.Variant;
 import blip.BasicModels;
 import blip.text.TextParser;
+import blip.text.UtfUtils;
 
 class JsonSerializer(T=char) : Serializer {
     int depth;

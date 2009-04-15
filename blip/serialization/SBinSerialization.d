@@ -1,26 +1,34 @@
-/// serialization to/from Json format
-module blip.serialization.JsonSerialization;
+/// serialization to/from a simple sequential binary format
+// (useful to transmit to other processes/computers)
+module blip.serialization.SBinSerialization;
 import blip.serialization.SerializationBase;
 import blip.serialization.Handlers;
 import tango.io.Stdout : Stdout;
 import tango.io.stream.Format;
-import tango.io.model.IConduit:IOStream;
+import tango.io.model.IConduit;
 import tango.core.Variant;
 import blip.BasicModels;
 import blip.text.TextParser;
 
 class SBinSerializer : Serializer {
-    long[MetaInfo] writtenMetaInfo;
+    uint[void*] writtenMetaInfo;
     int depth;
     uint lastMetaId;
     bool compact; // skips meta info
-    BinaryWriteHandlers writer;
+    WriteHandlers writer;
+    override void resetObjIdCounter(){
+        lastMetaId=3;
+        writtenMetaInfo=null; // avoid this?
+        super.resetObjIdCounter();
+    }
+    
     void writeCompressed(T)(T l){
         while (1){
             ubyte u=cast(ubyte)(l & 0x7FFF);
-            l=>>7;
+            l=l>>7;
             if (l!=0){
-                writer.handle(u|0x8000);
+                ubyte u2=u|0x8000;
+                writer.handle(u2);
             } else {
                 writer.handle(u);
                 break;
@@ -40,11 +48,14 @@ class SBinSerializer : Serializer {
             }
         }
     }
-    this(BinaryWriteHandlers w){
+    this(WriteHandlers w){
         super(w);
         writer=w;
         lastMetaId=3; // 0: null, 1: default type, 2: proxy, 3: metaInfo
         compact=true;
+    }
+    this(OutputStream s){
+        this(new BinaryWriteHandlers!()(s));
     }
     void writeField(FieldMetaInfo *field){ }
     /// writes something that has a custom write operation
@@ -69,8 +80,7 @@ class SBinSerializer : Serializer {
             ulong lSize=ulong.max;
             writeCompressed(lSize);
         } else {
-            ulong lSize;
-            writeCompressed(lSize);
+            writeCompressed(cast(ulong)size);
         }
         return PosCounter(size);
     }
@@ -90,21 +100,20 @@ class SBinSerializer : Serializer {
         ac.end();
     }
     /// start of a dictionary
-    override PosCounter writeDictStart(FieldMetaInfo *field,size_t length, bool stringKeys=false) {
+    override PosCounter writeDictStart(FieldMetaInfo *field,size_t size, bool stringKeys=false) {
         writeField(field);
         if (size==size_t.max){
             long lSize=long.max;
             writeCompressed(lSize);
         } else {
-            long lSize;
-            writeCompressed(lSize);
+            writeCompressed(cast(ulong)size);
         }
         return PosCounter(size);
     }
     /// writes an entry of the dictionary
     override void writeEntry(ref PosCounter ac, void delegate() writeKey,void delegate() writeVal) {
         if (ac.length==size_t.max){
-            writeCompressed(1);
+            writeCompressed(1u);
         }
         ac.next();
         writeKey();
@@ -126,19 +135,19 @@ class SBinSerializer : Serializer {
         if (compact && !isSubclass){
             writeCompressed(metaId);
         } else {
-            auto metaIdPtr= metaInfo in writtenMetaInfo;
+            auto metaIdPtr= (cast(void*)metaInfo) in writtenMetaInfo;
             if (metaIdPtr is null){
                 metaId=++lastMetaId;
-                writtenMetaInfo[metaInfo]=metaId;
+                writtenMetaInfo[cast(void*)metaInfo]=metaId;
                 writeCompressed(3);
                 writeCompressed(metaId);
-                writeMI(metaInfo);
+                writeMetaInfo(metaInfo);
             } else {
                 writeCompressed(*metaIdPtr);
             }
         }
-        ulong oid=cast(ulong)objId
-        writeCompressed(oid)
+        ulong oid=cast(ulong)objId;
+        writeCompressed(oid);
         realWrite();
     }
     /// write ObjectProxy
@@ -154,19 +163,19 @@ class SBinSerializer : Serializer {
         if (compact){
             writeCompressed(metaId);
         } else {
-            auto metaIdPtr= metaInfo in writtenMetaInfo;
+            auto metaIdPtr= cast(void*)metaInfo in writtenMetaInfo;
             if (metaIdPtr is null){
                 metaId=++lastMetaId;
-                writtenMetaInfo[metaInfo]=metaId;
+                writtenMetaInfo[cast(void*)metaInfo]=metaId;
                 writeCompressed(3u);
                 writeCompressed(metaId);
-                writeMI(metaInfo);
+                writeMetaInfo(metaInfo);
             } else {
                 writeCompressed(*metaIdPtr);
             }
         }
-        ulong oid=cast(ulong)objId
-        writeCompressed(oid)
+        ulong oid=cast(ulong)objId;
+        writeCompressed(oid);
         realWrite();
     }
     /// writes a core type
@@ -176,29 +185,32 @@ class SBinSerializer : Serializer {
     }
 
     override void writeEndRoot() {
-        writer.handle(0xdeadbeef);
+        uint l=0xdeadbeef;
+        writer.handle(l);
     }
     
     override void writeProtocolVersion(){
-        writer.handle("BLIP_SBIN_1.0");
+        char[] s="BLIP_SBIN_1.0";
+        writer.handle(s);
     }
 }
 
-class SBinUnserializer(T=char) : Unserializer {
-    BinaryReadHandlers reader;
-    MetaInfo[uint] _readMetaInfo;
-    alias T[] S;
+class SBinUnserializer: Unserializer {
+    ReadHandlers reader;
+    ClassMetaInfo[uint] _readMetaInfo;
+    uint lastMetaId;
     bool fieldRead;
-    const Eof=TextParser!(T).Eof;
     
-    void readCompressed(T)(T l){
-        l=cast(T)0;
-        int cont=1;
+    override void resetObjIdCounter(){
+        lastMetaId=3;
+        _readMetaInfo=null; // avoid this?
+        super.resetObjIdCounter();
+    }
+    void readCompressed(T)(ref T l){
         while (1){
             ubyte u;
-            reader.handle(u)
-            u=cast(ubyte);
-            l=(l<<7)|(u & 0x7FFF);
+            reader.handle(u);
+            l=(l<<7)|(cast(T)(u & 0x7FFF));
             if (!(u&0x8000)) break;
         }
     }
@@ -211,7 +223,7 @@ class SBinUnserializer(T=char) : Unserializer {
         uint nTotFields;
         readCompressed(nTotFields);
         if (nTotFields!=metaInfo.nTotFields()){
-            serializationError("meta info different from expected, recovery not implemented",&
+            serializationError("meta info different from expected, recovery not implemented",
                 __FILE__,__LINE__);
         }
         uint cont;
@@ -228,22 +240,21 @@ class SBinUnserializer(T=char) : Unserializer {
                 }
             }
         }
+        return metaInfo;
     }
-    this(FormattedReadHandlers!(T)h){
+    this(ReadHandlers h){
         super(h);
-        this.reader=h.reader;
-    }
-    this(TextParser!(T)r){
-        this(new FormattedReadHandlers!(T)(r));
+        this.reader=h;
+        lastMetaId=3;
     }
     this(InputStream s){
-        this(new TextParser!(T)(s));
+        this(new BinaryReadHandlers!()(s));
     }
     class FieldMismatchException:Exception{
         FieldMetaInfo *mismatchedField;
         char[] actualField;
         this(FieldMetaInfo *mismatchedField,char[] actualField,char[]desc,char[]filename,long line){
-            super(desc~" at "~convertToString!()(reader.parserPos()),filename,line);
+            super(desc~" at "~reader.parserPos(),filename,line);
             this.actualField=actualField;
             this.mismatchedField=mismatchedField;
         }
@@ -261,7 +272,7 @@ class SBinUnserializer(T=char) : Unserializer {
     override void readDebugPtr(FieldMetaInfo *field,void** o){
         readField(field);
         ulong l;
-        reader(l);
+        reader.handle(l);
     }
     /// reads the start of an array
     override PosCounter readArrayStart(FieldMetaInfo *field){
@@ -273,7 +284,7 @@ class SBinUnserializer(T=char) : Unserializer {
             size=size_t.max;
         } else if (lSize>=size_t.max){
             serializationError("trying to decode an array too large for 32 bit representation",__FILE__,__LINE__);
-        else {
+        } else {
             size=cast(size_t)lSize;
         }
         return PosCounter(size);
@@ -353,10 +364,14 @@ class SBinUnserializer(T=char) : Unserializer {
             setPtrFromId(oid,t);
             return true;
         case 1:
-            assert(metaI!is null,"metaI is null and default type");
             break;
         case 3:
+            uint newId;
+            readCompressed(newId);
+            ++lastMetaId;
+            assert(lastMetaId==newId,"wrongly counted meta info ids");
             metaI=readMetaInfo();
+            _readMetaInfo[newId]=metaI;
             break;
         default:
             metaI=_readMetaInfo[classId];
@@ -392,11 +407,11 @@ class SBinUnserializer(T=char) : Unserializer {
     /// override this to give more info on parser position,...
     /// this method *has* to throw
     override void serializationError(char[]msg,char[]filename,long line){
-        reader.parseError(msg,filename,line);
+        throw new SerializationException(msg,reader.parserPos(),filename,line);
     }
-    
+    /// returns true if this is the SBIN protocol, otherwise throws
     override bool readProtocolVersion(){
-        return reader.skipString("BLIP_JSON_1.0",false);
+        return reader.skipString("BLIP_SBIN_1.0",false);
     }
     
 }

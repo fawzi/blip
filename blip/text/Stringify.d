@@ -2,7 +2,7 @@
     Various utilities to convert methods that write to FormatOutput!(T),
     stream and writers to strings
         copyright:      Copyright (c) 2008. Fawzi Mohamed
-        license:        BSD style: $(LICENSE)
+        license:        apache 2.0
         version:        Initial release: July 2008
         author:         Fawzi Mohamed
 *******************************************************************************/

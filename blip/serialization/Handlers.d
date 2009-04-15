@@ -1,12 +1,16 @@
 module blip.serialization.Handlers;
 import tango.core.Tuple;
-import tango.io.protocol.Writer;
-import tango.io.protocol.Reader;
 import tango.io.stream.Format;
+import tango.io.model.IConduit;
 import tango.text.json.JsonEscape: escape;
 import tango.io.encode.Base64: encode,decode;
 import tango.core.Variant;
+import tango.core.ByteSwap;
+import tango.core.Traits: RealTypeOf,ctfe_i2a;
+import tango.math.Math:min;
+import tango.core.Exception: IOException;
 import blip.text.TextParser;
+import blip.text.UtfUtils;
 
 /// the non array core types
 template isBasicCoreType(T){
@@ -14,7 +18,7 @@ template isBasicCoreType(T){
      ||is(T==ushort)||is(T==int)||is(T==uint)||is(T==float)
      ||is(T==long)||is(T==ulong)||is(T==double)||is(T==real)
      ||is(T==ifloat)||is(T==idouble)||is(T==ireal)||is(T==cfloat)
-     ||is(T==cdouble)||is(T==creal)||is(T==char[])||is(T==wchar[]);
+     ||is(T==cdouble)||is(T==creal)||is(T==char[])||is(T==wchar[])||is(T==dchar[]);
 }
 /// the basic types, out of these more complex types are built
 template isCoreType(T){
@@ -83,6 +87,13 @@ class CoreHandlers{
 /// handlers for writing
 class WriteHandlers: CoreHandlers{
     this(){}
+    
+    /// nicer way to write out
+    WriteHandlers opCall(T)(T t){
+        static assert(isCoreType!(T),T.stringof~" is not a core type");
+        mixin("coreHandler_"~strForCoreType!(T)~"(t);");
+        return this;
+    }
     /// returns if the current protocol is binary or not
     bool binary(){
         assert(0,"unimplemented");
@@ -101,6 +112,12 @@ class WriteHandlers: CoreHandlers{
 /// handlers for reading
 class ReadHandlers: CoreHandlers{
     this(){}
+    /// nicer way to read in
+    ReadHandlers opCall(T)(ref T t){
+        static assert(isCoreType!(T),T.stringof~" is not a core type");
+        mixin("coreHandler_"~strForCoreType!(T)~"(t);");
+        return this;
+    }
     /// returns if the current protocol is binary or not
     bool binary(){
         assert(0,"unimplemented");
@@ -114,39 +131,52 @@ class ReadHandlers: CoreHandlers{
     char[] rawReadStr(size_t amount){
         assert(0,"unimplemented");
     }
-/+    /// reads the start of an array
-    PosCounter readArrayStart(){
-        return PosCounter(size_t.max);
+    /// skips the given string from the input
+    bool skipString(char[]str,bool shouldThrow){
+        auto res=rawReadStr(nCodePoints(str));
+        if (res!=str){
+            if (shouldThrow)
+                throw new Exception("could not skip string '"~str~"'",__FILE__,__LINE__);
+            else
+                throw new Exception("failed skip string '"~str~"' unimplemented",__FILE__,__LINE__);
+        }
+        return true;
     }
-    /// tries to go to the next element of the array
-    /// returns false if there is no next element (the array is finished)
-    bool arrayNext(ref PosCounter ac,lazy void delegate() readEl) {
-        return false;
+    /// skips the given bit pattern from the input
+    bool skipBytes(ubyte[]str,bool shouldThrow){
+        auto res=rawRead(str.length);
+        if (res!=str){
+            if (shouldThrow)
+                throw new Exception("could not skip bytes",__FILE__,__LINE__);
+            else
+                throw new Exception("failed skip bytes unimplemented",__FILE__,__LINE__);
+        }
+        return true;
     }
-    /// start of a dictionary
-    PosCounter readDictStart() {
-        return PosCounter(size_t.max);
+    /// current read position (only informative)
+    char[] parserPos(){
+        return "";
     }
-    /// returns true if there is a next entry
-    bool nextEntry(ref PosCounter, lazy void delegate() readKey,lazy void delegate() readVal) {
-        return false;
-    }
-    /// read an Object
-    /// read ObjectProxy
-    /// read Struct
-    /// read core type
-    +/
 }
 
-/// write handlers build on the top of tango Writer (could be faster)
-class BinaryWriteHandlers:WriteHandlers{
-    protected Writer       writer_;
+version (BigEndian){
+    enum:bool{ isSmallEndian=false }
+} else {
+    enum:bool{ isSmallEndian=true }
+}
+
+/// binary write handlers
+/// build it on the top of OutputBuffer? would spare a buffer and its copy if SwapBytes is true
+final class BinaryWriteHandlers(bool SwapBytes=isSmallEndian):WriteHandlers{
+    OutputStream writer;
     
-    this (Writer writer)
+    this (OutputStream writer)
     {
-        writer_=writer;
+        super();
+        this.writer=writer;
         setCoreHandlersFrom_basicWrite();
     }
+    
     /+ /// guartees the given alignment
     void alignStream(int i){
         assert(i>0&&i<=32);
@@ -159,30 +189,88 @@ class BinaryWriteHandlers:WriteHandlers{
         for (int j=(1<<(i-1))-rest;j!=0;--j)
             writer.handle(u);
     }+/
-
-    Writer writer ()
-    {
-        return writer_;
+    
+    final void writeExact(void[] src){
+        auto written=writer.write(src);
+        if (written!=src.length){
+            if (written==OutputStream.Eof){
+                throw new Exception("unexpected Eof",__FILE__,__LINE__);
+            }
+            uint countEmpty=0;
+            while (1){
+                auto writtenNow=writer.write(src[written..$]);
+                if (writtenNow==OutputStream.Eof){
+                    throw new Exception("unexpected Eof",__FILE__,__LINE__);
+                } else if (writtenNow==0){
+                    if (countEmpty==100)
+                        throw new Exception("unexpected suspension",__FILE__,__LINE__);
+                    else
+                        ++countEmpty;
+                } else {
+                    countEmpty=0;
+                }
+                written+=writtenNow;
+                if (written>=src.length) break;
+            }
+        }
     }
     
+    /// writes an ulong compressed, useful if the value is expected to be small
+    void writeCompressed(ulong l){
+        while (1){
+            ubyte u=cast(ubyte)(l & 0x7FFF);
+            l=l>>7;
+            if (l!=0){
+                ubyte u2=u|0x8000;
+                handle(u2);
+            } else {
+                handle(u);
+                break;
+            }
+        }
+    }
+
+    /// writes a core type
     void basicWrite(T)(ref T t){
-        static if (is(T==ifloat)){
-            writer_(t.im);
-        } else static if (is(T==idouble)){
-            writer_(t.im);
-        } else static if (is(T==ireal)){
-            writer_(t.im);
-        } else static if (is(T==cfloat)){
-            writer_(t.re);
-            writer_(t.im);
-        } else static if (is(T==cdouble)){
-            writer_(t.re);
-            writer_(t.im);
-        } else static if (is(T==creal)){
-            writer_(t.re);
-            writer_(t.im);
-        } else {
-            writer_(t);
+        static assert(isCoreType!(T),"only core types supported");
+        static if (is(T==cfloat)||is(T==cdouble)||is(T==creal)){
+            RealTypeOf!(T) tt=t.re;
+            basicWrite(tt);
+            tt=t.im;
+            basicWrite(tt);
+        } else static if (is(T U:U[])){
+            if (!is(U==ubyte)){
+                writeCompressed(cast(ulong)t.length*U.sizeof);
+            }
+            static if ((! SwapBytes) || U.sizeof==1){
+                writeExact((cast(void*)t.ptr)[0..t.length*U.sizeof]);
+            } else {
+                ubyte[1024] buf;
+                size_t written=0;
+                size_t toWrite=min(t.length*U.sizeof,buf.length);
+                while(toWrite>0){
+                    buf[0..toWrite]=(cast(ubyte*)t.ptr)[written..written+toWrite];
+                    written+=toWrite;
+                    static if (U.sizeof==2) {
+                        ByteSwap.swap16(buf.ptr,toWrite);
+                    } else static if (U.sizeof==4){
+                        ByteSwap.swap32(buf.ptr,toWrite);
+                    } else {
+                        static assert(0,"unexpected size");
+                    }
+                    writeExact(buf[0..toWrite]);
+                    toWrite=min(buf.length,t.length*U.sizeof-written);
+                }
+            }
+        } else{
+            static if ((! SwapBytes) || T.sizeof==1){
+                writeExact((cast(ubyte*)&t)[0..T.sizeof]);
+            } else {
+                ubyte[T.sizeof] buf;
+                ubyte* a=cast(ubyte*)&t;
+                for (size_t i=0;i!=T.sizeof;++i) buf[T.sizeof-1-i]=a[i];
+                writeExact(buf);
+            }
         }
     }
     
@@ -200,94 +288,97 @@ class BinaryWriteHandlers:WriteHandlers{
     void rawWriteStr(char[]data){
         basicWrite(data);
     }
-/+    override PosCounter writeArrayStart(size_t num){
-        auto ac=PosCounter(num);
-        do { // is this really a good idea? especially wrt. aligment and memory mapping?
-            ubyte part = num & 127;
-            if (num > 0b01111111) part |= 0b10000000;
-            num >>= 7;
-            writer_(part);
-        } while (num != 0);
-        return ac;
-    }
-    /// start of a dictionary
-    override void writeDictStart(size_t num,bool stringKeys=false) {
-        auto ac=PosCounter(num);
-        do { // is this really a good idea? especially wrt. aligment and memory mapping?
-            ubyte part = num & 127;
-            if (num > 0b01111111) part |= 0b10000000;
-            num >>= 7;
-            writer_(part);
-        } while (num != 0);
-        return ac;
-    }
-    /// writes an Object
-    void writeObject(ClassMetaInfo *metaInfo,FieldMetaInfo *field, size_t objId,
-        lazy void delegate() realWrite, Object o){
-        realWrite();
-    }
-    /// write ObjectProxy
-    void writeObjectProxy(ClassMetaInfo *metaInfo,FieldMetaInfo *field, size_t objId, Object o){
-        assert(0,"unimplemented");
-    }
-    /// write Struct
-    void writeStruct(ClassMetaInfo *metaInfo,FieldMetaInfo *field, size_t objId,
-        lazy void delegate() realWrite){
-        realWrite();
-    }
-    /// writes a core type
-    void writeCoreType(ClassMetaInfo *metaInfo,FieldMetaInfo *field, size_t objId,
-        lazy void delegate() realWrite){
-        realWrite();
-    }+/
-    
 }
 
-/// read handlers build on the top of tango Reader (could be faster)
-final class BinaryReadHandlers:ReadHandlers{
-    protected Reader       reader;
+/// binary read handlers
+/// build it on the top of InputBuffer? would spare a buffer and its copy if SwapBytes
+final class BinaryReadHandlers(bool SwapBytes=isSmallEndian):ReadHandlers{
+    protected InputStream       reader;
     
-    this (Reader reader)
+    this (InputStream reader)
     {
         this.reader=reader;
         setCoreHandlersFrom_basicRead();
+    }
+    
+    void readExact(void[] dest){
+        auto read=reader.read(dest);
+        if (read!=dest.length){
+            if (read==OutputStream.Eof){
+                throw new Exception("unexpected Eof",__FILE__,__LINE__);
+            }
+            uint countEmpty=0;
+            while (1){
+                auto readNow=reader.read(dest[read..$]);
+                if (readNow==OutputStream.Eof){
+                    throw new Exception("unexpected Eof",__FILE__,__LINE__);
+                } else if (readNow==0){
+                    if (countEmpty==100)
+                        throw new Exception("unexpected suspension",__FILE__,__LINE__);
+                    else
+                        ++countEmpty;
+                } else {
+                    countEmpty=0;
+                }
+                read+=readNow;
+                if (read>=dest.length) break;
+            }
+        }
     }
     
     /// returns if the current protocol is binary or not
     bool binary(){
         return true;
     }
-    /// writes a basic
+    /// reads a compressed ulong (useful for numbers that are likely to be small)
+    void readCompressed(ref ulong l){
+        while (1){
+            ubyte u;
+            handle(u);
+            l=(l<<7)|(cast(ulong)(u & 0x7FFF));
+            if (!(u&0x8000)) break;
+        }
+    }
+    /// reads a core type
     void basicRead(T)(ref T t){
-        static if (is(T==ifloat)){
-            float f;
-            reader(f);
-            t=cast(T)(1i*f);
-        } else static if (is(T==idouble)){
-            double d;
-            reader(d);
-            t=cast(T)(1i*d);
-        } else static if (is(T==ireal)){
-            real r;
-            reader(r);
-            t=cast(T)(1i*r);
-        } else static if (is(T==cfloat)){
-            float f1,f2;
-            reader(f1);
-            reader(f2);
-            t=cast(T)(f1+1i*f2);
-        } else static if (is(T==cdouble)){
-            double f1,f2;
-            reader(f1);
-            reader(f2);
-            t=cast(T)(f1+1i*f2);
-        } else static if (is(T==creal)){
-            real f1,f2;
-            reader(f1);
-            reader(f2);
-            t=cast(T)(f1+1i*f2);
-        } else {
-            reader(t);
+        static assert(isCoreType!(T),"only core types supported");
+        static if (is(T==cfloat)||is(T==cdouble)||is(T==creal)){
+            RealTypeOf!(T)* tt=cast(RealTypeOf!(T)*)&t;
+            basicRead(*tt);
+            basicRead(tt[1]);
+        } else static if (is(T U:U[])){
+            if (!is(U==ubyte)){
+                ulong length;
+                readCompressed(length);
+                if (length>=size_t.max){
+                    throw new Exception("string too long for 32 bit",__FILE__,__LINE__);
+                }
+                t.length=cast(size_t)length/U.sizeof;
+                if (length%U.sizeof != 0){
+                    throw new Exception("bad length",__FILE__,__LINE__);
+                }
+            }
+            void[] buf=(cast(void*)t.ptr)[0..t.length*U.sizeof];
+            readExact(buf);
+            static if ( SwapBytes && U.sizeof!=1){
+                static if (U.sizeof==2) {
+                    ByteSwap.swap16(buf);
+                } else static if (U.sizeof==4){
+                    ByteSwap.swap32(buf);
+                } else {
+                    static assert(0,"unexpected size");
+                }
+            }
+        } else{
+            static if ( (!SwapBytes) || T.sizeof==1){
+                void[] buf=(cast(void*)&t)[0..T.sizeof];
+                readExact(buf);
+            } else {
+                ubyte[T.sizeof] buf;
+                readExact(buf);
+                ubyte* a=cast(ubyte*)&t;
+                for (int i=0;i!=T.sizeof;++i) a[T.sizeof-1-i]=buf[i];
+            }
         }
     }
     mixin(coreHandlerSetFromTemplateMixinStr("basicRead"));
@@ -298,53 +389,25 @@ final class BinaryReadHandlers:ReadHandlers{
         basicRead(data);
         return data;
     }
-    /// reads a raw string
+    /// reads a raw string, amount is the number of *codepoints*!
     char[] rawReadStr(size_t amount){
         char[] data;
         basicRead(data);
         return data;
     }
-/+    override PosCounter readArrayStart(){
-        ulong res = 0;
-        bool cont = true;
-        for (int i = 0; cont; ++i) {
-            ubyte part;
-            reader(part);
-            //Stdout.formatln(`part: {}`, part);
-            cont = (part & 0b10000000) != 0;
-            res |= (part & 0b01111111) << (i * 7);
+    /// the current position (for information purposes)
+    char[] parserPos(){
+        long pos=0;
+        try {
+            pos=reader.seek(0,reader.Anchor.Current);
+        } catch (IOException e){
+            pos=-1;
         }
-        return PosCounter(cast(size_t)res);
+        return (cast(Object)reader).toString()~"@"~ctfe_i2a(pos);
     }
-    /// writes out a dictionary prepended by its compressed length
-    final class DictionaryCmptLengthReader:ReadHandlers.DictionaryReader{
-        size_t pos,length;
-        /// start of a dictionary
-        override void readDictStart(size_t length) {
-            assert(pos==length,"recursive use not supported");
-        }
-        /// returns true if there is a next entry
-        override bool nextEntry() {
-            if (pos!=length){
-                ++pos;
-                return true;
-            }
-            return false;
-        }
-        /// middle of entry (between key and value)
-        override void readEntryMid() {}
-        /// hint on the size of the dictionary
-        override size_t sizeHint(){ length; }
-        this() { super(); }
-    }
-    /// object that helps the writing of an associative array
-    override DictionaryCmptLengthReader dictionaryReader(){
-        return new DictionaryCmptLengthReader();
-    }+/
 }
 
-
-/// write handlers for formatted writing
+/// formatted write handlers written on the top of FormatOutput
 final class FormattedWriteHandlers: WriteHandlers{
     FormatOutput!(char) writer;
     this(FormatOutput!(char) w){
@@ -386,7 +449,7 @@ final class FormattedWriteHandlers: WriteHandlers{
     }
 }
 
-/// read handlers build on the top of tango Reader (could be faster)
+/// formatted read handlers build on the top of TextParser
 final class FormattedReadHandlers(T):ReadHandlers{
     TextParser!(T)       reader;
     
@@ -425,44 +488,7 @@ final class FormattedReadHandlers(T):ReadHandlers{
         return reader.readNCodePoints(amount);
     }
     /// skips the given string
-    bool skipStr(T[] str){
-        return reader.skipString(str);
+    bool skipStr(T[] str,bool shouldThrow=true){
+        return reader.skipString(str,shouldThrow);
     }
-/+    override PosCounter readArrayStart(){
-        ulong res = 0;
-        bool cont = true;
-        for (int i = 0; cont; ++i) {
-            ubyte part;
-            reader(part);
-            //Stdout.formatln(`part: {}`, part);
-            cont = (part & 0b10000000) != 0;
-            res |= (part & 0b01111111) << (i * 7);
-        }
-        return PosCounter(cast(size_t)res);
-    }
-    /// writes out a dictionary prepended by its compressed length
-    final class DictionaryCmptLengthReader:ReadHandlers.DictionaryReader{
-        size_t pos,length;
-        /// start of a dictionary
-        override void readDictStart(size_t length) {
-            assert(pos==length,"recursive use not supported");
-        }
-        /// returns true if there is a next entry
-        override bool nextEntry() {
-            if (pos!=length){
-                ++pos;
-                return true;
-            }
-            return false;
-        }
-        /// middle of entry (between key and value)
-        override void readEntryMid() {}
-        /// hint on the size of the dictionary
-        override size_t sizeHint(){ length; }
-        this() { super(); }
-    }
-    /// object that helps the writing of an associative array
-    override DictionaryCmptLengthReader dictionaryReader(){
-        return new DictionaryCmptLengthReader();
-    }+/
 }

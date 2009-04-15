@@ -5,6 +5,7 @@ import tango.io.stream.Lines;
 import tango.io.Stdout;
 import tango.math.Math;
 import blip.rtest.BasicGenerators;
+import blip.text.UtfUtils;
 
 void main(){
     assert(nCodePoints("abc")==3);

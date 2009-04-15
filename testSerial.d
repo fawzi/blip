@@ -7,6 +7,7 @@ import tango.io.device.Array;
 import tango.io.model.IConduit;
 import blip.text.Stringify;
 import blip.BasicModels;
+import tango.core.stacktrace.TraceExceptions;
 
 class A: Serializable{
     int x;
@@ -196,6 +197,38 @@ void testUnserial(T)(T a){
     assert(a==sOut,"unserial error with "~T.stringof);
     version(UnserializationTrace) Stdout("passed test of unserialization of "~T.stringof).newline;
 }
+/// unserialization test
+void testBinUnserial(T)(T a){
+    version(UnserializationTrace) Stdout("testing unserialization of "~T.stringof).newline;
+    auto buf=new Array(1000,1000);
+    auto js=new SBinSerializer(buf);
+    js(a);
+    version(UnserializationTrace) {
+        auto js2=new JsonSerializer!()(Stdout);
+        Stdout("in the buffer:-----").newline;
+        buf.seek(0,IOStream.Anchor.Begin);
+        foreach (i,ub;cast(ubyte[])buf.slice){
+            Stdout.format("{:x} ",ub);
+            if (i%10==9) Stdout.newline;
+        }
+        buf.seek(0,IOStream.Anchor.Begin);
+        Stdout.newline;
+        Stdout("original:----").newline;
+        js2(a);
+        Stdout("XXXXXX Unserialization start").newline;
+    }
+    auto jus=new SBinUnserializer(buf);
+    T sOut;
+    jus(sOut);
+    version(UnserializationTrace){
+        Stdout("XXXXXX Unserialization end").newline;
+        Stdout("unserialized:--").newline;
+        js2(sOut);
+        Stdout("-----").newline;
+    }
+    assert(a==sOut,"unserial error with "~T.stringof);
+    version(UnserializationTrace) Stdout("passed test of unserialization of "~T.stringof).newline;
+}
 
 void main(){
     CoreHandlers ch;
@@ -215,7 +248,8 @@ void main(){
     a.x=3;
     a.y=4;
     js.field(cast(FieldMetaInfo *)null,a);
-    version (Xpose){
+    version (no_Xpose){}
+    else {
         A b=new B();
         js(b);
         B bb;
@@ -241,6 +275,10 @@ void main(){
         testUnserial(b);
         testUnserial(c);
         testUnserial(ts);
+        testBinUnserial(a);
+        testBinUnserial(b);
+        testBinUnserial(c);
+        testBinUnserial(ts);
         Stdout("passed identity tests").newline;
 
         auto buf=new Array(`{ id:3,

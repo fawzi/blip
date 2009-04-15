@@ -24,6 +24,23 @@ version(SerializationTrace){
 } else version(SRegistryTrace){
     version=STrace;
 }
+
+/// basic exception for serialization errors
+class SerializationException: Exception{
+    char[] pos;
+    this(char[]msg,char[] pos,char[]file,long line){
+        super(msg,file,line);
+        this.pos=pos;
+    }
+    void writeOutMsg(void delegate(char[]s)sink){
+        sink(msg);
+        if (pos.length){
+            sink(" parsing ");
+            sink(pos);
+        }
+    }
+}
+
 // version PseudoFieldMetaInfo generates fields for arrays and associative arrays,
 // speeding up the getting of meta info if the elements are not subclasses, but seems to
 // give a compiler error when raising exceptions with gdc (the unwinding mechanism fails)
@@ -756,7 +773,7 @@ class Serializer {
                 /+ /// try to get meta info
                 metaInfo=getSerializationInfoForType!(T)();
                 if (metaInfo is null || metaInfo.externalHandlers is null){
-                    throw Exception("Error: no meta info and external handlers for field of type "~T.stringof)
+                    throw new SerializationException("Error: no meta info and external handlers for field of type "~T.stringof,handlers.parserPos(),__FILE__,__LINE__);
                 } else {
                     ExternalSerializationHandlers *h=metaInfo.externalHandlers;
                     writeStruct(fieldMeta,metaInfo,cast(objectId)0,
@@ -1216,7 +1233,7 @@ class Unserializer {
                             iPartial=0;
                             t[key]=value;
                         }
-                    })) { }
+                    })) { key=K.init; value=V.init; }
             } else static if (isPointerType!(T)) {
                 version(UnserializationTrace) Stdout("Y unserializing pointer").newline;
                 static if (is(typeof(*T.init)==struct)||is(isArrayType!(typeof(*T.init)))||is(typeof(*T.init)==class)){
@@ -1244,7 +1261,7 @@ class Unserializer {
                 /+ /// try to get meta info
                 metaInfo=getSerializationInfoForType!(T)();
                 if (metaInfo is null || metaInfo.externalHandlers is null){
-                    throw Exception("Error: no meta info and external handlers for field of type "~T.stringof)
+                    throw SerializationException("Error: no meta info and external handlers for field of type "~T.stringof,handlers.parserPos(),__FILE__,__LINE__)
                 } else {
                     ExternalSerializationHandlers *h=metaInfo.externalHandlers;
                     writeStruct(fieldMeta,metaInfo,oid,
@@ -1351,6 +1368,6 @@ class Unserializer {
     /// override this to give more info on parser position,...
     /// this method *has* to throw
     void serializationError(char[]msg,char[]filename,long line){
-        throw new Exception(msg,filename,line);
+        throw new SerializationException(msg,handlers.parserPos(),filename,line);
     }
 }
