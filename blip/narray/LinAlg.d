@@ -45,42 +45,6 @@ class LinAlgException:Exception{
     }
 }
 
-/// dot product between tensors (reduces a single axis)
-NArray!(typeof(T.init*U.init),rank1+rank2-2)dot(T,int rank1,U,int rank2)
-    (NArray!(T,rank1)a,NArray!(U,rank2)b,int axis1=-1, int axis2=0)
-in {
-    assert(-rank1<=axis1 && axis1<rank1,"axis1 out of bounds");
-    assert(-rank2<=axis2 && axis2<rank2,"axis2 out of bounds");
-    assert(a.shape[((axis1<0)?(rank1+axis1):axis1)]==b.shape[((axis2<0)?(rank2+axis2):axis2)],
-        "fuse axis has to have the same size in a and b");
-}
-body {
-    alias typeof(T.init*U.init) S;
-    const int rank3=rank1+rank2-2;
-    index_type[rank3] newshape;
-    int ii=0;
-    if (axis1<0) axis1+=rank1;
-    if (axis2<0) axis2+=rank2;
-    for (int i=0;i<rank1;++i){
-        if (i!=axis1){
-            newshape[ii]=a.shape[i];
-            ++ii;
-        }
-    }
-    for (int i=0;i<rank2;++i){
-        if (i!=axis2){
-            newshape[ii]=b.shape[i];
-            ++ii;
-        }
-    }
-    static if(rank3==0){
-        S res;
-    } else {
-        auto res=NArray!(S,rank3).empty(newshape);
-    }
-    return dot!(T,rank1,U,rank2,S,rank3)(a,b,res,cast(S)1,cast(S)0,axis1,axis2);
-}
-
 /// dot product between tensors (reduces a single axis) with scaling and
 /// already present storage target
 NArray!(S,rank3)dot(T,int rank1,U,int rank2,S,int rank3)
@@ -256,6 +220,42 @@ body {
         fuse1(a,b,c,axis1,axis2);
     }
     return c;
+}
+
+/// dot product between tensors (reduces a single axis)
+NArray!(typeof(T.init*U.init),rank1+rank2-2)dot(T,int rank1,U,int rank2)
+    (NArray!(T,rank1)a,NArray!(U,rank2)b,int axis1=-1, int axis2=0)
+in {
+    assert(-rank1<=axis1 && axis1<rank1,"axis1 out of bounds");
+    assert(-rank2<=axis2 && axis2<rank2,"axis2 out of bounds");
+    assert(a.shape[((axis1<0)?(rank1+axis1):axis1)]==b.shape[((axis2<0)?(rank2+axis2):axis2)],
+        "fuse axis has to have the same size in a and b");
+}
+body {
+    alias typeof(T.init*U.init) S;
+    const int rank3=rank1+rank2-2;
+    index_type[rank3] newshape;
+    int ii=0;
+    if (axis1<0) axis1+=rank1;
+    if (axis2<0) axis2+=rank2;
+    for (int i=0;i<rank1;++i){
+        if (i!=axis1){
+            newshape[ii]=a.shape[i];
+            ++ii;
+        }
+    }
+    for (int i=0;i<rank2;++i){
+        if (i!=axis2){
+            newshape[ii]=b.shape[i];
+            ++ii;
+        }
+    }
+    static if(rank3==0){
+        S res;
+    } else {
+        auto res=NArray!(S,rank3).empty(newshape);
+    }
+    return dot!(T,rank1,U,rank2,S,rank3)(a,b,res,cast(S)1,cast(S)0,axis1,axis2);
 }
 
 /// structure to request a subrange of eigenvalues

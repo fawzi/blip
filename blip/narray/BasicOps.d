@@ -12,6 +12,7 @@ import blip.TemplateFu;
 import tango.core.Traits;
 import tango.math.Math: round,sqrt,min,ceil;
 import tango.math.IEEE: feqrel;
+import tango.core.Memory:GC;
 
 template nullNArray(T,int rank){
     static if (rank>0){
@@ -491,7 +492,7 @@ NArray!(S,rank-1) multiplyAxis(T,int rank,S=T)(NArray!(T,rank)a,int axis=-1,NArr
 /// Multiplication Based on Peano’s Space Filling Curve" by Michael Bader and Christoph Zenger
 /// or other kinds of recursive refinements
 void fuse1(alias fuseOp,alias inOp, alias outOp, T,int rank1,S,int rank2,U)(NArray!(T,rank1) a,
-    NArray!(S,rank2) b, inout NArray!(U,rank1+rank2-2) c, int axis1=-1, int axis2=0,
+    NArray!(S,rank2) b, ref NArray!(U,rank1+rank2-2) c, int axis1=-1, int axis2=0,
     index_type optimalChunkSize=NArray!(U,rank1+rank2-1).defaultOptimalChunkSize)
 in {
     static assert(rank1>0,"rank1 should be at least 1");
@@ -560,14 +561,16 @@ in {
                 "            b.bStrides[axis2],a.shape[axis1]);\n","j");
     }
     
-    index_type oChunk=(optimalChunkSize+a.shape[axis1]-1)/a.shape[axis1];
-    index_type oChunk2=cast(index_type)ceil(sqrt(cast(real)oChunk));
-    index_type optimalChunkSize_i=oChunk2;
-    index_type optimalChunkSize_j=oChunk2;
-    if (a.size()/a.shape[axis1]<oChunk2){
-        optimalChunkSize_j=cast(index_type)(oChunk2*(cast(real)oChunk2/cast(real)(a.size()/a.shape[axis1])));
-    } else if (b.size()/a.shape[axis1]<oChunk2){
-        optimalChunkSize_i=cast(index_type)(oChunk2*(cast(real)oChunk2/cast(real)(b.size()/a.shape[axis1])));
+    static if (!(rank1==1 && rank2==1)){
+        index_type oChunk=(optimalChunkSize+a.shape[axis1]-1)/a.shape[axis1];
+        index_type oChunk2=cast(index_type)(ceil(sqrt(cast(real)oChunk)));
+        index_type optimalChunkSize_i=oChunk2;
+        index_type optimalChunkSize_j=oChunk2;
+        if (a.size()/a.shape[axis1]<oChunk2){
+            optimalChunkSize_j=cast(index_type)(oChunk2*(cast(real)oChunk2/cast(real)(a.size()/a.shape[axis1])));
+        } else if (b.size()/a.shape[axis1]<oChunk2){
+            optimalChunkSize_i=cast(index_type)(oChunk2*(cast(real)oChunk2/cast(real)(b.size()/a.shape[axis1])));
+        }
     }
     
     static if (rank1==1) {
@@ -625,7 +628,7 @@ body {
         }
     }
     if (manualAlloc){
-        res=cast(T*)calloc(resSize,cast(index_type)T.sizeof);
+        res=cast(T*)GC.malloc(resSize*T.sizeof,GC.BlkAttr.NO_SCAN);
     } else {
         resA=new T[resSize];
         res=resA.ptr;
@@ -640,7 +643,7 @@ body {
         {
             size_t newSize=min(resSize+a.nElArray/10,a.nElArray);
             if(manualAlloc){
-                res=cast(T*)realloc(res,newSize);
+                res=cast(T*)GC.realloc(res,newSize*T.sizeof,GC.BlkAttr.NO_SCAN);
             } else {
                 resA.length=newSize;
                 res=resA.ptr;
@@ -655,7 +658,7 @@ body {
     mixin(sLoopPtr(rank,["a","mask"],loopInstr,"i"));
     resSize=resP-res;
     if(manualAlloc){
-        res=cast(T*)realloc(res,resSize);
+        res=cast(T*)GC.realloc(res,resSize*T.sizeof,GC.BlkAttr.NO_SCAN);
         resA=res[0..resSize];
     } else {
         resA.length=resSize;

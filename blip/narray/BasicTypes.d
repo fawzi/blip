@@ -37,7 +37,7 @@
     author:         Fawzi Mohamed
 *******************************************************************************/
 module blip.narray.BasicTypes;
-import tango.stdc.stdlib: calloc,free,realloc;
+import tango.core.Memory: GC;
 import tango.core.Array: sort;
 import tango.stdc.string: memset,memcpy,memcmp;
 import blip.TemplateFu;
@@ -359,7 +359,7 @@ else {
         
         ~this(){
             if (flags&Flags.ShouldFreeData){
-                free(data.ptr);
+                GC.free(data.ptr);
             }
         }
         
@@ -389,8 +389,8 @@ else {
             uint flags=ArrayFlags.None;
             V[] mData;
             if (size>manualAllocThreshold/cast(index_type)V.sizeof) {
-                V* mData2=cast(V*)calloc(size,cast(index_type)V.sizeof);
-                if(mData2 is null) throw new Exception("calloc failed");
+                V* mData2=cast(V*)GC.malloc(size*V.sizeof,GC.BlkAttr.NO_SCAN);
+                if(mData2 is null) throw new Exception("malloc failed");
                 mData=mData2[0..size];
                 flags=ArrayFlags.ShouldFreeData;
             } else {
