@@ -350,8 +350,8 @@ version (Tango) {
 	template SerializerBackend() {
 		private {
 			import tango.io.protocol.Writer;
-			import tango.io.device.FileConduit;
-			import tango.io.device.DeviceConduit;
+			import tango.io.device.File : FileConduit = File;
+			import tango.io.device.Device : DeviceConduit = Device;
 			
 			const FileConduit.Style WriteCreate = {FileConduit.Access.Write, FileConduit.Open.Create}; 
 		}
@@ -710,7 +710,7 @@ version (Tango) {
 	template UnserializerBackend() {
 		private {
 			import tango.io.protocol.Reader;
-			import tango.io.device.FileConduit;
+			import tango.io.device.File : FileConduit = File;
 		}
 
 		protected FileConduit	fileCond;

@@ -221,21 +221,37 @@ template expose(namespace, int expNr = 0) {
 }
 
 
+// Thanks, downs!
+private char[] ctReplace(char[] source, char[][] pairs) {
+	assert((pairs.length%2) == 0, "Parameters to ctReplace must come in pairs. ");
+	if (!pairs.length) return source;
+	else {
+		char[] what = pairs[0], wth = pairs[1];
+		int i = 0;
+		while (i <= source.length - what.length) {
+			if (source[i .. i+what.length] == what) {
+				source = source[0 .. i] ~ wth ~ source[i+what.length .. $];
+				i += wth.length;
+			} else {
+				i++;
+			}
+		}
+		return ctReplace(source, pairs[2 .. $]);;
+	}
+}
+
 
 private char[] _expose(namespace, int expNr = 0)(char[] targetTypeName, char[] expStr) {
-	const char[] fid = "__LINE__.stringof";
+	static if (0 == expNr) {
+		char[] result = "mixin(\"static char[] mixf__\"~$fid$~\"() { char[] result = ``;";
+	} else {
+		char[] result = null;
+	}
 	
-	char[] result;
-	static if (0 == expNr) result ~= "mixin(\"static char[] mixf__\"~"~fid~"~\"() { char[] result = ``;";
-	
-	static if (0 == expNr || is(typeof(mixin(`&namespace.handler!(` ~ ToString!(expNr) ~ `).begin`)))) {
-		const char[] namesp = namespace.stringof;
-		//pragma (msg, namesp);
+	static if (0 == expNr || is(typeof(mixin(`&namespace.handler!(` ~ expNr.stringof ~ `).begin`)))) {
+		result ~= "result ~= $namesp$.handler!($expNr$).begin($targetTypeName$);";
 		
-		result ~= "result ~= " ~ namesp ~ ".handler!(" ~ ToString!(expNr) ~ ").begin("~targetTypeName~");";
-		
-		char[][] lines = expStr.splitLines();
-		foreach (line; lines) {
+		foreach (line; expStr.splitLines()) {
 			char[] name, tmpAttribs, attribs;
 			splitNameAttribs(line, name, tmpAttribs);
 			
@@ -246,21 +262,37 @@ private char[] _expose(namespace, int expNr = 0)(char[] targetTypeName, char[] e
 			extractInfo(tmpAttribs, attribs, rename, readOnly, overload);
 			
 			static if (is(typeof(namespace.xposeFieldsOnly))) {
-				result ~=	"result ~= " ~ namesp ~ ".handler!(" ~ ToString!(expNr) ~
-								").field("~targetTypeName~", `"~name~"`, `"~rename~"`, "~(readOnly?"true":"false")~", `"~attribs~"`);";
+				char[] resPart =
+				"result ~= $namesp$.handler!($expNr$).field($targetTypeName$, `$name$`, `$rename$`, $readOnly$, `$attribs$`);";
 			} else {
-				result ~= "static if (is(typeof(" ~ name ~ ") == function))";
-					result ~=	"result ~= " ~ namesp ~ ".handler!(" ~ ToString!(expNr) ~
-									").method("~targetTypeName~", `"~name~"`, `"~rename~"`, `"~overload~"`, `"~attribs~"`);";
-								
-				result ~=	"else result ~= " ~ namesp ~ ".handler!(" ~ ToString!(expNr) ~
-								").field("~targetTypeName~", `"~name~"`, `"~rename~"`, "~(readOnly?"true":"false")~", `"~attribs~"`);";
+				char[] resPart =
+				"static if (is(typeof($name$) == function)) {"
+				"	result ~= $namesp$.handler!($expNr$).method($targetTypeName$, `$name$`, `$rename$`, `$overload$`, `$attribs$`);"
+				"} else {"
+				"	result ~= $namesp$.handler!($expNr$).field($targetTypeName$, `$name$`, `$rename$`, $readOnly$, `$attribs$`);"
+				"}";
 			}
+			result ~= ctReplace(resPart, [
+				`$rename$`, rename,
+				`$name$`, name,
+				`$readOnly$`, (readOnly ? "true" : "false"),
+				`$overload$`, overload,
+				`$attribs$`, attribs
+			]);
 		}
 		
-		result ~= "result ~= " ~ namesp ~ ".handler!(" ~ ToString!(expNr) ~ ").end("~targetTypeName~");";
-		return result ~ _expose!(namespace, expNr+1)(targetTypeName, expStr);
+		result ~= "result ~= $namesp$.handler!($expNr$).end($targetTypeName$);";
+		result = ctReplace(result, [
+			`$namesp$`, namespace.stringof,
+			`$expNr$`, expNr.stringof
+		]);
+		result ~= _expose!(namespace, expNr+1)(targetTypeName, expStr);
 	} else {
-		return result ~ "return result; } /+pragma(msg, mixf__\"~"~fid~"~\"());+/ mixin(mixf__\"~"~fid~"~\"());\");";
+		result ~= "return result; } /+pragma(msg, mixf__\"~$fid$~\"());+/ mixin(mixf__\"~$fid$~\"());\");";
 	}
+	
+	return ctReplace(result, [
+		`$targetTypeName$`, targetTypeName,
+		`$fid$`, `__LINE__.stringof`
+	]);
 }

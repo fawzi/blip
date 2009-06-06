@@ -17,6 +17,8 @@ public alias tango.core.Traits.isStaticArrayType isStaticArrayType;
 // serializeFunc and unserializeFunc get called after all fields of the object have been (un)serialized
 // they should be static functions having the signature void f(T* obj, Serializer/Unserializer s)
 template xposeSerialization(char[] target_ = "", char[] serializeFunc = "", char[] unserializeFunc = "") {
+	private import xf.xpose2.Serialization; // workaround for dmdfe bug
+
 	static if (target_ == "") {
 		static if (is(typeof(*this) == struct)) {
 			const char[] target = typeof(*this).stringof;
@@ -56,8 +58,15 @@ template xposeSerialization(char[] target_ = "", char[] serializeFunc = "", char
 		
 		mixin(`alias `~("" == target ? `UnrefType!(typeof(this))` : target)~` TargetType;`);
 
+		// workaround for dmdfe bug
+		static if (is(typeof(*this) == struct)) {
+			alias typeof(*this) ThisT;
+		} else {
+			alias typeof(this) ThisT;
+		}
+		
 		with (serializationMetaInfo) {
-			static if (is(xposeFields)) foreach (field; xposeFields) {{
+			static if (is(ThisT.xposeFields)) foreach (field; ThisT.xposeFields) {{
 				static if (field.isData) {
 					static if (is(typeof(field.attribs.serial))) {
 						const attribs = field.attribs.serial;
@@ -124,6 +133,7 @@ template xposeSerialization(char[] target_ = "", char[] serializeFunc = "", char
 		
 		int serializationFieldCounter = fieldOffset;
 		
+		// workaround for dmdfe bug
 		static if (is(typeof(*this) == struct)) {
 			alias typeof(*this) ThisT;
 		} else {
@@ -754,15 +764,19 @@ version (Tango) {
 		private {
 			import tango.io.protocol.Reader;
 			import tango.io.device.File : FileConduit = File;
+			import tango.io.device.Conduit : Conduit;
+			import tango.io.stream.Buffered;
+			import tango.io.device.Array : Array;
+			import tango.io.device.FileMap : FileMap;
 		}
 
-		protected FileConduit	fileCond;
-		protected Reader		reader;
+		protected InputStream	fileCond;
+		protected Reader			reader;
 		
 		
 		uint streamTell() {
 			auto buf = reader.buffer();
-			return fileCond.position() - buf.limit + buf.position;
+			return fileCond.seek(0, Conduit.Anchor.Current) - buf.limit + buf.position;
 		}
 		
 
@@ -770,9 +784,9 @@ version (Tango) {
 			fileCond.seek(pos);
 			reader.buffer.clear();
 		}
-
 		
-		this(FileConduit fc) {
+		
+		this(InputStream fc) {
 			assert (fc !is null);
 			this.fileCond = fc;
 			this.reader = new Reader(this.fileCond);
@@ -781,7 +795,7 @@ version (Tango) {
 		
 		this(char[] filename) {
 			assert (filename !is null);
-			this(new FileConduit(filename, FileConduit.ReadExisting));
+			this(new FileMap(filename, FileConduit.ReadExisting));
 		}
 
 
@@ -845,6 +859,7 @@ struct CurUnserialObject {
 
 class Unserializer {
 	mixin UnserializerBackend;
+	import tango.text.convert.Format : Format;
 
 	public {
 		bool recoverFromErrors = false;
@@ -981,7 +996,9 @@ class Unserializer {
 		}
 
 		version (SerializationDebug) Stdout.format("lengthWrappedRead: ");
-		streamSeek(curPos+blockLen);
+		if (streamTell() != curPos+blockLen) {
+			streamSeek(curPos+blockLen);
+		}
 	}
 	
 	
@@ -992,19 +1009,18 @@ class Unserializer {
 		bool infoNow = (objId & 1) != 0;
 		objId /= 2;
 
-		uint firstPos;
-		uint nextPos;
-		uint infoOffset;
-		if (!infoNow) {
-			firstPos = streamTell();
-			infoOffset = packedNum();
-			nextPos = streamTell();
-		}
-		
 		if (!infoNow && objId in objectIdToPtr) {
+			packedNum();
 			return objectIdToPtr[objId];
 		} else {
+			uint firstPos;
+			uint nextPos;
+			uint infoOffset;
+
 			if (!infoNow) {
+				firstPos = streamTell();
+				infoOffset = packedNum();
+				nextPos = streamTell();
 				streamSeek(firstPos - infoOffset);
 			}
 			
@@ -1069,6 +1085,51 @@ class Unserializer {
 	}
 	
 
+	T readObject(T)(T obj) {
+		assert (obj !is null);
+	
+		static if (is(T == interface)) {
+			return cast(T)readObject!(Object)(obj);
+		} else {
+			version (SerializationDebug) Stdout.formatln("readObject");
+			
+			void* ptr = getObjectOr((objectId objId) {
+				version(SerializationTrace) Stdout.formatln(`unserializing class id: {}`, cast(uint)objId);
+				auto metaInfo = getClassMeta(cast(classId)packedNum());
+				
+				objectIdToPtr[objId] = cast(void*)obj;
+
+				version(SerializationTrace) Stdout.formatln(`unserializing an object`);
+				lengthWrappedRead({
+					auto funcPtr = SerializationRegistry().getUnserializeFunc(obj.classinfo);
+					assert (funcPtr !is null, "unserialize func pointer was null for " ~ obj.classinfo.name);
+					
+					auto metaBackup = pushUnserialObject(streamTell(), metaInfo);
+					{
+						funcPtr(this, cast(void*)obj, 0);
+					}
+					popUnserialObject(metaBackup);
+				});
+				version(SerializationTrace) Stdout.formatln(`done unserializing an object`);
+				
+				return cast(void*)obj;
+			});
+			
+			assert (ptr is cast(void*)obj);
+			
+			T res = cast(T)cast(Object)ptr;
+			assert (res !is null, `classes dont match`);
+			
+			auto onUnserial = SerializationRegistry().getOnUnserializedFunc(res.classinfo);
+			if (onUnserial !is null) {
+				onUnserial(cast(void*)res);
+			}
+			
+			return res;
+		}
+	}
+	
+	
 	T getStruct(T)() {
 		version (SerializationDebug) Stdout.formatln("getStruct");
 		auto metaInfo = getClassMeta(cast(classId)packedNum());
@@ -1280,8 +1341,7 @@ class Unserializer {
 				uint lastStreamPos = this.streamTell();
 				uint blockLength = lastStreamPos - firstStreamPos;
 				if (readLength && blockLength != fieldMeta.typeSize) {
-					assert (false);
-					//throw new Exception(format(`Unserialized field size (%s) doesn't match the size in field's meta info (%s)`, blockLength, fieldMeta.typeSize));
+					throw new Exception(Format(`Unserialized field size ({}) doesn't match the size in field's meta info ({})`, blockLength, fieldMeta.typeSize));
 				}
 			}
 		}

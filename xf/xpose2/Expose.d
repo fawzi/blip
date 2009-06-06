@@ -26,221 +26,6 @@ public char[][] xposeAttribParser_overload(char[] foo) {
 
 
 
-private char[] intToStringCT(int i) {
-	char[] res = "";
-	do
-	{
-		res ~= "0123456789"[i%10];
-		i /= 10;
-	} while (i > 0);
-	
-	for (int j = 0; j < res.length/2; ++j) {
-		char c = res[j];
-		res[j] = res[res.length-j-1];
-		res[res.length-j-1] = c;
-	}
-	return res;
-}
-
-private char[] rangeCodegen(int i) {
-	char[] res = `alias RangeTuple!(`;
-	if (i > 0) {
-		res ~= "0";
-		for (int j = 1; j < i; ++j) {
-			res ~= "," ~ intToStringCT(j);
-		}
-	}
-	return res ~ ") Range;";
-}
-
-private template RangeTuple(T ...) {
-	alias T RangeTuple;
-}
-
-private template Range(int i) {
-	mixin(rangeCodegen(i));
-}
-
-private char[][] allNamesInAlias(alias target)() {
-	char[][] names;
-	const int len = target.tupleof.length;
-	int prefix = target.stringof.length + 3;		// "(Type)."
-	foreach (i; Range!(len)) {
-		names ~= target.tupleof[i].stringof[prefix..$];
-	}
-	return names;
-}
-
-
-private bool matchesClassCT(char c, char[] cls) {
-	if (char.init == c) return false;
-	assert (cls.length > 0);
-
-	if ("." == cls) return true;
-	if (1 == cls.length && c == cls[0]) return true;
-
-	if ('[' == cls[0]) {
-		assert (']' == cls[$-1]);
-		cls = cls[1..$-1];
-		bool res = true;
-		int from = 0;
-		if ('^' == cls[0]) {
-			res = false;
-			from = 1;
-		}
-		for (int i = from; i < cls.length; ++i) {
-			if ('\\' == cls[i]) {
-				if (cls[i+1] == c) return res;
-				else ++i;
-			} else if (i+1 < cls.length && '-' == cls[i+1]) {
-				assert (i+2 < cls.length);
-				if (c >= cls[i] && c <= cls[i+2]) return res;
-				else i += 2;
-			} else if (cls[i] == c) return res;
-		}
-		return !res;
-	}
-	assert (1 == cls.length);
-	return cls[0] == c;
-}
-
-private int cutBRExprCT(char[] str, out char[] cls) {
-	for (int i = 0; i < str.length; ++i) {
-		if ('\\' == str[i]) ++i;
-		else if (']' == str[i]) {
-			cls = str[0..i+1];
-			return i;
-		}
-	}
-	assert (false);
-	return int.max;
-}
-
-
-/**
-	A very greedy pattern matching function.
-	
-	.				matches any character
-	[abc]		matches a, b and c
-	[a-z]			matches a through z
-	[abcA-Z]	matches a, b, c, and A through Z, etc.
-	[^stuff]		matches the inverse of [stuff]
-	?				matches the preceding element zero or one time
-	*				matches the preceding element zero or more times
-	
-	It's not a regex engine, it's much less powerful in order to be lightweight.
-	The greediness means that "f.*r" will not match "foobar", but "f.*" will.
-*/
-private bool matchesPatternCT(char[] str, char[] pattern) {
-	char[]	cls;
-	bool		prevMatched = true;
-	bool		fail = true;
-	int		stri = -1;
-	
-	strIter: while (pattern.length > 0) {
-		switch (pattern[0]) {
-			case '*': {
-				if (!prevMatched) --stri;
-				while (prevMatched && matchesClassCT(stri+1 < str.length ? str[stri+1] : char.init, cls)) {
-					++stri;
-				}
-				pattern = pattern[1..$];
-				prevMatched = true;
-			} break;
-			
-			case '?': {
-				if (!prevMatched) --stri;
-				pattern = pattern[1..$];
-				prevMatched = true;
-			} break;
-			
-			default: {
-				// see if the previous class matched, return false if it didn't
-				if (!prevMatched) {
-					return false;
-				} else {
-					++stri;
-				}
-				
-				// find the class
-				if ('[' == pattern[0]) {
-					pattern = pattern[cutBRExprCT(pattern, cls)+1..$];
-				} else {
-					cls = pattern[0..1];
-					pattern = pattern[1..$];
-				}
-				prevMatched = matchesClassCT(stri < str.length ? str[stri] : char.init, cls);
-			}
-		}
-	}
-	
-	return prevMatched && stri+1 >= str.length;
-}
-
-
-/**
-	Matches the str to a pattern expression formed by patterns supported by matchesPatternCT
-	and operators '+' and '-'
-*/
-private bool matchesComplexPatternCT(char[] str, char[] pattern) {
-	bool res = false;
-	char prevFunc = '+';
-	int i = 0;
-	for (; i < pattern.length; ++i) {
-		if ('-' == pattern[i] || '+' == pattern[i]) {
-			bool match = matchesPatternCT(str, pattern[0..i]);
-			if ('+' == prevFunc) {
-				res |= match;
-			} else {
-				res &= !match;
-			}
-			prevFunc = pattern[i];
-			pattern = pattern[i+1..$];
-			i = -1;
-		}
-	}
-
-	if (i > 0) {
-		bool match = matchesPatternCT(str, pattern[0..i]);
-		if ('+' == prevFunc) {
-			res |= match;
-		} else {
-			res &= !match;
-		}
-	}
-	
-	return res;
-}
-
-
-private bool isPatternCT(char[] str) {
-	foreach (c; str) {
-		switch (c) {
-			case '.':
-			case '?':
-			case '*':
-			case '-':
-			case '+':
-			case '[': return true;
-			default: break;
-		}
-	}
-	return false;
-}
-
-private char[][] matchedNamesCT(alias target)(char[] pattern) {
-	char[][] res;
-	foreach (name; allNamesInAlias!(target)) {
-		if (matchesComplexPatternCT(name, pattern)) {
-			res ~= name;
-		}
-	}
-	return res;
-}
-
-
-
-
 private char[] escapeDoubleQuotes(char[] str) {
 	char[] res;
 	foreach (c; str) {
@@ -598,6 +383,11 @@ template Xpose2Tuple(TList...) {
 
 private void findFieldXposeRename(char[] str, out char[] dname, out char[] xname) {
 	foreach (i, c; str) {
+		if (':' == c) {
+			dname = str[0..i];
+			xname = str[i+1..$];
+			return;
+		}
 		if ('@' == c) {
 			dname = str[0..i];
 			xname = dname ~ `__` ~ str[i+1..$];
@@ -630,20 +420,20 @@ char[] xpose2MainCodegenWorker(char[] targetName, char[] dname, char[] dataPrefi
 			";
 	} else {
 		return "
-			static if (is(typeof("~dataPrefix~dname~") == function)) {
+			static if (is(typeof(("~dataPrefix~dname~")) == function)) {
 				res ~=
 				`interface _Field_"~xname~" {
 					enum : bool { isFunction = true }
 					enum : bool { isCtor = false }
 					enum : bool { isData = false }
-					const bool isStatic = isStaticMemberFunc!("~dataPrefix~dname~")();
+					const bool isStatic = isStaticMemberFunc!(("~dataPrefix~dname~"))();
 					const name = \""~reflName~"\";
-					alias ReturnTypeOf!("~dataPrefix~dname~") returnType;
+					alias ReturnTypeOf!(("~dataPrefix~dname~")) returnType;
 				` ~ "~attribsCode~" ~ `
 					static if (is(attribs.overload)) {
 						alias ParameterTupleOf!(attribs.overload.type) paramTypes;
 					} else {
-						alias ParameterTupleOf!("~dataPrefix~dname~") paramTypes;
+						alias ParameterTupleOf!(("~dataPrefix~dname~")) paramTypes;
 					}`
 					\\n`}`\\n;
 			} else {
@@ -657,6 +447,22 @@ char[] xpose2MainCodegenWorker(char[] targetName, char[] dname, char[] dataPrefi
 				` ~ "~attribsCode~" \\n`}`\\n;
 			}";
 	}
+}
+
+
+private bool isPatternCT(char[] str) {
+	foreach (c; str) {
+		switch (c) {
+			case '.':
+			case '?':
+			case '*':
+			case '-':
+			case '+':
+			case '[': return true;
+			default: break;
+		}
+	}
+	return false;
 }
 
 

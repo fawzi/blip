@@ -389,17 +389,31 @@ template MiniDWrapperCommon(bool allowSubclassing) {
 
 		pop(t);
 
-		static if(is(_Target == class)) {
-			alias BaseTypeTupleOf!(_Target)[0] BaseClass;
+		static if (is(_Target == class) || (is(_Target == interface) && BaseTypeTupleOf!(_Target).length > 0)) {
+			alias BaseTypeTupleOf!(_Target) BaseTypeTuple;
+			static if (is(BaseTypeTuple[0] == Object)) {
+				static if (BaseTypeTuple.length > 1) {
+					alias BaseTypeTuple[1] BaseClass;
+				} else {
+					alias void BaseClass;
+				}
+			} else {
+				alias BaseTypeTuple[0] BaseClass;
+			}
 		} else {
 			alias void BaseClass;
 		}
 
-		static if (is(BaseClass : Object) && !is(BaseClass == Object)) {
+		static if (!is(BaseClass == void)) {
 			static if (is(typeof(BaseClass._minid_classInit(t)))) {
 				BaseClass._minid_classInit(t);
 			}
-			auto base = getWrappedClass(t, BaseClass.classinfo);
+
+			static if (is(BaseClass == class)) {
+				auto base = getWrappedClass(t, BaseClass.classinfo);
+			} else static if (is(BaseClass == interface)) {
+				auto base = getWrappedClass(t, typeid(BaseClass));
+			} else static assert (false, "wtf: " ~ BaseClass.stringof);
 		} else {
 			auto base = pushNull(t);
 		}
@@ -424,6 +438,9 @@ template MiniDWrapperCommon(bool allowSubclassing) {
 
 		// Set the class
 		setWrappedClass(t, typeid(_Target));
+		static if (!is(_Target == struct)) {
+			setWrappedClass(t, _Target.classinfo);
+		}
 		newGlobal(t, _classname_);
 		
 		int toCleanup = stackSize(t) - initialStackSize;
@@ -485,7 +502,7 @@ template xposeMiniD_worker(char[] target_, bool allowSubclassing) {
 	}
 	mixin("private alias " ~ target ~ " _Target;");
 	
-	static if (is(_Target == class) && is(typeof(this) == class)) {
+	static if ((is(_Target == class) || is(_Target == interface)) && (is(typeof(this) == class) || is(typeof(this) == interface))) {
 		alias BaseTypeTupleOf!(typeof(this))[0] SuperWrapClassType;
 	}
 
