@@ -6,6 +6,6 @@
 /// or via xpose
 module blip.serialization.Serialization;
 public import blip.serialization.SerializationBase;
-public import blip.serialization.SerializationExpose;
+//public import blip.serialization.SerializationExpose;
 public import blip.serialization.JsonSerialization;
 public import blip.serialization.SBinSerialization;

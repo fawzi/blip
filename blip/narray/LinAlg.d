@@ -22,7 +22,8 @@ module blip.narray.LinAlg;
 //import tango.io.Stdout;
 import blip.narray.BasicTypes;
 import blip.narray.BasicOps;
-import tango.math.Math:min,max;
+import tango.math.Math:min,max,round,sqrt,ceil,abs;
+
 import tango.core.Traits:isComplexType,isImaginaryType,ComplexTypeOf,RealTypeOf;
 
 version(no_blas){ 

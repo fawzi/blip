@@ -12,6 +12,7 @@ import blip.narray.BasicOps;
 import blip.TemplateFu;
 import tango.core.Traits;
 import tango.io.Stdout;
+import tango.math.Math:min;
 debug(ConvolveCheckAccess) import blip.text.Stringify;
 /+ --------- convolution --------- +/
 // convolution base in 2d: 3 streams (minus,zero,plus), kernel[imin..imax,jmin..jmax] in aij

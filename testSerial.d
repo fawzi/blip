@@ -8,7 +8,10 @@ import tango.io.model.IConduit;
 import blip.text.Stringify;
 import blip.BasicModels;
 import tango.core.stacktrace.TraceExceptions;
-
+version(no_Xpose){}
+else {
+    public import blip.serialization.SerializationExpose;
+}
 class A: Serializable{
     int x;
     int y;
