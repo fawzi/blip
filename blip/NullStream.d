@@ -14,11 +14,11 @@ class NullConduit: Conduit{
         return "NullConduit";
     } 
 
-    uint bufferSize () { return 256u;}
+    size_t bufferSize () { return 256u;}
 
-    uint read (void[] dst) { return Eof; }
+    size_t read (void[] dst) { return Eof; }
 
-    uint write (void[] src) { return src.length; }
+    size_t write (void[] src) { return src.length; }
 
     void detach () { }
     

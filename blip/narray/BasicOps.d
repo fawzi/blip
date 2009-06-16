@@ -215,8 +215,8 @@ char[] freeFunMixin(char[] opName){
     res~="                static if(is(BaseTypeOfArrays!(T)==index_type)) {\n";
     res~="                    return NArray!(V,rkOfShape!(T))."~opName~"(shape,fortran);\n";
     res~="                } else {\n";
-    res~="                    index_type[rankOfArray!(T)] s;\n";
-    res~="                    for (int i=0;i<shape;++i)\n";
+    res~="                    index_type[rkOfShape!(T)] s;\n";
+    res~="                    for (int i=0;i<rkOfShape!(T);++i)\n";
     res~="                        s[i]=cast(index_type)shape[i];\n";
     res~="                    return NArray!(V,rkOfShape!(T))."~opName~"(s,fortran);\n";
     res~="                }\n";
@@ -428,7 +428,7 @@ body  {
         static if (rank==1){
             myFold(res,a.startPtrArray,a.bStrides[0],a.shape[0]);
         } else {
-            int [rank-1] newstrides;
+            index_type [rank-1] newstrides;
             {
                 int ii=0;
                 for(int i=0;i<rank;i++){
@@ -541,7 +541,7 @@ in {
                 b.bStrides[0],b.shape[0]);`;
         }
     } else {
-        int [rank2-1] newshape2,newstrides2,newstrides2c;
+        index_type [rank2-1] newshape2,newstrides2,newstrides2c;
         {
             int ii=0;
             for(int i=0;i<rank2;i++){
@@ -580,7 +580,7 @@ in {
             mixin(innerLoop);
         }
     } else {
-        int [rank1-1] newshape1,newstrides1,newstrides1c;
+        index_type [rank1-1] newshape1,newstrides1,newstrides1c;
         {
             int ii=0;
             for(int i=0;i<rank1;i++){

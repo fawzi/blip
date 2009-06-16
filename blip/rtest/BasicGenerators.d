@@ -39,10 +39,10 @@
         author:         Fawzi Mohamed
 *******************************************************************************/
 module blip.rtest.BasicGenerators;
-import blip.rtest.RTestFramework: Rand;
 import tango.core.Traits;
 import blip.TemplateFu;
 import tango.math.Math;
+import tango.math.random.Random: Rand=Random;
 
 /// returns a positive number, most likely mean+hardMin, in [hardMin,hardMax]
 int generateSize(Rand r,int mean=4,int hardMin=0,int hardMax=-3) {

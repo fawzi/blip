@@ -509,7 +509,7 @@ class Serializer {
     bool structHasId;
 
     this(WriteHandlers h=null) {
-        ptrToObjectId[null] = 0;
+        ptrToObjectId[null] = cast(objectId)0;
         lastObjectId=cast(objectId)1;
         handlers=h;
         removeCycles=true;
@@ -518,7 +518,7 @@ class Serializer {
     /// resets objectId counter (and the mapping pointer->objectId) used to remove cycles
     void resetObjIdCounter(){
         ptrToObjectId=null;
-        ptrToObjectId[null] = 0;
+        ptrToObjectId[null] = cast(objectId)0;
         lastObjectId=cast(objectId)1;
     }
     
@@ -928,7 +928,7 @@ class Unserializer {
     }
     
     this(ReadHandlers h=null) {
-        objectIdToPtr[0] = null;
+        objectIdToPtr[cast(objectId)0] = null;
         lastObjectId=cast(objectId)1;
         handlers=h;
         recoverCycles=true;
@@ -937,7 +937,7 @@ class Unserializer {
     /// resets objectId counter (and the mapping objectId->pointer) used to recover cycles
     void resetObjIdCounter(){
         objectIdToPtr=null;
-        objectIdToPtr[0] = null;
+        objectIdToPtr[cast(objectId)0] = null;
         lastObjectId=cast(objectId)1;
     }
     
