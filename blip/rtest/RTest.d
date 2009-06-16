@@ -151,7 +151,7 @@ import blip.parallel.WorkManager;
 import blip.NullStream;
 import tango.io.stream.Format;
 
-private mixin testInit!() autoInitTst; 
+mixin testInit!() autoInitTst; 
 
 int[] parseIArray(char[] str){
     uint start=locate(str,'[');
