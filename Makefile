@@ -46,7 +46,8 @@ ARCHDIR=$(TANGO_HOME)/lib/build/arch
 EXCLUDEPAT_ALL=$(EXCLUDEPAT_OS)
 ARCHFILE=$(ARCHDIR)/$(IDENT).mak
 MAKEFILE=$(BLIP_HOME)/Makefile
-DFLAGS_ADD=-I$(BLIP_HOME)
+DFLAGS_ADD=-I$(BLIP_HOME) -d-version=no_Xpose
+WHAT=_lib
 
 LIB=libblip.$(LIB_EXT)
 INSTALL_LIB=libblip-$(shell $(TOOLDIR)/getCompVers.sh $(IDENT)).$(LIB_EXT)
@@ -64,11 +65,13 @@ EXCLUDE_DEP_ALL=$(EXCLUDE_DEP_COMP) ^tango.*
 
 OBJS=$(MODULES:%=%.$(OBJ_EXT))
 
-.PHONY: _genDeps newFiles build clean distclean
+TESTS=testTextParsing testRTest testSerial testNArray
+
+.PHONY: _genDeps newFiles build clean distclean _tests tests lib
 
 all: $(OBJDIR)/MODULES.inc $(OBJDIR)/intermediate.rule
 	@mkdir -p $(OBJDIR)
-	$(MAKE) -f $(MAKEFILE) -C $(OBJDIR) TANGO_HOME="$(TANGO_HOME)"  BLIP_HOME="$(BLIP_HOME)" IDENT="$(IDENT)" DC="$(DC)" build
+	$(MAKE) -f $(MAKEFILE) -C $(OBJDIR) TANGO_HOME="$(TANGO_HOME)"  BLIP_HOME="$(BLIP_HOME)" IDENT="$(IDENT)" DC="$(DC)" WHAT="_tests" build
 
 allVersions:	$(OBJDIR)/MODULES.inc $(OBJDIR)/intermediate.rule
 	@mkdir -p $(OBJDIR)
@@ -79,7 +82,13 @@ allVersions:	$(OBJDIR)/MODULES.inc $(OBJDIR)/intermediate.rule
 build:
 	@echo "XXX using the architecture file $(ARCHFILE)"
 	$(MAKE) -f $(MAKEFILE) -C $(OBJDIR) TANGO_HOME="$(TANGO_HOME)" BLIP_HOME="$(BLIP_HOME)" IDENT="$(IDENT)" DC="$(DC)" _genDeps
-	$(MAKE) -f $(MAKEFILE) -C $(OBJDIR) TANGO_HOME="$(TANGO_HOME)" BLIP_HOME="$(BLIP_HOME)" IDENT="$(IDENT)" DC="$(DC)" _lib
+	$(MAKE) -f $(MAKEFILE) -C $(OBJDIR) TANGO_HOME="$(TANGO_HOME)" BLIP_HOME="$(BLIP_HOME)" IDENT="$(IDENT)" DC="$(DC)" $(WHAT)
+
+tests:
+	$(MAKE) -f $(MAKEFILE) -C $(OBJDIR) TANGO_HOME="$(TANGO_HOME)"  BLIP_HOME="$(BLIP_HOME)" IDENT="$(IDENT)" DC="$(DC)" WHAT="_tests" build
+
+lib:
+	$(MAKE) -f $(MAKEFILE) -C $(OBJDIR) TANGO_HOME="$(TANGO_HOME)"  BLIP_HOME="$(BLIP_HOME)" IDENT="$(IDENT)" DC="$(DC)" WHAT="_lib" build
 
 _genDeps: $(MODULES:%=%.dep)
 
@@ -90,6 +99,14 @@ $(LIB):  $(OBJS)
 	$(mkLib) $@ $(OBJS)
 	$(ranlib) $@
 	cp $(OBJDIR)/$(LIB) $(TANGO_HOME)/$(INSTALL_LIB)
+$(TESTS:%=$(OBJDIR)/%.d):$(TESTS:%=$(SRCDIR)/%.d)
+	cp $(SRCDIR)/$(shell basename $@) $@
+
+$(TESTS):$(LIB) $(TESTS:%=$(OBJDIR)/%.$(OBJ_EXT))
+	$(DC) -of=$@ $(@:%=$(OBJDIR)/%.$(OBJ_EXT)) $(LIB) $(EXTRA_LIBS)
+	cp $@ ..
+
+_tests: $(TESTS)
 
 $(OBJDIR)/MODULES.inc:
 	@mkdir -p $(OBJDIR)
@@ -106,9 +123,6 @@ newFiles:
 	$(TOOLDIR)/mkMods.sh --out-var MOD_BLIP $(SRCDIR)/blip $(EXCLUDEPAT_ALL) > $(OBJDIR)/MODULES.inc
 	$(TOOLDIR)/mkMods.sh --out-var MOD_GOBO $(SRCDIR)/gobo $(EXCLUDEPAT_ALL) >> $(OBJDIR)/MODULES.inc
 	$(TOOLDIR)/mkIntermediate.sh $(SRCDIR) $(EXCLUDEPAT_ALL) > $(OBJDIR)/intermediate.rule
-
-testSerial:testSerial.$(OBJ_EXT) $(LIB)
-	$(DC) testSerial.$(OBJ_EXT) $(LIB) $(EXTRA_LIBS)
 
 clean:
 	rm -f $(OBJDIR)/*.$(OBJ_EXT)
