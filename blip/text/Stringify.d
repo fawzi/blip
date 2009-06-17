@@ -84,7 +84,11 @@ T[] printToString(T)(FormatOutput!(T) delegate(FormatOutput!(T))w){
 /// returns true if the string representation of a and b is the same
 /// useful for debugging and comparing read in floats to the one that were outputted
 bool eqStr(T)(T a,T b){
-    if (a is b) return 1;
+    static if (is(T:cfloat)||is(T:cdouble)||is(T:creal)) {
+        if (a==b) return 1;
+    } else {
+        if (a is b) return 1;
+    }
     auto aStr=getString(writeDesc!(T)(new Stringify(),a));
     auto bStr=getString(writeDesc!(T)(new Stringify(),b));
     return aStr==bStr;
