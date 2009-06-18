@@ -69,6 +69,10 @@ TESTS=testTextParsing testRTest testSerial testNArray
 
 .PHONY: _genDeps newFiles build clean distclean _tests tests lib
 
+lib:
+	@mkdir -p $(OBJDIR)
+	$(MAKE) -f $(MAKEFILE) -C $(OBJDIR) TANGO_HOME="$(TANGO_HOME)"  BLIP_HOME="$(BLIP_HOME)" IDENT="$(IDENT)" DC="$(DC)" WHAT="_lib" build
+
 all: $(OBJDIR)/MODULES.inc $(OBJDIR)/intermediate.rule
 	@mkdir -p $(OBJDIR)
 	$(MAKE) -f $(MAKEFILE) -C $(OBJDIR) TANGO_HOME="$(TANGO_HOME)"  BLIP_HOME="$(BLIP_HOME)" IDENT="$(IDENT)" DC="$(DC)" WHAT="_tests" build
@@ -85,10 +89,8 @@ build:
 	$(MAKE) -f $(MAKEFILE) -C $(OBJDIR) TANGO_HOME="$(TANGO_HOME)" BLIP_HOME="$(BLIP_HOME)" IDENT="$(IDENT)" DC="$(DC)" $(WHAT)
 
 tests:
+	@mkdir -p $(OBJDIR)
 	$(MAKE) -f $(MAKEFILE) -C $(OBJDIR) TANGO_HOME="$(TANGO_HOME)"  BLIP_HOME="$(BLIP_HOME)" IDENT="$(IDENT)" DC="$(DC)" WHAT="_tests" build
-
-lib:
-	$(MAKE) -f $(MAKEFILE) -C $(OBJDIR) TANGO_HOME="$(TANGO_HOME)"  BLIP_HOME="$(BLIP_HOME)" IDENT="$(IDENT)" DC="$(DC)" WHAT="_lib" build
 
 _genDeps: $(MODULES:%=%.dep)
 
