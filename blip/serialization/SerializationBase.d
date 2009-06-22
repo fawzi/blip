@@ -900,7 +900,7 @@ class Unserializer {
     typedef size_t objectId;
     ReadHandlers handlers;
 
-    void*[objectId]				objectIdToPtr;
+    void*[objectId]             objectIdToPtr;
     objectId                        lastObjectId;
     SerializationLevel serializationLevel;
     bool recoverCycles;
