@@ -46,7 +46,7 @@ ARCHDIR=$(TANGO_HOME)/lib/build/arch
 EXCLUDEPAT_ALL=$(EXCLUDEPAT_OS)
 ARCHFILE=$(ARCHDIR)/$(IDENT).mak
 MAKEFILE=$(BLIP_HOME)/Makefile
-DFLAGS_ADD=-I$(BLIP_HOME) -d-version=no_Xpose
+DFLAGS_MAIN=-I$(BLIP_HOME)
 WHAT=_lib
 
 LIB=libblip.$(LIB_EXT)
@@ -69,7 +69,7 @@ TESTS=testTextParsing testRTest testSerial testNArray
 
 .PHONY: _genDeps newFiles build clean distclean _tests tests lib
 
-lib:
+lib: $(OBJDIR)/MODULES.inc $(OBJDIR)/intermediate.rule
 	@mkdir -p $(OBJDIR)
 	$(MAKE) -f $(MAKEFILE) -C $(OBJDIR) TANGO_HOME="$(TANGO_HOME)"  BLIP_HOME="$(BLIP_HOME)" IDENT="$(IDENT)" DC="$(DC)" WHAT="_lib" build
 
@@ -83,7 +83,7 @@ allVersions:	$(OBJDIR)/MODULES.inc $(OBJDIR)/intermediate.rule
 	$(MAKE) -f $(MAKEFILE) -C $(OBJDIR) TANGO_HOME="$(TANGO_HOME)" BLIP_HOME="$(BLIP_HOME)" VERSION=tst DC="$(DC)" all
 	$(MAKE) -f $(MAKEFILE) -C $(OBJDIR) TANGO_HOME="$(TANGO_HOME)" BLIP_HOME="$(BLIP_HOME)" VERSION=dbg DC="$(DC)" all
 
-build:
+build: $(OBJDIR)/MODULES.inc $(OBJDIR)/intermediate.rule
 	@echo "XXX using the architecture file $(ARCHFILE)"
 	$(MAKE) -f $(MAKEFILE) -C $(OBJDIR) TANGO_HOME="$(TANGO_HOME)" BLIP_HOME="$(BLIP_HOME)" IDENT="$(IDENT)" DC="$(DC)" _genDeps
 	$(MAKE) -f $(MAKEFILE) -C $(OBJDIR) TANGO_HOME="$(TANGO_HOME)" BLIP_HOME="$(BLIP_HOME)" IDENT="$(IDENT)" DC="$(DC)" $(WHAT)
@@ -105,7 +105,7 @@ $(TESTS:%=$(OBJDIR)/%.d):$(TESTS:%=$(SRCDIR)/%.d)
 	cp $(SRCDIR)/$(shell basename $@) $@
 
 $(TESTS):$(LIB) $(TESTS:%=$(OBJDIR)/%.$(OBJ_EXT))
-	$(DC) -of=$@ $(@:%=$(OBJDIR)/%.$(OBJ_EXT)) $(LIB) $(EXTRA_LIBS)
+	$(DC) $(OUT_NAME)$@ $(@:%=$(OBJDIR)/%.$(OBJ_EXT)) $(LIB) $(EXTRA_LIBS)
 	cp $@ ..
 
 _tests: $(TESTS)
