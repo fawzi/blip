@@ -8,8 +8,7 @@ import tango.io.model.IConduit;
 import blip.text.Stringify;
 import blip.BasicModels;
 import tango.core.stacktrace.TraceExceptions;
-version(no_Xpose){}
-else {
+version(Xpose){
     public import blip.serialization.SerializationExpose;
 }
 class A: Serializable{
@@ -58,8 +57,7 @@ class A: Serializable{
         return 0;
     }
 }
-version(no_Xpose){}
-else {
+version(Xpose){
     class B:A{
         int a;
         uint b;
@@ -251,8 +249,7 @@ void main(){
     a.x=3;
     a.y=4;
     js.field(cast(FieldMetaInfo *)null,a);
-    version (no_Xpose){}
-    else {
+    version (no_Xpose){
         A b=new B();
         js(b);
         B bb;

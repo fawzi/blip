@@ -30,6 +30,13 @@
 # For problems with the flags (or if you want to define a new special build setting)
 # normally you should edit the tango/lib/build/arch/$(IDENT).mak file.
 #
+# * Other important variables
+#  DFLAGS_ADD: adds the given D flags
+#  CFLAGS_ADD: adds the given C flags
+#  DFLAGS: as environment variable is not changed
+#  CFLAGS: adds the given C flags
+#  EXTRA_LIBS: add the given link flags (to link tango user for example)
+#
 # tango & apache 2.0 license, © 2009 Fawzi Mohamed
 
 BLIP_HOME=$(PWD)
@@ -41,6 +48,7 @@ DC_SHORT=$(shell $(TOOLDIR)/guessCompiler.sh $(DC))
 IDENT=$(shell $(TOOLDIR)/archName.sh)-$(DC_SHORT)-$(VERSION)
 
 SRCDIR=$(BLIP_HOME)
+TESTS_DIR=$(BLIP_HOME)/tests
 OBJDIR=$(BLIP_HOME)/objs-$(IDENT)
 ARCHDIR=$(TANGO_HOME)/lib/build/arch
 EXCLUDEPAT_ALL=$(EXCLUDEPAT_OS)
@@ -51,6 +59,11 @@ WHAT=_lib
 
 LIB=libblip.$(LIB_EXT)
 INSTALL_LIB=libblip-$(shell $(TOOLDIR)/getCompVers.sh $(IDENT)).$(LIB_EXT)
+
+all: $(OBJDIR)/MODULES.inc $(OBJDIR)/intermediate.rule
+	@mkdir -p $(OBJDIR)
+	$(MAKE) -f $(MAKEFILE) -C $(OBJDIR) TANGO_HOME="$(TANGO_HOME)"  BLIP_HOME="$(BLIP_HOME)" IDENT="$(IDENT)" DC="$(DC)" WHAT="_tests" build
+
 include $(ARCHFILE)
 ifeq ($(shell if [ -e "$(OBJDIR)/MODULES.inc" ]; then echo 1; fi;),1)
 include $(OBJDIR)/MODULES.inc
@@ -65,17 +78,13 @@ EXCLUDE_DEP_ALL=$(EXCLUDE_DEP_COMP) ^tango.*
 
 OBJS=$(MODULES:%=%.$(OBJ_EXT))
 
-TESTS=testTextParsing testRTest testSerial testNArray
+TESTS=testTextParsing testRTest testSerial testNArray testNArrayPerf
 
-.PHONY: _genDeps newFiles build clean distclean _tests tests lib
+.PHONY: _genDeps newFiles build clean distclean _tests tests lib $(TESTS)
 
 lib: $(OBJDIR)/MODULES.inc $(OBJDIR)/intermediate.rule
 	@mkdir -p $(OBJDIR)
 	$(MAKE) -f $(MAKEFILE) -C $(OBJDIR) TANGO_HOME="$(TANGO_HOME)"  BLIP_HOME="$(BLIP_HOME)" IDENT="$(IDENT)" DC="$(DC)" WHAT="_lib" build
-
-all: $(OBJDIR)/MODULES.inc $(OBJDIR)/intermediate.rule
-	@mkdir -p $(OBJDIR)
-	$(MAKE) -f $(MAKEFILE) -C $(OBJDIR) TANGO_HOME="$(TANGO_HOME)"  BLIP_HOME="$(BLIP_HOME)" IDENT="$(IDENT)" DC="$(DC)" WHAT="_tests" build
 
 allVersions:	$(OBJDIR)/MODULES.inc $(OBJDIR)/intermediate.rule
 	@mkdir -p $(OBJDIR)
@@ -84,6 +93,7 @@ allVersions:	$(OBJDIR)/MODULES.inc $(OBJDIR)/intermediate.rule
 	$(MAKE) -f $(MAKEFILE) -C $(OBJDIR) TANGO_HOME="$(TANGO_HOME)" BLIP_HOME="$(BLIP_HOME)" VERSION=dbg DC="$(DC)" all
 
 build: $(OBJDIR)/MODULES.inc $(OBJDIR)/intermediate.rule
+	@mkdir -p $(OBJDIR)
 	@echo "XXX using the architecture file $(ARCHFILE)"
 	$(MAKE) -f $(MAKEFILE) -C $(OBJDIR) TANGO_HOME="$(TANGO_HOME)" BLIP_HOME="$(BLIP_HOME)" IDENT="$(IDENT)" DC="$(DC)" _genDeps
 	$(MAKE) -f $(MAKEFILE) -C $(OBJDIR) TANGO_HOME="$(TANGO_HOME)" BLIP_HOME="$(BLIP_HOME)" IDENT="$(IDENT)" DC="$(DC)" $(WHAT)
@@ -101,14 +111,20 @@ $(LIB):  $(OBJS)
 	$(mkLib) $@ $(OBJS)
 	$(ranlib) $@
 	cp $(OBJDIR)/$(LIB) $(TANGO_HOME)/$(INSTALL_LIB)
+
 $(TESTS:%=$(OBJDIR)/%.d):$(TESTS:%=$(SRCDIR)/%.d)
 	cp $(SRCDIR)/$(shell basename $@) $@
 
-$(TESTS):$(LIB) $(TESTS:%=$(OBJDIR)/%.$(OBJ_EXT))
-	$(DC) $(OUT_NAME)$@ $(@:%=$(OBJDIR)/%.$(OBJ_EXT)) $(LIB) $(EXTRA_LIBS)
-	cp $@ ..
+$(TESTS:%=_%): _% : $(OBJDIR)/%.$(OBJ_EXT) $(LIB)
+	$(DC) $(OUT_NAME)$@ $(@:_%=$(OBJDIR)/%.$(OBJ_EXT)) $(LIB) $(EXTRA_LIBS)
+	mkdir -p $(TESTS_DIR)
+	cp $@ $(TESTS_DIR)/$(@:_%=%)
 
-_tests: $(TESTS)
+$(TESTS):
+	@mkdir -p $(OBJDIR)
+	$(MAKE) -f $(MAKEFILE) -C $(OBJDIR) TANGO_HOME="$(TANGO_HOME)"  BLIP_HOME="$(BLIP_HOME)" IDENT="$(IDENT)" DC="$(DC)" WHAT="_$@" build
+
+_tests: $(TESTS:%=_%)
 
 $(OBJDIR)/MODULES.inc:
 	@mkdir -p $(OBJDIR)

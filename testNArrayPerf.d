@@ -1,5 +1,5 @@
 /// performace tests of NArray
-module testsNArrayPerf;
+module testNArrayPerf;
 import tango.io.Stdout;
 import tango.core.Exception;
 import tango.time.StopWatch;
@@ -381,7 +381,7 @@ Stdout("t10: loop+binaryOp on NArray").newline;
 Stdout("t11: loop+mixin pLoopPtr on NArray").newline;
 Stdout("t12: loop+mixin pLoopIdx on NArray").newline;
 Stdout("t13: index op floated to outer loops and removal of multiplication on struct without *T.sizeof(smart compiler)").newline;
-Stdout("t13: index op floated to outer loops and removal of multiplication on struct with (no native,w var )").newline;
+Stdout("t14: index op floated to outer loops and removal of multiplication on struct with (no native,w var )").newline;
 
 } 
 

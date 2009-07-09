@@ -34,10 +34,13 @@ version(build) {
     version(darwin){
         version(GNU){
             pragma(link,"--framework,Accelerate");
-        } else version(DigitalMars) {
-            pragma(link,"--framework -LAccelerate");
         }
     }
+}
+version(DigitalMars) {
+    pragma(lib,"-framework -LAccelerate");
+} else version(LDC) {
+    pragma(lib,"-framework -L=Accelerate");
 }
 
 version (FORTRAN_FLOAT_FUNCTIONS_RETURN_DOUBLE) {

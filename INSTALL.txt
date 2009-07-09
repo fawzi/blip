@@ -19,9 +19,18 @@ blas/lapack are used by default, and are part of the distribution, they come fro
     http://dsource.org/projects/multiarray
 project.
 
+you can also use the included makefile, for example on mac I do
+
+  make EXTRA_LIBS="-L=-ltango-user-ldc -L=-framework -L=Accelerate" TANGO_HOME=$HOME/d/tango
+
 to deactivate them you need
     -version=no_blas       // deactivates blas calling in dot product
     -version=no_lapack     // deactivates lapack derived LinAlg routines (solve,eig,eigh,svd,...)
+
+so if you do not want to link blas/lapack do something like
+
+  make EXTRA_LIBS="-L=-ltango-user-ldc" DFLAGS_ADD="-d-version=no_lapack \
+    -d-version=no_blas" TANGO_HOME=$HOME/d/tango
 
 other useful flags are
     -debug=TestNArray   // activates extra internal consistency checks in NArray
@@ -30,19 +39,25 @@ other useful flags are
 The serialization routine can use xpose to automatically define a serialization routine.
 Xpose comes from
     http://h3.team0xf.com:1024/xf/file/38f8ec538442/xpose
-and its use can be deactivated with
-    -version=no_Xpose
+and its use can be activated with
+    -version=Xpose
 
-To have maximum speed compile with -release -O, but as it is quite new you might want to first compile it with checks.
+To have maximum speed compile with -release -O, but as it is quite new you might want to 
+first compile it with checks.
 
-The code has a comprehensive battery of test. The tests in testNArray are quite stringent,
-and with random generation they might be numerically difficult.
-I did not want to reduce too much the accuracy of the tests, and so in some cases they might fail 
-(especially without blas, or with very agressive blas), it this is the case look at the error that 
-they have, probably everything is still ok.
-On windows there is a limit on the number of symbols that can be defined in a single file, testNArray with all tests would exceed this limit, so by default only the tests for double argument are performed, if you want other you have to activate them by hand.
+The code has a comprehensive battery of test.
+By default all of them are built, which especially for testNArray might take some time, 
+if you don't want to build them use lib as target.
+The tests in testNArray are quite stringent, and with random generation they might be 
+numerically difficult.
+I did not want to reduce too much the accuracy of the tests, and so in some cases they 
+might fail (especially without blas, or with very agressive blas), it this is the case 
+look at the error that they have, probably everything is still ok.
+On windows there is a limit on the number of symbols that can be defined in a single file, 
+testNArray with all tests would exceed this limit, so by default only the tests for double 
+argument are performed, if you want other you have to activate them by hand.
 
-To test there are test executables, or one can also 
+To test one can also 
     dsss build -debug=UnitTest -g --test
 
 have fun!
