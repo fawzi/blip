@@ -9,3 +9,4 @@ public import blip.serialization.SerializationBase;
 //public import blip.serialization.SerializationExpose;
 public import blip.serialization.JsonSerialization;
 public import blip.serialization.SBinSerialization;
+public import blip.serialization.SimpleWrappers;

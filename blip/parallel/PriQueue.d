@@ -11,7 +11,7 @@ import blip.BasicModels;
 /// - insert (insert a new element )
 /// - popNext (remove the next element, keeping into account priority, blocking)
 /// - stop (stop queue, and return null to the waiting threads)
-/// the strange use of semaphore allows someone to lock queueLock, chang the queue, 
+/// the strange use of semaphore allows someone to lock queueLock, change the queue, 
 /// nr of Els,... and release it by unlocking without any problem
 /// this means that task reorganizations are ok
 class PriQueue(T){

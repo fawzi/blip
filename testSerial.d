@@ -57,6 +57,41 @@ class A: Serializable{
         return 0;
     }
 }
+
+struct FExp{
+    int f(int i){
+        return i*(i-1)/2;
+    }
+    int i=4;
+    int max=100;
+    int opApply(int delegate(ref int) loopOp){
+        while(i>0 && i<max){
+            int res=loopOp(i);
+            if (res) return res;
+            i=f(i);
+        }
+        return 0;
+    }
+    int opApply(int delegate(ref int,ref int) loopOp){
+        while(i>0 && i<max){
+            int j=f(i);
+            int res=loopOp(i,j);
+            if (res) return res;
+            i=j;
+        }
+        return 0;
+    }
+    int next(){
+        if (i<=0 || i>=max) throw new Exception("at end",__FILE__,__LINE__);
+        int res=i;
+        i=f(i);
+        return res;
+    }
+    bool atEnd(){
+        return i<=0||i>=max;
+    }
+}
+
 version(Xpose){
     class B:A{
         int a;
@@ -173,8 +208,12 @@ version(Xpose){
     }
 }
 
-/// unserialization test
 void testUnserial(T)(T a){
+    testJsonUnserial!(T)(a);
+    testBinUnserial!(T)(a);
+}
+/// unserialization test
+void testJsonUnserial(T)(T a){
     version(UnserializationTrace) Stdout("testing unserialization of "~T.stringof).newline;
     auto buf=new Array(1000,1000);
     auto js=new JsonSerializer!()(new FormatOutput!(char)(buf));
@@ -231,6 +270,57 @@ void testBinUnserial(T)(T a){
     version(UnserializationTrace) Stdout("passed test of unserialization of "~T.stringof).newline;
 }
 
+void testUnserial2(T,U)(void delegate(void function(T,U)) testF){
+    testF(function void(T a,U b){ testJsonUnserial2!(T,U)(a,b); });
+    testF(function void(T a,U b){ testBinUnserial2!(T,U)(a,b); });
+}
+
+/// unserialization test2 Json
+void testJsonUnserial2(T,U)(T a,ref U sOut){
+    version(UnserializationTrace) Stdout("testing unserialization of "~T.stringof).newline;
+    auto buf=new Array(1000,1000);
+    auto js=new JsonSerializer!()(new FormatOutput!(char)(buf));
+    js(a);
+    auto jus=new JsonUnserializer!()(buf);
+    version(UnserializationTrace) Stdout("XXXXXX Unserialization start").newline;
+    jus(sOut);
+    version(UnserializationTrace) {
+        auto js2=new JsonSerializer!()(Stdout);
+        Stdout("XXXXXX Unserialization end").newline;
+        Stdout("in the buffer:-----").newline;
+        buf.seek(0,IOStream.Anchor.Begin);
+        Stdout(cast(char[])buf.slice).newline;
+        Stdout("-----").newline;
+    }
+    version(UnserializationTrace) Stdout("unserialization of "~T.stringof).newline;
+}
+/// unserialization test2 Bin
+void testBinUnserial2(T,U)(T a,ref U b){
+    version(UnserializationTrace) Stdout("testing unserialization of "~T.stringof).newline;
+    auto buf=new Array(1000,1000);
+    auto js=new SBinSerializer(buf);
+    js(a);
+    version(UnserializationTrace) {
+        auto js2=new JsonSerializer!()(Stdout);
+        Stdout("in the buffer:-----").newline;
+        buf.seek(0,IOStream.Anchor.Begin);
+        foreach (i,ub;cast(ubyte[])buf.slice){
+            Stdout.format("{:x} ",ub);
+            if (i%10==9) Stdout.newline;
+        }
+        buf.seek(0,IOStream.Anchor.Begin);
+        Stdout.newline;
+        Stdout("----").newline;
+        Stdout("XXXXXX Unserialization start").newline;
+    }
+    auto jus=new SBinUnserializer(buf);
+    jus(b);
+    version(UnserializationTrace){
+        Stdout("XXXXXX Unserialization end").newline;
+    }
+    version(UnserializationTrace) Stdout("test of unserialization of "~T.stringof).newline;
+}
+
 void main(){
     CoreHandlers ch;
 
@@ -249,8 +339,38 @@ void main(){
     a.x=3;
     a.y=4;
     js.field(cast(FieldMetaInfo *)null,a);
-    version (no_Xpose){
+    testUnserial(a);
+    
+    void testLazyArray(void function(LazyArray!(int),LazyArray!(int)) testF){
+        FExp fExp;
+        FExp fExp2;
+        auto arrayIn=LazyArray!(int)(cast(int delegate(int delegate(ref int)))&fExp.opApply);
+        auto arrayOut=LazyArray!(int)(delegate void(int i){
+                if (i!=fExp2.next()) throw new Exception("unexpected value",__FILE__,__LINE__);
+            });
+        testF(arrayIn,arrayOut);
+        if (!fExp2.atEnd()) throw new Exception("incomplete read",__FILE__,__LINE__);
+    }
+
+    void testLazyAA(void function(LazyAA!(int,int),LazyAA!(int,int)) testF){
+        FExp fExp;
+        FExp fExp2;
+        auto arrayIn=LazyAA!(int,int)(cast(int delegate(int delegate(ref int,ref int)))&fExp.opApply);
+        auto arrayOut=LazyAA!(int,int)(delegate void(int k,int v){
+                auto kR=fExp2.i;
+                auto vR=fExp2.next();
+                if (k!=kR || v!=vR) throw new Exception("unexpected value",__FILE__,__LINE__);
+            });
+        testF(arrayIn,arrayOut);
+        if (!fExp2.atEnd()) throw new Exception("incomplete read",__FILE__,__LINE__);
+    }
+    
+    testUnserial2(&testLazyArray);
+    testUnserial2(&testLazyAA);
+    
+    version (Xpose){
         A b=new B();
+        
         js(b);
         B bb;
         simpleRandom(r,bb);
@@ -271,14 +391,9 @@ void main(){
         js(c);
         b=bb;
     
-        testUnserial(a);
         testUnserial(b);
         testUnserial(c);
         testUnserial(ts);
-        testBinUnserial(a);
-        testBinUnserial(b);
-        testBinUnserial(c);
-        testBinUnserial(ts);
         Stdout("passed identity tests").newline;
 
         auto buf=new Array(`{ id:3,

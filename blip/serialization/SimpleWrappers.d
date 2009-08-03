@@ -12,57 +12,59 @@ struct LazyArray(T) {
     void delegate(size_t l) setLen; /// set the length (before addition with a guess, after with real size)
     
     /// if you just want to write out this is all that is needed
-    this(int delegate(int delegate(ref T)) loop,ulong size=ulong.max){
-        this.size=size;
-        this.loopOp=loopOp;
+    static LazyArray opCall(int delegate(int delegate(ref T)) loopOp,ulong size=ulong.max){
+        LazyArray res;
+        res.size=size;
+        res.loopOp=loopOp;
+        return res;
     }
     /// if you just want to readin this is all that is needed
-    this(void delegate(T) addOp,void delegate(size_t l) setLen=null){
-        this.addOp=addOp;
-        this.setLen=setLen;
+    static LazyArray opCall(void delegate(T) addOp,void delegate(size_t l) setLen=null){
+        LazyArray res;
+        res.addOp=addOp;
+        res.setLen=setLen;
+        return res;
     }
     /// initialize a complete (input/output) wrapper
-    this(int delegate(int delegate(ref T)) loop,void delegate(T) addOp,
+    static LazyArray opCall(int delegate(int delegate(ref T)) loopOp,void delegate(T) addOp,
         ulong size=ulong.max,void delegate(size_t l) setLen=null){
-        this.size=size;
-        this.loopOp=loopOp;
-        this.addOp=addOp;
-        this.setLen=setLen;
+        LazyArray res;
+        res.size=size;
+        res.loopOp=loopOp;
+        res.addOp=addOp;
+        res.setLen=setLen;
+        return res;
     }
     static ClassMetaInfo metaI;
     static this(){
-        metaI=ClassMetaInfo.createForType!(typeof(this))("LazyArray!("~T.stringof~")");// use T.mangleof?
+        metaI=ClassMetaInfo.createForType!(typeof(*this))("LazyArray!("~T.stringof~")");// use T.mangleof?
         metaI.kind=TypeKind.CustomK;
     }
     ClassMetaInfo getSerializationMetaInfo(){
         return metaI;
     }
-    void preSerialize(Serializer s){ }
-    void postSerialize(Serializer s){ }
     void serialize(Serializer s){
         if (loopOp is null) s.serializationError("LazyArray missing loopOp",__FILE__,__LINE__);
-        auto ac=s.writeArrayStart(null,size());
+        auto ac=s.writeArrayStart(null,size);
+        FieldMetaInfo *elMetaInfoP=null;
         version(PseudoFieldMetaInfo){
             FieldMetaInfo elMetaInfo=FieldMetaInfo("el","",
                 getSerializationInfoForType!(T)());
-        } else {
-            FieldMetaInfo elMetaInfo=null;
+            elMetaInfo.pseudo=true;
+            elMetaInfoP=&elMetaInfo;
         }
-        elMetaInfo.pseudo=true;
         loopOp(delegate int(ref T el){
-            s.writeArrayEl(ac,{ s.field(elMetaInfo, el); } );
+            s.writeArrayEl(ac,{ s.field(elMetaInfoP, el); } );
             return 0;
         });
         s.writeArrayEnd(ac);
     }
-    Serializable preUnserialize(Unserializer s){ return this; }
-    Serializable postUnserialize(Unserializer s){ return this; }
     void unserialize(Unserializer s){
         if (addOp is null) s.serializationError("LazyArray missing addOp",__FILE__,__LINE__);
         FieldMetaInfo elMetaInfo=FieldMetaInfo("el","",
             getSerializationInfoForType!(T)());
         elMetaInfo.pseudo=true;
-        auto ac=readArrayStart(fieldMeta);
+        auto ac=s.readArrayStart(null);
         if (setLen !is null) {
             setLen(ac.sizeHint()); // use ac.length?
         }
@@ -87,57 +89,64 @@ struct LazyAA(K,V) {
     void delegate(size_t l) setLen; /// set the length (before addition with a guess, after with real size)
     
     /// if you just want to write out this is all that is needed
-    this(int delegate(int delegate(ref K,ref V)) loop,ulong size=ulong.max){
-        this.size=size;
-        this.loopOp=loopOp;
+    static LazyAA opCall(int delegate(int delegate(ref K,ref V)) loopOp,ulong size=ulong.max){
+        LazyAA res;
+        res.size=size;
+        res.loopOp=loopOp;
+        return res;
     }
     /// if you just want to readin this is all that is needed
-    this(void delegate(K,V) addOp,void delegate(size_t l) setLen=null){
-        this.addOp=addOp;
-        this.setLen=setLen;
+    static LazyAA opCall(void delegate(K,V) addOp,void delegate(size_t l) setLen=null){
+        LazyAA res;
+        res.addOp=addOp;
+        res.setLen=setLen;
+        return res;
     }
     /// initialize a complete (input/output) wrapper
-    this(int delegate(int delegate(ref K,ref V)) loop,void delegate(K,V) addOp,
+    static LazyAA opCall(int delegate(int delegate(ref K,ref V)) loopOp,void delegate(K,V) addOp,
         ulong size=ulong.max,void delegate(size_t l) setLen=null){
-        this.size=size;
-        this.loopOp=loopOp;
-        this.addOp=addOp;
-        this.setLen=setLen;
+        LazyAA res;
+        res.size=size;
+        res.loopOp=loopOp;
+        res.addOp=addOp;
+        res.setLen=setLen;
+        return res;
     }
     static ClassMetaInfo metaI;
     static this(){
-        metaI=ClassMetaInfo.createForType!(typeof(this))("LazyAA!("~T.stringof~")");// use T.mangleof?
+        metaI=ClassMetaInfo.createForType!(typeof(*this))("LazyAA!("~K.stringof~","~V.stringof~")");// use T.mangleof?
         metaI.kind=TypeKind.CustomK;
     }
     ClassMetaInfo getSerializationMetaInfo(){
         return metaI;
     }
-    void preSerialize(Serializer s){ }
-    void postSerialize(Serializer s){ }
+
     void serialize(Serializer s){
         if (loopOp is null) s.serializationError("LazyAA missing loopOp",__FILE__,__LINE__);
+        FieldMetaInfo *valMetaInfoP=null;
         version(PseudoFieldMetaInfo){
             FieldMetaInfo keyMetaInfo=FieldMetaInfo("key","",getSerializationInfoForType!(K)());
             keyMetaInfo.pseudo=true;
             FieldMetaInfo valMetaInfo=FieldMetaInfo("val","",getSerializationInfoForType!(V)());
             valMetaInfo.pseudo=true;
+            valMetaInfoP=&valMetaInfo;
         }
-        auto ac=writeDictStart(fieldMeta,t.length,
+        auto ac=s.writeDictStart(null,size,
             is(K==char[])||is(K==wchar[])||is(K==dchar[]));
         loopOp(delegate int(ref K key, ref V value){
             version(SerializationTrace) Stdout.formatln("X serializing associative array entry").newline;
             version(PseudoFieldMetaInfo){
-                writeEntry(ac,{ s.field!(K)(&keyMetaInfo, key); },
+                s.writeEntry(ac,{ s.field!(K)(&keyMetaInfo, key); },
                     { s.field(&valMetaInfo, value); });
             } else {
-                writeEntry(ac,{ s.field!(K)(cast(FieldMetaInfo*)null, key); },
+                s.writeEntry(ac,{ s.field!(K)(cast(FieldMetaInfo*)null, key); },
                     { s.field(cast(FieldMetaInfo*)null, value); });
             }
+            return 0;
         });
-        writeDictEnd(ac);
+        s.writeDictEnd(ac);
     }
-    Serializable preUnserialize(Unserializer s){ return this; }
-    Serializable postUnserialize(Unserializer s){ return this; }
+
     void unserialize(Unserializer s){
         if (addOp is null) s.serializationError("LazyAA missing addOp",__FILE__,__LINE__);
         FieldMetaInfo keyMetaInfo=FieldMetaInfo("key","",getSerializationInfoForType!(K)());
@@ -146,12 +155,12 @@ struct LazyAA(K,V) {
         valMetaInfo.pseudo=true;
         K key;
         V value;
-        auto ac=readDictStart(fieldMeta,is(K==char[])||is(K==wchar[])||is(K==dchar[]));
+        auto ac=s.readDictStart(null,is(K==char[])||is(K==wchar[])||is(K==dchar[]));
         if (setLen !is null) {
             setLen(ac.sizeHint()); // use ac.length?
         }
         int iPartial=0;
-        while (readEntry(ac,
+        while (s.readEntry(ac,
             {
                 s.field!(K)(&keyMetaInfo, key);
                 if(++iPartial==2){
@@ -170,4 +179,6 @@ struct LazyAA(K,V) {
         }
     }
 }
+
+
 

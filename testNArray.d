@@ -604,7 +604,7 @@ void testSerial(T,int rank)(NArray!(T,rank)a){
     }
 }
 
-//private mixin testInit!() autoInitTst;
+// private mixin testInit!() autoInitTst;
 
 TestCollection narrayRTst1(T,int rank)(TestCollection superColl){
     TestCollection coll=new TestCollection("NArray!("~T.stringof~","~ctfe_i2a(rank)~")",

@@ -755,16 +755,17 @@ class Serializer {
             }
             else static if (isArrayType!(T)) {
                 version(SerializationTrace) Stdout.formatln("X serializing array").newline;
+                FieldMetaInfo *elMetaInfoP=null;
                 version(PseudoFieldMetaInfo){
                     FieldMetaInfo elMetaInfo=FieldMetaInfo("el","",
                         getSerializationInfoForType!(ElementTypeOfArray!(T))());
                     elMetaInfo.pseudo=true;
+                    elMetaInfoP=&elMetaInfo;
                 }
                 auto ac=writeArrayStart(fieldMeta,t.length);
                 foreach (ref x; t) {
                     version(SerializationTrace) Stdout.formatln("X serializing array element").newline;
-                    version(PseudoFieldMetaInfo) writeArrayEl(ac,{ this.field(&elMetaInfo, x); } );
-                    else writeArrayEl(ac,{ this.field(cast(FieldMetaInfo*)null, x); } );
+                    writeArrayEl(ac,{ this.field(elMetaInfoP, x); } );
                 }
                 writeArrayEnd(ac);
             }
@@ -890,6 +891,12 @@ class Serializer {
     /// writes a core type
     void writeCoreType(FieldMetaInfo *field,void delegate() realWrite, void *t){
         realWrite();
+    }
+    /// utility method that throws an exception
+    /// override this to give more info on parser position,...
+    /// this method *has* to throw
+    void serializationError(char[]msg,char[]filename,long line){
+        throw new SerializationException(msg,"",filename,line);
     }
 }
 
