@@ -223,7 +223,7 @@ class ClassMetaInfo {
             }
         } else {
             static if(is(T==class)){
-                assert(allocEl !is null,"cannot allocate automatically, and no allocator given");
+                assert(allocEl !is null,"cannot allocate automatically, and no allocator given for "~T.stringof~" name:"~name);
             }
         }
         auto res=new ClassMetaInfo(name,newSuperMeta,newTi,newCi,typeKindForType!(T),allocEl);
