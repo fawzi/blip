@@ -24,10 +24,10 @@ class SBinSerializer : Serializer {
     
     void writeCompressed(T)(T l){
         while (1){
-            ubyte u=cast(ubyte)(l & 0x7FFF);
+            ubyte u=cast(ubyte)(l & 0x7F);
             l=l>>7;
             if (l!=0){
-                ubyte u2=u|0x8000;
+                ubyte u2=u|0x80;
                 writer.handle(u2);
             } else {
                 writer.handle(u);
@@ -103,7 +103,7 @@ class SBinSerializer : Serializer {
     override PosCounter writeDictStart(FieldMetaInfo *field,size_t size, bool stringKeys=false) {
         writeField(field);
         if (size==size_t.max){
-            long lSize=long.max;
+            ulong lSize=ulong.max;
             writeCompressed(lSize);
         } else {
             writeCompressed(cast(ulong)size);
@@ -207,11 +207,12 @@ class SBinUnserializer: Unserializer {
         super.resetObjIdCounter();
     }
     void readCompressed(T)(ref T l){
-        while (1){
+        l=0;
+        for (int i=0;i<T.sizeof*8;i+=7){
             ubyte u;
             reader.handle(u);
-            l=(l<<7)|(cast(T)(u & 0x7FFF));
-            if (!(u&0x8000)) break;
+            l=l|((cast(T)(u & 0x7F))<<i);
+            if ((u & 0x80) == 0) break;
         }
     }
     ClassMetaInfo readMetaInfo(){
@@ -283,6 +284,7 @@ class SBinUnserializer: Unserializer {
         if (lSize==ulong.max){
             size=size_t.max;
         } else if (lSize>=size_t.max){
+            Stdout.format("lSize:{:x}",lSize).newline;
             serializationError("trying to decode an array too large for 32 bit representation",__FILE__,__LINE__);
         } else {
             size=cast(size_t)lSize;

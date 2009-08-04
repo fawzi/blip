@@ -1,5 +1,5 @@
 /// quick test file
-module test;
+module testRTest;
 import tango.io.Stdout;
 import blip.rtest.RTest;
 import blip.NullStream;

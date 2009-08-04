@@ -277,7 +277,7 @@ void testUnserial2(T,U)(void delegate(void function(T,U)) testF){
 
 /// unserialization test2 Json
 void testJsonUnserial2(T,U)(T a,ref U sOut){
-    version(UnserializationTrace) Stdout("testing unserialization of "~T.stringof).newline;
+    version(UnserializationTrace) Stdout("testing json unserialization of "~T.stringof).newline;
     auto buf=new Array(1000,1000);
     auto js=new JsonSerializer!()(new FormatOutput!(char)(buf));
     js(a);
@@ -292,11 +292,11 @@ void testJsonUnserial2(T,U)(T a,ref U sOut){
         Stdout(cast(char[])buf.slice).newline;
         Stdout("-----").newline;
     }
-    version(UnserializationTrace) Stdout("unserialization of "~T.stringof).newline;
+    version(UnserializationTrace) Stdout("json unserialization of "~T.stringof).newline;
 }
 /// unserialization test2 Bin
 void testBinUnserial2(T,U)(T a,ref U b){
-    version(UnserializationTrace) Stdout("testing unserialization of "~T.stringof).newline;
+    version(UnserializationTrace) Stdout("testing binary unserialization of "~T.stringof).newline;
     auto buf=new Array(1000,1000);
     auto js=new SBinSerializer(buf);
     js(a);
@@ -318,7 +318,7 @@ void testBinUnserial2(T,U)(T a,ref U b){
     version(UnserializationTrace){
         Stdout("XXXXXX Unserialization end").newline;
     }
-    version(UnserializationTrace) Stdout("test of unserialization of "~T.stringof).newline;
+    version(UnserializationTrace) Stdout("binary test of unserialization of "~T.stringof).newline;
 }
 
 void main(){
@@ -346,7 +346,11 @@ void main(){
         FExp fExp2;
         auto arrayIn=LazyArray!(int)(cast(int delegate(int delegate(ref int)))&fExp.opApply);
         auto arrayOut=LazyArray!(int)(delegate void(int i){
-                if (i!=fExp2.next()) throw new Exception("unexpected value",__FILE__,__LINE__);
+                auto val=fExp2.next();
+                if (i!=val) {
+                    Stdout("ERROR: read ")(i)(" vs ")(val).newline;
+                    throw new Exception("unexpected value",__FILE__,__LINE__);
+                }
             });
         testF(arrayIn,arrayOut);
         if (!fExp2.atEnd()) throw new Exception("incomplete read",__FILE__,__LINE__);
@@ -357,9 +361,12 @@ void main(){
         FExp fExp2;
         auto arrayIn=LazyAA!(int,int)(cast(int delegate(int delegate(ref int,ref int)))&fExp.opApply);
         auto arrayOut=LazyAA!(int,int)(delegate void(int k,int v){
-                auto kR=fExp2.i;
-                auto vR=fExp2.next();
-                if (k!=kR || v!=vR) throw new Exception("unexpected value",__FILE__,__LINE__);
+                auto kR=fExp2.next();
+                auto vR=fExp2.i;
+                if (k!=kR || v!=vR) {
+                    Stdout("keys:")(k)(" vs ")(kR)(" vals:")(v)(" vs ")(vR).newline;
+                    throw new Exception("unexpected value",__FILE__,__LINE__);
+                }
             });
         testF(arrayIn,arrayOut);
         if (!fExp2.atEnd()) throw new Exception("incomplete read",__FILE__,__LINE__);
