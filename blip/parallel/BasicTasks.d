@@ -13,23 +13,158 @@ import tango.core.sync.Semaphore;
 import blip.TemplateFu:ctfe_i2a;
 import blip.parallel.Models;
 import blip.BasicModels;
+import blip.container.Pool;
+
+size_t defaultFiberSize=1024*1024; // a largish (1MB) stack
+
+class FiberPoolT(int batchSize=16):Pool!(Fiber,batchSize){
+    size_t stackSize;
+    
+    this(size_t stackSize=defaultFiberSize,size_t bufferSpace=8*batchSize,
+        size_t maxEl=16*batchSize){
+        super(bufferSpace,maxEl);
+        this.stackSize=stackSize;
+    }
+    
+    override Fiber clear(Fiber f){
+        if (f !is null){
+            if (f.stackSize==stackSize){
+                f.clear();
+                return f;
+            }
+            delete f;
+        }
+        return null;
+    }
+    
+    Fiber reset(Fiber f){
+        return f;
+    }
+    
+    override Fiber allocateNew(){
+        return new Fiber(function void(){},stackSize);
+    }
+    
+    Fiber getObj(void function() f){
+        auto res=super.getObj();
+        res.reset(f);
+        return res;
+    }
+    Fiber getObj(void delegate() f){
+        auto res=super.getObj();
+        res.reset(f);
+        return res;
+    }
+}
+alias FiberPoolT!() FiberPool;
+
+class TaskPoolT(int batchSize=16):Pool!(Task,batchSize){
+    this(size_t bufferSpace=8*batchSize, size_t maxEl=16*batchSize){
+        super(bufferSpace,maxEl);
+    }
+    Task getObj(char[] name, void delegate() taskOp,bool mightSpawn=true){
+        auto res=super.getObj();
+        res.reset(name,taskOp,cast(Fiber)null,cast(bool delegate())null,
+            cast(TaskI delegate())null, mightSpawn);
+        return res;
+    }
+    /// constructor with a possibly yieldable call
+    Task getObj(char[] name, YieldableCall c,bool mightSpawn=true){
+        auto res=super.getObj();
+        res.reset(name,c,mightSpawn);
+        return res;
+    }
+    /// constructor (with fiber)
+    Task getObj(char[] name,Fiber fiber,bool mightSpawn=true){
+        auto res=super.getObj();
+        res.reset(name,&res.runFiber,fiber,cast(bool delegate())null,
+            cast(TaskI delegate())null, mightSpawn);
+        return res;
+    }
+    /// constructor (with generator)
+    Task getObj(char[] name, bool delegate() generator,bool mightSpawn=true){
+        auto res=super.getObj();
+        res.reset(name,&res.runGenerator,cast(Fiber)null,generator,
+            cast(TaskI delegate())null, mightSpawn);
+        return res;
+    }
+    /// constructor (with generator)
+    Task getObj(char[] name, TaskI delegate() generator2,bool mightSpawn=true){
+        auto res=super.getObj();
+        res.reset(name,&res.runGenerator2,cast(Fiber)null,cast(bool delegate())null,
+        generator2, mightSpawn);
+        return res;
+    }
+    /// general constructor
+    Task getObj(char[] name, void delegate() taskOp,Fiber fiber,
+        bool delegate() generator,TaskI delegate() generator2, bool mightSpawn=true, FiberPool fPool=null){
+        auto res=super.getObj();
+        res.reset(name,taskOp,fiber,generator,generator2,mightSpawn,fPool);
+        return res;
+    }
+}
+
+alias TaskPoolT!(16) TaskPool;
+
+class SchedulerPools{
+    FiberPool fiberPool;
+    TaskPool taskPool;
+    this(FiberPool fiberPool=null,TaskPool taskPool=null){
+        this.fiberPool=fiberPool;
+        if (this.fiberPool is null){
+            this.fiberPool=new FiberPool(defaultFiberSize);
+        }
+        this.taskPool=taskPool;
+        if (taskPool is null){
+            taskPool=new TaskPool();
+        }
+    }
+    
+}
+
+ThreadLocal!(SchedulerPools) _schedulerPools;
+
+static this(){
+    _schedulerPools=new ThreadLocal!(SchedulerPools)(null);
+}
+
+SchedulerPools defaultSchedulerPools(){
+    auto sPool=_schedulerPools.val;
+    if (sPool is null){
+        synchronized{
+            volatile sPool=_schedulerPools.val;
+            if (sPool is null){
+                sPool=new SchedulerPools();
+                _schedulerPools.val=sPool;
+            }
+        }
+    }
+    assert(sPool !is null);
+    return sPool;
+}
+FiberPool defaultFiberPool(FiberPool fPool=null){
+    if (fPool) return fPool;
+    auto sPools=defaultSchedulerPools();
+    return sPools.fiberPool;
+}
 
 /// a fiber if work manager is parallel, a simple delegate call if not
 /// this allows to easily remove the depenedence of fibers in most cases
 struct YieldableCall{
     void delegate() dlg;
-    size_t stackSize;
+    FiberPool fPool;
     bool mightYield;
-    static YieldableCall opCall(void delegate() dlg,bool mightYield=true, size_t stackSize=1024*1024){
+    static YieldableCall opCall(void delegate() dlg,bool mightYield=true,
+        FiberPool fiberPool=null){
         YieldableCall res;
         res.dlg=dlg;
-        res.stackSize=stackSize;
+        res.fPool=fiberPool;
         res.mightYield=mightYield;
         return res;
     }
     /// returns a new fiber that performs the call
     Fiber fiber(){
-        return new Fiber(this.dlg,this.stackSize);
+        return defaultFiberPool(fPool).getObj(this.dlg);
     }
 }
 
@@ -57,7 +192,7 @@ class Task:TaskI{
     bool delegate() generator; /// generator to run
     TaskI delegate() generator2; /// generator to run
     Fiber fiber; /// fiber to run
-    size_t stackSize; /// if non zero allocates a fiber executing taskOp with the given stack (unless Sequential)
+    FiberPool fPool; /// if non null allocates a fiber executing taskOp with the given stack (unless Sequential)
     LinkedList!(void delegate()) onFinish; /// actions to execute sequentially at the end of the task
     TaskI _superTask; /// super task of this task
     char[] _taskName; /// name of the task
@@ -73,6 +208,31 @@ class Task:TaskI{
     Semaphore waitSem; /// lock to wait for task end
     LinkedList!(Variant) variants; /// variants to help with full closures and gc
     
+    /// clears a task for reuse
+    void clear(){
+        assert(_status==TaskStatus.Finished || _status==TaskStatus.Building || 
+            _status==TaskStatus.NonStarted,"invalid status for clear");
+        _level=0;
+        _status=TaskStatus.Finished;
+        taskOp=null; generator=null; generator2=null;
+        if (fiber){
+            defaultFiberPool(fPool).giveBack(fiber);
+            fiber=null;
+        }
+        fPool=null;
+        onFinish.clear();
+        _superTask=null;
+        _taskName=null;
+        resubmit=false;
+        holdSubtasks=false;
+        holdedSubtasks=null;
+        spawnTasks=0;
+        finishedTasks=0;
+        _scheduler=null;
+        _mightSpawn=false;
+        _mightYield=false;
+        variants.clear();
+    }
     /// it the task might be yielded (i.e. if it is a fiber)
     bool mightYield(){ return _mightYield && (fiber !is null); }
     /// return the name of this task
@@ -95,41 +255,49 @@ class Task:TaskI{
     void scheduler(TaskSchedulerI sched){ assert(status==TaskStatus.Building); _scheduler=sched; }
     /// it the task might spawn other tasks
     bool mightSpawn() { return _mightSpawn; }
+    /// empty constructor, task will need to be reset before using
+    this(){}
     /// constructor (with single delegate)
     this(char[] name, void delegate() taskOp,bool mightSpawn=true){
-        this(name,taskOp,cast(Fiber)null,cast(bool delegate())null,
+        reset(name,taskOp,cast(Fiber)null,cast(bool delegate())null,
             cast(TaskI delegate())null, mightSpawn);
     }
     /// constructor with a possibly yieldable call
     this(char[] name, YieldableCall c,bool mightSpawn=true){
+        reset(name,c,mightSpawn);
+    }
+    void reset(char[] name, YieldableCall c,bool mightSpawn=true){
         if (! c.mightYield){
-            this(name,c.dlg,cast(Fiber)null,cast(bool delegate())null,
+            reset(name,c.dlg,cast(Fiber)null,cast(bool delegate())null,
                 cast(TaskI delegate())null, mightSpawn);
         } else {
-            assert(c.stackSize>0, "stackSize cannot be 0");
-            this(name,c.dlg,cast(Fiber)null,cast(bool delegate())null,
-                cast(TaskI delegate())null, mightSpawn, c.stackSize);
+            reset(name,c.dlg,cast(Fiber)null,cast(bool delegate())null,
+                cast(TaskI delegate())null, mightSpawn, defaultFiberPool(c.fPool));
             this._mightYield=c.mightYield;
         }
     }
     /// constructor (with fiber)
     this(char[] name,Fiber fiber,bool mightSpawn=true){
-        this(name,&runFiber,fiber,cast(bool delegate())null,
+        reset(name,&runFiber,fiber,cast(bool delegate())null,
             cast(TaskI delegate())null, mightSpawn);
     }
-    /// constructor (with genrator)
+    /// constructor (with generator)
     this(char[] name, bool delegate() generator,bool mightSpawn=true){
-        this(name,&runGenerator,cast(Fiber)null,generator,
+        reset(name,&runGenerator,cast(Fiber)null,generator,
             cast(TaskI delegate())null, mightSpawn);
     }
-    /// constructor (with genrator)
+    /// constructor (with generator)
     this(char[] name, TaskI delegate() generator2,bool mightSpawn=true){
-        this(name,&runGenerator2,cast(Fiber)null,cast(bool delegate())null,
+        reset(name,&runGenerator2,cast(Fiber)null,cast(bool delegate())null,
         generator2, mightSpawn);
     }
     /// general constructor
     this(char[] name, void delegate() taskOp,Fiber fiber,
-        bool delegate() generator,TaskI delegate() generator2, bool mightSpawn=true, size_t stackSize=cast(size_t)0){
+        bool delegate() generator,TaskI delegate() generator2, bool mightSpawn=true, FiberPool fPool=null){
+        reset(name,taskOp,fiber,generator,generator2,mightSpawn,fPool);
+    }
+    void reset(char[] name, void delegate() taskOp,Fiber fiber,
+        bool delegate() generator,TaskI delegate() generator2, bool mightSpawn=true, FiberPool fPool=null){
         assert(taskOp !is null);
         this.level=0;
         this._taskName=name;
@@ -149,7 +317,7 @@ class Task:TaskI{
         this._mightSpawn=mightSpawn;
         this.variants=new LinkedList!(Variant)();
         this._mightYield=fiber !is null;
-        this.stackSize=stackSize;
+        this.fPool=fPool;
     }
     /// has value for tasks
     uint getHash(){
@@ -166,11 +334,10 @@ class Task:TaskI{
     /// be careful overriding this (probably you should override internalExe)
     void execute(bool sequential=false){
         if (status==TaskStatus.NonStarted){
-            if (stackSize && (! sequential)) {
-                fiber=new Fiber(taskOp,stackSize);
+            if (fiber is null && (! sequential) && (mightSpawn || fPool)) {
+                fiber=defaultFiberPool(fPool).getObj(taskOp);
                 taskOp=&runFiber;
             }
-            stackSize=cast(size_t)0;
             synchronized(taskLock) {
                 assert(status==TaskStatus.NonStarted);
                 status=TaskStatus.Started;
@@ -341,8 +508,20 @@ class Task:TaskI{
         }
         return this;
     }
+    /// sets the fiber pool used
+    Task setFiberPool(FiberPool fPool){
+        this.fPool=fPool;
+        return this;
+    }
+    /// returns the fiber pool used
+    FiberPool fiberPool(bool canBeNull=false){
+        if (canBeNull)
+            return fPool;
+        else
+            return defaultFiberPool(fPool);
+    }
     /// submits this task (with the given supertask, or with the actual task as supertask)
-    TaskI submit(TaskI superTask=null){
+    Task submit(TaskI superTask=null){
         if (superTask !is null){
             assert(this.superTask is null || this.superTask is superTask,"superTask was already set");
             this.superTask=superTask;
@@ -359,7 +538,7 @@ class Task:TaskI{
     }
     /// submits the current task and yields the current one
     /// needs a Fiber or Yieldable task
-    TaskI submitYield(TaskI superTask=null){
+    Task submitYield(TaskI superTask=null){
         submit(superTask);
         auto tAtt=taskAtt.val;
         if (tAtt.mightYield)

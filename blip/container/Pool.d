@@ -4,12 +4,37 @@
         author:         Fawzi Mohamed
 *******************************************************************************/
 module blip.containter.Pool;
+import tango.core.Traits:ctfe_i2a;
+import tango.math.Math: max;
+
+/// calls the allocator for the given type
+T allocT(T,A...)(A args) {
+    static if(is(T==class)){
+        static if (is(typeof(new T(args)))){
+            return new T(args);
+        } else {
+            assert(false,"no empty constructor for "~T.stringof~" with "~A.stringof
+                ~" you need to override the allocation method");
+        }
+    } else static if (is(T==struct)){
+        return T.init;
+    } else static if (is(T U:U*)){
+        T t;
+        static if (is(typeof(new U(args)))){
+            t=new U(args);
+        } else {
+            assert(false,"no empty constructor for "~T.stringof~" with "~A.stringof
+                ~" you need to override the allocation method");
+        }
+        return t;
+    }
+}
 
 /// a pool, tries to use little memory if not used, and grow gracefully
 /// keeping heap activity small
 class Pool(T,int batchSize=16){
     alias T ElType;
-    static assert(batchSize & (batchSize-1)==0,"batchSize should be a power of 2");
+    static assert((batchSize & (batchSize-1))==0,"batchSize should be a power of 2 "~ctfe_i2a(batchSize));
     struct S{
         T[batchSize]array;
         S*next;
@@ -19,30 +44,41 @@ class Pool(T,int batchSize=16){
     size_t nCapacity;
     size_t maxEl;
     size_t bufferSpace;
-    T delegate() allocator;
-    T delegate(T obj) reset;
     S* pool;
-    this(T delegate() allocator=null,T delegate(T obj) reset=null,
-        T delegate(T obj) clear=null, size_t bufferSpace=2*batchSize){
-        this.allocator=allocator;
-        this.reset=reset;
-        this.clear=clear;
+    this(size_t bufferSpace=8*batchSize, size_t maxEl=16*batchSize){
+        this.maxEl=max(batchSize,maxEl);
         this.bufferSpace=max(batchSize,bufferSpace);
+    }
+    /// allocates a new object of type T
+    T allocateNew(){
+        return allocT!(T)();
+    }
+    /// clears object T before adding it to pool storage
+    T clear(T obj){
+        static if(is(typeof(obj.clear()))){
+            obj.clear();
+        }
+        return obj;
+    }
+    /// resets a object just before returning it as new
+    T reset(T obj){
+        static if(is(typeof(obj.reset()))){
+            obj.reset();
+        }
+        return obj;
     }
     /// returns an object to the pool
     void giveBack(T obj){
         if (obj is null) return;
-        if (clear !is null) {
-            obj=clear(obj);
-            if (obj is null) return;
-        }
+        obj=clear(obj);
+        if (obj is null) return;
         bool deleteObj=false;
         synchronized(this){
             if (nEl>=maxEl){
                 deleteObj=true;
             }else if (nEl==nCapacity){
                 S* nP=new S();
-                np.array[0]=obj;
+                nP.array[0]=obj;
                 if (pool is null){
                     nP.next=nP;
                     nP.prev=nP;
@@ -89,11 +125,10 @@ class Pool(T,int batchSize=16){
                 }
             }
             if (obj !is null){
-                if (reset !is null) return reset(obj);
-                return obj;
+                return reset(obj);
             }
         }
-        return allocator();
+        return allocateNew();
     }
     /// get rid of all cached values
     void flush(){

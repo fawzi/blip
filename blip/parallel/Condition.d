@@ -3,7 +3,7 @@ import blip.parallel.Models;
 import blip.parallel.BasicTasks;
 import tango.core.Thread;
 
-/// waits for a lock
+/// waits for an OS lock
 class WaitLock(T){
     T lockObj;
     bool alwaysLock;

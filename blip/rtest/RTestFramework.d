@@ -347,7 +347,7 @@ class RunTestsArgs{
         this.mightYield=mightYield;
     }
     YieldableCall yieldableCall(){
-        return YieldableCall(&exec,mightYield,1024*1024);
+        return YieldableCall(&exec,mightYield,defaultFiberPool());
     }
     void exec(){
         test.runTests(testFactor,rngState,counterVal);

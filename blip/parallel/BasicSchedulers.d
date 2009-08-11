@@ -41,14 +41,24 @@ class PriQTaskScheduler:TaskSchedulerI {
     SchedulerRunLevel runLevel;
     /// active tasks (tasks that have been taken from the scheduler and not yet finished)
     int[TaskI] activeTasks;
+    /// level of the scheduler (mirrors a numa topology level)
+    int level;
     /// executer
     ExecuterI _executer;
     /// returns the root task
     TaskI rootTask(){ return _rootTask; }
+    /// super scheduler, only subclasses of this are accepted
+    PriQTaskScheduler superScheduler;
     /// creates a new PriQTaskScheduler
-    this(char[] name,char[] loggerPath="blip.parallel.queue"){
+    this(char[] name,char[] loggerPath="blip.parallel.queue",int level=0,
+        PriQTaskScheduler superScheduler=null){
         this.name=name;
-        queue=new PriQueue!(TaskI)();
+        if (superScheduler){
+            this.superScheduler=superScheduler;
+            queue=new PriQueue!(TaskI)(superScheduler.queue);
+        } else {
+            queue=new PriQueue!(TaskI)();
+        }
         log=Log.lookup(loggerPath);
         _rootTask=new RootTask(this,0,name~"RootTask");
         runLevel=SchedulerRunLevel.Running;
@@ -62,8 +72,28 @@ class PriQTaskScheduler:TaskSchedulerI {
             queue.insert(t.level,t);
         }
     }
+    /// returns nextTask if available, null if it should wait
+    TaskI nextTaskImmediate(int stealLevel){
+        TaskI t;
+        if (queue.nEntries==0){
+            if (stealLevel==0) return null;
+        } else {
+            t=queue.popNext(true);
+        }
+        if (stealLevel>level && t is null){
+            t=trySteal(stealLevel);
+        }
+        if (t !is null){
+            subtaskActivated(t);
+        }
+        return t;
+    }
+    /// tries to steal a task, might redistribute the tasks
+    TaskI trySteal(int stealLevel){
+        return null;
+    }
     /// returns nextTask (blocks, returns null only when stopped)
-    Task nextTask(){
+    TaskI nextTask(){
         TaskI t;
         if (runLevel>=SchedulerRunLevel.StopNoTasks){
             if (queue.nEntries==0){
@@ -91,6 +121,7 @@ class PriQTaskScheduler:TaskSchedulerI {
         return getString(desc(new Stringify()).newline);
     }
     /// locks the scheduler (to perform task reorganization)
+    /// if you call this then toString is threadsafe
     void lockSched(){
         queue.queueLock.lock();
     }

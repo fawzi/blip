@@ -122,13 +122,16 @@ class PriQueue(T){
     int nEntries;
     /// if the queue should stop
     bool shouldStop;
+    /// a super queue (asked for tasks)
+    PriQueue superQueue;
     /// lock for queue modifications
     Mutex queueLock;
     /// to make the threads wait when no tasks are available
     /// use a Condition instead? (on mac I should test them, I strongly suspect they don't work);
     Semaphore zeroSem;
     /// creates a new piriority queue
-    this(){
+    this(PriQueue superQueue=null){
+        this.superQueue=superQueue;
         nEntries=0;
         queue=null;
         shouldStop=false;
@@ -172,9 +175,10 @@ class PriQueue(T){
         }
     }
     /// remove the next task from the queue and returns it
-    /// locks if no tasks are available, returns null if and only if shouldStop is true
+    /// locks if no tasks are available, if immediate is false
+    /// returns null if and only if shouldStop is true
     /// threadsafe
-    T popNext(){
+    T popNext(bool immediate=false){
         bool shouldLockZero=false;
         while(1){
             if (shouldStop) return null;
@@ -198,6 +202,11 @@ class PriQueue(T){
                 }
             }
             if (shouldLockZero) {
+                if (superQueue){
+                    T res=superQueue.popNext(true);
+                    if (res) return res;
+                }
+                if (immediate) return null;
                 zeroSem.wait();
                 synchronized(queueLock){
                     if (nEntries>0)
