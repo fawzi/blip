@@ -97,7 +97,6 @@ class WriteHandlers: CoreHandlers{
     /// returns if the current protocol is binary or not
     bool binary(){
         assert(0,"unimplemented");
-        return true;
     }
     /// writes a raw sequence of bytes
     void rawWrite(ubyte[] data){
@@ -121,7 +120,6 @@ class ReadHandlers: CoreHandlers{
     /// returns if the current protocol is binary or not
     bool binary(){
         assert(0,"unimplemented");
-        return false;
     }
     /// reads a raw sequence of bytes
     ubyte[] rawRead(size_t amount){

@@ -276,12 +276,14 @@ class TextController: TestControllerI{
         case OnFailure.StopTest:
             return false;
         case OnFailure.Throw:
-            throw new Exception("test failure");
+            throw new Exception("test failure",__FILE__,__LINE__);
         case OnFailure.StopAllTests:
             this._isStopping=true;
             break;
         case OnFailure.Continue:
             break;
+        default:
+            throw new Exception("unknown failure",__FILE__,__LINE__);
         }
         return !isStopping;
     }

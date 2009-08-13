@@ -130,7 +130,6 @@ proc_id_t currentCpuId() { throw new Exception("unimplemented",__FILE__,__LINE__
 /// loops on the available nodes (at one ot the levels 0,1 or 2)
 SimpleIterator!(NumaNode) nodesAvailable() {
     throw new Exception("unimplemented",__FILE__,__LINE__); // do not implement at all, so that presence can be statically checked?
-    return null;
 }
 
 /// describes the topology of a machine in a simplified hierarchical way

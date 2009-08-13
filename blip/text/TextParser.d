@@ -160,6 +160,8 @@ class TextParser(T) : InputFilter
                     smallCacheError("no characters in buffer",__FILE__,__LINE__);
                 case SliceExtent.ToEnd:
                     return 0;
+                default:
+                    throw new Exception("unknown slice extent",__FILE__,__LINE__);
                 }
                 return 0;
             }
@@ -250,8 +252,11 @@ class TextParser(T) : InputFilter
                 if (inComment==CommentType.None) inComment=CommentType.Whitespace;
             case SliceExtent.ToEnd :
                 return data.length;
+            default:
+                throw new Exception("unknown SliceExtent",__FILE__,__LINE__);
         }
         parseError("invalid SliceExtent",__FILE__,__LINE__);
+        return 0;
     }
     /// skips whitespace
     bool skipWhitespace(){
@@ -338,6 +343,8 @@ class TextParser(T) : InputFilter
             smallCacheError("float did not terminate within buffer window ("~Integer.toString(data.length)~")",__FILE__,__LINE__);
             case SliceExtent.ToEnd :
                 return data.length;
+            default:
+                throw new Exception("unknown SliceExtent",__FILE__,__LINE__);
         }
         parseError("invalid SliceExtent",__FILE__,__LINE__);
     }
@@ -366,6 +373,8 @@ class TextParser(T) : InputFilter
                 smallCacheError("quoted string did not terminate within buffer window ("~Integer.toString(data.length)~")",__FILE__,__LINE__);
                 case SliceExtent.ToEnd :
                 parseError("quoted string was not closed before EOF",__FILE__,__LINE__);
+                default:
+                    throw new Exception("unknown SliceExtent",__FILE__,__LINE__);
             }
         } else {
             for(;i!=data.length;++i){
@@ -384,6 +393,8 @@ class TextParser(T) : InputFilter
                 smallCacheError("string did not terminate within buffer window ("~Integer.toString(data.length)~")",__FILE__,__LINE__);
                 case SliceExtent.ToEnd :
                     return data.length;
+                default:
+                    throw new Exception("unknown SliceExtent",__FILE__,__LINE__);
             }
         }
         parseError("invalid SliceExtent",__FILE__,__LINE__);
@@ -507,6 +518,8 @@ class TextParser(T) : InputFilter
                     smallCacheError("skipString string is larger than buffer window ("~Integer.toString(data.length)~"<"~Integer.toString(str.length)~")",__FILE__,__LINE__);
                 case SliceExtent.ToEnd:
                     return 0;
+                default:
+                    throw new Exception("unknown SliceExtent",__FILE__,__LINE__);
                 }
             }
             if (str == data[0..str.length]){
@@ -534,6 +547,8 @@ class TextParser(T) : InputFilter
                 case SliceExtent.ToEnd:
                     if (data.length==str.length &&data==str) return str.length;
                     return 0;
+                default:
+                    throw new Exception("unknown SliceExtent",__FILE__,__LINE__);
                 }
             }
             if (str == data[0..str.length]){
