@@ -81,7 +81,7 @@ enum ArrayFlags {
     None = 0
 }
 
-alias ptrdiff_t index_type; // switch back to int later
+alias ptrdiff_t index_type; // switch back to int later?
 
 /// describes a range
 /// upper bound is not part of the range if positive
@@ -135,6 +135,25 @@ template reductionFactor(T,S...){
 
 /// threshold for manual allocation
 const int manualAllocThreshold=200*1024;
+
+/// guard object to deallocate large arrays that contain inner pointers
+class Guard{
+    ubyte[] data;
+    this(void[] data){
+        this.data=cast(ubyte[])data;
+    }
+    this(size_t size,bool scanPtr=false){
+        GC.BlkAttr attr;
+        if (!scanPtr)
+            attr=GC.BlkAttr.NO_SCAN;
+        ubyte* mData2=cast(ubyte*)GC.malloc(size,attr);
+        if(mData2 is null) throw new Exception("malloc failed");
+        data=mData2[0..size];
+    }
+    ~this(){
+        GC.free(data.ptr);
+    }
+}
 
 /// the template class that represent a rank-dimensional dense rectangular array of type T
 /// WARNING the fields of the array (bStrides,shape,nElArray,flags,mBase) should not be changed
@@ -382,17 +401,18 @@ else {
                     
         /// returns an empty (uninitialized) array of the requested shape
         static NArray empty(index_type[rank] shape,bool fortran=false){
-            
             index_type size=1;
             foreach (sz;shape)
                 size*=sz;
             uint flags=ArrayFlags.None;
             V[] mData;
+            void *mBase;
             if (size>manualAllocThreshold/cast(index_type)V.sizeof) {
-                V* mData2=cast(V*)GC.malloc(size*V.sizeof,GC.BlkAttr.NO_SCAN);
-                if(mData2 is null) throw new Exception("malloc failed");
+                auto guard=new Guard(size*V.sizeof);
+                V* mData2=cast(V*)guard.data.ptr;
                 mData=mData2[0..size];
-                flags=ArrayFlags.ShouldFreeData;
+                mBase=cast(void*)guard;
+                //flags=ArrayFlags.ShouldFreeData;
             } else {
                 mData=new V[size];
             }
@@ -410,7 +430,7 @@ else {
                     sz *= d;
                 }
             }
-            return NArray(strides,shape,cast(index_type)0,mData,flags);
+            return NArray(strides,shape,cast(index_type)0,mData,flags,mBase);
         }
         /// returns an array initialized to 0 of the requested shape
         static NArray zeros(index_type[rank] shape, bool fortran=false){
@@ -1472,10 +1492,10 @@ else {
         /// returns the base for an array that is a view of the current array
         void *newBase(){
             void *res=mBase;
-            if (flags&Flags.ShouldFreeData){
+            /+if (flags&Flags.ShouldFreeData){
                 assert(mBase is null,"if this array is the owner of the data it should not have base arrays");
                 res=cast(void *)&this;
-            }
+            }+/
             return res;
         }
         
@@ -1743,7 +1763,7 @@ else {
             void getData()
             {
                 if (mBase is null) {
-                    s.serializationError("cannot read data befor knowing shape",__FILE__,__LINE__);
+                    s.serializationError("cannot read data before knowing shape",__FILE__,__LINE__);
                 }
                 NArray a=cast(NArray)cast(Object)mBase;
                 auto ac=s.readArrayStart(null);
@@ -1772,6 +1792,30 @@ else {
     } // end NArray class
 }// end static if
 }// end template NArray
+
+/// returns a "null" or dummy array (useful as default parameter)
+template nullNArray(T,int rank){
+    static if (rank>0){
+        const NArray!(T,rank) nullNArray=null;
+    } else {
+        const T nullNArray=T.init;
+    }
+}
+
+
+/// returns if the argument is a null or dummy array (useful as default parameter)
+/// cannot recognize rank 0 null arrays
+bool isNullNArray(T,int rank, bool acceptZeroRank=false)(NArray!(T,rank)a){
+    static if (rank>0){
+        return a is null;
+    } else {
+        static if (acceptZeroRank) {
+            return false;
+        } else {
+            static assert(false,"cannot recognize rank 0 null arrays");
+        }
+    }
+}
 
 /+ -------- looping/generic operations --------- +/
 

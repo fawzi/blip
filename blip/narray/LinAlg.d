@@ -295,12 +295,12 @@ version(no_lapack){ }
 else {
     /// finds x for which dot(a,x)==b for a square matrix a
     /// not so efficient (copies a)
-    NArray!(T,2) solve(T)(NArray!(T,2)a,NArray!(T,2)b,NArray!(T,2)x=null)
+    NArray!(T,2) solve(T)(NArray!(T,2)a,NArray!(T,2)b,NArray!(T,2)x=nullNArray!(T,2))
     in{
         static assert(isBlasType!(T),"implemented only for blas types");
         assert(a.shape[0]==a.shape[1],"a should be square");
         assert(a.shape[0]==b.shape[0],"incompatible shapes a-b");
-        if (x !is null){
+        if (!isNullNArray(x)){
             assert(a.shape[1]==x.shape[0],"incompatible shapes a-x");
             assert(x.shape[1]==b.shape[1],"incompatible shapes b-x");
         }
@@ -309,7 +309,7 @@ else {
         a=a.dup(true);
         scope ipiv=NArray!(f_int,1).empty([a.shape[0]]);
         f_int info;
-        if (x is null) x=empty!(T)(b.shape,true);
+        if (isNullNArray(x)) x=empty!(T)(b.shape,true);
         if (!(x.bStrides[0]==cast(index_type)T.sizeof && x.bStrides[1]>0)){
             scope NArray!(T,2) xx=b.dup(true);
             DLapack.gesv(a.shape[0], b.shape[1], a.startPtrArray, a.bStrides[1]/cast(index_type)T.sizeof, ipiv.startPtrArray,
@@ -327,16 +327,16 @@ else {
         return x;
     }
     /// ditto
-    NArray!(T,1) solve(T)(NArray!(T,2)a,NArray!(T,1)b,NArray!(T,1)x=null)
+    NArray!(T,1) solve(T)(NArray!(T,2)a,NArray!(T,1)b,NArray!(T,1)x=nullNArray!(T,1))
     in{
         static assert(isBlasType!(T),"implemented only for blas types");
         assert(a.shape[0]==a.shape[1],"a should be square");
         assert(a.shape[0]==b.shape[0],"incompatible shapes a-b");
-        assert(x is null || x.shape[0]==b.shape[0],"incompatible shapes b-x");
+        assert(isNullNArray(x) || x.shape[0]==b.shape[0],"incompatible shapes b-x");
     }
     body {
         scope NArray!(T,2) b1=repeat(b,1,-1);
-        if (x is null) x=zeros!(T)(b.shape,true);
+        if (isNullNArray(x)) x=zeros!(T)(b.shape,true);
         scope NArray!(T,2) x1=repeat(x,1,-1);
         auto res=solve(a,b1,x1);
         if (res.startPtrArray!=x.startPtrArray) {
@@ -406,19 +406,21 @@ else {
     /// dot(leftEVect.H,a)==leftEVect.H*repeat(ev,n,-1)
     /// note: it could be relaxed and accept all matrixes with .bStrides[0]=T.sizeof
     /// without copying
-    NArray!(ComplexTypeOf!(T),1) eig(T)(NArray!(T,2)a,NArray!(ComplexTypeOf!(T),1) ev=null,
-        NArray!(ComplexTypeOf!(T),2)leftEVect=null,NArray!(ComplexTypeOf!(T),2)rightEVect=null)
+    NArray!(ComplexTypeOf!(T),1) eig(T)(NArray!(T,2)a,
+        NArray!(ComplexTypeOf!(T),1) ev=nullNArray!(ComplexTypeOf!(T),1),
+        NArray!(ComplexTypeOf!(T),2)leftEVect=nullNArray!(ComplexTypeOf!(T),2),
+        NArray!(ComplexTypeOf!(T),2)rightEVect=nullNArray!(ComplexTypeOf!(T),2))
     in {
         static assert(isBlasType!(T),"only blas types accepted");
         assert(a.shape[0]==a.shape[1],"matrix a has to be square");
-        if (ev !is null) {
+        if (!isNullNArray(ev)) {
             assert(a.shape[0]==ev.shape[0],"ev has an incorrect size");
         }
-        if (rightEVect !is null) {
+        if (!isNullNArray(rightEVect)) {
             assert(a.shape[0]==rightEVect.shape[0],"invalid size for rightEVect");
             assert(a.shape[0]==rightEVect.shape[1],"invalid size for rightEVect");
         }
-        if (leftEVect !is null) {
+        if (!isNullNArray(leftEVect)) {
             assert(a.shape[0]==leftEVect.shape[0],"invalid size for leftEVect");
             assert(a.shape[0]==leftEVect.shape[1],"invalid size for leftEVect");
         }
@@ -428,7 +430,7 @@ else {
         NArray!(T,2) lE,rE;
         T* lEPtr=null,rEPtr=null;
         f_int lELd=1,rELd=1;
-        if (leftEVect !is null){
+        if (!isNullNArray(leftEVect)){
             if (leftEVect.flags & ArrayFlags.Fortran) {
                 lE=NArray!(T,2)([T.sizeof,T.sizeof*a.shape[0]],leftEVect.shape,
                     cast(T*)leftEVect.startPtrArray,leftEVect.newFlags,leftEVect.newBase);
@@ -438,7 +440,7 @@ else {
             lEPtr=lE.startPtrArray;
             lELd=lE.bStrides[1]/cast(index_type)T.sizeof;
         }
-        if (rightEVect !is null){
+        if (!isNullNArray(rightEVect)){
             if (rightEVect.flags & ArrayFlags.Fortran) {
                 rE=NArray!(T,2)([T.sizeof,T.sizeof*a.shape[0]],rightEVect.shape,
                     cast(T*)rightEVect.startPtrArray,rightEVect.newFlags,rightEVect.newBase);
@@ -449,7 +451,7 @@ else {
             rELd=rE.bStrides[1]/cast(index_type)T.sizeof;
         }
         NArray!(ComplexTypeOf!(T),1) eigenval=ev;
-        if (eigenval is null || is(T==ComplexTypeOf!(T)) && (!(eigenval.flags&ArrayFlags.Fortran))) {
+        if (isNullNArray(eigenval) || is(T==ComplexTypeOf!(T)) && (!(eigenval.flags&ArrayFlags.Fortran))) {
             eigenval = zeros!(ComplexTypeOf!(T))(a.shape[0]);
         }
         f_int n=a.shape[0],info;
@@ -466,9 +468,9 @@ else {
                 a1.startPtrArray, a1.bStrides[1]/cast(index_type)T.sizeof, eigenval.startPtrArray, lEPtr, lELd, rEPtr, rELd,
                 work.startPtrArray, lwork, rwork.startPtrArray, info);
             
-            if (leftEVect ! is null && leftEVect.startPtrArray != lE.startPtrArray) leftEVect[]=lE;
-            if (rightEVect !is null && rightEVect.startPtrArray != rE.startPtrArray) rightEVect[]=rE;
-            if (ev !is null && ev.startPtrArray != eigenval.startPtrArray) ev[]=eigenval;
+            if (!isNullNArray(leftEVect) && leftEVect.startPtrArray != lE.startPtrArray) leftEVect[]=lE;
+            if (!isNullNArray(rightEVect) && rightEVect.startPtrArray != rE.startPtrArray) rightEVect[]=rE;
+            if (!isNullNArray(ev) && ev.startPtrArray != eigenval.startPtrArray) ev[]=eigenval;
         } else {
             scope NArray!(RealTypeOf!(T),1) wr = empty!(RealTypeOf!(T))(n);
             scope NArray!(RealTypeOf!(T),1) wi = empty!(RealTypeOf!(T))(n);
@@ -528,20 +530,21 @@ else {
     /// with square orthogonal u,v and singular values s, the larger of u,vt can be reduced to rectangular
     /// (as the other vectors are not really well defined)
     /// to do: switch to 'O' method, to spare a matrix
-    NArray!(RealTypeOf!(T),1) svd(T,S=RealTypeOf!(T))(NArray!(T,2)a,NArray!(T,2)u=null,
-        NArray!(S,1)s=null,NArray!(T,2)vt=null)
+    NArray!(RealTypeOf!(T),1) svd(T,S=RealTypeOf!(T))(NArray!(T,2)a,
+        NArray!(T,2)u=nullNArray!(T,2),NArray!(S,1)s=nullNArray!(S,1),
+        NArray!(T,2)vt=nullNArray!(T,2))
     in{
         static assert(is(RealTypeOf!(T)==S),"singular values are real");
         index_type mn=min(a.shape[0],a.shape[1]);
-        if (u !is null){
+        if (!isNullNArray(u)){
             assert(u.shape[0]==a.shape[0],"invalid shape[0] for u");
             assert(u.shape[1]==a.shape[0] || u.shape[1]==mn,"invalid shape[1] for u");
         }
-        if (vt !is null){
+        if (!isNullNArray(vt)){
             assert(vt.shape[0]==a.shape[1] || vt.shape[0]==mn,"invalid shape[0] for vt");
             assert(vt.shape[1]==a.shape[1],"invalid shape[1] for vt");
         }
-        if (s !is null){
+        if (!isNullNArray(s)){
             assert(s.shape[0]==mn,"invalid shape for s");
         }
     }
@@ -549,7 +552,7 @@ else {
         index_type m=a.shape[0],n=a.shape[1],mn=min(m,n);
         a=a.dup(true);
         auto myS=s;
-        if (s is null || s.bStrides[0]!=cast(index_type)RealTypeOf!(T).sizeof){
+        if (isNullNArray(s) || s.bStrides[0]!=cast(index_type)RealTypeOf!(T).sizeof){
             myS=empty!(RealTypeOf!(T))(mn,true);
         }
         if (mn==cast(index_type)0) return s;
@@ -560,16 +563,16 @@ else {
         if (lda==1) lda=a.shape[0];
         f_int ldu= cast(f_int)1;
         f_int ldvt=cast(f_int)1;
-        if (u !is null || vt !is null){
-            if (u is null || u.bStrides[0]!=cast(index_type)T.sizeof || u.bStrides[1]<=0 ){
+        if (!isNullNArray(u) || !isNullNArray(vt)){
+            if (isNullNArray(u) || u.bStrides[0]!=cast(index_type)T.sizeof || u.bStrides[1]<=0 ){
                 index_type[2] uShape=m;
-                if (u !is null) uShape[1]=mn;
+                if (!isNullNArray(u)) uShape[1]=mn;
                 myU=empty!(T)(uShape,true);
             }
             uPtr=myU.startPtrArray;
-            if (vt is null || vt.bStrides[0]!=cast(index_type)T.sizeof || vt.bStrides[1]<=0){
+            if (isNullNArray(vt) || vt.bStrides[0]!=cast(index_type)T.sizeof || vt.bStrides[1]<=0){
                 index_type[2] vtShape=n;
-                if (vt !is null) vtShape[0]=mn;
+                if (!isNullNArray(vt)) vtShape[0]=mn;
                 myVt=empty!(T)(vtShape,true);
             }
             vtPtr=myVt.startPtrArray;
@@ -610,8 +613,8 @@ else {
                     work.startPtrArray, lwork, iwork.startPtrArray, info);
             }
         }
-        if (u !is null && u.startPtrArray!=myU.startPtrArray) u[]=myU;
-        if (vt !is null && vt.startPtrArray!=myVt.startPtrArray) vt[]=myVt;
+        if (!isNullNArray(u) && u.startPtrArray!=myU.startPtrArray) u[]=myU;
+        if (!isNullNArray(vt) && vt.startPtrArray!=myVt.startPtrArray) vt[]=myVt;
         if (info<0) throw new LinAlgException("Illegal input to Fortran routine gesdd");
         if (info>0) throw new LinAlgException("svd decomposition did not converge");
         return myS;
@@ -619,19 +622,20 @@ else {
     
     /// eigenvaules for hermitian matrix
     NArray!(RealTypeOf!(T),1)eigh(T)(NArray!(T,2)a,MStorage storage=MStorage.up,
-        NArray!(RealTypeOf!(T),1)ev=null,NArray!(T,2)eVect=null,
-        EigRange range=EigRange(),NArray!(f_int,2)supportEVect=null,
+        NArray!(RealTypeOf!(T),1)ev=nullNArray!(RealTypeOf!(T),1),
+        NArray!(T,2)eVect=nullNArray!(T,2),EigRange range=EigRange(),
+        NArray!(f_int,2)supportEVect=nullNArray!(f_int,2),
         RealTypeOf!(T) abstol=cast(RealTypeOf!(T))0)
     in {
         assert(a.shape[0]==a.shape[1],"a has to be square");
-        assert(ev is null || ev.shape[0]==a.shape[0],"ev has incorret shape");
-        if (eVect !is null){
+        assert(isNullNArray(ev) || ev.shape[0]==a.shape[0],"ev has incorret shape");
+        if (!isNullNArray(eVect)){
             index_type m=a.shape[0];
             if (range.kind=='I') m=range.toI-range.fromI+1;
             assert(eVect.shape[0]==a.shape[0] && (eVect.shape[1]<=a.shape[0] && eVect.shape[1]>=m),
                 "eVect has invalid shape");
         }
-        assert(supportEVect is null || supportEVect.shape[0]==2 && supportEVect.shape[1]==a.shape[0],
+        assert(isNullNArray(supportEVect) || supportEVect.shape[0]==2 && supportEVect.shape[1]==a.shape[0],
             "supportEVect has incorrect shape");
     }
     body {
@@ -639,7 +643,7 @@ else {
         f_int m=cast(f_int)n;
         if (range.kind=='I') m=cast(f_int)(range.toI-range.fromI+1);
         auto myEv=ev;
-        if (ev is null || myEv.bStrides[0]!=cast(index_type)RealTypeOf!(T).sizeof){
+        if (isNullNArray(ev) || myEv.bStrides[0]!=cast(index_type)RealTypeOf!(T).sizeof){
             myEv=empty!(RealTypeOf!(T))(n);
         }
         if (n==0) return myEv;
@@ -648,7 +652,7 @@ else {
         T* eVectPtr=null;
         auto myEVect=eVect;
         f_int ldEVect=cast(f_int)1;
-        if (eVect !is null) {
+        if (!isNullNArray(eVect)) {
             if (eVect.bStrides[0]!=T.sizeof || eVect.bStrides[1]<=cast(index_type)0){
                 myEVect=empty!(T)(eVect.shape);
             }
@@ -657,7 +661,7 @@ else {
             if (ldEVect==cast(f_int)1) ldEVect=cast(f_int)myEVect.shape[0];
         }
         auto isuppz=supportEVect;
-        if (supportEVect is null || (!(supportEVect.flags&ArrayFlags.Fortran))){
+        if (isNullNArray(supportEVect) || (!(supportEVect.flags&ArrayFlags.Fortran))){
             isuppz=empty!(f_int)([2,max(1,cast(index_type)m)],true);
         }
         T tmpWork;
@@ -703,9 +707,9 @@ else {
                     work.startPtrArray, lwork, iwork.startPtrArray, liwork, info);
             }
         }
-        if (ev !is null && ev.startPtrArray!=myEv.startPtrArray) ev[]=myEv; // avoid?
-        if (eVect !is null && myEVect.startPtrArray!=eVect.startPtrArray) eVect[]=myEVect;
-        if (supportEVect !is null && supportEVect.startPtrArray!=isuppz.startPtrArray) supportEVect[]=isuppz;
+        if (!isNullNArray(ev) && ev.startPtrArray!=myEv.startPtrArray) ev[]=myEv; // avoid?
+        if (!isNullNArray(eVect) && myEVect.startPtrArray!=eVect.startPtrArray) eVect[]=myEVect;
+        if (!isNullNArray(supportEVect) && supportEVect.startPtrArray!=isuppz.startPtrArray) supportEVect[]=isuppz;
         if (m!=cast(f_int)n) myEv=myEv[Range(m)];
         if (info<0) throw new LinAlgException("Illegal input to Fortran routine syevr/heevr");
         if (info>0) throw new LinAlgException("eigenvalue decomposition did not converge");

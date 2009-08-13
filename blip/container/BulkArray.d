@@ -4,65 +4,99 @@
         author:         Fawzi Mohamed
 *******************************************************************************/
 module blip.container.BulkArray;
+import tango.core.Memory;
 
-enum BulkArrayFlags{
-    ShouldFreeData
+/// guard object to deallocate large arrays that contain inner pointers
+class Guard{
+    ubyte[] data;
+    this(void[] data){
+        this.data=cast(ubyte[])data;
+    }
+    this(size_t size,bool scanPtr=false){
+        GC.BlkAttr attr;
+        if (!scanPtr)
+            attr=GC.BlkAttr.NO_SCAN;
+        ubyte* mData2=cast(ubyte*)GC.malloc(size);
+        if(mData2 is null) throw new Exception("malloc failed");
+        data=mData2[0..size];
+    }
+    ~this(){
+        GC.free(data.ptr);
+    }
 }
 
 /// 1D array mallocated if large, with parallel looping
-class BulkArray(T){
+struct BulkArray(T){
     static size_t defaultOptimalBlockSize=100*1024/T.sizeof;
-    const BulkArrayCallocSize=100*1024;
-    BulkArray owner;
-    T[] data;
-    uint flags;
-    this(size_t size){
+    static const BulkArrayCallocSize=100*1024;
+    T* ptr, ptrEnd;
+    Guard owner;
+    T[] data(){
+        return ptr[0..(ptrEnd-ptr)];
+    }
+    void data(T[] newData){
+        ptr=newData.ptr;
+        ptrEnd=ptr+newData.length;
+    }
+    static BulkArray opCall(size_t size,bool scanPtr=false){
+        BulkArray res;
         if (size*T.sizeof>BulkArrayCallocSize){
-            aut p=calloc(size,T.sizeof);
-            this((cast(T*)p)[0..size],BulkArrayFlags.ShouldFreeData,null);
+            res.guard=new Guard(size*T.sizeof);
+            res.ptr=cast(T*)guard.data.ptr;
+            res.ptrEnd=res.ptr+size;
         } else {
-            this(new T[size],0,null);
+            res.data=new T[size];
         }
+        return res;
     }
-    this(T[] data,uint flags,BulkArray owner){
-        this.data=data;
-        this.flags=flags;
-        this.owner=owner;
+    static BulkArray opCall(T[] data,Guard owner=null){
+        BulkArray res;
+        res.data=data;
+        res.owner=owner;
+        return res;
     }
-    ~this(){
-        if (flags & BulkArrayFlags.ShouldFreeData){
-            free(data.ptr);
-        }
+    static BulkArray opCall(T*ptr,T*ptrEnd,Guard owner=null){
+        BulkArray res;
+        res.ptr=ptr;
+        res.ptrEnd=ptrEnd;
+        assert(ptrEnd>=ptr,"invalid pointers");
+        res.owner=owner;
+        return res;
     }
     /// returns the adress of element i
-    T* opIndex(size_t i){
-        return &data[i];
+    T* ptrI(size_t i){
+        assert(ptr+i<ptrEnd,"index out of bounds");
+        return ptr+i;
+    }
+    /// returns element i
+    T opIndex(size_t i){
+        assert(ptr+i<ptrEnd,"index out of bounds");
+        return ptr+i;
+    }
+    /// assign element i
+    void opIndexAssign(T val,size_t i){
+        assert(ptr+i<ptrEnd,"index out of bounds");
+        *(ptr+i)=val;
     }
     /// returns a slice of the array
-    T* opIndex(size_t i,size_t j){
-        return new BulkArray(data[i..j],0,baseOwner());
-    }
-    /// returns the owner of the data
-    BulkArray baseOwner(){
-        if (flags & BulkArrayFlags.ShouldFreeData){
-            assert(owner is null, "should free data and not owner");
-            return this;
-        } else {
-            return owner;
-        }
+    BulkArray opIndex(size_t i,size_t j){
+        assert(i<=j,"slicing with i>j"); // allow???
+        assert(i>0&&j<=length,"slicing index out of bounds");
+        return BulkArray(data[i..j],owner);
     }
     /// length of the array
     size_t length(){
-        return data.length;
+        return ptrEnd-ptr;
     }
     /// shallow copy of the array
     BulkArray dup(){
-        BulkArray n=new BulkArray(length);
+        BulkArray n=BulkArray(length);
         memcopy(n.data.ptr,data.ptr,length*T.sizeof);
+        return n;
     }
     /// deep copy of the array
     BulkArray deepdup(){
-        BulkArray n=new BulkArray(length);
+        BulkArray n=BulkArray(length);
         static if (T.deepdup){
             baBinaryOpStr("*bPtr0=aPtr0.deepdup",T,T)(this,n);
         } else static if (is(typeof(T.init.dup()))) {
@@ -70,111 +104,40 @@ class BulkArray(T){
         } else {
             memcopy(n.data.ptr,data.ptr,length*T.sizeof);
         }
+        return n;
     }
-    /// implements an iterator
-    struct Iterator{
-        T *ptr,ptrEnd;
-        BulkArray array;
-        static Iterator opCall(BulkArray array,T* ptr=null, T*ptrEnd=null){
-            Iterator it;
-            it.ptr=ptr;
-            it.ptrEnd=ptrEnd;
-            it.array=array;
-            assert(array !is null,"null array in iterator");
-            if (ptr is null){
-                it.ptr=array.data.ptr;
-            }
-            if (ptrEnd is null){
-                it.ptrEnd=array.data.ptr+array.data.length;
-            }
-        }
-        T* next(){
-            if (ptr==ptrEnd) return null;
-            return ++ptr;
-        }
-        bool atEnd(){
-            return ptr==ptrEnd;
-        }
-        int opApply(int delegate(T* v) loopBody){
-            for (T*aPtr=ptr;aPtr!=ptrEnd;++aPtr){
-                int ret=loopBody(aPtr0);
-                if (ret) return ret;
-            }
-        }
-        int opApply(int delegate(size_t i,T* v) loopBody){
-            T*aPtr=ptr;
-            for (i=ptrEnd-aPtr;i!=0;--i,++aPtr){
-                int ret=loopBody(i,aPtr0);
-                if (ret) return ret;
-            }
-        }
-        int opApply(int delegate(ref T v) loopBody){
-            for (T*aPtr=ptr;aPtr!=aEnd;++aPtr){
-                int ret=loopBody(*aPtr0);
-                if (ret) return ret;
-            }
-        }
-        int opApply(int delegate(size_t i,ref T v) loopBody){
-            T*aPtr=ptr;
-            for (i=aEnd-aPtr;i!=0;--i,++aPtr){
-                int ret=loopBody(i,*aPtr0);
-                if (ret) return ret;
-            }
+    // iterator/sequential loop done directly on BulkArray
+    T* next(){
+        if (ptr==ptrEnd) return null;
+        return ++ptr;
+    }
+    bool atEnd(){
+        return ptr==ptrEnd;
+    }
+    int opApply(int delegate(T* v) loopBody){
+        for (T*aPtr=ptr;aPtr!=ptrEnd;++aPtr){
+            int ret=loopBody(aPtr0);
+            if (ret) return ret;
         }
     }
-    /// sequential foreach loop structure
-    struct SLoop{
-        BulkArray array;
-        static SLoop opCall(BulkArray array){
-            SLoop it;
-            assert(array!is null, "array cannot be null");
-            it.array=array;
-            return it;
+    int opApply(int delegate(size_t i,T* v) loopBody){
+        T*aPtr=ptr;
+        for (i=ptrEnd-aPtr;i!=0;--i,++aPtr){
+            int ret=loopBody(i,aPtr0);
+            if (ret) return ret;
         }
-        int opApply(int delegate(T* v) loopBody){
-            for (T*aPtr=ptr;aPtr!=aEnd;++aPtr){
-                int ret=loopBody(aPtr0);
-                if (ret) return ret;
-            }
-            return 0;
+    }
+    int opApply(int delegate(ref T v) loopBody){
+        for (T*aPtr=ptr;aPtr!=aEnd;++aPtr){
+            int ret=loopBody(*aPtr0);
+            if (ret) return ret;
         }
-        int opApply(int delegate(size_t i,T* v) loopBody){
-            T*aPtr=ptr;
-            for (i=aEnd-aPtr;i!=0;--i,++aPtr){
-                int ret=loopBody(i,aPtr0);
-                if (ret) return ret;
-            }
-            return 0;
-        }
-        int opApply(int delegate(ref T v) loopBody){
-            for (T*aPtr=ptr;aPtr!=aEnd;++aPtr){
-                int ret=loopBody(*aPtr0);
-                if (ret) return ret;
-            }
-            return 0;
-        }
-        int opApply(int delegate(size_t i,ref T v) loopBody){
-            T*aPtr=ptr;
-            for (i=aEnd-aPtr;i!=0;--i,++aPtr){
-                int ret=loopBody(i,*aPtr0);
-                if (ret) return ret;
-            }
-            return 0;
-        }
-        int opApply(int delegate(T v) loopBody){
-            for (T*aPtr=ptr;aPtr!=aEnd;++aPtr){
-                int ret=loopBody(*aPtr0);
-                if (ret) return ret;
-            }
-            return 0;
-        }
-        int opApply(int delegate(size_t i,T v) loopBody){
-            T*aPtr=ptr;
-            for (i=aEnd-aPtr;i!=0;--i,++aPtr){
-                int ret=loopBody(i,*aPtr0);
-                if (ret) return ret;
-            }
-            return 0;
+    }
+    int opApply(int delegate(size_t i,ref T v) loopBody){
+        T*aPtr=ptr;
+        for (i=aEnd-aPtr;i!=0;--i,++aPtr){
+            int ret=loopBody(i,*aPtr0);
+            if (ret) return ret;
         }
     }
     /// parallel foreach loop structure
@@ -235,20 +198,20 @@ class BulkArray(T){
         }
     }
     /// return what is needed for a sequential foreach loop on the array
-    SLoop sLoop(){
-        return SLoop(this);
+    BulkArray sLoop(){
+        return this;
     }
     /// return what is needed for a parallel foreach loop on the array
     PLoop pLoop(size_t optimalBlockSize=defaultOptimalBlockSize){
         return PLoop(this);
     }
     /// implement an FIterator compliant interface on T*
-    final class FIterator:FIteratorI!(T*){
-        Iterator it;
+    final class FIteratorP:FIteratorI!(T*){
+        BulkArray it;
         bool parallel;
         size_t optimalChunkSize;
-        this(BulkArray array,T* ptr=null, T*ptrEnd=null){
-            it=Iterator(array,ptr,ptrEnd);
+        this(BulkArray array){
+            it=array;
             parallel=false;
             optimalChunkSize=defaultOptimalBlockSize;
         }
@@ -272,18 +235,18 @@ class BulkArray(T){
                 array.sLoop().opApply(loopBody);
             }
         }
-        FIterator parallelLoop(size_t myOptimalChunkSize){
+        FIteratorP parallelLoop(size_t myOptimalChunkSize){
             optimalChunkSize=myOptimalChunkSize;
             parallel=true;
             return this;
         }
-        FIterator parallelLoop(){
+        FIteratorP parallelLoop(){
             parallel=true;
             return this;
         }
     }
     /// implement an FIterator compliant interface on T
-    final class FIterator:FIteratorI!(T){
+    final class FIteratorV:FIteratorI!(T){
         Iterator it;
         bool parallel;
         size_t optimalChunkSize;
@@ -312,23 +275,23 @@ class BulkArray(T){
                 array.sLoop().opApply(loopBody);
             }
         }
-        FIterator parallelLoop(size_t myOptimalChunkSize){
+        FIteratorV parallelLoop(size_t myOptimalChunkSize){
             optimalChunkSize=myOptimalChunkSize;
             parallel=true;
             return this;
         }
-        FIterator parallelLoop(){
+        FIteratorV parallelLoop(){
             parallel=true;
             return this;
         }
     }
     /// returns an iterator
-    Iterator iterator(){
-        return Iterator(this);
+    BulkArray iterator(){
+        return this;
     }
     /// return an FIteratorI
-    FIteratorI fIterator(){
-        return new FIteratorI(this);
+    FIteratorP fIterator(){
+        return new FIteratorP(this);
     }
 }
 

@@ -412,12 +412,12 @@ char[] convolveJOnly(char[] indent,Border border){
 
 /// performs a convolution using the given (full) kernel
 NArray!(T,rank) convolveNNRef(T,int rank,Border border=Border.Same)
-    (NArray!(T,rank) kernel,NArray!(T,rank)inA,NArray!(T,rank)outA=null)
+    (NArray!(T,rank) kernel,NArray!(T,rank)inA,NArray!(T,rank)outA=nullNArray!(T,rank))
 in {
     for (int i=0;i<rank;++i){
         assert(kernel.shape[i]==3,"kernel must have 3 elements in each dimension"); // relax?
     }
-    if (outA !is null && (!(inA.flags & ArrayFlags.Zero))){
+    if (!isNullNArray!(T,rank,true)(outA) && (!(inA.flags & ArrayFlags.Zero))){
         for (int i=0;i<rank;++i){
             index_type inI=inA.shape[i];
             index_type outI=outA.shape[i];
@@ -432,7 +432,7 @@ in {
 }
 body{
     if (inA.flags & ArrayFlags.Zero) return outA;
-    if (outA is null){
+    if (isNullNArray!(T,rank,true)(outA)){
         index_type[rank] outShape=inA.shape;
         foreach(ref el;outShape){
             static if (border==Border.Decrease){
@@ -492,12 +492,12 @@ body{
 
 /// performs a convolution using the given (full) kernel
 NArray!(T,rank) convolveNN(T,int rank,Border border=Border.Same)
-    (NArray!(T,rank) kernel,NArray!(T,rank)inA,NArray!(T,rank)outA=null)
+    (NArray!(T,rank) kernel,NArray!(T,rank)inA,NArray!(T,rank)outA=nullNArray!(T,rank))
 in {
     for (int i=0;i<rank;++i){
         assert(kernel.shape[i]==3,"kernel must have 3 elements in each dimension"); // relax?
     }
-    if (outA !is null && (!(inA.flags & ArrayFlags.Zero))){
+    if (!isNullNArray!(T,rank,true)(outA) && (!(inA.flags & ArrayFlags.Zero))){
         for (int i=0;i<rank;++i){
             index_type inI=inA.shape[i];
             static if (border==Border.Decrease) {
@@ -513,7 +513,7 @@ in {
 body{
     //pragma(msg,"convolveNN, rank="~ctfe_i2a(rank)~", border="~ctfe_i2a(cast(int)border));
     if (inA.flags & ArrayFlags.Zero) return outA;
-    if (outA is null){
+    if (isNullNArray!(T,rank,true)(outA)){
         index_type[rank] outShape=inA.shape;
         foreach(ref el;outShape){
             static if (border==Border.Decrease){

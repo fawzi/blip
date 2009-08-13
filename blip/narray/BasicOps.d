@@ -14,13 +14,6 @@ import tango.math.Math: round,sqrt,min,ceil;
 import tango.math.IEEE: feqrel;
 import tango.core.Memory:GC;
 
-template nullNArray(T,int rank){
-    static if (rank>0){
-        const NArray!(T,rank) nullNArray=null;
-    } else {
-        const T nullNArray=T.init;
-    }
-}
 /+ ---------------- structural ops -------------------- +/
 
 /// returns a view of the current data with the axes reordered
@@ -305,12 +298,13 @@ template a2NAof(V){
         }
     }
 }
-/// aquires an array using it as NArray, without copying.
+/// acquires an array using it as NArray, without copying.
 /// if shouldFree=true it frees the array when destroyed
 NArray!(T,1)a2NA2(T)(T[] arr,bool shouldFree=false){
     uint flags=ArrayFlags.None;
-    if (shouldFree) flags=ArrayFlags.ShouldFreeData;
-    return NArray!(T,1)([cast(index_type)T.sizeof],[cast(index_type)arr.length],0,arr,flags,null);
+    Guard guard;
+    if (shouldFree) guard=new Guard(arr);
+    return NArray!(T,1)([cast(index_type)T.sizeof],[cast(index_type)arr.length],0,arr,flags,cast(void*)guard);
 }
 
 /// returns a into shape the shape of the nested D array T (for a2NA)
@@ -388,7 +382,7 @@ in {
     assert(-rank<=axis && axis<rank,"axis out of bounds");
     int ii=0;
     static if (rank>1){
-        if (res !is null){
+        if (! isNullNArray(res)){
             for(int i=0;i<rank;i++){
                 if(i!=axis && i!=rank+axis){
                     assert(res.shape[ii]==a.shape[i],"invalid res shape");
@@ -414,7 +408,7 @@ body  {
             x0=x;
         }
         if (axis<0) axis+=rank;
-        if (res is null){
+        if (isNullNArray(res)){
             index_type[rank-1] newshape;
             int ii=0;
             for(int i=0;i<rank;i++){
@@ -667,16 +661,17 @@ body {
     newshape[0]=resSize;
     newstrides[0]=cast(index_type)T.sizeof;
     uint newflags=ArrayFlags.None;
-    if (manualAlloc) newflags=ArrayFlags.ShouldFreeData;
-    return NArray!(T,1)(newstrides,newshape,0,resA,newflags);
+    Guard guard;
+    if (manualAlloc) guard=new Guard(resA);
+    return NArray!(T,1)(newstrides,newshape,0,resA,newflags,cast(void*)guard);
 }
 
 /// writes back the data to an array in the places where mask is true.
 /// if res is given it writes into res
-NArray!(T,rank2) unfilterMask(T,int rank1,S,int rank2,U=T,int rank3=rank2)(NArray!(T,rank1) a,NArray!(S,rank2) mask, NArray!(T,rank3)res=null)
+NArray!(T,rank2) unfilterMask(T,int rank1,S,int rank2,U=T,int rank3=rank2)(NArray!(T,rank1) a,NArray!(S,rank2) mask, NArray!(T,rank3)res=nullNArray!(T,rank3))
 in{
     static assert(rank2==rank3,"mask and result need to have the same shape");
-    if (res !is null){
+    if (! isNullNArray(res)){
         assert(res.shape==mask.shape);
     }
     index_type nEl=sumAll!(bool,rank2,index_type)(mask);
@@ -686,7 +681,7 @@ body {
     static assert(rank1==1,"a needs to have rank 1");
     static assert(rank2==rank3,"mask and result need to have the same shape");
     static assert(is(S:bool)||is(S:int),"maks should be castable to bool");
-    if (res is null){
+    if (isNullNArray(res)){
         res=NArray!(T,rank2).zeros(mask.shape);
     }
     T* elAtt=a.startPtrArray;
