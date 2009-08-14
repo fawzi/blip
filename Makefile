@@ -110,7 +110,7 @@ $(LIB):  $(OBJS)
 	rm -f $@
 	$(mkLib) $@ $(OBJS)
 	$(ranlib) $@
-	cp $(OBJDIR)/$(LIB) $(TANGO_HOME)/$(INSTALL_LIB)
+	cp $(OBJDIR)/$(LIB) $(BLIP_HOME)/$(INSTALL_LIB)
 
 $(TESTS:%=$(OBJDIR)/%.d):$(TESTS:%=$(SRCDIR)/%.d)
 	cp $(SRCDIR)/$(shell basename $@) $@
