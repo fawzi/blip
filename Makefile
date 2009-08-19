@@ -40,7 +40,7 @@
 # tango & apache 2.0 license, © 2009 Fawzi Mohamed
 
 BLIP_HOME=$(PWD)
-TANGO_HOME=$(HOME)/d/tango
+TANGO_HOME=/work/famo/tango
 TOOLDIR=$(TANGO_HOME)/build/tools
 VERSION=opt
 DC=$(shell $(TOOLDIR)/guessCompiler.sh --path)
@@ -116,7 +116,7 @@ $(TESTS:%=$(OBJDIR)/%.d):$(TESTS:%=$(SRCDIR)/%.d)
 	cp $(SRCDIR)/$(shell basename $@) $@
 
 $(TESTS:%=_%): _% : $(OBJDIR)/%.$(OBJ_EXT) $(LIB)
-	$(DC) $(OUT_NAME)$@ $(@:_%=$(OBJDIR)/%.$(OBJ_EXT)) $(LIB) $(EXTRA_LIBS)
+	$(DC) $(OUT_NAME)$@ $(@:_%=$(OBJDIR)/%.$(OBJ_EXT)) $(LIB_DIR). $(LIB_LINK)blip $(EXTRA_LIBS)
 	mkdir -p $(TESTS_DIR)
 	cp $@ $(TESTS_DIR)/$(@:_%=%)
 

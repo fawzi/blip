@@ -14,11 +14,12 @@ import blip.TemplateFu:ctfe_i2a;
 import blip.parallel.Models;
 import blip.BasicModels;
 import blip.container.Pool;
-
+import tango.stdc.stdio:printf; //pippo
 size_t defaultFiberSize=1024*1024; // a largish (1MB) stack
 
 class FiberPoolT(int batchSize=16):Pool!(Fiber,batchSize){
     size_t stackSize;
+    static void dummyF(){}
     
     this(size_t stackSize=defaultFiberSize,size_t bufferSpace=8*batchSize,
         size_t maxEl=16*batchSize){
@@ -37,23 +38,29 @@ class FiberPoolT(int batchSize=16):Pool!(Fiber,batchSize){
         return null;
     }
     
-    Fiber reset(Fiber f){
+    override Fiber reset(Fiber f){
         return f;
     }
     
     override Fiber allocateNew(){
-        return new Fiber(function void(){},stackSize);
+        printf("pippo will AllocateNew %p\n",stackSize);
+        return new Fiber(&dummyF,stackSize);
     }
     
     Fiber getObj(void function() f){
-        auto res=super.getObj();
+        return new Fiber(f,defaultFiberSize);
+/+        auto res=super.getObj();
         res.reset(f);
-        return res;
+        return res;+/
     }
     Fiber getObj(void delegate() f){
+        return new Fiber(f,defaultFiberSize);
+/+        printf("pippo will create\n");
         auto res=super.getObj();
+        printf("pippo will reset\n");
         res.reset(f);
-        return res;
+        printf("pippo did reset\n");
+        return res;+/
     }
 }
 alias FiberPoolT!() FiberPool;
@@ -121,10 +128,11 @@ class SchedulerPools{
     }
     
 }
-
+SchedulerPools __schedulerPools;
 ThreadLocal!(SchedulerPools) _schedulerPools;
 
 static this(){
+    __schedulerPools=new SchedulerPools();
     _schedulerPools=new ThreadLocal!(SchedulerPools)(null);
 }
 
@@ -720,7 +728,7 @@ class TaskSet:Task{
         TaskI res=null;
         bool hold=!holdSubtasks;
         if (hold) holdSub();
-        int nHolded=holdedSubtasks.length;
+        size_t nHolded=holdedSubtasks.length;
         taskOp();
         if (nHolded<holdedSubtasks.length){
             assert(nHolded+1==holdedSubtasks.length,"generated more than one task");
