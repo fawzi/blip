@@ -408,7 +408,7 @@ else {
             V[] mData;
             void *mBase;
             if (size>manualAllocThreshold/cast(index_type)V.sizeof) {
-                auto guard=new Guard(size*V.sizeof);
+                auto guard=new Guard(size*V.sizeof,(typeid(V).flags & 2)!=0);
                 V* mData2=cast(V*)guard.data.ptr;
                 mData=mData2[0..size];
                 mBase=cast(void*)guard;

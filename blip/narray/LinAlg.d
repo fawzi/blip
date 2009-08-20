@@ -259,6 +259,87 @@ body {
     return dot!(T,rank1,U,rank2,S,rank3)(a,b,res,cast(S)1,cast(S)0,axis1,axis2);
 }
 
+/// outer product between tensors with scaling and
+/// already present storage target
+NArray!(S,rank3)outer(T,int rank1,U,int rank2,S,int rank3)
+    (NArray!(T,rank1)a, NArray!(U,rank2)b, ref NArray!(S,rank3) c,
+        S scaleRes=cast(S)1, S scaleC=cast(S)0)
+in {
+    static assert(rank3==rank1+rank2,"rank3 has to be rank1+rank2");
+    assert(a.shape==c.shape[0..rank1],"invalid shape for c");
+    assert(b.shape==c.shape[rank1..rank1+rank2],"invalid shape for c");
+}
+body {
+    if ((a.flags|b.flags)&ArrayFlags.Zero){
+        if (scaleC==0){
+            c[]=cast(S)0;
+        } else {
+            c *= scaleC;
+        }
+        return c;
+    }
+    version(no_blas){ }
+    else {
+/+ to do call gemm, can be used also for higher dims if everything is Contigous of Fortran
+        static if ((is(T==U) && isBlasType!(T)) && (rank1==1)&&(rank2==1)){
+            // call blas
+            // negative incremented vector in blas loops backwards on a[0..n], not on a[-n+1..1]
+            static if(rank1==1 && rank2==1){
+                if ((a.bStrides[0]>0 && b.bStrides[0]>0)||(a.bStrides[0]<0 && b.bStrides[0]<0)){
+                    T* aStartPtr=a.startPtrArray,bStartPtr=b.startPtrArray;
+                    if (a.bStrides[0]<0 && b.bStrides[0]<0){
+                        aStartPtr=cast(T*)(cast(size_t)aStartPtr+(a.shape[0]-1)*a.bStrides[0]);
+                        bStartPtr=cast(T*)(cast(size_t)bStartPtr+(b.shape[0]-1)*b.bStrides[0]);
+                    }
+                    void gemm('N', 'N', a.shape[0], b.shape[0], 1, scaleRes, aStartPtr, a.shape[0], bStartPtr, b.shape[0], scaleC, c.startPtrArray, c.bStrides[0]/cast(index_type)T.sizeof);
+                    return c;
+                }
+            }
+        }+/
+    }
+    
+    auto t1=NArray(c.strides[rank1], c.shape[rank1],c.startPtrArray,
+        c.newFlags, c.mBase);
+    auto t2=NArray(c.strides[rank1..rank1+rank2], c.shape[rank1..rank1+rank2],
+        c.startPtrArray,c.newFlags, c.mBase);
+    if (scaleC==0){
+        if (scaleRes==1){
+            const char[] innerLoop=pLoopPtr(rank2,["b","t2"],
+                    "*t2Ptr0 = (*aPtr0)*(*bPtr0);","j");
+            mixin(pLoopPtr(rank1,["a","t1"],
+                    "t2.startPtrArray=t1Ptr;\n"~innerLoop,"i"));
+        } else {
+            const char[] innerLoop=pLoopPtr(rank2,["b","t2"],
+                    "*t2Ptr0 = scaleRes*(*aPtr0)*(*bPtr0);","j");
+            mixin(pLoopPtr(rank1,["a","t1"],
+                    "t2.startPtrArray=t1Ptr;\n"~innerLoop,"i"));
+        }
+    } else {
+        const char[] innerLoop=pLoopPtr(rank2,["b","t2"],
+                "*t2Ptr0 = scaleC*(*t2Ptr0)+scaleRes*(*aPtr0)*(*bPtr0);","j");
+        mixin(pLoopPtr(rank1,["a","t1"],
+                "t2.startPtrArray=t1Ptr;\n"~innerLoop,"i"));
+    }
+    return c;
+}
+
+/// outer product between tensors (reduces a single axis)
+NArray!(typeof(T.init*U.init),rank1+rank2)outer(T,int rank1,U,int rank2)
+    (NArray!(T,rank1)a,NArray!(U,rank2)b)
+body {
+    alias typeof(T.init*U.init) S;
+    const int rank3=rank1+rank2;
+    index_type[rank3] newshape;
+    newshape[0..rank1]=a.shape;
+    newshape[rank1..rank1+rank2]=b.shape;
+    static if(rank3==0){
+        S res;
+    } else {
+        auto res=NArray!(S,rank3).empty(newshape);
+    }
+    return outer!(T,rank1,U,rank2,S,rank3)(a,b,res,cast(S)1,cast(S)0,axis1,axis2);
+}
+
 /// structure to request a subrange of eigenvalues
 struct EigRange{
     char kind;

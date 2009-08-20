@@ -38,10 +38,14 @@ struct BulkArray(T){
         ptr=newData.ptr;
         ptrEnd=ptr+newData.length;
     }
+    static BulkArray opCall(){
+        BulkArray b;
+        return b;
+    }
     static BulkArray opCall(size_t size,bool scanPtr=false){
         BulkArray res;
         if (size*T.sizeof>BulkArrayCallocSize){
-            res.guard=new Guard(size*T.sizeof);
+            res.guard=new Guard(size*T.sizeof,(typeid(T).flags & 2)!=0);
             res.ptr=cast(T*)guard.data.ptr;
             res.ptrEnd=res.ptr+size;
         } else {

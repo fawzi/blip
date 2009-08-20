@@ -119,7 +119,6 @@ class SchedulerPools{
             taskPool=new TaskPool();
         }
     }
-    
 }
 
 ThreadLocal!(SchedulerPools) _schedulerPools;
