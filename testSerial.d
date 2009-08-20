@@ -103,12 +103,21 @@ class B:A{
     float h;
     double i;
     real l;
-    ifloat m;
-    idouble n;
-    ireal o;
-    cfloat p;
-    cdouble q;
-    creal r;
+    version(noComplex){
+        float m;
+        double n;
+        real o;
+        float p;
+        double q;
+        real r;
+    } else {
+        ifloat m;
+        idouble n;
+        ireal o;
+        cfloat p;
+        cdouble q;
+        creal r;
+    }
     bool s;
     byte t;
     ubyte u;
@@ -415,6 +424,8 @@ void main(){
     testUnserial(ts);
     Stdout("passed identity tests").newline;
 
+    version(noComplex){ }
+    else {
     auto buf=new Array(`{ id:3,
       x:36331662,
       y:504414800,
@@ -475,7 +486,8 @@ void main(){
     version(UnserializationTrace) Stdout("XX unserialization finished").newline;
     b2.l=b1.l;
     assert(b1==b2,"reordering+comments+missing failed");
-
+    }
+    
     Stdout("passed tests").newline;
 }
 

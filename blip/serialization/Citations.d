@@ -52,16 +52,6 @@ class CitationDB{
     static this(){
         defaultDb=new CitationDB();
     }
-    /// gets the citations with the given keys (separated by spaces)
-    Citation[] citationsForSpacedKeys(char[]sk){
-        if (sk.length==0) return [];
-        auto a=split(sk," ");
-        Citation[] res=new Citation[a.length];
-        foreach(i,k;a){
-            res[i]=this[k];
-        }
-        return res;
-    }
     /// add citation of an article
     void addCitation(char[] key,char[] citation){
         synchronized(this){

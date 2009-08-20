@@ -6,7 +6,6 @@
 /// or via xpose
 module blip.serialization.SerializationBase;
 import blip.serialization.Handlers;
-import blip.serialization.Citations;
 import tango.io.Stdout : Stdout;
 import tango.core.Tuple;
 import tango.io.stream.Format;
@@ -15,6 +14,7 @@ import blip.BasicModels;
 import tango.util.container.HashSet;
 import tango.text.Util;
 import blip.TemplateFu;
+import tango.text.Regex;
 public import tango.core.Traits;
 
 version(SerializationTrace){
@@ -62,17 +62,15 @@ struct FieldMetaInfo {
     ClassMetaInfo metaInfo; /// expected meta info (used if not class)
     SerializationLevel serializationLevel; /// when to serialize
     char[] doc; /// documentation of the field
-    char[][] citationKeys; /// citations
     /// creates a field meta info (normally one uses ClassMetaInfo.addFieldOfType)
     static FieldMetaInfo opCall(char[] name,char[] doc,ClassMetaInfo metaInfo,
-        SerializationLevel l=SerializationLevel.normalLevel,char[][] citationKeys=[])
+        SerializationLevel l=SerializationLevel.normalLevel)
     {
         FieldMetaInfo res;
         res.name = name;
         res.metaInfo=metaInfo;
         res.doc=doc;
         res.serializationLevel=l;
-        res.citationKeys=citationKeys;
         res.pseudo=false;
         return res;
     }
@@ -82,15 +80,13 @@ struct FieldMetaInfo {
         s("level:")(serializationLevel)(",");
         s("metaInfo:")((metaInfo is null) ? "*NULL*" : metaInfo.className)(">");
         s("metaInfo:")((metaInfo is null) ? "*NULL*" : metaInfo.className)(">");
-        if (citationKeys.length>0){
-            s("citationKeys:");
-            foreach(i,c;citationKeys){
-                if (i!=0) s(", ");
-                s(c);
-            }
-            s.newline;
-        }
         return s;
+    }
+    char[][]citationKeys(){
+        char[][] res=[];
+        foreach(m; Regex(r"\[[a-zA-Z]\w*\]").search(doc))
+            res~=m.match(0);
+        return res;
     }
 }
 /// returns the typeid of the given type
@@ -175,8 +171,8 @@ class ClassMetaInfo {
     }
     /// adds a field with given name and type
     void addFieldOfType(T)(char[] name,char[] doc,
-        char[]spacedCiteKeys="",SerializationLevel sLevel=SerializationLevel.normalLevel){
-        addField(FieldMetaInfo(name,doc,getSerializationInfoForType!(T)(),sLevel,split(spacedCiteKeys," ")));
+        SerializationLevel sLevel=SerializationLevel.normalLevel){
+        addField(FieldMetaInfo(name,doc,getSerializationInfoForType!(T)(),sLevel));
     }
     /// constructor (normally use createForType)
     this(char[] className,ClassMetaInfo superMeta,TypeInfo ti,ClassInfo ci,TypeKind kind,void* function(ClassMetaInfo)allocEl){

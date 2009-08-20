@@ -739,6 +739,7 @@ template testInit(char[] checkInit="", char[] manualInit=""){
             } catch (Exception e){
                 synchronized(test.testController.writeLock()){
                     test.failureLog("test`")(test.testName)("` failed with exception").newline;
+                    test.failureLog.flush();
                     e.writeOut(delegate void(char[]s){test.failureLog(s);});
                     test.failureLog.flush();
                     mixin(printArgs(nArgs!(S),"test.failureLog"));
@@ -770,6 +771,7 @@ template testInit(char[] checkInit="", char[] manualInit=""){
             }
             synchronized(test.testController.writeLock){
                 test.failureLog("test`")(test.testName)("` failed (no exception thrown and one expected)").newline;
+                test.failureLog.flush();
                 mixin(printArgs(nArgs!(S),"test.failureLog"));
             }
             return TestResult.Fail;
@@ -804,6 +806,7 @@ template testInit(char[] checkInit="", char[] manualInit=""){
             } catch (Exception e){
                 synchronized(test.testController.writeLock){
                     test.failureLog("test`")(test.testName)("` failed with exception").newline;
+                    test.failureLog.flush();
                     e.writeOut(delegate void(char[]s){test.failureLog(s);});
                     test.failureLog.flush();
                     mixin(printArgs(nArgs!(S),"test.failureLog"));
@@ -841,7 +844,9 @@ template testInit(char[] checkInit="", char[] manualInit=""){
                 return TestResult.Skip;
             } catch (Exception e){
                 synchronized(test.testController.writeLock){
+                    test.failureLog.flush();
                     test.failureLog("test`")(test.testName)("` unexpectedly failed with exception").newline;
+                    test.failureLog.flush();
                     e.writeOut(delegate void(char[]s){test.failureLog(s);});
                     test.failureLog.flush();
                     mixin(printArgs(nArgs!(S),"test.failureLog"));
