@@ -40,7 +40,7 @@
 # tango & apache 2.0 license, © 2009 Fawzi Mohamed
 
 BLIP_HOME=$(PWD)
-TANGO_HOME=/work/famo/tango
+TANGO_HOME=$(HOME)/tango
 TOOLDIR=$(TANGO_HOME)/build/tools
 VERSION=opt
 DC=$(shell $(TOOLDIR)/guessCompiler.sh --path)
