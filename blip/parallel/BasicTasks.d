@@ -14,7 +14,6 @@ import blip.TemplateFu:ctfe_i2a;
 import blip.parallel.Models;
 import blip.BasicModels;
 import blip.container.Pool;
-import tango.stdc.stdio:printf; //pippo
 size_t defaultFiberSize=1024*1024; // a largish (1MB) stack
 
 class FiberPoolT(int batchSize=16):Pool!(Fiber,batchSize){
@@ -43,8 +42,7 @@ class FiberPoolT(int batchSize=16):Pool!(Fiber,batchSize){
     }
     
     override Fiber allocateNew(){
-        printf("pippo will AllocateNew %p\n",stackSize);
-        return new Fiber(&dummyF,stackSize);
+        return new Fiber(stackSize);
     }
     
     Fiber getObj(void function() f){
@@ -54,13 +52,10 @@ class FiberPoolT(int batchSize=16):Pool!(Fiber,batchSize){
         return res;+/
     }
     Fiber getObj(void delegate() f){
-        return new Fiber(f,defaultFiberSize);
-/+        printf("pippo will create\n");
+        //return new Fiber(f,defaultFiberSize);
         auto res=super.getObj();
-        printf("pippo will reset\n");
         res.reset(f);
-        printf("pippo did reset\n");
-        return res;+/
+        return res;
     }
 }
 alias FiberPoolT!() FiberPool;

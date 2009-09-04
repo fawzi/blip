@@ -143,7 +143,7 @@ module blip.rtest.RTest;
 public import blip.rtest.BasicGenerators;
 public import blip.rtest.RTestFramework;
 import tango.util.Convert;
-import tango.util.Arguments;
+import tango.util.ArgParser;
 import tango.text.Util;
 import tango.io.Stdout;
 import blip.parallel.WorkManager;
@@ -178,75 +178,69 @@ int mainTestFun(char[][] argStr,SingleRTest testSuite){
      --seed defines the seed for the test
      --on-failure sets the action to perform after a test fails (default stop-test)
      --print-level sets the print level (default all-short)`;
-    Arguments args = new Arguments();
+    ArgParser args = new ArgParser();
 
     char[] seed=null;
+    char[] test=null;
     int runs=1;
     int[] counter=null;
+    bool help=false;
+    bool trace=false;
+    TextController.OnFailure onFailure=TextController.OnFailure.StopTest;
+    TextController.PrintLevel printLevel=TextController.PrintLevel.AllShort;
     
-    args.define("help");
-    args.define("runs").parameters(1);
-    args.define("trace");
-    args.define("seed").parameters(1);
-    args.define("counter").parameters(1);
-    args.define("test").parameters(1);
-    args.define("on-failure").aliases(["onFailure"]).parameters(1);
-    args.define("print-level").aliases(["print","printLevel"]).parameters(1);
+    args.bind("--","help",delegate void(){ help=true; });
+    args.bind("--","runs",delegate(char[] arg){ runs=to!(int)(arg); });
+    args.bind("--","trace",delegate void(){ trace=true; });
+    args.bind("--","seed",delegate(char[] arg){ seed=arg.dup; });
+    args.bind("--","counter",delegate(char[] arg){ counter=parseIArray(arg); });
+    args.bind("--","test",delegate void(char[] arg){ test=arg.dup; });
+    args.bind("--","on-failure",delegate void(char[] arg){
+        if (arg[0]=='=') arg=arg[1..$];
+        switch(arg){
+            case "Continue","continue" : onFailure=TextController.OnFailure.Continue; break;
+            case "StopTest","stoptest","stop-test": onFailure=TextController.OnFailure.StopTest; break;
+            case "StopAllTests","StopAll","stopall","stopalltests","stop-all-tests":
+            onFailure=TextController.OnFailure.StopAllTests; break;
+            case "Throw","throw": onFailure=TextController.OnFailure.Throw; break;
+            default:
+                // use Stderr?
+                Stdout("ERROR invalid options for on-failure: '")(arg)("'").newline;
+                Stdout(helpStr).newline;
+                return -1;
+        }
+    });
+    args.bind("--","print-level",delegate void(char[]arg){
+        if (arg[0]=='=') arg=arg[1..$];
+        switch(arg){
+            case "Error", "error": printLevel=TextController.PrintLevel.Error; break;
+            case "Skip","skip": printLevel=TextController.PrintLevel.Skip; break;
+            case "AllShort", "allshort", "all-short", "short": printLevel=TextController.PrintLevel.AllShort; break;
+            case "AllVerbose","allverbose","all","all-verbose","verbose":
+                printLevel=TextController.PrintLevel.AllVerbose; break;
+            default:
+                Stderr("ERROR invalid options for print-level: '")(arg)("'").newline;
+                Stdout(helpStr).newline;
+                return -2;
+        }
+    });
     
     args.parse(argStr[1..$]);
     
-    if (args.contains("help")){
+    if (help){
         Stdout(helpStr).newline;
         return 0;
-    }
-    bool trace=args.contains("trace");
-    if(args.contains("counter")){
-        counter=parseIArray(args["counter"]);
-    }
-    if (args.contains("seed")){
-        seed=args["seed"];
-    }
-    if (args.contains("runs")){
-        runs=to!(int)(args["runs"]);
-    }
-    TextController.OnFailure onFailure=TextController.OnFailure.StopTest;
-    if (args.contains("on-failure"))
-    switch(args["on-failure"]){
-        case "Continue","continue" : onFailure=TextController.OnFailure.Continue; break;
-        case "StopTest","stoptest","stop-test": onFailure=TextController.OnFailure.StopTest; break;
-        case "StopAllTests","StopAll","stopall","stopalltests","stop-all-tests":
-        onFailure=TextController.OnFailure.StopAllTests; break;
-        case "Throw","throw": onFailure=TextController.OnFailure.Throw; break;
-        default:
-            // use Stderr?
-            Stdout("ERROR invalid options for on-failure: '")(args["on-failure"])("'").newline;
-            Stdout(helpStr).newline;
-            return -1;
-    }
-
-    TextController.PrintLevel printLevel=TextController.PrintLevel.AllShort;
-    if (args.contains("print-level"))
-    switch(args["print-level"]){
-        case "Error", "error": printLevel=TextController.PrintLevel.Error; break;
-        case "Skip","skip": printLevel=TextController.PrintLevel.Skip; break;
-        case "AllShort", "allshort", "all-short", "short": printLevel=TextController.PrintLevel.AllShort; break;
-        case "AllVerbose","allverbose","all","all-verbose","verbose":
-            printLevel=TextController.PrintLevel.AllVerbose; break;
-        default:
-            Stderr("ERROR invalid options for print-level: '")(args["print-level"])("'").newline;
-            Stdout(helpStr).newline;
-            return -2;
     }
     
     SingleRTest.defaultTestController=new TextController(
         onFailure, printLevel,Stdout,Stdout,1,trace);
-    if (args["test"].length==0){
+    if (test.length==0){
         // testSuite.runTests(runs,seed,counter);
         testSuite.runTestsTask(runs,seed,counter).submit(defaultTask).wait();
     } else{
-        auto tst=testSuite.findTest(args["test"]);
+        auto tst=testSuite.findTest(test);
         if (tst is null){
-            Stdout("ERROR test '")(args["test"])("' not found!").newline;
+            Stdout("ERROR test '")(test)("' not found!").newline;
             return -3;
         }
         //tst.runTests(runs,seed,counter);

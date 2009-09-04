@@ -37,6 +37,7 @@ class TextParser(T) : InputFilter
     protected T[]           slice;
     size_t maxTranscodingOverhead;
     bool skippedWhitespace;
+    bool newlineIsSpace; /// newline counts as space
     T[] delims;
     long line,col;
     long oldLine,oldCol;
@@ -63,6 +64,12 @@ class TextParser(T) : InputFilter
     }
     /// exception for when the cached part is too small
     class SmallCacheException:ParsingException{
+        this(TextParser p,char[]desc,char[]filename,long line){
+            super(p,desc,filename,line);
+        }
+    }
+    /// exception for when eof is found unexpectedly
+    class EofException:ParsingException{
         this(TextParser p,char[]desc,char[]filename,long line){
             super(p,desc,filename,line);
         }
@@ -229,7 +236,7 @@ class TextParser(T) : InputFilter
         }
         for(;i!=data.length;++i){
             auto c=data[i];
-            if (!(c==' '||c=='\t'||c=='\r'||c=='\n')){
+            if (!(c==' '||c=='\t'||(newlineIsSpace &&(c=='\r'||c=='\n')))){
                 if (skipComments && c=='#'){
                     inComment=CommentType.Line;
                     ++i;
@@ -269,6 +276,126 @@ class TextParser(T) : InputFilter
         } while (inComment!=CommentType.None);
         skippedWhitespace=true;
         return didSkip;
+    }
+    /// skips a newline
+    bool skipNewline(bool shouldThrow=true){
+        if (next(delegate size_t(T[]data,SliceExtent se){
+            if (data.length<2){
+                switch(se){
+                    case SliceExtent.Partial : return Eof;
+                    case SliceExtent.Maximal :
+                    smallCacheError("int did not terminate within buffer window ("~Integer.toString(data.length)~")",__FILE__,__LINE__);
+                    case SliceExtent.ToEnd :
+                        if (data.length==0){
+                            return 0;
+                        } else if (data[0]=='\n' || data[0]=='\r') return 1;
+                    default:
+                        throw new Exception("unknown SliceExtent",__FILE__,__LINE__);
+                }
+            } else {
+                if (data[0]=='\n'){
+                    if (data[1]=='\r') return 2;
+                    return 1;
+                }
+                if (data[0]=='\r'){
+                    return 1;
+                }
+            }
+            return 0;
+        }) && source.slice.length!=0) {
+            return true;
+        }
+        if (shouldThrow) throw new Exception("no newline when expected");
+        return false;
+    }
+    /// skips the given number of lines, returns the left over lines
+    size_t skipLines(size_t nlines,bool shouldThrow=true){
+        bool checkCr=false;
+        while (nlines!=0 || checkCr){
+            if (!next(delegate size_t(T[]t,SliceExtent se){
+                    size_t i=0;
+                    for (;i<t.length;++i){
+                        if (t[i]=='\n') {
+                            --nlines;
+                            checkCr=true;
+                            if (nlines==0) break;
+                        }
+                        if (t[i]=='\r' || checkCr){
+                            if (checkCr){
+                                checkCr=false;
+                            } else {
+                                --nlines;
+                                if (nlines==0) break;
+                            }
+                        }
+                    }
+                    if (checkCr && i<t.length){
+                        if (t[i+1]=='\r'){
+                            return i+2;
+                        } else {
+                            return i+1;
+                        }
+                    }
+                    if (nlines==0 && ! checkCr) return i+1;
+                    switch(se){
+                        case SliceExtent.Partial :
+                        case SliceExtent.Maximal :
+                        return i+1;
+                        case SliceExtent.ToEnd :
+                            if (nlines==0 || nlines==1) { // accept missing newline at end of file
+                                nlines=0;
+                                checkCr=false;
+                                return i+1;
+                            }
+                            if (shouldThrow) {
+                                throw new EofException(this,"unexpected EOF",__FILE__,__LINE__);
+                            }
+                            return 0;
+                        default:
+                            throw new ParsingException(this,"unknown SliceExtent",__FILE__,__LINE__);
+                    }
+                })&& source.slice.length!=0)
+            {
+                if (shouldThrow) throw new Exception("no newline when expected");
+                return nlines;
+            }
+        }
+        if (shouldThrow) throw new Exception("no newline when expected");
+        return nlines;
+    }
+    /// scans a line
+    protected size_t scanLine (T[] data,SliceExtent se){
+        size_t i=0;
+        for(;i!=data.length;++i){
+            auto c=data[i];
+            if (c=='\r'){
+                return i+1;
+            }
+            if (c=='\n'){
+                break;
+            }
+        }
+        if (i+1<data.length){
+            if (data[i]=='\n' && data[i+1]=='\r')
+                return i+2;
+        }
+        switch(se){
+            case SliceExtent.Partial : return Eof;
+            case SliceExtent.Maximal :
+                smallCacheError("int did not terminate within buffer window ("~Integer.toString(data.length)~")",__FILE__,__LINE__);
+            case SliceExtent.ToEnd :
+                return data.length;
+            default:
+            parseError("invalid SliceExtent",__FILE__,__LINE__);
+        }
+        return 0;
+    }
+    /// returns the next line (as slice in local storage)
+    T[]nextLine(){
+        T[] str;
+        if (!next(&scanLine))
+            return null;
+        return slice;
     }
     /// reads n codepoints
     T[] readNCodePoints(size_t n,bool skipSpace=true){
@@ -588,7 +715,7 @@ class TextParser(T) : InputFilter
 
     /// Instantiate with a buffer
     this(InputStream stream = null,T[]delims=cast(T[])",;:{}[]",size_t maxTranscodingOverhead=6,
-        bool skipComments=true)
+        bool skipComments=true, bool newlineIsSpace=true)
     {       
         super (stream);
         if (stream)
@@ -596,6 +723,7 @@ class TextParser(T) : InputFilter
         this.maxTranscodingOverhead=maxTranscodingOverhead;
         this.delims=delims;
         this.skipComments=skipComments;
+        this.newlineIsSpace=newlineIsSpace;
     }
 
     /// Set the provided stream as the scanning source
