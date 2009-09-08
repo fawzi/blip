@@ -25,6 +25,7 @@ import blip.narray.BasicOps;
 import tango.math.Math:min,max,round,sqrt,ceil,abs;
 
 import tango.core.Traits:isComplexType,isImaginaryType,ComplexTypeOf,RealTypeOf;
+import tango.util.log.Trace; //pippo
 
 version(no_blas){ 
     version(no_lapack){ }
@@ -771,6 +772,15 @@ else {
                     iwork.startPtrArray, liwork, info);
             }
         } else {
+            /+writeDesc(Stdout("a:"),a);Stdout.newline;// pippo
+            writeDesc(Stdout("eVect:"),eVect);Stdout.newline;// pippo
+            writeDesc(Stdout("supportEVect:"),supportEVect); Stdout.newline;// pippo+/
+            assert(false,"buggy!");
+            Trace.formatln("DLapack.syevr({},{},{},{},{},{},{},{},{},{},\n{},{},{},{},{},{},{},{},{},{}, {});",(eVectPtr is null)?'N':'V', range.kind, (storage==MStorage.up)?'U':'L',
+                cast(f_int) n, a.startPtrArray,
+                lda, cast(T)range.fromV, cast(T)range.toV, cast(f_int)range.fromI, cast(f_int)range.toI,
+                abstol, m, myEv.startPtrArray, eVectPtr, ldEVect, isuppz.startPtrArray,
+                &tmpWork, cast(f_int)(-1), &tmpIWork, cast(f_int)(-1), info);// pippo
             DLapack.syevr((eVectPtr is null)?'N':'V', range.kind, (storage==MStorage.up)?'U':'L',
                 cast(f_int) n, a.startPtrArray,
                 lda, cast(T)range.fromV, cast(T)range.toV, cast(f_int)range.fromI, cast(f_int)range.toI,
@@ -781,11 +791,17 @@ else {
                 f_int liwork=cast(f_int)abs(tmpIWork)+cast(f_int)1;
                 scope iwork=empty!(f_int)(liwork);
                 scope work=empty!(T)(lwork);
+                Trace.formatln("DLapack.syevr({},{},{},{},{},{},{},{},{},{},\n{},{},{},{},{},{},{},{},{},{}, {});",(eVectPtr is null)?'N':'V', range.kind, (storage==MStorage.up)?'U':'L',
+                    cast(f_int) n, a.startPtrArray,
+                    lda, cast(T)range.fromV, cast(T)range.toV, cast(f_int)range.fromI, cast(f_int)range.toI,
+                    abstol, m, myEv.startPtrArray, eVectPtr, ldEVect, isuppz.startPtrArray,
+                    work.startPtrArray, lwork, iwork.startPtrArray, liwork, info);// pippo
                 DLapack.syevr((eVectPtr is null)?'N':'V', range.kind, (storage==MStorage.up)?'U':'L',
                     cast(f_int) n, a.startPtrArray,
                     lda, cast(T)range.fromV, cast(T)range.toV, cast(f_int)range.fromI, cast(f_int)range.toI,
                     abstol, m, myEv.startPtrArray, eVectPtr, ldEVect, isuppz.startPtrArray,
                     work.startPtrArray, lwork, iwork.startPtrArray, liwork, info);
+                Trace.formatln("done");//pippo
             }
         }
         if (!isNullNArray(ev) && ev.startPtrArray!=myEv.startPtrArray) ev[]=myEv; // avoid?

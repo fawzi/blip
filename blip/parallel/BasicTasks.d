@@ -46,13 +46,13 @@ class FiberPoolT(int batchSize=16):Pool!(Fiber,batchSize){
     }
     
     Fiber getObj(void function() f){
-        return new Fiber(f,defaultFiberSize);
-/+        auto res=super.getObj();
+//        return new Fiber(f,defaultFiberSize);
+        auto res=super.getObj();
         res.reset(f);
-        return res;+/
+        return res;
     }
     Fiber getObj(void delegate() f){
-        //return new Fiber(f,defaultFiberSize);
+//        return new Fiber(f,defaultFiberSize);
         auto res=super.getObj();
         res.reset(f);
         return res;

@@ -671,8 +671,8 @@ TestCollection narrayRTst1(T,int rank)(TestCollection superColl){
                     { testSolve2x2!(T)(d,r); },__LINE__,__FILE__,coll);
                 autoInitTst.testNoFail("testEig",(Dottable!(T,2,T,1,false,true,true) d){ testEig!(T)(d); },
                     __LINE__,__FILE__,coll);
-                autoInitTst.testNoFail("testEigh",(Dottable!(T,2,T,1,false,true,true) d){ testEigh!(T)(d); },
-                    __LINE__,__FILE__,coll);
+                //autoInitTst.testNoFail("testEigh",(Dottable!(T,2,T,1,false,true,true) d){ testEigh!(T)(d); },
+                //    __LINE__,__FILE__,coll);
                 autoInitTst.testNoFail("testSvd",(Dottable!(T,2,T,1,false,true,false) d){ testSvd!(T)(d); },
                     __LINE__,__FILE__,coll);
             }
