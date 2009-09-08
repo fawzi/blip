@@ -167,111 +167,111 @@ f_int izamax_(f_int *n, f_cdouble *x, f_int *incx);
    OR   y = alpha*A.T*x + beta*y
    OR   y = alpha*A.H*x + beta*y,  with A an mxn matrix
 */
-void sgemv_(char *trans, f_int *m, f_int *n, f_float *alpha, f_float *A, f_int *lda, f_float *x, f_int *incx, f_float *beta, f_float *y, f_int *incy, f_int trans_len);
-void dgemv_(char *trans, f_int *m, f_int *n, f_double *alpha, f_double *A, f_int *lda, f_double *x, f_int *incx, f_double *beta, f_double *y, f_int *incy, f_int trans_len);
-void cgemv_(char *trans, f_int *m, f_int *n, f_cfloat *alpha, f_cfloat *A, f_int *lda, f_cfloat *x, f_int *incx, f_cfloat *beta, f_cfloat *y, f_int *incy, f_int trans_len);
-void zgemv_(char *trans, f_int *m, f_int *n, f_cdouble *alpha, f_cdouble *A, f_int *lda, f_cdouble *x, f_int *incx, f_cdouble *beta, f_cdouble *y, f_int *incy, f_int trans_len);
+void sgemv_(char *trans, f_int *m, f_int *n, f_float *alpha, f_float *A, f_int *lda, f_float *x, f_int *incx, f_float *beta, f_float *y, f_int *incy);
+void dgemv_(char *trans, f_int *m, f_int *n, f_double *alpha, f_double *A, f_int *lda, f_double *x, f_int *incx, f_double *beta, f_double *y, f_int *incy);
+void cgemv_(char *trans, f_int *m, f_int *n, f_cfloat *alpha, f_cfloat *A, f_int *lda, f_cfloat *x, f_int *incx, f_cfloat *beta, f_cfloat *y, f_int *incy);
+void zgemv_(char *trans, f_int *m, f_int *n, f_cdouble *alpha, f_cdouble *A, f_int *lda, f_cdouble *x, f_int *incx, f_cdouble *beta, f_cdouble *y, f_int *incy);
 
 /** banded matrix vector multiply
         y = alpha*A*x   + beta*y 
     OR  y = alpha*A.T*x + beta*y
     OR  y = alpha*A.H*x + beta*y,  with A a banded mxn matrix
 */
-void sgbmv_(char *trans, f_int *m, f_int *n, f_int *kl, f_int *ku, f_float *alpha, f_float *A, f_int *lda, f_float *x, f_int *incx, f_float *beta, f_float *y, f_int *incy, f_int trans_len);
-void dgbmv_(char *trans, f_int *m, f_int *n, f_int *kl, f_int *ku, f_double *alpha, f_double *A, f_int *lda, f_double *x, f_int *incx, f_double *beta, f_double *y, f_int *incy, f_int trans_len);
-void cgbmv_(char *trans, f_int *m, f_int *n, f_int *kl, f_int *ku, f_cfloat *alpha, f_cfloat *A, f_int *lda, f_cfloat *x, f_int *incx, f_cfloat *beta, f_cfloat *y, f_int *incy, f_int trans_len);
-void zgbmv_(char *trans, f_int *m, f_int *n, f_int *kl, f_int *ku, f_cdouble *alpha, f_cdouble *A, f_int *lda, f_cdouble *x, f_int *incx, f_cdouble *beta, f_cdouble *y, f_int *incy, f_int trans_len);
+void sgbmv_(char *trans, f_int *m, f_int *n, f_int *kl, f_int *ku, f_float *alpha, f_float *A, f_int *lda, f_float *x, f_int *incx, f_float *beta, f_float *y, f_int *incy);
+void dgbmv_(char *trans, f_int *m, f_int *n, f_int *kl, f_int *ku, f_double *alpha, f_double *A, f_int *lda, f_double *x, f_int *incx, f_double *beta, f_double *y, f_int *incy);
+void cgbmv_(char *trans, f_int *m, f_int *n, f_int *kl, f_int *ku, f_cfloat *alpha, f_cfloat *A, f_int *lda, f_cfloat *x, f_int *incx, f_cfloat *beta, f_cfloat *y, f_int *incy);
+void zgbmv_(char *trans, f_int *m, f_int *n, f_int *kl, f_int *ku, f_cdouble *alpha, f_cdouble *A, f_int *lda, f_cdouble *x, f_int *incx, f_cdouble *beta, f_cdouble *y, f_int *incy);
 
 /** hermitian matrix vector multiply
  */
-void chemv_(char *uplo, f_int *n, f_cfloat *alpha, f_cfloat *A, f_int *lda, f_cfloat *x, f_int *incx, f_cfloat *beta, f_cfloat *y, f_int *incy, f_int uplo_len);
-void zhemv_(char *uplo, f_int *n, f_cdouble *alpha, f_cdouble *A, f_int *lda, f_cdouble *x, f_int *incx, f_cdouble *beta, f_cdouble *y, f_int *incy, f_int uplo_len);
+void chemv_(char *uplo, f_int *n, f_cfloat *alpha, f_cfloat *A, f_int *lda, f_cfloat *x, f_int *incx, f_cfloat *beta, f_cfloat *y, f_int *incy);
+void zhemv_(char *uplo, f_int *n, f_cdouble *alpha, f_cdouble *A, f_int *lda, f_cdouble *x, f_int *incx, f_cdouble *beta, f_cdouble *y, f_int *incy);
 
 /// hermitian banded matrix vector multiply
-void chbmv_(char *uplo, f_int *n, f_int *k, f_cfloat *alpha, f_cfloat *A, f_int *lda, f_cfloat *x, f_int *incx, f_cfloat *beta, f_cfloat *y, f_int *incy, f_int uplo_len);
-void zhbmv_(char *uplo, f_int *n, f_int *k, f_cdouble *alpha, f_cdouble *A, f_int *lda, f_cdouble *x, f_int *incx, f_cdouble *beta, f_cdouble *y, f_int *incy, f_int uplo_len);
+void chbmv_(char *uplo, f_int *n, f_int *k, f_cfloat *alpha, f_cfloat *A, f_int *lda, f_cfloat *x, f_int *incx, f_cfloat *beta, f_cfloat *y, f_int *incy);
+void zhbmv_(char *uplo, f_int *n, f_int *k, f_cdouble *alpha, f_cdouble *A, f_int *lda, f_cdouble *x, f_int *incx, f_cdouble *beta, f_cdouble *y, f_int *incy);
 
 /// hermitian packed matrix vector multiply
-void chpmv_(char *uplo, f_int *n, f_cfloat *alpha, f_cfloat *A, f_cfloat *x, f_int *incx, f_cfloat *beta, f_cfloat *y, f_int *incy, f_int uplo_len);
-void zhpmv_(char *uplo, f_int *n, f_cdouble *alpha, f_cdouble *A, f_cdouble *x, f_int *incx, f_cdouble *beta, f_cdouble *y, f_int *incy, f_int uplo_len);
+void chpmv_(char *uplo, f_int *n, f_cfloat *alpha, f_cfloat *A, f_cfloat *x, f_int *incx, f_cfloat *beta, f_cfloat *y, f_int *incy);
+void zhpmv_(char *uplo, f_int *n, f_cdouble *alpha, f_cdouble *A, f_cdouble *x, f_int *incx, f_cdouble *beta, f_cdouble *y, f_int *incy);
 
 /** symmetric matrix vector multiply
     y := alpha * A * x + beta * y
  */
-void ssymv_(char *uplo, f_int *n, f_float *alpha, f_float *A, f_int *lda, f_float *x, f_int *incx, f_float *beta, f_float *y, f_int *incy, f_int uplo_len);
-void dsymv_(char *uplo, f_int *n, f_double *alpha, f_double *A, f_int *lda, f_double *x, f_int *incx, f_double *beta, f_double *y, f_int *incy, f_int uplo_len);
+void ssymv_(char *uplo, f_int *n, f_float *alpha, f_float *A, f_int *lda, f_float *x, f_int *incx, f_float *beta, f_float *y, f_int *incy);
+void dsymv_(char *uplo, f_int *n, f_double *alpha, f_double *A, f_int *lda, f_double *x, f_int *incx, f_double *beta, f_double *y, f_int *incy);
 
 /** symmetric banded matrix vector multiply
     y := alpha * A * x + beta * y
  */
-void ssbmv_(char *uplo, f_int *n, f_int *k, f_float *alpha, f_float *A, f_int *lda, f_float *x, f_int *incx, f_float *beta, f_float *y, f_int *incy, f_int uplo_len);
-void dsbmv_(char *uplo, f_int *n, f_int *k, f_double *alpha, f_double *A, f_int *lda, f_double *x, f_int *incx, f_double *beta, f_double *y, f_int *incy, f_int uplo_len);
+void ssbmv_(char *uplo, f_int *n, f_int *k, f_float *alpha, f_float *A, f_int *lda, f_float *x, f_int *incx, f_float *beta, f_float *y, f_int *incy);
+void dsbmv_(char *uplo, f_int *n, f_int *k, f_double *alpha, f_double *A, f_int *lda, f_double *x, f_int *incx, f_double *beta, f_double *y, f_int *incy);
 
 /** symmetric packed matrix vector multiply
     y := alpha * A * x + beta * y
  */
-void sspmv_(char *uplo, f_int *n, f_float *alpha, f_float *ap, f_float *x, f_int *incx, f_float *beta, f_float *y, f_int *incy, f_int uplo_len);
-void dspmv_(char *uplo, f_int *n, f_double *alpha, f_double *ap, f_double *x, f_int *incx, f_double *beta, f_double *y, f_int *incy, f_int uplo_len);
+void sspmv_(char *uplo, f_int *n, f_float *alpha, f_float *ap, f_float *x, f_int *incx, f_float *beta, f_float *y, f_int *incy);
+void dspmv_(char *uplo, f_int *n, f_double *alpha, f_double *ap, f_double *x, f_int *incx, f_double *beta, f_double *y, f_int *incy);
 
 /** triangular matrix vector multiply
         x := A * x
     OR  x := A.T * x
     OR  x := A.H * x
  */
-void strmv_(char *uplo, char *trans, char *diag, f_int *n, f_float *A, f_int *lda, f_float *x, f_int *incx, f_int uplo_len, f_int trans_len, f_int diag_len);
-void dtrmv_(char *uplo, char *trans, char *diag, f_int *n, f_double *A, f_int *lda, f_double *x, f_int *incx, f_int uplo_len, f_int trans_len, f_int diag_len);
-void ctrmv_(char *uplo, char *trans, char *diag, f_int *n, f_cfloat *A, f_int *lda, f_cfloat *x, f_int *incx, f_int uplo_len, f_int trans_len, f_int diag_len);
-void ztrmv_(char *uplo, char *trans, char *diag, f_int *n, f_cdouble *A, f_int *lda, f_cdouble *x, f_int *incx, f_int uplo_len, f_int trans_len, f_int diag_len);
+void strmv_(char *uplo, char *trans, char *diag, f_int *n, f_float *A, f_int *lda, f_float *x, f_int *incx);
+void dtrmv_(char *uplo, char *trans, char *diag, f_int *n, f_double *A, f_int *lda, f_double *x, f_int *incx);
+void ctrmv_(char *uplo, char *trans, char *diag, f_int *n, f_cfloat *A, f_int *lda, f_cfloat *x, f_int *incx);
+void ztrmv_(char *uplo, char *trans, char *diag, f_int *n, f_cdouble *A, f_int *lda, f_cdouble *x, f_int *incx);
 
 /** triangular banded matrix vector multiply
         x := A * x
     OR  x := A.T * x
     OR  x := A.H * x
  */
-void stbmv_(char *uplo, char *trans, char *diag, f_int *n, f_int *k, f_float *A, f_int *lda, f_float *x, f_int *incx, f_int uplo_len, f_int trans_len, f_int diag_len);
-void dtbmv_(char *uplo, char *trans, char *diag, f_int *n, f_int *k, f_double *A, f_int *lda, f_double *x, f_int *incx, f_int uplo_len, f_int trans_len, f_int diag_len);
-void ctbmv_(char *uplo, char *trans, char *diag, f_int *n, f_int *k, f_cfloat *A, f_int *lda, f_cfloat *x, f_int *incx, f_int uplo_len, f_int trans_len, f_int diag_len);
-void ztbmv_(char *uplo, char *trans, char *diag, f_int *n, f_int *k, f_cdouble *A, f_int *lda, f_cdouble *x, f_int *incx, f_int uplo_len, f_int trans_len, f_int diag_len);
+void stbmv_(char *uplo, char *trans, char *diag, f_int *n, f_int *k, f_float *A, f_int *lda, f_float *x, f_int *incx);
+void dtbmv_(char *uplo, char *trans, char *diag, f_int *n, f_int *k, f_double *A, f_int *lda, f_double *x, f_int *incx);
+void ctbmv_(char *uplo, char *trans, char *diag, f_int *n, f_int *k, f_cfloat *A, f_int *lda, f_cfloat *x, f_int *incx);
+void ztbmv_(char *uplo, char *trans, char *diag, f_int *n, f_int *k, f_cdouble *A, f_int *lda, f_cdouble *x, f_int *incx);
 
 /** triangular packed matrix vector multiply
         x := A * x
     OR  x := A.T * x
     OR  x := A.H * x
  */
-void stpmv_(char *uplo, char *trans, char *diag, f_int *n, f_float *ap, f_float *x, f_int *incx, f_int uplo_len, f_int trans_len, f_int diag_len);
-void dtpmv_(char *uplo, char *trans, char *diag, f_int *n, f_double *ap, f_double *x, f_int *incx, f_int uplo_len, f_int trans_len, f_int diag_len);
-void ctpmv_(char *uplo, char *trans, char *diag, f_int *n, f_cfloat *ap, f_cfloat *x, f_int *incx, f_int uplo_len, f_int trans_len, f_int diag_len);
-void ztpmv_(char *uplo, char *trans, char *diag, f_int *n, f_cdouble *ap, f_cdouble *x, f_int *incx, f_int uplo_len, f_int trans_len, f_int diag_len);
+void stpmv_(char *uplo, char *trans, char *diag, f_int *n, f_float *ap, f_float *x, f_int *incx);
+void dtpmv_(char *uplo, char *trans, char *diag, f_int *n, f_double *ap, f_double *x, f_int *incx);
+void ctpmv_(char *uplo, char *trans, char *diag, f_int *n, f_cfloat *ap, f_cfloat *x, f_int *incx);
+void ztpmv_(char *uplo, char *trans, char *diag, f_int *n, f_cdouble *ap, f_cdouble *x, f_int *incx);
 
 /** solving triangular matrix problems
         x := A.inv * x
     OR  x := A.inv.T * x
     OR  x := A.inv.H * x
  */
-void strsv_(char *uplo, char *trans, char *diag, f_int *n, f_float *A, f_int *lda, f_float *x, f_int *incx, f_int uplo_len, f_int trans_len, f_int diag_len);
-void dtrsv_(char *uplo, char *trans, char *diag, f_int *n, f_double *A, f_int *lda, f_double *x, f_int *incx, f_int uplo_len, f_int trans_len, f_int diag_len);
-void ctrsv_(char *uplo, char *trans, char *diag, f_int *n, f_cfloat *A, f_int *lda, f_cfloat *x, f_int *incx, f_int uplo_len, f_int trans_len, f_int diag_len);
-void ztrsv_(char *uplo, char *trans, char *diag, f_int *n, f_cdouble *A, f_int *lda, f_cdouble *x, f_int *incx, f_int uplo_len, f_int trans_len, f_int diag_len);
+void strsv_(char *uplo, char *trans, char *diag, f_int *n, f_float *A, f_int *lda, f_float *x, f_int *incx);
+void dtrsv_(char *uplo, char *trans, char *diag, f_int *n, f_double *A, f_int *lda, f_double *x, f_int *incx);
+void ctrsv_(char *uplo, char *trans, char *diag, f_int *n, f_cfloat *A, f_int *lda, f_cfloat *x, f_int *incx);
+void ztrsv_(char *uplo, char *trans, char *diag, f_int *n, f_cdouble *A, f_int *lda, f_cdouble *x, f_int *incx);
 
 /** solving triangular banded matrix problems
         x := A.inv * x
     OR  x := A.inv.T * x
     OR  x := A.inv.H * x
  */
-void stbsv_(char *uplo, char *trans, char *diag, f_int *n, f_int *k, f_float *A, f_int *lda, f_float *x, f_int *incx, f_int uplo_len, f_int trans_len, f_int diag_len);
-void dtbsv_(char *uplo, char *trans, char *diag, f_int *n, f_int *k, f_double *A, f_int *lda, f_double *x, f_int *incx, f_int uplo_len, f_int trans_len, f_int diag_len);
-void ctbsv_(char *uplo, char *trans, char *diag, f_int *n, f_int *k, f_cfloat *A, f_int *lda, f_cfloat *x, f_int *incx, f_int uplo_len, f_int trans_len, f_int diag_len);
-void ztbsv_(char *uplo, char *trans, char *diag, f_int *n, f_int *k, f_cdouble *A, f_int *lda, f_cdouble *x, f_int *incx, f_int uplo_len, f_int trans_len, f_int diag_len);
+void stbsv_(char *uplo, char *trans, char *diag, f_int *n, f_int *k, f_float *A, f_int *lda, f_float *x, f_int *incx);
+void dtbsv_(char *uplo, char *trans, char *diag, f_int *n, f_int *k, f_double *A, f_int *lda, f_double *x, f_int *incx);
+void ctbsv_(char *uplo, char *trans, char *diag, f_int *n, f_int *k, f_cfloat *A, f_int *lda, f_cfloat *x, f_int *incx);
+void ztbsv_(char *uplo, char *trans, char *diag, f_int *n, f_int *k, f_cdouble *A, f_int *lda, f_cdouble *x, f_int *incx);
 
 /** solving triangular packed matrix problems
         x := A.inv * x
     OR  x := A.inv.T * x
     OR  x := A.inv.H * x
  */
-void stpsv_(char *uplo, char *trans, char *diag, f_int *n, f_float *ap, f_float *x, f_int *incx, f_int uplo_len, f_int trans_len, f_int diag_len);
-void dtpsv_(char *uplo, char *trans, char *diag, f_int *n, f_double *ap, f_double *x, f_int *incx, f_int uplo_len, f_int trans_len, f_int diag_len);
-void ctpsv_(char *uplo, char *trans, char *diag, f_int *n, f_cfloat *ap, f_cfloat *x, f_int *incx, f_int uplo_len, f_int trans_len, f_int diag_len);
-void ztpsv_(char *uplo, char *trans, char *diag, f_int *n, f_cdouble *ap, f_cdouble *x, f_int *incx, f_int uplo_len, f_int trans_len, f_int diag_len);
+void stpsv_(char *uplo, char *trans, char *diag, f_int *n, f_float *ap, f_float *x, f_int *incx);
+void dtpsv_(char *uplo, char *trans, char *diag, f_int *n, f_double *ap, f_double *x, f_int *incx);
+void ctpsv_(char *uplo, char *trans, char *diag, f_int *n, f_cfloat *ap, f_cfloat *x, f_int *incx);
+void ztpsv_(char *uplo, char *trans, char *diag, f_int *n, f_cdouble *ap, f_cdouble *x, f_int *incx);
 
 /// performs the rank 1 operation 
 ///    A := A + alpha*x*y.T
@@ -290,111 +290,111 @@ void zgerc_(f_int *m, f_int *n, f_cdouble *alpha, f_cdouble *x, f_int *incx, f_c
 
 /// hermitian rank 1 operation 
 ///    A := A + alpha*x*x.H
-void cher_(char *uplo, f_int *n, f_float *alpha, f_cfloat *x, f_int *incx, f_cfloat *A, f_int *lda, f_int uplo_len);
-void zher_(char *uplo, f_int *n, f_double *alpha, f_cdouble *x, f_int *incx, f_cdouble *A, f_int *lda, f_int uplo_len);
+void cher_(char *uplo, f_int *n, f_float *alpha, f_cfloat *x, f_int *incx, f_cfloat *A, f_int *lda);
+void zher_(char *uplo, f_int *n, f_double *alpha, f_cdouble *x, f_int *incx, f_cdouble *A, f_int *lda);
 
 /// hermitian packed rank 1 operation
 ///    A := A + alpha*x*x.H
-void chpr_(char *uplo, f_int *n, f_float *alpha, f_cfloat *x, f_int *incx, f_cfloat *A, f_int uplo_len);
-void zhpr_(char *uplo, f_int *n, f_double *alpha, f_cdouble *x, f_int *incx, f_cdouble *A, f_int uplo_len);
+void chpr_(char *uplo, f_int *n, f_float *alpha, f_cfloat *x, f_int *incx, f_cfloat *A);
+void zhpr_(char *uplo, f_int *n, f_double *alpha, f_cdouble *x, f_int *incx, f_cdouble *A);
 
 /// hermitian rank 2 operation
 ///    A := A + alpha*x*y.H + alpha.conj * y * x.H
-void cher2_(char *uplo, f_int *n, f_cfloat *alpha, f_cfloat *x, f_int *incx, f_cfloat *y, f_int *incy, f_cfloat *A, f_int *lda, f_int uplo_len);
-void zher2_(char *uplo, f_int *n, f_cdouble *alpha, f_cdouble *x, f_int *incx, f_cdouble *y, f_int *incy, f_cdouble *A, f_int *lda, f_int uplo_len);
+void cher2_(char *uplo, f_int *n, f_cfloat *alpha, f_cfloat *x, f_int *incx, f_cfloat *y, f_int *incy, f_cfloat *A, f_int *lda);
+void zher2_(char *uplo, f_int *n, f_cdouble *alpha, f_cdouble *x, f_int *incx, f_cdouble *y, f_int *incy, f_cdouble *A, f_int *lda);
 
 /// hermitian packed rank 2 operation
 ///    A := A + alpha*x*y.H + alpha.conj * y * x.H
-void chpr2_(char *uplo, f_int *n, f_cfloat *alpha, f_cfloat *x, f_int *incx, f_cfloat *y, f_int *incy, f_cfloat *A, f_int uplo_len);
-void zhpr2_(char *uplo, f_int *n, f_cdouble *alpha, f_cdouble *x, f_int *incx, f_cdouble *y, f_int *incy, f_cdouble *A, f_int uplo_len);
+void chpr2_(char *uplo, f_int *n, f_cfloat *alpha, f_cfloat *x, f_int *incx, f_cfloat *y, f_int *incy, f_cfloat *A);
+void zhpr2_(char *uplo, f_int *n, f_cdouble *alpha, f_cdouble *x, f_int *incx, f_cdouble *y, f_int *incy, f_cdouble *A);
 
 /// performs the symmetric rank 1 operation 
 ///    A := A + alpha*x*x.T
-void ssyr_(char *uplo, f_int *n, f_float *alpha, f_float *x, f_int *incx, f_float *A, f_int *lda, f_int uplo_len);
-void dsyr_(char *uplo, f_int *n, f_double *alpha, f_double *x, f_int *incx, f_double *A, f_int *lda, f_int uplo_len);
+void ssyr_(char *uplo, f_int *n, f_float *alpha, f_float *x, f_int *incx, f_float *A, f_int *lda);
+void dsyr_(char *uplo, f_int *n, f_double *alpha, f_double *x, f_int *incx, f_double *A, f_int *lda);
 
 /// symmetric packed rank 1 operation  
 ///    A := A + alpha*x*x.T
-void sspr_(char *uplo, f_int *n, f_float *alpha, f_float *x, f_int *incx, f_float *ap, f_int uplo_len);
-void dspr_(char *uplo, f_int *n, f_double *alpha, f_double *x, f_int *incx, f_double *ap, f_int uplo_len);
+void sspr_(char *uplo, f_int *n, f_float *alpha, f_float *x, f_int *incx, f_float *ap);
+void dspr_(char *uplo, f_int *n, f_double *alpha, f_double *x, f_int *incx, f_double *ap);
 
 /// performs the symmetric rank 2 operation
 ///    A := A + alpha * x * y.T  +  alpha * y * x.T
-void ssyr2_(char *uplo, f_int *n, f_float *alpha, f_float *x, f_int *incx, f_float *y, f_int *incy, f_float *A, f_int *lda, f_int uplo_len);
-void dsyr2_(char *uplo, f_int *n, f_double *alpha, f_double *x, f_int *incx, f_double *y, f_int *incy, f_double *A, f_int *lda, f_int uplo_len);
+void ssyr2_(char *uplo, f_int *n, f_float *alpha, f_float *x, f_int *incx, f_float *y, f_int *incy, f_float *A, f_int *lda);
+void dsyr2_(char *uplo, f_int *n, f_double *alpha, f_double *x, f_int *incx, f_double *y, f_int *incy, f_double *A, f_int *lda);
 
 /// performs the symmetric packed rank 2 operation
 ///    A := A + alpha*x*y.T + alpha*y*x.T
-void sspr2_(char *uplo, f_int *n, f_float *alpha, f_float *x, f_int *incx, f_float *y, f_int *incy, f_float *ap, f_int uplo_len);
-void dspr2_(char *uplo, f_int *n, f_double *alpha, f_double *x, f_int *incx, f_double *y, f_int *incy, f_double *ap, f_int uplo_len);
+void sspr2_(char *uplo, f_int *n, f_float *alpha, f_float *x, f_int *incx, f_float *y, f_int *incy, f_float *ap);
+void dspr2_(char *uplo, f_int *n, f_double *alpha, f_double *x, f_int *incx, f_double *y, f_int *incy, f_double *ap);
 
 
 /// Level 3 BLAS
 
 /// matrix matrix multiply
 ///     C := alpha * transa(A) * transb(B) + beta * C
-void sgemm_(char *transa, char *transb, f_int *m, f_int *n, f_int *k, f_float *alpha, f_float *A, f_int *lda, f_float *B, f_int *ldb, f_float *beta, f_float *C, f_int *ldc, f_int transa_len, f_int transb_len);
-void dgemm_(char *transa, char *transb, f_int *m, f_int *n, f_int *k, f_double *alpha, f_double *A, f_int *lda, f_double *B, f_int *ldb, f_double *beta, f_double *C, f_int *ldc, f_int transa_len, f_int transb_len);
-void cgemm_(char *transa, char *transb, f_int *m, f_int *n, f_int *k, f_cfloat *alpha, f_cfloat *A, f_int *lda, f_cfloat *B, f_int *ldb, f_cfloat *beta, f_cfloat *C, f_int *ldc, f_int transa_len, f_int transb_len);
-void zgemm_(char *transa, char *transb, f_int *m, f_int *n, f_int *k, f_cdouble *alpha, f_cdouble *A, f_int *lda, f_cdouble *B, f_int *ldb, f_cdouble *beta, f_cdouble *C, f_int *ldc, f_int transa_len, f_int transb_len);
+void sgemm_(char *transa, char *transb, f_int *m, f_int *n, f_int *k, f_float *alpha, f_float *A, f_int *lda, f_float *B, f_int *ldb, f_float *beta, f_float *C, f_int *ldc);
+void dgemm_(char *transa, char *transb, f_int *m, f_int *n, f_int *k, f_double *alpha, f_double *A, f_int *lda, f_double *B, f_int *ldb, f_double *beta, f_double *C, f_int *ldc);
+void cgemm_(char *transa, char *transb, f_int *m, f_int *n, f_int *k, f_cfloat *alpha, f_cfloat *A, f_int *lda, f_cfloat *B, f_int *ldb, f_cfloat *beta, f_cfloat *C, f_int *ldc);
+void zgemm_(char *transa, char *transb, f_int *m, f_int *n, f_int *k, f_cdouble *alpha, f_cdouble *A, f_int *lda, f_cdouble *B, f_int *ldb, f_cdouble *beta, f_cdouble *C, f_int *ldc);
 
 /// symmetric matrix matrix multiply
 ///     C := alpha * A * B + beta * C
 /// OR  C := alpha * B * A + beta * C,    where A == A.T
-void ssymm_(char *side, char *uplo, f_int *m, f_int *n, f_float *alpha, f_float *A, f_int *lda, f_float *B, f_int *ldb, f_float *beta, f_float *C, f_int *ldc, f_int side_len, f_int uplo_len);
-void dsymm_(char *side, char *uplo, f_int *m, f_int *n, f_double *alpha, f_double *A, f_int *lda, f_double *B, f_int *ldb, f_double *beta, f_double *C, f_int *ldc, f_int side_len, f_int uplo_len);
-void csymm_(char *side, char *uplo, f_int *m, f_int *n, f_cfloat *alpha, f_cfloat *A, f_int *lda, f_cfloat *B, f_int *ldb, f_cfloat *beta, f_cfloat *C, f_int *ldc, f_int side_len, f_int uplo_len);
-void zsymm_(char *side, char *uplo, f_int *m, f_int *n, f_cdouble *alpha, f_cdouble *A, f_int *lda, f_cdouble *B, f_int *ldb, f_cdouble *beta, f_cdouble *C, f_int *ldc, f_int side_len, f_int uplo_len);
+void ssymm_(char *side, char *uplo, f_int *m, f_int *n, f_float *alpha, f_float *A, f_int *lda, f_float *B, f_int *ldb, f_float *beta, f_float *C, f_int *ldc);
+void dsymm_(char *side, char *uplo, f_int *m, f_int *n, f_double *alpha, f_double *A, f_int *lda, f_double *B, f_int *ldb, f_double *beta, f_double *C, f_int *ldc);
+void csymm_(char *side, char *uplo, f_int *m, f_int *n, f_cfloat *alpha, f_cfloat *A, f_int *lda, f_cfloat *B, f_int *ldb, f_cfloat *beta, f_cfloat *C, f_int *ldc);
+void zsymm_(char *side, char *uplo, f_int *m, f_int *n, f_cdouble *alpha, f_cdouble *A, f_int *lda, f_cdouble *B, f_int *ldb, f_cdouble *beta, f_cdouble *C, f_int *ldc);
 
 /// hermitian matrix matrix multiply
 ///     C := alpha * A * B + beta * C
 /// OR  C := alpha * B * A + beta * C,    where A == A.H
-void chemm_(char *side, char *uplo, f_int *m, f_int *n, f_cfloat *alpha, f_cfloat *A, f_int *lda, f_cfloat *B, f_int *ldb, f_cfloat *beta, f_cfloat *C, f_int *ldc, f_int side_len, f_int uplo_len);
-void zhemm_(char *side, char *uplo, f_int *m, f_int *n, f_cdouble *alpha, f_cdouble *A, f_int *lda, f_cdouble *B, f_int *ldb, f_cdouble *beta, f_cdouble *C, f_int *ldc, f_int side_len, f_int uplo_len);
+void chemm_(char *side, char *uplo, f_int *m, f_int *n, f_cfloat *alpha, f_cfloat *A, f_int *lda, f_cfloat *B, f_int *ldb, f_cfloat *beta, f_cfloat *C, f_int *ldc);
+void zhemm_(char *side, char *uplo, f_int *m, f_int *n, f_cdouble *alpha, f_cdouble *A, f_int *lda, f_cdouble *B, f_int *ldb, f_cdouble *beta, f_cdouble *C, f_int *ldc);
 
 /// symmetric rank-k update to a matrix
 ///     C := alpha * A * A.T + beta * C
 /// OR  C := alpha * A.T * A + beta * C
-void ssyrk_(char *uplo, char *trans, f_int *n, f_int *k, f_float *alpha, f_float *A, f_int *lda, f_float *beta, f_float *C, f_int *ldc, f_int uplo_len, f_int trans_len);
-void dsyrk_(char *uplo, char *trans, f_int *n, f_int *k, f_double *alpha, f_double *A, f_int *lda, f_double *beta, f_double *C, f_int *ldc, f_int uplo_len, f_int trans_len);
-void csyrk_(char *uplo, char *trans, f_int *n, f_int *k, f_cfloat *alpha, f_cfloat *A, f_int *lda, f_cfloat *beta, f_cfloat *C, f_int *ldc, f_int uplo_len, f_int trans_len);
-void zsyrk_(char *uplo, char *trans, f_int *n, f_int *k, f_cdouble *alpha, f_cdouble *A, f_int *lda, f_cdouble *beta, f_cdouble *C, f_int *ldc, f_int uplo_len, f_int trans_len);
+void ssyrk_(char *uplo, char *trans, f_int *n, f_int *k, f_float *alpha, f_float *A, f_int *lda, f_float *beta, f_float *C, f_int *ldc);
+void dsyrk_(char *uplo, char *trans, f_int *n, f_int *k, f_double *alpha, f_double *A, f_int *lda, f_double *beta, f_double *C, f_int *ldc);
+void csyrk_(char *uplo, char *trans, f_int *n, f_int *k, f_cfloat *alpha, f_cfloat *A, f_int *lda, f_cfloat *beta, f_cfloat *C, f_int *ldc);
+void zsyrk_(char *uplo, char *trans, f_int *n, f_int *k, f_cdouble *alpha, f_cdouble *A, f_int *lda, f_cdouble *beta, f_cdouble *C, f_int *ldc);
 
 /// hermitian rank-k update to a matrix
 ///     C := alpha * A * A.H + beta * C
 /// OR  C := alpha * A.H * A + beta * C
-void cherk_(char *uplo, char *trans, f_int *n, f_int *k, f_float *alpha, f_cfloat *A, f_int *lda, f_float *beta, f_cfloat *C, f_int *ldc, f_int uplo_len, f_int trans_len);
-void zherk_(char *uplo, char *trans, f_int *n, f_int *k, f_double *alpha, f_cdouble *A, f_int *lda, f_double *beta, f_cdouble *C, f_int *ldc, f_int uplo_len, f_int trans_len);
+void cherk_(char *uplo, char *trans, f_int *n, f_int *k, f_float *alpha, f_cfloat *A, f_int *lda, f_float *beta, f_cfloat *C, f_int *ldc);
+void zherk_(char *uplo, char *trans, f_int *n, f_int *k, f_double *alpha, f_cdouble *A, f_int *lda, f_double *beta, f_cdouble *C, f_int *ldc);
 
 /// symmetric rank-2k update to a matrix
 ///     C := alpha * A * B.T + alpha.conj * B * A.T + beta * C
 /// OR  C := alpha * A.T * B + alpha.conj * B.T * A + beta * C
-void ssyr2k_(char *uplo, char *trans, f_int *n, f_int *k, f_float *alpha, f_float *A, f_int *lda, f_float *B, f_int *ldb, f_float *beta, f_float *C, f_int *ldc, f_int uplo_len, f_int trans_len);
-void dsyr2k_(char *uplo, char *trans, f_int *n, f_int *k, f_double *alpha, f_double *A, f_int *lda, f_double *B, f_int *ldb, f_double *beta, f_double *C, f_int *ldc, f_int uplo_len, f_int trans_len);
-void csyr2k_(char *uplo, char *trans, f_int *n, f_int *k, f_cfloat *alpha, f_cfloat *A, f_int *lda, f_cfloat *B, f_int *ldb, f_cfloat *beta, f_cfloat *C, f_int *ldc, f_int uplo_len, f_int trans_len);
-void zsyr2k_(char *uplo, char *trans, f_int *n, f_int *k, f_cdouble *alpha, f_cdouble *A, f_int *lda, f_cdouble *B, f_int *ldb, f_cdouble *beta, f_cdouble *C, f_int *ldc, f_int uplo_len, f_int trans_len);
+void ssyr2k_(char *uplo, char *trans, f_int *n, f_int *k, f_float *alpha, f_float *A, f_int *lda, f_float *B, f_int *ldb, f_float *beta, f_float *C, f_int *ldc);
+void dsyr2k_(char *uplo, char *trans, f_int *n, f_int *k, f_double *alpha, f_double *A, f_int *lda, f_double *B, f_int *ldb, f_double *beta, f_double *C, f_int *ldc);
+void csyr2k_(char *uplo, char *trans, f_int *n, f_int *k, f_cfloat *alpha, f_cfloat *A, f_int *lda, f_cfloat *B, f_int *ldb, f_cfloat *beta, f_cfloat *C, f_int *ldc);
+void zsyr2k_(char *uplo, char *trans, f_int *n, f_int *k, f_cdouble *alpha, f_cdouble *A, f_int *lda, f_cdouble *B, f_int *ldb, f_cdouble *beta, f_cdouble *C, f_int *ldc);
 
 /// hermitian rank-2k update to a matrix
 ///     C := alpha * A * B.H + alpha.conj * B * A.H + beta * C
 /// OR  C := alpha * A.H * B + alpha.conj * B.H * A + beta * C
-void cher2k_(char *uplo, char *trans, f_int *n, f_int *k, f_cfloat *alpha, f_cfloat *A, f_int *lda, f_cfloat *B, f_int *ldb, f_float *beta, f_cfloat *C, f_int *ldc, f_int uplo_len, f_int trans_len);
-void zher2k_(char *uplo, char *trans, f_int *n, f_int *k, f_cdouble *alpha, f_cdouble *A, f_int *lda, f_cdouble *B, f_int *ldb, f_double *beta, f_cdouble *C, f_int *ldc, f_int uplo_len, f_int trans_len);
+void cher2k_(char *uplo, char *trans, f_int *n, f_int *k, f_cfloat *alpha, f_cfloat *A, f_int *lda, f_cfloat *B, f_int *ldb, f_float *beta, f_cfloat *C, f_int *ldc);
+void zher2k_(char *uplo, char *trans, f_int *n, f_int *k, f_cdouble *alpha, f_cdouble *A, f_int *lda, f_cdouble *B, f_int *ldb, f_double *beta, f_cdouble *C, f_int *ldc);
 
 /// triangular matrix matrix multiply
 ///     B := alpha * transa(A) * B
 /// OR  B := alpha * B * transa(A)
-void strmm_(char *side, char *uplo, char *transa, char *diag, f_int *m, f_int *n, f_float *alpha, f_float *A, f_int *lda, f_float *B, f_int *ldb, f_int side_len, f_int uplo_len, f_int transa_len, f_int diag_len);
-void dtrmm_(char *side, char *uplo, char *transa, char *diag, f_int *m, f_int *n, f_double *alpha, f_double *A, f_int *lda, f_double *B, f_int *ldb, f_int side_len, f_int uplo_len, f_int transa_len, f_int diag_len);
-void ctrmm_(char *side, char *uplo, char *transa, char *diag, f_int *m, f_int *n, f_cfloat *alpha, f_cfloat *A, f_int *lda, f_cfloat *B, f_int *ldb, f_int side_len, f_int uplo_len, f_int transa_len, f_int diag_len);
-void ztrmm_(char *side, char *uplo, char *transa, char *diag, f_int *m, f_int *n, f_cdouble *alpha, f_cdouble *A, f_int *lda, f_cdouble *B, f_int *ldb, f_int side_len, f_int uplo_len, f_int transa_len, f_int diag_len);
+void strmm_(char *side, char *uplo, char *transa, char *diag, f_int *m, f_int *n, f_float *alpha, f_float *A, f_int *lda, f_float *B, f_int *ldb);
+void dtrmm_(char *side, char *uplo, char *transa, char *diag, f_int *m, f_int *n, f_double *alpha, f_double *A, f_int *lda, f_double *B, f_int *ldb);
+void ctrmm_(char *side, char *uplo, char *transa, char *diag, f_int *m, f_int *n, f_cfloat *alpha, f_cfloat *A, f_int *lda, f_cfloat *B, f_int *ldb);
+void ztrmm_(char *side, char *uplo, char *transa, char *diag, f_int *m, f_int *n, f_cdouble *alpha, f_cdouble *A, f_int *lda, f_cdouble *B, f_int *ldb);
 
 /// solving triangular matrix with multiple right hand sides
 ///     B := alpha * transa(A.inv) * B
 /// OR  B := alpha * B * transa(A.inv)
-void strsm_(char *side, char *uplo, char *transa, char *diag, f_int *m, f_int *n, f_float *alpha, f_float *A, f_int *lda, f_float *B, f_int *ldb, f_int side_len, f_int uplo_len, f_int transa_len, f_int diag_len);
-void dtrsm_(char *side, char *uplo, char *transa, char *diag, f_int *m, f_int *n, f_double *alpha, f_double *A, f_int *lda, f_double *B, f_int *ldb, f_int side_len, f_int uplo_len, f_int transa_len, f_int diag_len);
-void ctrsm_(char *side, char *uplo, char *transa, char *diag, f_int *m, f_int *n, f_cfloat *alpha, f_cfloat *A, f_int *lda, f_cfloat *B, f_int *ldb, f_int side_len, f_int uplo_len, f_int transa_len, f_int diag_len);
-void ztrsm_(char *side, char *uplo, char *transa, char *diag, f_int *m, f_int *n, f_cdouble *alpha, f_cdouble *A, f_int *lda, f_cdouble *B, f_int *ldb, f_int side_len, f_int uplo_len, f_int transa_len, f_int diag_len);
+void strsm_(char *side, char *uplo, char *transa, char *diag, f_int *m, f_int *n, f_float *alpha, f_float *A, f_int *lda, f_float *B, f_int *ldb);
+void dtrsm_(char *side, char *uplo, char *transa, char *diag, f_int *m, f_int *n, f_double *alpha, f_double *A, f_int *lda, f_double *B, f_int *ldb);
+void ctrsm_(char *side, char *uplo, char *transa, char *diag, f_int *m, f_int *n, f_cfloat *alpha, f_cfloat *A, f_int *lda, f_cfloat *B, f_int *ldb);
+void ztrsm_(char *side, char *uplo, char *transa, char *diag, f_int *m, f_int *n, f_cdouble *alpha, f_cdouble *A, f_int *lda, f_cdouble *B, f_int *ldb);
 
 /// Test if the characters are equal. (Auxiliary routine in Level 2 and 3 BLAS routines)
 f_int lsame_(char *ca, char *cb, f_int ca_len, f_int cb_len);
