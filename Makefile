@@ -51,7 +51,7 @@ SRCDIR=$(BLIP_HOME)
 TESTS_DIR=$(BLIP_HOME)/tests
 OBJDIR=$(BLIP_HOME)/objs-$(IDENT)
 ARCHDIR=$(TANGO_HOME)/build/arch
-EXCLUDEPAT_ALL=$(EXCLUDEPAT_OS)
+EXCLUDEPAT_ALL=$(EXCLUDEPAT_OS) *objs-*
 ARCHFILE=$(ARCHDIR)/$(IDENT).mak
 MAKEFILE=$(BLIP_HOME)/Makefile
 DFLAGS_MAIN=-I$(BLIP_HOME)
@@ -133,7 +133,9 @@ $(OBJDIR)/MODULES.inc:
 
 $(OBJDIR)/intermediate.rule:
 	@mkdir -p $(OBJDIR)
-	$(TOOLDIR)/mkIntermediate.sh $(SRCDIR) $(EXCLUDEPAT_ALL) > $(OBJDIR)/intermediate.rule
+	$(TOOLDIR)/mkIntermediate.sh $(SRCDIR)/blip $(EXCLUDEPAT_ALL) > $(OBJDIR)/intermediate.rule
+	$(TOOLDIR)/mkIntermediate.sh $(SRCDIR)/gobo $(EXCLUDEPAT_ALL) >> $(OBJDIR)/intermediate.rule
+	$(TOOLDIR)/mkIntermediate.sh $(SRCDIR)/xf $(EXCLUDEPAT_ALL) >> $(OBJDIR)/intermediate.rule
 
 newFiles:
 	@mkdir -p $(OBJDIR)
