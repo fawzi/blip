@@ -75,7 +75,15 @@ char[] serializeSome(char[] typeName1,char[]fieldsDoc){
     res~="void serial(Ser)(Ser s){\n";
     for (int ifield=0;ifield<fieldsDocArray.length/2;++ifield){
         auto field=fieldsDocArray[2*ifield];
+        res~="    static if(isStaticArrayType!(typeof(this."~field~"))){\n";
+        res~="        auto this_"~field~"=this."~field~"[];\n";
+        res~="        s.field(metaI["~ctfe_i2a(ifield)~"],this_"~field~");\n";
+        res~="        assert(this."~field~".length==this_"~field~".length);\n";
+        res~="        if (this."~field~".ptr !is this_"~field~".ptr)\n";
+        res~="            this."~field~"[]=this_"~field~";\n";
+        res~="    } else {\n";
         res~="        s.field(metaI["~ctfe_i2a(ifield)~"],this."~field~");\n";
+        res~="    }\n";
     }
     res~="    }\n";
     res~=`

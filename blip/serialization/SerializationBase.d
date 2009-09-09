@@ -503,6 +503,13 @@ class Serializer {
     SerializationLevel serializationLevel;
     bool removeCycles;
     bool structHasId;
+    bool recursePtr;
+    enum AutoReset:int {
+        None,
+        ResetCache,
+        ResetCounters
+    }
+    AutoReset autoReset;
 
     this(WriteHandlers h=null) {
         ptrToObjectId[null] = cast(objectId)0;
@@ -510,6 +517,13 @@ class Serializer {
         handlers=h;
         removeCycles=true;
         structHasId=false;
+        recursePtr=false;
+        autoReset=AutoReset.ResetCache;
+    }
+    /// resets the cache used to remove cycles (but not the counter)
+    void resetObjCache(){
+        ptrToObjectId=null;
+        ptrToObjectId[null] = cast(objectId)0;
     }
     /// resets objectId counter (and the mapping pointer->objectId) used to remove cycles
     void resetObjIdCounter(){
@@ -524,6 +538,18 @@ class Serializer {
         writeStartRoot();
         field!(T)(cast(FieldMetaInfo *)null,o);
         writeEndRoot();
+        switch(autoReset){
+            case AutoReset.None:
+            break;
+            case AutoReset.ResetCache:
+            resetObjCache();
+            break;
+            case AutoReset.ResetCounters:
+            resetObjIdCounter();
+            break;
+            default:
+                throw new Exception("unknown AutoReset value",__FILE__,__LINE__);
+        }
         return this;
     }
     
@@ -789,7 +815,7 @@ class Serializer {
                 }
                 writeDictEnd(ac);
             } else static if (isPointerType!(T)) {
-                Stdout("X serializing pointer").newline;
+                version(SerializationTrace) Stdout("X serializing pointer").newline;
                 if (t is null){
                     writeNull(fieldMeta);
                     return;
