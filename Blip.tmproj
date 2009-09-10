@@ -2,8 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>currentDocument</key>
-	<string>gobo/blas/Blas.d</string>
 	<key>documents</key>
 	<array>
 		<dict>
@@ -44,13 +42,13 @@
 			<key>filename</key>
 			<string>testSerial.d</string>
 			<key>lastUsed</key>
-			<date>2009-06-21T16:14:56Z</date>
+			<date>2009-09-10T09:26:08Z</date>
 		</dict>
 		<dict>
 			<key>filename</key>
 			<string>testRTest.d</string>
 			<key>lastUsed</key>
-			<date>2009-04-08T13:53:22Z</date>
+			<date>2009-09-10T09:26:06Z</date>
 		</dict>
 		<dict>
 			<key>filename</key>
@@ -72,9 +70,15 @@
 		</dict>
 		<dict>
 			<key>filename</key>
+			<string>Makefile</string>
+			<key>lastUsed</key>
+			<date>2009-09-10T09:26:07Z</date>
+		</dict>
+		<dict>
+			<key>filename</key>
 			<string>testNArray.d</string>
 			<key>lastUsed</key>
-			<date>2009-06-19T09:35:34Z</date>
+			<date>2009-09-10T09:26:05Z</date>
 		</dict>
 		<dict>
 			<key>filename</key>
@@ -83,139 +87,17 @@
 		<dict>
 			<key>filename</key>
 			<string>INSTALL.txt</string>
+			<key>selected</key>
+			<true/>
 		</dict>
 	</array>
 	<key>fileHierarchyDrawerWidth</key>
-	<integer>194</integer>
+	<integer>188</integer>
 	<key>metaData</key>
-	<dict>
-		<key>blip/serialization/Citations.d</key>
-		<dict>
-			<key>caret</key>
-			<dict>
-				<key>column</key>
-				<integer>0</integer>
-				<key>line</key>
-				<integer>0</integer>
-			</dict>
-			<key>firstVisibleColumn</key>
-			<integer>0</integer>
-			<key>firstVisibleLine</key>
-			<integer>68</integer>
-		</dict>
-		<key>blip/serialization/Handlers.d</key>
-		<dict>
-			<key>caret</key>
-			<dict>
-				<key>column</key>
-				<integer>2</integer>
-				<key>line</key>
-				<integer>0</integer>
-			</dict>
-			<key>firstVisibleColumn</key>
-			<integer>0</integer>
-			<key>firstVisibleLine</key>
-			<integer>0</integer>
-		</dict>
-		<key>blip/serialization/Serialization.d</key>
-		<dict>
-			<key>caret</key>
-			<dict>
-				<key>column</key>
-				<integer>55</integer>
-				<key>line</key>
-				<integer>8</integer>
-			</dict>
-			<key>firstVisibleColumn</key>
-			<integer>0</integer>
-			<key>firstVisibleLine</key>
-			<integer>0</integer>
-		</dict>
-		<key>blip/serialization/SerializationBase.d</key>
-		<dict>
-			<key>caret</key>
-			<dict>
-				<key>column</key>
-				<integer>20</integer>
-				<key>line</key>
-				<integer>903</integer>
-			</dict>
-			<key>firstVisibleColumn</key>
-			<integer>0</integer>
-			<key>firstVisibleLine</key>
-			<integer>1127</integer>
-		</dict>
-		<key>blip/serialization/SimpleWrappers.d</key>
-		<dict>
-			<key>caret</key>
-			<dict>
-				<key>column</key>
-				<integer>36</integer>
-				<key>line</key>
-				<integer>14</integer>
-			</dict>
-			<key>firstVisibleColumn</key>
-			<integer>0</integer>
-			<key>firstVisibleLine</key>
-			<integer>0</integer>
-		</dict>
-		<key>gobo/blas/Blas.d</key>
-		<dict>
-			<key>caret</key>
-			<dict>
-				<key>column</key>
-				<integer>1</integer>
-				<key>line</key>
-				<integer>43</integer>
-			</dict>
-			<key>firstVisibleColumn</key>
-			<integer>0</integer>
-			<key>firstVisibleLine</key>
-			<integer>18</integer>
-		</dict>
-		<key>gobo/blas/DBlas.d</key>
-		<dict>
-			<key>caret</key>
-			<dict>
-				<key>column</key>
-				<integer>0</integer>
-				<key>line</key>
-				<integer>0</integer>
-			</dict>
-			<key>firstVisibleColumn</key>
-			<integer>0</integer>
-			<key>firstVisibleLine</key>
-			<integer>8</integer>
-		</dict>
-		<key>testSerial.d</key>
-		<dict>
-			<key>caret</key>
-			<dict>
-				<key>column</key>
-				<integer>4</integer>
-				<key>line</key>
-				<integer>12</integer>
-			</dict>
-			<key>firstVisibleColumn</key>
-			<integer>0</integer>
-			<key>firstVisibleLine</key>
-			<integer>28</integer>
-		</dict>
-	</dict>
-	<key>openDocuments</key>
-	<array>
-		<string>blip/serialization/SimpleWrappers.d</string>
-		<string>gobo/blas/DBlas.d</string>
-		<string>gobo/blas/Blas.d</string>
-		<string>blip/serialization/Citations.d</string>
-		<string>testSerial.d</string>
-		<string>blip/serialization/Serialization.d</string>
-		<string>blip/serialization/SerializationBase.d</string>
-		<string>blip/serialization/Handlers.d</string>
-	</array>
+	<dict/>
 	<key>showFileHierarchyDrawer</key>
 	<true/>
 	<key>windowFrame</key>
-	<string>{{333, 200}, {796, 578}}</string>
+	<string>{{32, 0}, {805, 778}}</string>
 </dict>
 </plist>
