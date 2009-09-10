@@ -6,42 +6,43 @@ out=
 compiler=
 silent="-s"
 tests=1
-if [ -z "$TANGO_HOME" ] ; then
-    TANGO_HOME=$HOME/tango
-fi
-if [ -z "$BLIP_HOME" ] ; then
-    BLIP_HOME=$HOME/blip
+if [ -z "$D_HOME" ] ; then
+    D_HOME=$HOME
 fi
 while [ $# -gt 0 ]
 do
     case $1 in
         --help)
-            echo "usage: build [--dbg] [--opt] [--quick] [--tango-home tangoHome] "
-            echo "           [--verbose]"
+            echo "usage: build [--version x] [--quick] [--d-home dHome] [--tango-home tangoHome] "
+            echo "           [--verbose] [--build-dir buildDir]"
             echo ""
             echo "  builds mainDFile.d linking tango, blip and all needed libs (lapack, bz2,...)"
-            echo "  --debug         builds the debug version"
-            echo "  --opt           builds the optimized version"
+            echo "  --version x     builds version x (typically opt or dbg)"
             echo "  --quick         no clean before rebuilding"
             echo "  --verbose       verbose building"
-            echo "  --tango-home x  uses x as tango home (default is $TANGO_HOME )"
+            echo "  --d-home x      uses x as d home (default $D_HOME )"
+            echo "  --tango-home x  uses x as tango home"
+            echo "  --no-tests      does not compile "
+            echo "  --build-dir X   uses X as build dir (you *really* want to use a local"
+            echo "                  filesystem like /tmp/$USER/build for building if possible)"
             echo ""
-            echo "  useful xfbuild options:"
-            echo "  -ox       can be used to give the name x to the executable"
-            echo "  --        separates xfbuild options from compiler options"
+            echo "The script uses '$'DC as compiler if set"
+            echo "or the first compiler found if not set."
             exit 0
             ;;
-        --dbg)
-            version=dbg
-            ;;
-        --opt)
-            version=opt
+        --version)
+          shift
+          version=$1
             ;;
         --quick)
             clean=
             ;;
         --verbose)
             silent=
+            ;;
+        --d-home)
+            shift
+            D_HOME=$1
             ;;
         --tango-home)
             shift
@@ -57,6 +58,9 @@ do
     esac
     shift
 done
+if [ -z "$TANGO_HOME" ] ; then
+    TANGO_HOME=$D_HOME/tango
+fi
 
 if [ -z "$compiler" ]; then
     compiler=`$TANGO_HOME/build/tools/guessCompiler.sh --path $DC`
@@ -69,35 +73,39 @@ else
 fi
 case $compShort in
     dmd)
-    linkLib="-L-l"
-    linkPath="-L-L"
-    extra_libs_opt="-L-ltango-user-dmd -defaultlib=tango-base-dmd -L-framework -LAccelerate -L-lz -L-lbz2"
-    extra_libs_dbg="-L-ltango-user-dmd-dbg -defaultlib=tango-base-dmd -L-framework -LAccelerate -L-lz -L-lbz2"
-    extra_libs="-L-ltango-user-dmd$libExt -defaultlib=tango-base-dmd -L-framework -LAccelerate -L-lz -L-lbz2"
+    linkFlag="-L"
+    extra_libs_comp="-defaultlib=tango-base-${compShort}"
     ;;
     ldc)
-    linkLib="-L=-l"
-    linkPath="-L=-L"
-    extra_libs_opt="-L=-ltango-user-dmd -defaultlib=tango-base-dmd -L=-framework -L=Accelerate -L=-lz -L=-lbz2"
-    extra_libs_dbg="-L=-ltango-user-dmd-dbg -defaultlib=tango-base-dmd -L=-framework -L=Accelerate -L=-lz -L=-lbz2"
-    extra_libs="-L=-ltango-user-dmd$libExt -defaultlib=tango-base-dmd -L=-framework -L=Accelerate -L=-lz -L=-lbz2"
+    linkFlag="-L="
+    extra_libs_comp=
     ;;
     *)
     die "unsupported compiler"
 esac
+case `uname` in
+  Darwin)
+  extra_libs_os="${linkFlag}-framework ${linkFlag}Accelerate ${linkFlag}-lz ${linkFlag}-lbz2"
+  ;;
+  Linux)
+  extra_libs_os="${linkFlag}-lgoto2 ${linkFlag}-ldl ${linkFlag}-lz ${linkFlag}-lbz2"
+  ;;
+  *)
+  die "unknown platform, you need to set extra_libs_os"
+esac
+extra_libs_opt="${linkFlag}-ltango-user-${compShort} $extra_libs_os $extra_libs_comp"
+extra_libs_dbg="${linkFlag}-ltango-user-${compShort}-dbg $extra_libs_os $extra_libs_comp"
 case $version in
     opt)
-    flags="-release -O"
+    extra_libs="$extra_libs_opt"
     ;;
     dbg)
-    flags="-g"
+    extra_libs="$extra_libs_dbg"
     ;;
     *)
-    die "unknown version"
+    echo "unknown version, guessing extra_libs"
+    extra_libs="${linkFlag}-ltango-user-${compShort}-${version} $extra_libs_os $extra_libs_comp"
 esac
-if [ -z "$out_name" ]; then
-    out_name=${main_d%%d}$version
-fi
 
 if [ -n "$clean" ]; then
     make $silent distclean
