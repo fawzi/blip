@@ -153,7 +153,7 @@ clean-all:
 	rm -rf $(OBJDIR)
 
 distclean:
-	rm -rf $(BLIP_HOME)/objs-*
+	rm -rf $(OBJDIRBASE)/blipBuild/objs-*
 
 ifeq ($(shell if [ -e "$(OBJDIR)/intermediate.rule" ]; then echo 1; fi;),1)
 include $(OBJDIR)/intermediate.rule
