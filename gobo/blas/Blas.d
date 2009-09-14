@@ -119,6 +119,11 @@ void zaxpy_(f_int *n, f_cdouble *alpha, f_cdouble *x, f_int *incx, f_cdouble *y,
 
 
 /// ret := x.T * y
+// gotoBlas2 has the correct interface only for cblas on 64 bit targets
+float  cblas_sdsdot(f_int n, float, float *x, f_int incx, float *y, f_int incy);
+double cblas_dsdot (f_int n, float *x, f_int incx, float *y, f_int incy);
+float  cblas_sdot(f_int n, float  *x, f_int incx, float  *y, f_int incy);
+
 float_ret_t sdot_(f_int *n, f_float *x, f_int *incx, f_float *y, f_int *incy);
 f_double ddot_(f_int *n, f_double *x, f_int *incx, f_double *y, f_int *incy);
 f_double dsdot_(f_int *n, f_float *sx, f_int *incx, f_float *sy, f_int *incy);

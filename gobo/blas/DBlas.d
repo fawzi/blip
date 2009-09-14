@@ -166,14 +166,14 @@ void axpy(f_int n, f_cdouble alpha, f_cdouble *x, f_int incx, f_cdouble *y, f_in
 
 
 /// ret := x.T * y
-float_ret_t dot(f_int n, f_float *x, f_int incx, f_float *y, f_int incy) {
-    return sdot_(&n, x, &incx, y, &incy);
+float dot(f_int n, f_float *x, f_int incx, f_float *y, f_int incy) {
+    return cblas_sdot(n, x, incx, y, incy);
 }
 f_double dot(f_int n, f_double *x, f_int incx, f_double *y, f_int incy) {
     return ddot_(&n, x, &incx, y, &incy);
 }
 f_double ddot(f_int n, f_float *sx, f_int incx, f_float *sy, f_int incy) {
-    return dsdot_(&n, sx, &incx, sy, &incy);
+    return cblas_dsdot(n, sx, incx, sy, incy);
 }
 f_cfloat dotu(f_int n, f_cfloat *x, f_int incx, f_cfloat *y, f_int incy) {
     f_cfloat ret_val;
