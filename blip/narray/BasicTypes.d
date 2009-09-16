@@ -139,6 +139,7 @@ const int manualAllocThreshold=200*1024;
 /// guard object to deallocate large arrays that contain inner pointers
 class Guard{
     ubyte[] data;
+    size_t refCount; // used to guarantee collection when used with scope objects
     this(void[] data){
         this.data=cast(ubyte[])data;
     }
@@ -149,6 +150,18 @@ class Guard{
         ubyte* mData2=cast(ubyte*)GC.malloc(size,attr);
         if(mData2 is null) throw new Exception("malloc failed");
         data=mData2[0..size];
+        refCount=1;
+    }
+    void retain(){
+        assert(refCount>0,"refCount was 0 in retain...");
+        ++refCount;
+    }
+    void release(){
+        assert(refCount>0,"refCount was 0 in release...");
+        --refCount;
+        if (refCount==0){
+            delete(this);
+        }
     }
     ~this(){
         GC.free(data.ptr);
@@ -374,12 +387,16 @@ else {
             this.nElArray=sz;
             this.flags=calcBaseFlags(strides,shape)|(flags & Flags.ExtFlags);
             this.mBase=mBase;
+            Guard g=cast(Guard)mBase;
+            if (g !is null) g.retain;
         }
         
         ~this(){
-            if (flags&Flags.ShouldFreeData){
+            /+if (flags&Flags.ShouldFreeData){
                 GC.free(data.ptr);
-            }
+            }+/
+            Guard g=cast(Guard)mBase;
+            if (g !is null) g.release;
         }
         
         /// the preferred low level way to construct an object
@@ -1427,7 +1444,6 @@ else {
         /// elements using the standard C ordering??)
         int opCmp(NArray o) { 
             assert(0, "Comparison of arrays not allowed");
-            return 0; 
         }
 
         char[] toString(){
@@ -2267,6 +2283,21 @@ body {
     }
 }
 /+ ------------------------------------------------- +/
+/// rank of NArray for the given shape (for empty,zeros,ones)
+/// more flexible than member function, accepts int/long, int/long static array
+template rkOfShape(T){
+    static if(isStaticArrayType!(T)){
+        static assert(is(BaseTypeOfArrays!(T)==int)||is(BaseTypeOfArrays!(T)==uint)||
+            is(BaseTypeOfArrays!(T)==long)||is(BaseTypeOfArrays!(T)==ulong),
+            "only integer types supported as shape dimensions");
+        const int rkOfShape = cast(int)staticArraySize!(T);
+    } else {
+        static assert(is(T==int)||is(T==uint)||is(T==long)||is(T==ulong),
+            "only integer types (and static arrays of them) supported as dimensions");
+        const int rkOfShape = 1;
+    }
+}
+
 // array randomization (here because due to bug 2246 in the 
 // compiler the specialization of randomGenerate does not work,
 // and it uses the RandGen interface)
@@ -2283,9 +2314,13 @@ NArray!(T,rank) randomizeNArray(RandG,T,int rank)(RandG r,NArray!(T,rank)a){
     return a;
 }
 /// returns a random array of the given size with the given distribution
+/// this seems to triggers bugs in DMD
 template randomNArray(T){
     NArray!(T,rkOfShape!(S))randomNArray(RandG,S)(RandG r,S dim){
-        static if (ElementTypeOfArray!(S)==index_type){
+        static if (! isStaticArrayType!(S)){
+            index_type[1] mdim;
+            mdim[0]=cast(index_type)dim;
+        } else static if (is(ElementTypeOfArray!(S)==index_type)){
             alias dim mdim;
         } else {
             index_type[rkOfShape!(S)] mdim;

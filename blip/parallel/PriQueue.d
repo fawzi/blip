@@ -215,6 +215,7 @@ class PriQueue(T){
                 shouldLockZero=false;
             }
         }
+        return null;
     }
     /// description (for debugging)
     /// non threadsafe

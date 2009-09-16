@@ -183,20 +183,6 @@ body {
     return NArray!(T,1)(newstrides,newshape,a.startPtrArray,a.newFlags,a.newBase);
 }
 /+ --------- array creation ---------- +/
-/// rank of NArray for the given shape (for empty,zeros,ones)
-/// more flexible than member function, accepts int/long, int/long static array
-template rkOfShape(T){
-    static if(isStaticArrayType!(T)){
-        static assert(is(BaseTypeOfArrays!(T)==int)||is(BaseTypeOfArrays!(T)==uint)||
-            is(BaseTypeOfArrays!(T)==long)||is(BaseTypeOfArrays!(T)==ulong),
-            "only integer types supported as shape dimensions");
-        const int rkOfShape = cast(int)staticArraySize!(T);
-    } else {
-        static assert(is(T==int)||is(T==uint)||is(T==long)||is(T==ulong),
-            "only integer types (and static arrays of them) supported as dimensions");
-        const int rkOfShape = 1;
-    }
-}
 
 /// function to create free standing empty,zeros,ones
 char[] freeFunMixin(char[] opName){

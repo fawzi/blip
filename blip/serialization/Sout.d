@@ -1,4 +1,5 @@
 /// a serializer to Stdout
+/// author: fawzi
 module blip.serialization.Sout;
 import blip.serialization.JsonSerialization;
 import blip.serialization.SerializationBase;
