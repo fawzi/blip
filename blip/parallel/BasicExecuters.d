@@ -13,6 +13,10 @@ import blip.parallel.BasicTasks;
 import blip.parallel.PriQueue;
 import blip.BasicModels;
 
+static this(){
+    Log.lookup("blip.parallel.exec").level(Logger.Level.Warn,true);
+}
+
 class SExecuter:ExecuterI,TaskSchedulerI{
     /// logger for problems/info
     Logger log;

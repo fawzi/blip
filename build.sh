@@ -6,8 +6,16 @@ out=
 compiler=
 silent="-s"
 tests=1
+build_dir=
 if [ -z "$D_HOME" ] ; then
     D_HOME=$HOME
+fi
+if [ -n "`which gmake`" ] ; then
+    make="gmake"
+elif [ -n "`which gnumake`" ] ; then
+    make="gnumake"
+else
+    make="make"
 fi
 while [ $# -gt 0 ]
 do
@@ -44,6 +52,14 @@ do
             shift
             D_HOME=$1
             ;;
+	--make)
+	    shift
+            make="$1"
+	    ;;
+        --build-dir)
+            shift
+            build_dir="OBJDIRBASE=$1"
+            ;;
         --tango-home)
             shift
             TANGO_HOME=$1
@@ -61,7 +77,11 @@ done
 if [ -z "$TANGO_HOME" ] ; then
     TANGO_HOME=$D_HOME/tango
 fi
-
+if [ -z "$build_dir" ] ; then
+    if [ -n "$D_BUILD_DIR" ] ; then
+        build_dir=OBJDIRBASE="$D_BUILD_DIR"
+    fi
+fi
 if [ -z "$compiler" ]; then
     compiler=`$TANGO_HOME/build/tools/guessCompiler.sh --path $DC`
 fi
@@ -88,7 +108,7 @@ case `uname` in
   extra_libs_os="${linkFlag}-framework ${linkFlag}Accelerate ${linkFlag}-lz ${linkFlag}-lbz2"
   ;;
   Linux)
-  extra_libs_os="${linkFlag}-lgoto2 ${linkFlag}-ldl ${linkFlag}-lz ${linkFlag}-lbz2"
+  extra_libs_os="${linkFlag}-lgoto2 ${linkFlag}-ldl ${linkFlag}-lz ${linkFlag}-lbz2 ${linkFlag}-lg2c"
   ;;
   *)
   die "unknown platform, you need to set extra_libs_os"
@@ -106,15 +126,15 @@ case $version in
     echo "unknown version, guessing extra_libs"
     extra_libs="${linkFlag}-ltango-user-${compShort}-${version} $extra_libs_os $extra_libs_comp"
 esac
-
+makeFlags="$silent TANGO_HOME=$TANGO_HOME $build_dir"
 if [ -n "$clean" ]; then
-    make $silent distclean
+    $make $makeFlags distclean
 fi
 rm libblip-*
-make $silent EXTRA_LIBS="$extra_libs_opt" VERSION=opt lib
-make $silent EXTRA_LIBS="$extra_libs_dbg" VERSION=dbg lib
+$make $makeFlags EXTRA_LIBS="$extra_libs_opt" VERSION=opt lib
+$make $makeFlags EXTRA_LIBS="$extra_libs_dbg" VERSION=dbg lib
 if [ -n "$tests" ] ; then
-    make $silent EXTRA_LIBS="$extra_libs" VERSION=$version
+    $make $makeFlags EXTRA_LIBS="$extra_libs" VERSION=$version
 fi
 installDir=`dirname $compiler`/../lib
 echo "cp libblip-* $installDir"
