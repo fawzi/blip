@@ -320,8 +320,6 @@ body {
     } else {
         const char[] innerLoop=pLoopPtr(rank2,["b","t2"],
                 "*t2Ptr0 = scaleC*(*t2Ptr0)+scaleRes*(*aPtr0)*(*bPtr0);","j");
-        pragma(msg,pLoopPtr(rank1,["a","t1"],
-                      "t2.startPtrArray=t1Ptr0;\n"~innerLoop,"i"))
         mixin(pLoopPtr(rank1,["a","t1"],
                 "t2.startPtrArray=t1Ptr0;\n"~innerLoop,"i"));
     }
