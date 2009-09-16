@@ -96,11 +96,18 @@ V[K] addRandomEntriesToAA(V,K)(Rand r,V[K]a){
 private char[] valid_chars=
     "abcdefghijklmnopqrstuwxyzABCDEFGHIJKLMNOPQRSTUWXYZ0123456789_+-*%&/()=?!$`'\"\\[]{}<>.:;, \t\n";
 
+template NonStaticArray(T){
+  static if (isStaticArrayType!(T)){
+    alias typeof(T.dup) NonStaticArray;
+  }else{
+    alias T NonStaticArray;
+  }
+}
 /// utility method for random generation
 /// this is the main method, it checks things in the following order:
 /// static method with full interface, static methods with reduced interface,
 /// and finally template specialization of generateRandom
-T genRandom(T)(Rand r,int idx,ref int nEl, ref bool acceptable){
+NonStaticArray!(T) genRandom(T)(Rand r,int idx,ref int nEl, ref bool acceptable){
     static if (is(typeof(T.randomGenerate(r,idx,nEl,acceptable))==T)){
         return T.randomGenerate(r,idx,nEl,acceptable);
     } else static if (is(typeof(T.randomGenerate(r,acceptable))==T)){
@@ -145,7 +152,7 @@ T genRandom(T)(Rand r,int idx,ref int nEl, ref bool acceptable){
             ~" you should implement one of the static methods generateRandom, the RandGen interface or a specialization of generateRandom, unfortunately due to compiler limitations (or design choice) specializations external to this module are not picked up by this utility wrapper.");
     }
 }
-T genRandom2(T)(Rand r,ref T t,int idx,ref int nEl, ref bool acceptable){
+NonStaticArray!(T) genRandom2(T)(Rand r,ref T t,int idx,ref int nEl, ref bool acceptable){
     t=genRandom!(T)(r,idx,nEl,acceptable);
 }
 /// utility method for purely random generation

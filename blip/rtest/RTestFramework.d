@@ -8,6 +8,7 @@
 module blip.rtest.RTestFramework;
 import tango.math.random.Random: Random;
 public import blip.TemplateFu: nArgs,ctfe_i2a,ctfe_hasToken, ctfe_replaceToken;
+public import tango.core.Traits:isStaticArrayType;
 public import tango.io.stream.Format;
 import tango.io.Stdout: Stdout;
 public import tango.core.Variant:Variant;
@@ -55,6 +56,17 @@ char[] completeInitStr(S...)(char[] checks,char[] manualInit,char[] indent="    
     foreach (i,T;S){
         char[] argName="arg"~ctfe_i2a(i);
         if (!ctfe_hasToken(argName,manualInit)){
+            res~=indent1~"static if(isStaticArrayType!(S["~ctfe_i2a(i)~"])){\n";
+            res~=indent1~"static if(is(typeof(genRandom!(S["~ctfe_i2a(i)~"])(new Rand(),arg0_i,arg0_nEl,acceptable)))){\n";
+            res~=indent1~"    genRandom!(S["~ctfe_i2a(i)~"])(r,arg"~
+                ctfe_i2a(i)~"_i,arg"~ctfe_i2a(i)~"_nEl,acceptable);\n";
+            res~=indent1~"} else static if (is(typeof(generateRandom!(S["~ctfe_i2a(i)~"])(new Rand(),arg0_i,arg0_nEl,acceptable)))) {\n";
+            res~=indent1~"    generateRandom!(S["~ctfe_i2a(i)~"])(r,arg"~
+                ctfe_i2a(i)~"_i,arg"~ctfe_i2a(i)~"_nEl,acceptable);\n";
+            res~=indent1~"} else {\n";
+            res~=indent1~"    static assert(0,\""~T.stringof~" cannot be automatically generated, missing one of the generateRandom static methods or a T generateRandom(T:"~T.stringof~")(Rand r,int idx,ref int nEl, ref bool acceptable) specialization, see blip.rtest.BasicGenerators.\");\n";
+            res~=indent1~"}\n";
+            res~=indent1~"}else{\n";
             res~=indent1~"static if(is(typeof(genRandom!(S["~ctfe_i2a(i)~"])(new Rand(),arg0_i,arg0_nEl,acceptable)))){\n";
             res~=indent1~"    arg["~ctfe_i2a(i)~"]"~"=genRandom!(S["~ctfe_i2a(i)~"])(r,arg"~
                 ctfe_i2a(i)~"_i,arg"~ctfe_i2a(i)~"_nEl,acceptable);\n";
@@ -63,6 +75,7 @@ char[] completeInitStr(S...)(char[] checks,char[] manualInit,char[] indent="    
                 ctfe_i2a(i)~"_i,arg"~ctfe_i2a(i)~"_nEl,acceptable);\n";
             res~=indent1~"} else {\n";
             res~=indent1~"    static assert(0,\""~T.stringof~" cannot be automatically generated, missing one of the generateRandom static methods or a T generateRandom(T:"~T.stringof~")(Rand r,int idx,ref int nEl, ref bool acceptable) specialization, see blip.rtest.BasicGenerators.\");\n";
+            res~=indent1~"}\n";
             res~=indent1~"}\n";
             res~=indent1~"acceptableAll=acceptableAll && acceptable;\n";
         }

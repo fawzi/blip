@@ -190,11 +190,11 @@ int mainTestFun(char[][] argStr,SingleRTest testSuite){
     TextController.PrintLevel printLevel=TextController.PrintLevel.AllShort;
     
     args.bind("--","help",delegate void(){ help=true; });
-    args.bind("--","runs",delegate(char[] arg){ runs=to!(int)(arg); });
+    args.bind("--","runs",delegate(char[] arg){ runs=to!(int)(arg[1..$]); });
     args.bind("--","trace",delegate void(){ trace=true; });
-    args.bind("--","seed",delegate(char[] arg){ seed=arg.dup; });
-    args.bind("--","counter",delegate(char[] arg){ counter=parseIArray(arg); });
-    args.bind("--","test",delegate void(char[] arg){ test=arg.dup; });
+    args.bind("--","seed",delegate(char[] arg){ seed=arg[1..$].dup; });
+    args.bind("--","counter",delegate(char[] arg){ counter=parseIArray(arg[1..$]); });
+    args.bind("--","test",delegate void(char[] arg){ test=arg[1..$].dup; });
     args.bind("--","on-failure",delegate void(char[] arg){
         if (arg[0]=='=') arg=arg[1..$];
         switch(arg){

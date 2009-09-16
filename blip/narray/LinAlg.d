@@ -299,27 +299,31 @@ body {
         }+/
     }
     
-    auto t1=NArray(c.strides[rank1], c.shape[rank1],c.startPtrArray,
-        c.newFlags, c.mBase);
-    auto t2=NArray(c.strides[rank1..rank1+rank2], c.shape[rank1..rank1+rank2],
-        c.startPtrArray,c.newFlags, c.mBase);
+    index_type[rank1] t1Strides=c.bStrides[0..rank1];
+    auto t1=NArray!(S,rank1)(t1Strides,a.shape,c.startPtrArray,c.newFlags, c.mBase);
+    index_type[rank2] t2Strides=c.bStrides[rank1..rank1+rank2];
+    auto t2=NArray!(S,rank2)(t2Strides, b.shape,c.startPtrArray,c.newFlags, c.mBase);
+    index_type optimalChunkSize_i=NArray!(S,rank1).defaultOptimalChunkSize;
+    index_type optimalChunkSize_j=NArray!(S,rank2).defaultOptimalChunkSize;
     if (scaleC==0){
         if (scaleRes==1){
             const char[] innerLoop=pLoopPtr(rank2,["b","t2"],
                     "*t2Ptr0 = (*aPtr0)*(*bPtr0);","j");
             mixin(pLoopPtr(rank1,["a","t1"],
-                    "t2.startPtrArray=t1Ptr;\n"~innerLoop,"i"));
+                    "t2.startPtrArray=t1Ptr0;\n"~innerLoop,"i"));
         } else {
             const char[] innerLoop=pLoopPtr(rank2,["b","t2"],
                     "*t2Ptr0 = scaleRes*(*aPtr0)*(*bPtr0);","j");
             mixin(pLoopPtr(rank1,["a","t1"],
-                    "t2.startPtrArray=t1Ptr;\n"~innerLoop,"i"));
+                    "t2.startPtrArray=t1Ptr0;\n"~innerLoop,"i"));
         }
     } else {
         const char[] innerLoop=pLoopPtr(rank2,["b","t2"],
                 "*t2Ptr0 = scaleC*(*t2Ptr0)+scaleRes*(*aPtr0)*(*bPtr0);","j");
+        pragma(msg,pLoopPtr(rank1,["a","t1"],
+                      "t2.startPtrArray=t1Ptr0;\n"~innerLoop,"i"))
         mixin(pLoopPtr(rank1,["a","t1"],
-                "t2.startPtrArray=t1Ptr;\n"~innerLoop,"i"));
+                "t2.startPtrArray=t1Ptr0;\n"~innerLoop,"i"));
     }
     return c;
 }
@@ -338,8 +342,19 @@ body {
     } else {
         auto res=NArray!(S,rank3).empty(newshape);
     }
-    return outer!(T,rank1,U,rank2,S,rank3)(a,b,res,cast(S)1,cast(S)0,axis1,axis2);
+    return outer!(T,rank1,U,rank2,S,rank3)(a,b,res,cast(S)1,cast(S)0);
 }
+
+/// degenerate case v s
+NArray!(T,rank1)outer(T,int rank1)(NArray!(T,rank1) a,T b){
+  return a*b;
+}
+/// degenerate case s v
+NArray!(T,rank1)outer(int rank1,T)(T b,NArray!(T,rank1) a){
+  return a*b;
+}
+// scalar scalar case cannot be cleanly supported with D1 as far as can I see 
+// (and also the previous cases are limited)
 
 /// structure to request a subrange of eigenvalues
 struct EigRange{
