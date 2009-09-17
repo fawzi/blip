@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-version=opt
+version=dbg
 clean=1
 relink=
 out=
@@ -131,11 +131,13 @@ if [ -n "$clean" ]; then
     $make $makeFlags distclean
 fi
 rm libblip-*
-$make $makeFlags EXTRA_LIBS="$extra_libs_opt" VERSION=opt lib
-$make $makeFlags EXTRA_LIBS="$extra_libs_dbg" VERSION=dbg lib
+$make $makeFlags EXTRA_LIBS="$extra_libs_opt" VERSION=opt lib || die "error building the opt version"
+$make $makeFlags EXTRA_LIBS="$extra_libs_dbg" VERSION=dbg lib || die "error building the dbg version"
 if [ -n "$tests" ] ; then
-    $make $makeFlags EXTRA_LIBS="$extra_libs" VERSION=$version
+    $make $makeFlags EXTRA_LIBS="$extra_libs" VERSION=$version || die "error building the tests"
 fi
 installDir=`dirname $compiler`/../lib
-echo "cp libblip-* $installDir"
-cp libblip-* $installDir
+for l in libblip-* ; do
+    echo "$l -> $installDir"
+    cp $l $installDir
+done

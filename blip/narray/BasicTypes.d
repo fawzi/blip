@@ -48,6 +48,7 @@ import blip.rtest.RTest;
 import blip.BasicModels;
 import blip.serialization.Serialization;
 import blip.text.Stringify;
+import tango.core.sync.Atomic;
 //import tango.io.Stdout;
 
 /// flags for fast checking of 
@@ -59,8 +60,6 @@ enum ArrayFlags {
     /// Fortran-style contiguous means that a lineat scan of
     /// data with stride 1 with a (transpose of Contiguous).
     Fortran      = 0x2,
-    /// If this flag is set this array frees its data in the destructor.
-    ShouldFreeData      = 0x4,
     /// if the array is "compact" and data=startPtr[0..size]
     /// Contiguous|Fortran implies Compact1
     Compact1      = 0x8,
@@ -76,8 +75,8 @@ enum ArrayFlags {
     /// if the array has size 0
     Zero         = 0x80,
     /// flags that the user can set (the other are automatically calculated)
-    ExtFlags = ShouldFreeData | ReadOnly,
-    All = Contiguous | Fortran | ShouldFreeData | Compact1 | Compact2 | Small | Large| ReadOnly| Zero, // useful ??
+    ExtFlags = ReadOnly,
+    All = Contiguous | Fortran | Compact1 | Compact2 | Small | Large| ReadOnly| Zero, // useful ??
     None = 0
 }
 
@@ -137,34 +136,48 @@ template reductionFactor(T,S...){
 const int manualAllocThreshold=200*1024;
 
 /// guard object to deallocate large arrays that contain inner pointers
+///
+/// to use ref counting this has to be long lived memory (i.e. survive until 
+/// all finalizers of the current sweep have been run), which is not yet implemented in tango
+/// as some finalizer on half filled pages will be run later...
 class Guard{
-    ubyte[] data;
+    void *dataPtr;
+    size_t dataDim; // just informative, remove?
     size_t refCount; // used to guarantee collection when used with scope objects
     this(void[] data){
-        this.data=cast(ubyte[])data;
+        this.dataPtr=cast(void*)data.ptr;
+        this.dataDim=data.length;
     }
     this(size_t size,bool scanPtr=false){
         GC.BlkAttr attr;
         if (!scanPtr)
             attr=GC.BlkAttr.NO_SCAN;
-        ubyte* mData2=cast(ubyte*)GC.malloc(size,attr);
-        if(mData2 is null) throw new Exception("malloc failed");
-        data=mData2[0..size];
+        dataPtr=cast(void*)GC.malloc(size,attr);
+        if(dataPtr is null && size!=0) throw new Exception("malloc failed");
+        dataDim=size;
         refCount=1;
     }
-    void retain(){
-        assert(refCount>0,"refCount was 0 in retain...");
-        ++refCount;
-    }
-    void release(){
-        assert(refCount>0,"refCount was 0 in release...");
-        --refCount;
-        if (refCount==0){
-            delete(this);
+    version(RefCount){
+        // warning see note about ref counting
+        void retain(){
+            assert(refCount>0,"refCount was 0 in retain...");
+            atomicAdd(refCount,cast(size_t)1);
+        }
+        void release(){
+            assert(refCount>0,"refCount was 0 in release...");
+            if (atomicAdd(refCount,-cast(size_t)1)==cast(size_t)1){
+                free();
+            }
         }
     }
     ~this(){
-        GC.free(data.ptr);
+        free();
+    }
+    void free(){
+        void *d=atomicSwap(dataPtr,null);
+        if (d !is null) {
+            GC.free(dataPtr);
+        }
     }
 }
 
@@ -190,7 +203,7 @@ else {
         /// flags to quickly check properties of the array
         uint flags = Flags.None;
         /// owner of the data if it is manually managed
-        void *mBase = null;
+        Guard mBase = null;
         alias V dtype;
         alias ArrayFlags Flags;
         /// the underlying data slice
@@ -339,10 +352,9 @@ else {
         /// constructor using an array storage, preferred over the pointer based,
         /// as it does some checks more, still it is quite lowlevel, you are
         /// supposed to create arrays with higher level functions (empty,zeros,ones,...)
-        /// the data will be freed if flags & Flags.ShouldFreeData, flags not in
-        /// Flags.ExtFlags are ignored
+        /// flags not in Flags.ExtFlags are ignored
         this(index_type[rank] strides, index_type[rank] shape, index_type startIdx,
-            V[] data, uint flags, void *mBase=null)
+            V[] data, uint flags, Guard mBase=null)
         in {
             index_type minIndex=startIdx,maxIndex=startIdx,size=1;
             for (int i=0;i<rank;i++){
@@ -359,17 +371,13 @@ else {
                 assert(minIndex>=0,"minimum real internal index negative in NArray construction");
                 assert(maxIndex<data.length*cast(index_type)V.sizeof,"data array too small in NArray construction");
             }
-            if (flags&Flags.ShouldFreeData && data !is null){
-                assert(minIndex==0,"ShouldFreeData with array not starting at beginning of data");
-            }
         }
         body { this(strides,shape,data.ptr+startIdx,flags,mBase); }
         
         /// this is the designated constructor, it is quite lowlevel and you are
         /// supposed to create arrays with higher level functions (empty,zeros,ones,...)
-        /// the data will be freed if flags & Flags.ShouldFreeData, flags not in
-        /// Flags.ExtFlags are ignored
-        this(index_type[rank] strides, index_type[rank] shape, V* startPtr, uint flags, void *mBase=null)
+        /// flags not in Flags.ExtFlags are ignored
+        this(index_type[rank] strides, index_type[rank] shape, V* startPtr, uint flags, Guard mBase=null)
         in{
             index_type sz=1;
             for (int i=0;i<rank;++i){
@@ -387,16 +395,18 @@ else {
             this.nElArray=sz;
             this.flags=calcBaseFlags(strides,shape)|(flags & Flags.ExtFlags);
             this.mBase=mBase;
-            Guard g=cast(Guard)mBase;
-            if (g !is null) g.retain;
+            version(RefCount){
+                if (mBase !is null) mBase.retain;
+            }
         }
         
         ~this(){
-            /+if (flags&Flags.ShouldFreeData){
-                GC.free(data.ptr);
-            }+/
-            Guard g=cast(Guard)mBase;
-            if (g !is null) g.release;
+            version(RefCount){
+                if (mBase !is null) {
+                    mBase.release;
+                    mBase=null;
+                }
+            }
         }
         
         /// the preferred low level way to construct an object
@@ -404,7 +414,7 @@ else {
         /// this should be used over the constructor because it would ease the transition to a struct
         /// should it be done
         static NArray opCall(index_type[rank] strides, index_type[rank] shape, index_type startIdx,
-            V[] data, uint flags, void* mBase=null){
+            V[] data, uint flags, Guard mBase=null){
             return new NArray(strides,shape,startIdx,data,flags,mBase);
         }
 
@@ -412,7 +422,7 @@ else {
         /// this should be used over the constructor because it would ease the transition to a struct
         /// should it be done
         static NArray opCall(index_type[rank] strides, index_type[rank] shape, 
-            V*startPtr, uint flags, void* mBase=null){
+            V*startPtr, uint flags, Guard mBase=null){
             return new NArray(strides,shape,startPtr,flags,mBase);
         }
                     
@@ -423,13 +433,11 @@ else {
                 size*=sz;
             uint flags=ArrayFlags.None;
             V[] mData;
-            void *mBase;
+            Guard guard;
             if (size>manualAllocThreshold/cast(index_type)V.sizeof) {
-                auto guard=new Guard(size*V.sizeof,(typeid(V).flags & 2)!=0);
-                V* mData2=cast(V*)guard.data.ptr;
+                guard=new Guard(size*V.sizeof,(typeid(V).flags & 2)!=0);
+                V* mData2=cast(V*)guard.dataPtr;
                 mData=mData2[0..size];
-                mBase=cast(void*)guard;
-                //flags=ArrayFlags.ShouldFreeData;
             } else {
                 mData=new V[size];
             }
@@ -447,7 +455,9 @@ else {
                     sz *= d;
                 }
             }
-            return NArray(strides,shape,cast(index_type)0,mData,flags,mBase);
+            auto res=NArray(strides,shape,cast(index_type)0,mData,flags,guard);
+            version(RefCount) if (guard !is null) guard.release;
+            return res;
         }
         /// returns an array initialized to 0 of the requested shape
         static NArray zeros(index_type[rank] shape, bool fortran=false){
@@ -1496,7 +1506,6 @@ else {
             if (flags&Flags.Compact2) s("|Compact2");
             if (flags&Flags.Small) s("|Small");
             if (flags&Flags.Large) s("|Large");
-            if (flags&Flags.ShouldFreeData) s("|ShouldFreeData");
             if (flags&Flags.ReadOnly) s("|ReadOnly");
             s(",").newline;
             s("  data: <array<")(V.stringof)("> @:")(startPtrArray)(", #:")(nElArray)(",").newline;
@@ -1506,18 +1515,13 @@ else {
         }
         
         /// returns the base for an array that is a view of the current array
-        void *newBase(){
-            void *res=mBase;
-            /+if (flags&Flags.ShouldFreeData){
-                assert(mBase is null,"if this array is the owner of the data it should not have base arrays");
-                res=cast(void *)&this;
-            }+/
-            return res;
+        Guard newBase(){
+            return mBase;
         }
         
         /// returns the flags for an array derived from the current one
         uint newFlags(){
-            return flags&~Flags.ShouldFreeData; // &Flags.ExtFlags ???
+            return flags; // &Flags.ExtFlags ???
         }
         
         /// increments a static index array, return true if it did wrap
@@ -1774,16 +1778,22 @@ else {
             s.field(metaI[0],shp);
             if (shp.length>0) {
                 shape[]=shp;
-                mBase=cast(void*)empty(shape,false);
+                scope tmp=empty(shape,false);
+                this.shape[] = tmp.shape;
+                this.bStrides[] = tmp.bStrides;
+                this.startPtrArray=tmp.startPtrArray;
+                this.nElArray=tmp.nElArray;
+                this.flags=tmp.flags;
+                this.mBase=tmp.mBase;
+                version(RefCount) if (this.mBase !is null) this.mBase.retain;
             }
             void getData()
             {
-                if (mBase is null) {
+                if (flags == 0) {
                     s.serializationError("cannot read data before knowing shape",__FILE__,__LINE__);
                 }
-                NArray a=cast(NArray)cast(Object)mBase;
                 auto ac=s.readArrayStart(null);
-                mixin(sLoopPtr(rank,["a"],`if (!s.readArrayEl(ac,{ s.field(cast(FieldMetaInfo*)null, *aPtr0); } )) s.serializationError("unexpected number of elements",__FILE__,`~ctfe_i2a(__LINE__)~`);`,"i"));
+                mixin(sLoopPtr(rank,[""],`if (!s.readArrayEl(ac,{ s.field(cast(FieldMetaInfo*)null, *Ptr0); } )) s.serializationError("unexpected number of elements",__FILE__,`~ctfe_i2a(__LINE__)~`);`,"i"));
                 V dummy;
                 if (s.readArrayEl(ac,{ s.field(cast(FieldMetaInfo*)null, dummy); } ))
                     s.serializationError("unexpected extra elements",__FILE__,__LINE__);
@@ -1801,9 +1811,7 @@ else {
         /// or replace to unserialized object (for things that must be unique)
         /// guaranteed to be called if preSerialize ended sucessfully
         typeof(this) postUnserialize(Unserializer s){
-            auto res=cast(NArray)cast(Object)mBase;
-            mBase=null; // could also delete this...
-            return res;
+            return this;
         }
     } // end NArray class
 }// end static if

@@ -155,17 +155,16 @@ NArray!(T,newRank) reshape(T,int rank,S,int newRank)(NArray!(T,rank) a,S[newRank
             return NArray!(T,newRank)(newstrides,ns,a.startPtrArray,a.newFlags,a.newBase);
         } else {
             // copy data to contiguous mem first.
-            NArray!(T,rank) cpy = a.dup();
+            scope NArray!(T,rank) cpy = a.dup();
             T* newData=cpy.startPtrArray;
             uint newF=cpy.flags;
-            // Steal new array's data (do as with slices without really stealing the data?)
-            cpy.startPtrArray = null;
-            return NArray!(T,newRank)(newstrides,ns,newData,newF);
+            auto res=NArray!(T,newRank)(newstrides,ns,newData,newF,cpy.mBase);
+            return res;
         }
     }
 }
 
-/// returns a flattened view of the array, copyes if the array is not Contiguos
+/// returns a flattened view of the array, copies if the array is not Contiguos
 NArray!(T,1) ravel(T,int rank)(NArray!(T,rank)a){
     return reshape(a,[-1]);
 }
@@ -290,7 +289,9 @@ NArray!(T,1)a2NA2(T)(T[] arr,bool shouldFree=false){
     uint flags=ArrayFlags.None;
     Guard guard;
     if (shouldFree) guard=new Guard(arr);
-    return NArray!(T,1)([cast(index_type)T.sizeof],[cast(index_type)arr.length],0,arr,flags,cast(void*)guard);
+    auto res=NArray!(T,1)([cast(index_type)T.sizeof],[cast(index_type)arr.length],0,arr,flags,guard);
+    version(RefCount) if (shouldFree) guard.release;
+    return res;
 }
 
 /// returns a into shape the shape of the nested D array T (for a2NA)
@@ -649,7 +650,8 @@ body {
     uint newflags=ArrayFlags.None;
     Guard guard;
     if (manualAlloc) guard=new Guard(resA);
-    return NArray!(T,1)(newstrides,newshape,0,resA,newflags,cast(void*)guard);
+    return NArray!(T,1)(newstrides,newshape,0,resA,newflags,guard);
+    version(RefCount) if (manualAlloc) guard.release;
 }
 
 /// writes back the data to an array in the places where mask is true.
