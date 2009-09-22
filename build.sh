@@ -7,6 +7,12 @@ compiler=
 silent="-s"
 tests=1
 build_dir=
+
+die() {
+    echo "$1"
+    exit $2
+}
+
 if [ -z "$D_HOME" ] ; then
     D_HOME=$HOME
 fi
@@ -52,10 +58,10 @@ do
             shift
             D_HOME=$1
             ;;
-	--make)
-	    shift
+        --make)
+            shift
             make="$1"
-	    ;;
+            ;;
         --build-dir)
             shift
             build_dir="OBJDIRBASE=$1"
