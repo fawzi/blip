@@ -72,13 +72,13 @@
 			<key>filename</key>
 			<string>Makefile</string>
 			<key>lastUsed</key>
-			<date>2009-09-10T09:26:07Z</date>
+			<date>2009-09-18T19:45:46Z</date>
 		</dict>
 		<dict>
 			<key>filename</key>
 			<string>testNArray.d</string>
 			<key>lastUsed</key>
-			<date>2009-09-10T09:26:05Z</date>
+			<date>2009-09-18T19:45:43Z</date>
 		</dict>
 		<dict>
 			<key>filename</key>
@@ -87,6 +87,10 @@
 		<dict>
 			<key>filename</key>
 			<string>INSTALL.txt</string>
+		</dict>
+		<dict>
+			<key>filename</key>
+			<string>build.sh</string>
 			<key>selected</key>
 			<true/>
 		</dict>
@@ -98,6 +102,6 @@
 	<key>showFileHierarchyDrawer</key>
 	<true/>
 	<key>windowFrame</key>
-	<string>{{32, 0}, {805, 778}}</string>
+	<string>{{223, 11}, {696, 767}}</string>
 </dict>
 </plist>
