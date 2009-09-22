@@ -6,7 +6,7 @@
 #include "SimpleProtocol.h"
 
 void *handleConnection(void* sockT){
-    socket_t sock=(socket_t)sockT;
+    socket_t sock=(socket_t)(ssize_t)sockT;
     int err;
     while(1){
         uint32_t kind;
@@ -170,7 +170,7 @@ int main(int argc,char*argv[]){
             printf("thread_attr detach error\n");
             return 7;
         }
-        if (pthread_create(&new_t,&t_attr,&handleConnection,(void *)newSock)){
+        if (pthread_create(&new_t,&t_attr,&handleConnection,(void *)(ssize_t)newSock)){
             printf("error creating thread\n");
             return 8;
         }

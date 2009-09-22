@@ -13,6 +13,7 @@
 #include <stdint.h>
 #include <errno.h>
 #include "SimpleProtocol.h"
+//#include <unistd.h>
 
 enum SBP_SIZES{
     max_listening_sockets=10,
@@ -1142,7 +1143,7 @@ void sbpclose__(int *ierr,socket_t *sock,int *what){
 /// returns 1 if addrStr could not be fully initialized (either due to a lookup error 
 /// or because it was too small)
 int sbpAccept32(socket_t sock,socket_t *newSock,char*addrStr,uint32_t *addrStrLen){
-    struct fd_set readSock;
+    fd_set readSock;
     struct sbp_listening_sockets *lS;
     *newSock=-1;
     for (lS=sbpListeningSockets;lS;lS->next){
@@ -1155,7 +1156,7 @@ int sbpAccept32(socket_t sock,socket_t *newSock,char*addrStr,uint32_t *addrStrLe
     }
     while (1){
         int nSock,ndesc,ierr=0;
-        FD_COPY(&(lS->selectSet),&readSock);
+        memcpy(&readSock,&(lS->selectSet),sizeof(readSock)); // linux does not define FD_COPY
         ndesc=select(lS->maxDesc+1, &readSock, NULL, NULL, NULL);
         if (ndesc<0){
             if (errno!=EINTR){
@@ -1179,7 +1180,7 @@ int sbpAccept32(socket_t sock,socket_t *newSock,char*addrStr,uint32_t *addrStrLe
                         perror("SBP accepting socket");
                         return 33;
                     }
-                    if (getnameinfo(&address, address.sa_len, addrStr, addrStrLen2, &serviceBuf[0],
+                    if (getnameinfo(&address, addrLen, addrStr, addrStrLen2, &serviceBuf[0],
                         (socklen_t)sizeof(serviceBuf), 0))
                     {
                         addrStr[0]=0;
