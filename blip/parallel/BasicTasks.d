@@ -14,100 +14,68 @@ import blip.TemplateFu:ctfe_i2a;
 import blip.parallel.Models;
 import blip.BasicModels;
 import blip.container.Pool;
-size_t defaultFiberSize=1024*1024; // a largish (1MB) stack
+import tango.core.sync.Atomic;
+import blip.container.FiberPool;
 
-class FiberPoolT(int batchSize=16):Pool!(Fiber,batchSize){
-    size_t stackSize;
-    static void dummyF(){}
-    
-    this(size_t stackSize=defaultFiberSize,size_t bufferSpace=8*batchSize,
-        size_t maxEl=16*batchSize){
-        super(bufferSpace,maxEl);
-        this.stackSize=stackSize;
-    }
-    
-    override Fiber clear(Fiber f){
-        if (f !is null){
-            if (f.stackSize==stackSize){
-                f.clear();
-                return f;
-            }
-            delete f;
-        }
-        return null;
-    }
-    
-    override Fiber reset(Fiber f){
-        return f;
-    }
-    
-    override Fiber allocateNew(){
-        return new Fiber(stackSize);
-    }
-    
-    Fiber getObj(void function() f){
-//        return new Fiber(f,defaultFiberSize);
-        auto res=super.getObj();
-        res.reset(f);
-        return res;
-    }
-    Fiber getObj(void delegate() f){
-//        return new Fiber(f,defaultFiberSize);
-        auto res=super.getObj();
-        res.reset(f);
-        return res;
-    }
+enum TaskFlags:uint{
+    None=0, // no flags
+    NoSpawn=1, // the task will not spawn other tasks
+    NoYield=2, // the task will not yield
+    TaskSet=4, // the task is basically just a collection of other tasks
+    Pin=8,    // the task should be pinned (i.e. cannot be stealed)
+    HoldTasks=16, // tasks are holded
+    FiberPoolTransfer=32, // the fiber pool is transferred to subtasks
+    Resubmit=64, // the task should be resubmitted
 }
-alias FiberPoolT!() FiberPool;
 
 class TaskPoolT(int batchSize=16):Pool!(Task,batchSize){
     this(size_t bufferSpace=8*batchSize, size_t maxEl=16*batchSize){
         super(bufferSpace,maxEl);
     }
-    Task getObj(char[] name, void delegate() taskOp,bool mightSpawn=true){
+    Task getObj(char[] name, void delegate() taskOp,TaskFlags f=TaskFlags.None){
         auto res=super.getObj();
         res.reset(name,taskOp,cast(Fiber)null,cast(bool delegate())null,
-            cast(TaskI delegate())null, mightSpawn);
+            cast(TaskI delegate())null, f);
         return res;
     }
     /// constructor with a possibly yieldable call
-    Task getObj(char[] name, YieldableCall c,bool mightSpawn=true){
+    Task getObj(char[] name, YieldableCall c){
         auto res=super.getObj();
-        res.reset(name,c,mightSpawn);
+        res.reset(name,c);
         return res;
     }
     /// constructor (with fiber)
-    Task getObj(char[] name,Fiber fiber,bool mightSpawn=true){
+    Task getObj(char[] name,Fiber fiber,TaskFlags f=TaskFlags.None){
         auto res=super.getObj();
         res.reset(name,&res.runFiber,fiber,cast(bool delegate())null,
-            cast(TaskI delegate())null, mightSpawn);
+            cast(TaskI delegate())null, f);
         return res;
     }
     /// constructor (with generator)
-    Task getObj(char[] name, bool delegate() generator,bool mightSpawn=true){
+    Task getObj(char[] name, bool delegate() generator,TaskFlags f=TaskFlags.None){
         auto res=super.getObj();
         res.reset(name,&res.runGenerator,cast(Fiber)null,generator,
-            cast(TaskI delegate())null, mightSpawn);
+            cast(TaskI delegate())null, f);
         return res;
     }
     /// constructor (with generator)
-    Task getObj(char[] name, TaskI delegate() generator2,bool mightSpawn=true){
+    Task getObj(char[] name, TaskI delegate() generator2,TaskFlags f=TaskFlags.None){
         auto res=super.getObj();
         res.reset(name,&res.runGenerator2,cast(Fiber)null,cast(bool delegate())null,
-        generator2, mightSpawn);
+        generator2, f);
         return res;
     }
     /// general constructor
     Task getObj(char[] name, void delegate() taskOp,Fiber fiber,
-        bool delegate() generator,TaskI delegate() generator2, bool mightSpawn=true, FiberPool fPool=null){
+        bool delegate() generator,TaskI delegate() generator2, TaskFlags f=TaskFlags.None, FiberPool fPool=null){
         auto res=super.getObj();
-        res.reset(name,taskOp,fiber,generator,generator2,mightSpawn,fPool);
+        res.reset(name,taskOp,fiber,generator,generator2,f,fPool);
         return res;
     }
 }
 
 alias TaskPoolT!(16) TaskPool;
-
+// to do: this should be solved with a number of pools limited by the number of cpus or even sockets
 class SchedulerPools{
     FiberPool fiberPool;
     TaskPool taskPool;
@@ -117,16 +85,16 @@ class SchedulerPools{
             this.fiberPool=new FiberPool(defaultFiberSize);
         }
         this.taskPool=taskPool;
-        if (taskPool is null){
-            taskPool=new TaskPool();
+        if (this.taskPool is null){
+            this.taskPool=new TaskPool();
         }
     }
 }
-SchedulerPools __schedulerPools;
+SchedulerPools __schedulerPools; // to remove
 ThreadLocal!(SchedulerPools) _schedulerPools;
 
 static this(){
-    __schedulerPools=new SchedulerPools();
+    __schedulerPools=new SchedulerPools(); // to remove
     _schedulerPools=new ThreadLocal!(SchedulerPools)(null);
 }
 
@@ -155,13 +123,13 @@ FiberPool defaultFiberPool(FiberPool fPool=null){
 struct YieldableCall{
     void delegate() dlg;
     FiberPool fPool;
-    bool mightYield;
-    static YieldableCall opCall(void delegate() dlg,bool mightYield=true,
+    TaskFlags flags;
+    static YieldableCall opCall(void delegate() dlg,TaskFlags f=TaskFlags.None,
         FiberPool fiberPool=null){
         YieldableCall res;
         res.dlg=dlg;
         res.fPool=fiberPool;
-        res.mightYield=mightYield;
+        res.flags=f;
         return res;
     }
     /// returns a new fiber that performs the call
@@ -169,7 +137,6 @@ struct YieldableCall{
         return defaultFiberPool(fPool).getObj(this.dlg);
     }
 }
-
 
 /// level of simple tasks, tasks with ths level or higher should not spawn
 /// other tasks. Tasks with higher level are tasks (like communication) that
@@ -190,25 +157,47 @@ static this(){
 class Task:TaskI{
     int _level; /// priority level of the task, the higher the better
     TaskStatus _status; /// execution status of the task
+    
     void delegate() taskOp; /// task to execute
     bool delegate() generator; /// generator to run
     TaskI delegate() generator2; /// generator to run
+    
     Fiber fiber; /// fiber to run
     FiberPool fPool; /// if non null allocates a fiber executing taskOp with the given stack (unless Sequential)
+    
     LinkedList!(void delegate()) onFinish; /// actions to execute sequentially at the end of the task
+    
     TaskI _superTask; /// super task of this task
-    char[] _taskName; /// name of the task
-    bool resubmit; /// if the task should be resubmitted
-    bool holdSubtasks; /// if subtasks should be kept on hold
-    TaskI[] holdedSubtasks; /// the subtasks on hold
+    char[] _taskName; /// name of the task (might be null, for debugging purposes)
+
+    TaskI[] holdedSubtasks; /// the subtasks on hold (debug, to remove)
+    
+    TaskFlags flags; /// various flags wrt. the task
+    int refCount; /// number of references to this task
     int spawnTasks; /// number of spawn tasks
     int finishedTasks; /// number of finished subtasks
-    Mutex taskLock; /// lock to update task numbers and status
+    version(NoTaskLock){ } else {
+        Mutex taskLock; /// lock to update task numbers and status (remove and use atomic ops)
+    }
     TaskSchedulerI _scheduler; /// scheduer of the current task
-    bool _mightSpawn; /// if the task might spawn other subtasks
-    bool _mightYield; /// if the task might be yielded
     Semaphore waitSem; /// lock to wait for task end
-    LinkedList!(Variant) variants; /// variants to help with full closures and gc
+
+    /// the task should be resubmitted
+    bool resubmit(){
+        return (flags & TaskFlags.Resubmit)!=0;
+    }
+    /// ditto
+    void resubmit(bool v){
+        flags=cast(TaskFlags)((flags & ~TaskFlags.Resubmit)|(v?TaskFlags.Resubmit:0));
+    }
+    /// if subtasks should be kept on hold
+    bool holdSubtasks() {
+        return (flags & TaskFlags.HoldTasks)!=0;
+    }
+    /// ditto
+    void holdSubtasks(bool v) {
+        flags=cast(TaskFlags)((flags & ~TaskFlags.HoldTasks)|(v?TaskFlags.HoldTasks:0));
+    }
     
     /// clears a task for reuse
     void clear(){
@@ -217,26 +206,24 @@ class Task:TaskI{
         _level=0;
         _status=TaskStatus.Finished;
         taskOp=null; generator=null; generator2=null;
-        if (fiber){
-            defaultFiberPool(fPool).giveBack(fiber);
+        if (fiber!is null && fPool!is null){
+            fPool.giveBack(fiber);
             fiber=null;
         }
         fPool=null;
         onFinish.clear();
         _superTask=null;
         _taskName=null;
-        resubmit=false;
-        holdSubtasks=false;
         holdedSubtasks=null;
         spawnTasks=0;
         finishedTasks=0;
+        refCount=1;
+        flags=TaskFlags.None;
         _scheduler=null;
-        _mightSpawn=false;
-        _mightYield=false;
-        variants.clear();
+        waitSem=null;
     }
     /// it the task might be yielded (i.e. if it is a fiber)
-    bool mightYield(){ return _mightYield && (fiber !is null); }
+    bool mightYield(){ return !(flags & TaskFlags.NoYield) && (fiber !is null); }
     /// return the name of this task
     char[] taskName(){ return _taskName; }
     /// returns the the status of the task
@@ -256,51 +243,80 @@ class Task:TaskI{
     /// sets the scheduler of this task
     void scheduler(TaskSchedulerI sched){ assert(status==TaskStatus.Building); _scheduler=sched; }
     /// it the task might spawn other tasks
-    bool mightSpawn() { return _mightSpawn; }
+    bool mightSpawn() { return !(flags & TaskFlags.NoSpawn); }
+
+    /// efficient allocation constructor (with single delegate)
+    static Task opCall(char[] name, void delegate() taskOp,TaskFlags f=TaskFlags.None){
+        auto tPool=defaultSchedulerPools().taskPool;
+        return tPool.getObj(name,taskOp,f);
+    }
+    /// efficient allocation constructor with a possibly yieldable call
+    static Task opCall(char[] name, YieldableCall c){
+        auto tPool=defaultSchedulerPools().taskPool;
+        return tPool.getObj(name,c);
+    }
+    /// efficient allocation constructor (with fiber)
+    static Task opCall(char[] name,Fiber fiber,TaskFlags f=TaskFlags.None){
+        auto tPool=defaultSchedulerPools().taskPool;
+        return tPool.getObj(name,fiber,f);
+    }
+    /// efficient allocation constructor (with generator)
+    static Task opCall(char[] name, bool delegate() generator,TaskFlags f=TaskFlags.None){
+        auto tPool=defaultSchedulerPools().taskPool;
+        return tPool.getObj(name,generator,f);
+    }
+    /// efficient allocation constructor (with generator)
+    static Task opCall(char[] name, TaskI delegate() generator2,TaskFlags f=TaskFlags.None){
+        auto tPool=defaultSchedulerPools().taskPool;
+        return tPool.getObj(name,generator2,f);
+    }
+    /// efficient allocation general constructor
+    static Task opCall(char[] name, void delegate() taskOp,Fiber fiber,
+        bool delegate() generator,TaskI delegate() generator2, TaskFlags f=TaskFlags.None, FiberPool fPool=null)
+    {
+        auto tPool=defaultSchedulerPools().taskPool;
+        return tPool.getObj(name,taskOp,fiber,generator,generator2,f,fPool);
+    }
+
     /// empty constructor, task will need to be reset before using
     this(){}
     /// constructor (with single delegate)
-    this(char[] name, void delegate() taskOp,bool mightSpawn=true){
+    this(char[] name, void delegate() taskOp,TaskFlags f=TaskFlags.None){
         reset(name,taskOp,cast(Fiber)null,cast(bool delegate())null,
-            cast(TaskI delegate())null, mightSpawn);
+            cast(TaskI delegate())null, f);
     }
     /// constructor with a possibly yieldable call
-    this(char[] name, YieldableCall c,bool mightSpawn=true){
-        reset(name,c,mightSpawn);
+    this(char[] name, YieldableCall c){
+        reset(name,c);
     }
-    void reset(char[] name, YieldableCall c,bool mightSpawn=true){
-        if (! c.mightYield){
-            reset(name,c.dlg,cast(Fiber)null,cast(bool delegate())null,
-                cast(TaskI delegate())null, mightSpawn);
-        } else {
-            reset(name,c.dlg,cast(Fiber)null,cast(bool delegate())null,
-                cast(TaskI delegate())null, mightSpawn, defaultFiberPool(c.fPool));
-            this._mightYield=c.mightYield;
-        }
+    void reset(char[] name, YieldableCall c){
+        reset(name,c.dlg,cast(Fiber)null,cast(bool delegate())null,
+            cast(TaskI delegate())null, c.flags, c.fPool);
     }
     /// constructor (with fiber)
-    this(char[] name,Fiber fiber,bool mightSpawn=true){
+    this(char[] name,Fiber fiber,TaskFlags f=TaskFlags.None){
         reset(name,&runFiber,fiber,cast(bool delegate())null,
-            cast(TaskI delegate())null, mightSpawn);
+            cast(TaskI delegate())null, f);
     }
     /// constructor (with generator)
-    this(char[] name, bool delegate() generator,bool mightSpawn=true){
+    this(char[] name, bool delegate() generator,TaskFlags f=TaskFlags.None){
         reset(name,&runGenerator,cast(Fiber)null,generator,
-            cast(TaskI delegate())null, mightSpawn);
+            cast(TaskI delegate())null, f);
     }
     /// constructor (with generator)
-    this(char[] name, TaskI delegate() generator2,bool mightSpawn=true){
+    this(char[] name, TaskI delegate() generator2,TaskFlags f=TaskFlags.None){
         reset(name,&runGenerator2,cast(Fiber)null,cast(bool delegate())null,
-        generator2, mightSpawn);
+        generator2, f);
     }
     /// general constructor
     this(char[] name, void delegate() taskOp,Fiber fiber,
-        bool delegate() generator,TaskI delegate() generator2, bool mightSpawn=true, FiberPool fPool=null){
-        reset(name,taskOp,fiber,generator,generator2,mightSpawn,fPool);
+        bool delegate() generator,TaskI delegate() generator2, TaskFlags f=TaskFlags.None, FiberPool fPool=null){
+        reset(name,taskOp,fiber,generator,generator2,f,fPool);
     }
     void reset(char[] name, void delegate() taskOp,Fiber fiber,
-        bool delegate() generator,TaskI delegate() generator2, bool mightSpawn=true, FiberPool fPool=null){
+        bool delegate() generator,TaskI delegate() generator2, TaskFlags f=TaskFlags.None, FiberPool fPool=null){
         assert(taskOp !is null);
+        this._status=TaskStatus.Building;
         this.level=0;
         this._taskName=name;
         this.taskOp=taskOp;
@@ -312,16 +328,17 @@ class Task:TaskI{
         this.resubmit=false;
         this.holdSubtasks=false;
         this.holdedSubtasks=[];
-        this.taskLock=new Mutex();
+        version(NoTaskLock){} else {
+            this.taskLock=new Mutex();
+        }
+        this.refCount=1;
         this.status=TaskStatus.Building;
         this.spawnTasks=0;
         this.finishedTasks=0;
-        this._mightSpawn=mightSpawn;
-        this.variants=new LinkedList!(Variant)();
-        this._mightYield=fiber !is null;
+        this.flags=f;
         this.fPool=fPool;
     }
-    /// has value for tasks
+    /// hash value for tasks
     uint getHash(){
         return cast(uint)(cast(void*)this);
     }
@@ -337,12 +354,18 @@ class Task:TaskI{
     void execute(bool sequential=false){
         if (status==TaskStatus.NonStarted){
             if (fiber is null && (! sequential) && (mightSpawn || fPool)) {
-                fiber=defaultFiberPool(fPool).getObj(taskOp);
+                fPool=defaultFiberPool(fPool);
+                fiber=fPool.getObj(taskOp);
                 taskOp=&runFiber;
             }
-            synchronized(taskLock) {
+            version(NoTaskLock){
                 assert(status==TaskStatus.NonStarted);
                 status=TaskStatus.Started;
+            } else {
+                synchronized(taskLock) {
+                    assert(status==TaskStatus.NonStarted);
+                    status=TaskStatus.Started;
+                }
             }
         }
         if (status==TaskStatus.Started){
@@ -368,10 +391,23 @@ class Task:TaskI{
         assert(status==TaskStatus.Started);
         status=TaskStatus.WaitingEnd;
         bool callOnFinish=false;
-        synchronized(taskLock){
-            if (status==TaskStatus.WaitingEnd && spawnTasks==finishedTasks){
-                status=TaskStatus.PostExec;
-                callOnFinish=true;
+        version(NoTaskLock){
+            volatile auto finishTaskAtt=finishTask;
+            volatile memoryBarrier!(true,false,false,false)(); // probably excessive
+            volatile auto spawnTasksAtt=spawnTasks;
+            volatile statusAtt=status;
+            if (status==TaskStatus.WaitingEnd){
+                if (spawnTasksAtt==finishTaskAtt){
+                    if (atomicCAS(status,TaskStatus.PostExec,statusAtt))
+                        callOnFinish=true;
+                }
+            }
+        } else {
+            synchronized(taskLock){
+                if (status==TaskStatus.WaitingEnd && spawnTasks==finishedTasks){
+                    status=TaskStatus.PostExec;
+                    callOnFinish=true;
+                }
             }
         }
         if (callOnFinish){
@@ -393,24 +429,53 @@ class Task:TaskI{
                     t();
                 }
             }
-            synchronized(taskLock){
+            version(NoTaskLock){
                 assert(status==TaskStatus.PostExec);
                 status=TaskStatus.Finished;
-                if (waitSem !is null) waitSem.notify();
+                volatile auto waitSemAtt=waitSem;
+                if (waitSemAtt !is null) waitSemAtt.notify();
+            } else {
+                synchronized(taskLock){
+                    assert(status==TaskStatus.PostExec);
+                    status=TaskStatus.Finished;
+                    if (waitSem !is null) waitSem.notify();
+                }
             }
         }
         if (superTask !is null){
             superTask.subtaskEnded(this);
         }
+        volatile auto refCountAtt=refCount;
+        if (refCountAtt==1){
+            if (this.classinfo == Task.classinfo){
+                auto tPool=defaultSchedulerPools().taskPool;
+                tPool.giveBack(this); // already returns the fiber
+            } else if (fiber !is null && fPool!is null){
+                fPool.giveBack(fiber);
+                fiber=null;
+            }
+        }
     }
     /// called when a subtasks has finished
     void subtaskEnded(TaskI st){
         bool callOnFinish=false;
-        synchronized(taskLock){
-            ++finishedTasks;
-            if (status==TaskStatus.WaitingEnd && spawnTasks==finishedTasks){
-                status=TaskStatus.PostExec;
-                callOnFinish=true;
+        version(NoTaskLock){
+            volatile auto oldTasks=flagAdd(finishedTasks,1);
+            volatile memoryBarrier!(true,false,false,false)();// probably excessive
+            volatile auto spawnTasksAtt=spawnTasks;
+            volatile auto statusAtt=status;
+            if (statusAtt==TaskStatus.WaitingEnd && spawnTasksAtt==oldTasks+1){
+                if (atomicCAS(statusAtt,TaskStatus.PostExec,statusAtt)){
+                    callOnFinish=true;
+                }
+            }
+        } else {
+            synchronized(taskLock){
+                ++finishedTasks;
+                if (status==TaskStatus.WaitingEnd && spawnTasks==finishedTasks){
+                    status=TaskStatus.PostExec;
+                    callOnFinish=true;
+                }
             }
         }
         if (callOnFinish){
@@ -419,8 +484,12 @@ class Task:TaskI{
     }
     /// called before spawning a new subtask
     void willSpawn(TaskI st){
-        synchronized(taskLock){
-            ++spawnTasks;
+        version(NoTaskLock){
+            flagAdd(spawnTasks,1); // probably atomicAdd would be sufficient...
+        } else {
+            synchronized(taskLock){
+                ++spawnTasks;
+            }
         }
     }
     /// operation that spawn the given task as subtask of this one
@@ -435,6 +504,11 @@ class Task:TaskI{
             task.level=task.level+level+1;
         } else {
             task.level=task.level+SimpleTaskLevel;
+        }
+        task.retain;
+        if ((flags & TaskFlags.FiberPoolTransfer)!=0 && fPool !is null && 
+            task.fiberPool(true) is null){
+            task.setFiberPool(fPool);
         }
         task.status=TaskStatus.NonStarted;
         willSpawn(task);
@@ -453,22 +527,42 @@ class Task:TaskI{
         }
         fiber.call;
         resubmit=(fiber.state!=Fiber.State.TERM);
+        if (resubmit && (flags & TaskFlags.TaskSet) && !scheduler.manyQueued()
+            && scheduler.executer.nSimpleTasksWanted()>1)
+        {
+            // to be smarter should store the cost and update it in willSpawn
+            fiber.call;
+            resubmit=(fiber.state!=Fiber.State.TERM);
+        }
     }
     /// runs the generator (can be used as taskOp)
     void runGenerator(){
         assert(generator!is null);
         resubmit=generator();
+        if (resubmit && !scheduler.manyQueued()
+            && scheduler.executer.nSimpleTasksWanted()>1) {
+                // to be smarter should store the cost and update it in willSpawn
+                resubmit=generator();
+        }
+        
     }
     /// runs a generator that returns a pointer to a task (can be used as taskOp)
     void runGenerator2(){
         assert(generator2!is null);
-        TaskI t=generator2();
-        if (t !is null) spawnTask(t);
-        resubmit=t !is null;
-    }
-    /// returns the number of variant
-    uint nVariants(){
-        return variants.size();
+        long subCost=0,maxCost=scheduler.executer.nSimpleTasksWanted();
+        do {
+            TaskI t=generator2();
+            resubmit=t !is null;
+            if (resubmit) {
+                if (t.mightSpawn) {
+                    subCost+=maxCost;
+                    if (maxCost>1) subCost-=1;
+                } else {
+                    subCost+=1;
+                }
+                spawnTask(t.autorelease);
+            }
+        } while (!scheduler.manyQueued() && subCost<maxCost)
     }
     
     // ------------------------ task setup ops -----------------------
@@ -476,12 +570,6 @@ class Task:TaskI{
     Task appendOnFinish(void delegate() onF) {
         assert(status==TaskStatus.Building,"appendOnFinish allowed only during task building"); // change?
         onFinish.append(onF);
-        return this;
-    }
-    /// adds a variant
-    Task appendVariant(Variant v) {
-        assert(status==TaskStatus.Building,"appendVariant allowed only during task building"); // change?
-        variants.append(v);
         return this;
     }
     /// changes the level of the task (before submittal)
@@ -492,18 +580,28 @@ class Task:TaskI{
     }
     /// holds all the tasks (can be called also when the task is running)
     Task holdSub(){
-        synchronized(taskLock){ // should not be needed
+        version(NoTaskLock){
             holdSubtasks=true;
+        } else {
+            synchronized(taskLock){ // should not be needed
+                holdSubtasks=true;
+            }
         }
         return this;
     }
     /// lets the holded tasks run (can be called also when the task is running)
     Task releaseSub(){
         TaskI[] tToRel;
-        synchronized(taskLock){ // should not be needed
+        version(NoTaskLock){
             holdSubtasks=false;
             tToRel=holdedSubtasks;
             holdedSubtasks=[];
+        } else {
+            synchronized(taskLock){ // should not be needed
+                holdSubtasks=false;
+                tToRel=holdedSubtasks;
+                holdedSubtasks=[];
+            }
         }
         foreach(t;tToRel){
             scheduler.addTask(t);
@@ -619,24 +717,38 @@ class Task:TaskI{
         s("  spawnTasks:")(spawnTasks)(",").newline;
         s("  finishedTasks:")(finishedTasks)(",").newline;
         writeDesc(s("  scheduler:"),scheduler,true)(",").newline;
-        bool lokD=taskLock.tryLock();
-        if (lokD) taskLock.unlock();
-        s("  taskLock:");
-        if (lokD)
-            s("locked by others");
-        else
-            s("unlocked by others");
-        s(",").newline;
+        version(NoTaskLock){} else {
+            bool lokD=taskLock.tryLock();
+            if (lokD) taskLock.unlock();
+            s("  taskLock:");
+            if (lokD)
+                s("locked by others");
+            else
+                s("unlocked by others");
+            s(",").newline;
+        }
         s("  mightSpawn:")(mightSpawn);
         return s;
     }
     /// waits for the task to finish
     void wait(){
         if (status!=TaskStatus.Finished && waitSem is null) {
-            synchronized(taskLock) {
-                 if (status!=TaskStatus.Finished && waitSem is null) {
-                     waitSem=new Semaphore();
-                 }
+            version(NoTaskLock){
+                volatile auto statusAtt=statusAtt;
+                if (statusAtt!=TaskStatus.Finished){
+                    if (waitSem is null){
+                        auto waitSemNew=new Semaphore();
+                        if (!atomicCAS(waitSem,waitSemNew,null)){
+                            delete waitSemNew;
+                        }
+                    }
+                }
+            } else {
+                synchronized(taskLock) {
+                     if (status!=TaskStatus.Finished && waitSem is null) {
+                         waitSem=new Semaphore();
+                     }
+                }
             }
         }
         if (status!=TaskStatus.Finished) {
@@ -645,12 +757,30 @@ class Task:TaskI{
             waitSem.notify();
         }
     }
+    
+    typeof(this) autorelease(){
+        assert(refCount>0,"invalid refCount in autorelease");
+        auto oldRefC=atomicAdd(refCount,-1);
+        return this;
+    }
+    void release(){
+        assert(refCount>0,"invalid refCount in release");
+        auto oldRefC=atomicAdd(refCount,-1);
+        /+if (oldRefC==0){
+            // does nothing (leave the work to the gc, as it might be too late to avoid collection)
+        }+/
+    }
+    typeof(this) retain(){
+        assert(refCount>=0,"invalid refCount in retain");
+        auto oldRefC=atomicAdd(refCount,1);
+        return this;
+    }
 }
 
 /// a task that does nothing
 class EmptyTask: Task{
-    this(char[] name="EmptyTask", bool mightSpawn=false){
-        super(name,&internalExe,mightSpawn);
+    this(char[] name="EmptyTask", TaskFlags f=TaskFlags.None){
+        super(name,&internalExe,f);
     }
     override void internalExe(){ }
 }
@@ -661,7 +791,7 @@ class RootTask: Task{
     Logger log;
     bool warnSpawn;
     this(TaskSchedulerI scheduler, int level=0, char[] name="RootTask", bool warnSpawn=false){
-        super(name,&internalExe,true);
+        super(name,&internalExe,TaskFlags.None);
         this.scheduler=scheduler;
         this.level=level;
         this.status=TaskStatus.Started;
@@ -679,75 +809,3 @@ class RootTask: Task{
     }
 }
 
-/// Task generators
-class TaskSet:Task{
-    long subCost;
-    /// constructor with a possibly yieldable call
-    this(char[] name, YieldableCall c,bool mightSpawn=true){
-        assert(c.mightYield,"TaskSet should generate tasks...");
-        super(name,c,mightSpawn);
-    }
-    this(char[] name, bool delegate() gen) {
-        super(name, gen, true);
-    }
-    this(char[] name, TaskI delegate() gen) {
-        super(name, gen, true);
-    }
-    this(char[] name, Fiber fib) {
-        super(name, fib, true);
-    }
-    
-    /// generates a subtasks (returns true if successful), does not resubmit itself
-    TaskI generate(){
-        TaskI res=null;
-        if (status==TaskStatus.NonStarted){
-            synchronized(taskLock) {
-                assert(status==TaskStatus.NonStarted);
-                status=TaskStatus.Started;
-            }
-        }
-        if (status==TaskStatus.Started){
-            {
-                scope(exit){
-                    taskAtt.val=noTask;
-                }
-                taskAtt.val=this;
-                res=internalGen();
-            }
-        }
-        return res;
-    }
-    /// generate a task and returns it (null if no tasks are left)
-    TaskI internalGen(){
-        TaskI res=null;
-        bool hold=!holdSubtasks;
-        if (hold) holdSub();
-        size_t nHolded=holdedSubtasks.length;
-        taskOp();
-        if (nHolded<holdedSubtasks.length){
-            assert(nHolded+1==holdedSubtasks.length,"generated more than one task");
-            res=holdedSubtasks[$];
-        }
-        if (hold) releaseSub();
-        if (!resubmit) {
-            startWaiting();
-        }
-        return res;
-    }
-    // generate nproc subtasks
-    override void internalExe(){
-        long maxCost=subCost+scheduler.executer.nSimpleTasksWanted();
-        do{
-            taskOp();
-            if (!resubmit) break;
-        } while (!scheduler.manyQueued() && subCost<maxCost)
-    }
-    override void willSpawn(TaskI t){
-        long cost=1;
-        if (cast(TaskSet)t || t.mightSpawn) cost+=scheduler.executer.nSimpleTasksWanted();
-        synchronized(taskLock){
-            subCost+=cost;
-        }
-        super.willSpawn(t);
-    }
-}

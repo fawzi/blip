@@ -3,6 +3,7 @@ module blip.parallel.Models;
 import tango.util.log.Log;
 import blip.BasicModels;
 import tango.io.stream.Format;
+import blip.container.FiberPool;
 
 enum TaskStatus:int{
     Building=-1,
@@ -74,9 +75,9 @@ interface TaskI:SubtaskNotificationsI,SubmittingI{
     int level();
     /// sets the level of the task
     void level(int level);
-    /// returns the super task of this task (the one that spawned this)
+    /// sets the super task of this task (the one that spawned this)
     void superTask(TaskI task);
-    /// returns the scheduler of this task
+    /// sets the scheduler of this task
     void scheduler(TaskSchedulerI sched);
     /// returns the super task of this task (the one that spawned this)
     TaskI superTask();
@@ -92,6 +93,17 @@ interface TaskI:SubtaskNotificationsI,SubmittingI{
     bool mightYield();
     /// waits for task completion
     void wait();
+    /// retains the task (call it if you want to avoid reuse of the task before you release it)
+    TaskI retain();
+    /// releases the task (call it when you don't need the task anymore)
+    void release();
+    /// call this when you don't need the task anymore, but it should not be reused immediately (typically before submit)
+    TaskI autorelease();
+    /// return the fiberpool to be used to allocate fibers (null if the default one should be used)
+    /// sets the fiber pool used
+    TaskI setFiberPool(FiberPool fPool);
+    /// returns the fiber pool used
+    FiberPool fiberPool(bool canBeNull=false);
 }
 
 /// notifications called by direct subtasks

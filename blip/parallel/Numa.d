@@ -78,10 +78,8 @@ struct NodeMask{
 
 /// identifies a numa node
 struct NumaNode{
-    int level;
+    int level=-1; // invalid
     int pos;
-    // system dependent
-    int id;
     
     equals_t opEquals(NumaNode n){
         return level==n.level && pos==n.pos;
@@ -97,7 +95,6 @@ struct NumaNode{
         metaI=ClassMetaInfo.createForType!(typeof(*this))("NumaNode");
         metaI.addFieldOfType!(int)("level","the level of this node");
         metaI.addFieldOfType!(int)("pos","position of this node within the level");
-        metaI.addFieldOfType!(int)("id","the id of this node (system dependent)");
     }
     ClassMetaInfo getSerializationMetaInfo(){
         return metaI;
@@ -105,7 +102,6 @@ struct NumaNode{
     void serial(Ser)(Ser s){
         s.field(metaI[0],level);
         s.field(metaI[1],pos);
-        s.field(metaI[2],id);
     }
     void serialize(Serializer s){
         serial(s);
@@ -113,6 +109,32 @@ struct NumaNode{
     void unserialize(Unserializer s){
         serial(s);
     }
+}
+
+struct Cache{
+    NumaNode attachedTo;
+    ulong size_kB;
+    ulong sharingLevel;
+    ulong depth; // useful?
+}
+
+struct Memory{
+    NumaNode attachedTo;
+    ulong memory_kB;          /**< \brief Size of memory node */
+    ulong huge_page_free;     /**< \brief Number of available huge pages */
+}
+
+struct Machine{
+    NumaNode attachedTo;
+    char *dmi_board_vendor;       /**< \brief DMI board vendor name */
+    char *dmi_board_name;         /**< \brief DMI board model name */
+    ulong memory_kB;          /**< \brief Size of memory node */
+    ulong huge_page_free;     /**< \brief Number of available huge pages */
+    ulong huge_page_size_kB;      /**< \brief Size of huge pages */
+}
+
+struct Socket{
+    NumaNode attachedTo;
 }
 
 /// simple iterator
@@ -161,6 +183,7 @@ interface Topology(NodeType){
 /// the nodes of level 2 that are at the next possible latency distance
 /// for levels higher than 2 the nodes do not necessarily form a partition (i.e. they might overlap)
 /// the level of subnodes is min(node.level-1,2)
+/// this simplified structure might miss some caches, as only one cache per level is assumed
 interface NumaTopology: Topology!(NumaNode){
     /// mask for the given node
     NodeMask maskForNode(NumaNode node);
@@ -168,10 +191,19 @@ interface NumaTopology: Topology!(NumaNode){
     NumaNode procToNode(proc_id_t extLeaf);
     /// mapping from nodes of level 0 to processors
     proc_id_t nodeToProc(NumaNode);
-    /// mapping from cpu socket to nodes of level 2
+    /// mapping from cpu socket to nodes of level x>=2
     NumaNode socketToNode(cpu_sock_t extLeaf);
-    /// mapping from nodes of level 2 to cpu sockets
+    /// mapping from nodes of level x>=2 to cpu sockets
     cpu_sock_t nodeToSocket(NumaNode);
+    // next*, mean with level>= to the current level
+    /// returns the next cache, if attachedTo.level=-1 the result is bogus (no cache found)
+    Cache nextCache(NumaNode);
+    /// returns the next memory, if attachedTo.level=-1 the result is bogus (no memory found)
+    Memory nextMemory(NumaNode);
+    /// returns the next machine, if attachedTo.level=-1 the result is bogus (no machine found)
+    Machine nextMachine(NumaNode);
+    /// returns the next socket, if attachedTo.level=-1 the result is bogus (no socket found)
+    Socket nextSocket(NumaNode);
 }
 
 class ExplicitTopology(NodeType): Topology!(NumaNode){
@@ -315,6 +347,12 @@ class ExplicitTopology(NodeType): Topology!(NumaNode){
     void unserialize(Unserializer s){
         s.field(metaI[0],levels);
     }
+    
+    Cache nextCache(NumaNode){ Cache res; return res; }
+    Memory nextMemory(NumaNode){ Memory res; return res; }
+    Machine nextMachine(NumaNode){ Machine res; return res; }
+    Socket nextSocket(NumaNode){ Socket res; return res; }
+    
 }
 
 
@@ -323,14 +361,12 @@ ExplicitTopology!(NumaNode) uniformTopology(int[] nDirectChilds){
     int nNodesLevel=1;
     auto nLevels=nDirectChilds.length;
     Level[] levels=new Level[nLevels+1];
-    int id=0;
     for (int ilevel=0;ilevel<nLevels;++ilevel){
         Level *lAtt=&(levels[nLevels-ilevel]);
         lAtt.nNodes=nNodesLevel;
         for (int inode=0;inode<nNodesLevel;++inode){
             lAtt.nodes[inode].level=nLevels-ilevel;
             lAtt.nodes[inode].pos=inode;
-            lAtt.nodes[inode].id=++id;
             
             int nChilds=nDirectChilds[ilevel];
             lAtt.subNodes[inode]=new NumaNode[nChilds];
@@ -354,7 +390,6 @@ ExplicitTopology!(NumaNode) uniformTopology(int[] nDirectChilds){
 
         lAtt.nodes[inode].level=0;
         lAtt.nodes[inode].pos=inode;
-        lAtt.nodes[inode].id=++id;
     }
     levels[nLevels].superNodes[0]=levels[nLevels].nodes[0];
     for (int ilevel=1;ilevel<=nLevels;++ilevel){
@@ -368,3 +403,5 @@ ExplicitTopology!(NumaNode) uniformTopology(int[] nDirectChilds){
     }
     return new ExplicitTopology!(NumaNode)(levels);
 }
+
+

@@ -362,7 +362,7 @@ class RunTestsArgs{
         this.mightYield=mightYield;
     }
     YieldableCall yieldableCall(){
-        return YieldableCall(&exec,mightYield,defaultFiberPool());
+        return YieldableCall(&exec,(mightYield?TaskFlags.None:(TaskFlags.NoYield|TaskFlags.NoSpawn)));
     }
     void exec(){
         test.runTests(testFactor,rngState,counterVal);
@@ -499,8 +499,7 @@ class SingleRTest{
     /// task that executes runTests
     Task runTestsTask(int testFactor=1,char[] rngState=null,int[] counterVal=null){
         auto closure=new RunTestsArgs(this,false,testFactor,rngState,counterVal);
-        return (new Task(testName,closure.yieldableCall(),false))
-            .appendVariant(Variant(closure)); // variant should not be needed... to check
+        return Task(testName,closure.yieldableCall());
     }
     /// constructor
     this(char[]testName,long sourceLine,char[]sourceFile,
@@ -606,7 +605,7 @@ class TestCollection: SingleRTest, TestControllerI {
             version(SequentialTests){
                 t.runTests(testFactor);
             } else {
-                t.runTestsTask(testFactor).submitYield();
+                t.runTestsTask(testFactor).autorelease().submitYield();
             }
             if (testController.isStopping) break;
         }
@@ -622,8 +621,7 @@ class TestCollection: SingleRTest, TestControllerI {
     /// task that executes runTests
     Task runTestsTask(int testFactor=1,char[] rngState=null,int[] counterVal=null){
         auto closure=new RunTestsArgs(this,true,testFactor,rngState,counterVal);
-        auto res=new TaskSet(testName,closure.yieldableCall());
-        res.appendVariant(Variant(closure)); // should not be needed... check
+        auto res=Task(testName,&closure.exec,TaskFlags.TaskSet);
         res.appendOnFinish(&incrNCombTest);
         return res;
     }
