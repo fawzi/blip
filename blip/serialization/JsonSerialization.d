@@ -189,7 +189,7 @@ class JsonSerializer(T=char) : Serializer {
         if (compact) {
             writer(cast(T[])`{`);
             if (objId!=cast(objectId)0) {
-                writer(cast(T[])`, "id":`)(objId);
+                writer(cast(T[])` "id":`)(objId);
                 atStart=false;
             } else {
                 atStart=true;

@@ -111,16 +111,16 @@ case $compShort in
 esac
 case `uname` in
   Darwin)
-  extra_libs_os="${linkFlag}-framework ${linkFlag}Accelerate ${linkFlag}-lz ${linkFlag}-lbz2"
+  extra_libs_os="${linkFlag}-lhwloc ${linkFlag}-framework ${linkFlag}Accelerate ${linkFlag}-lz ${linkFlag}-lbz2"
   ;;
   Linux)
-  extra_libs_os="${linkFlag}-lgoto2 ${linkFlag}-ldl ${linkFlag}-lz ${linkFlag}-lbz2 ${linkFlag}-lg2c"
+  extra_libs_os="${linkFlag}-lhwloc ${linkFlag}-lgoto2 ${linkFlag}-ldl ${linkFlag}-lz ${linkFlag}-lbz2 ${linkFlag}-lg2c"
   ;;
   *)
   die "unknown platform, you need to set extra_libs_os"
 esac
-extra_libs_opt="${linkFlag}-ltango-user-${compShort} $extra_libs_os $extra_libs_comp"
-extra_libs_dbg="${linkFlag}-ltango-user-${compShort}-dbg $extra_libs_os $extra_libs_comp"
+extra_libs_opt="${linkFlag}-L${D_HOME}/lib ${linkFlag}-ltango-user-${compShort} $extra_libs_os $extra_libs_comp"
+extra_libs_dbg="${linkFlag}-L${D_HOME}/lib ${linkFlag}-ltango-user-${compShort}-dbg $extra_libs_os $extra_libs_comp"
 case $version in
     opt)
     extra_libs="$extra_libs_opt"

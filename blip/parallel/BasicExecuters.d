@@ -12,6 +12,7 @@ import blip.parallel.BasicSchedulers;
 import blip.parallel.BasicTasks;
 import blip.parallel.PriQueue;
 import blip.BasicModels;
+import blip.parallel.Numa;
 
 static this(){
     Log.lookup("blip.parallel.exec").level(Logger.Level.Warn,true);
@@ -150,9 +151,8 @@ class PExecuter:ExecuterI{
             this._scheduler=new PriQTaskScheduler(this.name~"sched");
         }
         this.scheduler.executer=this;
-        if (nproc<1){
-            // try to figure it out
-            this.nproc=2;
+        if (nproc==-1){
+            this.nproc=defaultTopology.nNodes(0);
         } else {
             this.nproc=nproc;
         }
@@ -162,7 +162,7 @@ class PExecuter:ExecuterI{
         for(int i=0;i<this.nproc;++i){
             workers[i]=new Thread(&(this.workThreadJob),16*8192);
             workers[i].isDaemon=true;
-            workers[i].name="worker-"~ctfe_i2a(i);
+            workers[i].name=name~"-worker-"~ctfe_i2a(i);
             workers[i].start();
         }
     }
@@ -226,3 +226,137 @@ class PExecuter:ExecuterI{
     }
 }
 
+class TWorker{
+    ExecuterI executer;
+    NumaTopology topology;
+    TaskSchedulerI scheduler;
+    NumaNode node;
+    this(ExecuterI exec,TaskSchedulerI sched,NumaTopology topo,NumaNode n){
+        executer=exec;
+        scheduler=sched;
+        topology=topo;
+        node=n;
+    }
+    /// the job of the worker threads
+    void workThreadJob(){
+        auto log=executer.execLogger;
+        log.info("Work thread "~Thread.getThis().name~" started");
+        if (topology.bindToNode(node)){
+            log.info(Thread.getThis().name~" bound to node");
+        } {
+            log.info(Thread.getThis().name~" binding failed");
+        }
+        while(1){
+            try{
+                TaskI t=scheduler.nextTask();
+                log.info("Work thread "~Thread.getThis().name~" starting task "~
+                    (t is null?"*NULL*":t.taskName));
+                if (t is null) return;
+                t.execute(false);
+                scheduler.subtaskDeactivated(t);
+                log.info("Work thread "~Thread.getThis().name~" finished task "~t.taskName);
+            }
+            catch(Exception e) {
+                log.error("exception in working thread ");
+                e.writeOut(delegate void(char[]s){ Stdout(s); });
+                Stdout.flush();
+                scheduler.raiseRunlevel(SchedulerRunLevel.Stopped);
+            }
+        }
+        log.info("Work thread ".dup~Thread.getThis().name~" stopped");
+    }
+    
+}
+/// topolgy using executer
+class TExecuter:ExecuterI{
+    // StarvationManager // to do
+    PriQTaskScheduler[NumaNode] schedulers;
+    PriQTaskScheduler rootScheduler;
+    /// number of processors (used as hint for the number of tasks)
+    int nproc;
+    /// Numa topology (for executers)
+    NumaTopology topology;
+    /// worker threads
+    Thread[] workers;
+    /// logger for problems/info
+    Logger log;
+    /// name of the executer
+    char[] _name;
+    /// name accessor
+    char[] name(){
+        return _name;
+    }
+    TaskSchedulerI scheduler(){ return rootScheduler; }
+    /// creates a new executer
+    this(char[] name,NumaTopology topology,char[]loggerPath="blip.parallel.exec"){
+        this._name=name;
+        int level=topology.maxLevel();
+        this.rootScheduler=new PriQTaskScheduler(this.name~"sched_"~ctfe_i2a(level)~"_"~ctfe_i2a(0),
+            "blip.parallel.queue",level);
+        schedulers[NumaNode(level,0)]=this.rootScheduler;
+        this.rootScheduler.level=level;
+        this.rootScheduler.executer=this;
+        while (level>0){
+            --level;
+            foreach (nodeAtt;topology.nodes(level)){
+                auto superN=topology.superNode(nodeAtt);
+                auto superS=schedulers[superN];
+                auto newS=new PriQTaskScheduler(this.name~"sched_"~ctfe_i2a(level)~"_"~ctfe_i2a(nodeAtt.pos),
+                    "blip.parallel.queue",level,superS);
+                schedulers[nodeAtt]=newS;
+                newS.executer=this;
+            }
+        }
+        this.topology=topology;
+        assert(topology!is null,"a valid topology is needed");
+        this.nproc=topology.nNodes(0);
+        assert(this.nproc>0,"nproc must be at least 1");
+        log=Log.lookup(loggerPath);
+        workers=new Thread[this.nproc];
+        for(int i=0;i<this.nproc;++i){
+            auto nodeAtt=NumaNode(0,i);
+            auto closure=new TWorker(this,schedulers[nodeAtt],topology,nodeAtt);
+            workers[i]=new Thread(&(closure.workThreadJob),16*8192);
+            workers[i].isDaemon=true;
+            workers[i].name=name~"-worker-"~ctfe_i2a(i);
+            workers[i].start();
+        }
+    }
+    
+    /// description (for debugging)
+    /// non threadsafe
+    char[] toString(){
+        return getString(desc(new Stringify()).newline);
+    }
+    /// description (for debugging)
+    FormatOutput!(char) desc(FormatOutput!(char)s){ return desc(s,false); }
+    /// description (for debugging)
+    /// (might not be a snapshot if other threads modify it while printing)
+    /// non threadsafe
+    FormatOutput!(char) desc(FormatOutput!(char)s,bool shortVersion){
+        s.format("<TExecuter@{}",cast(void*)this);
+        if (shortVersion) {
+            s(" >");
+            return s;
+        }
+        s.newline;
+        s("  nproc:")(nproc)(",").newline;
+        s("  workers:")(workers)(",").newline;
+        writeDesc(s("  scheduler:"),scheduler)(",").newline;
+        s("  log:")(log)(",").newline;
+        s(" >").newline;
+        return s;
+    }
+    /// number of simple tasks wanted
+    int nSimpleTasksWanted(){
+        return nproc/2+1;
+    }
+    /// number of tasks (unknown if simple or not) wanted
+    int nTaskWanted(){
+        return min(2,nproc);
+    }
+    /// logger for task execution messages
+    Logger execLogger(){
+        return log;
+    }
+}

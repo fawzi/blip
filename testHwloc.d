@@ -72,13 +72,8 @@ int main()
                 return 0;
 
         /* Get its cpuset.  */
-        hwloc_cpuset_t cpuset = obj.cpuset.singlify();
-        printf("post singlify %x %x\n",cpuset.data[0],cpuset.data[1]);
-
         /* Get only one logical processor (in case the core is SMT/hyperthreaded).  */
-        printf("pre singlify %.*s\n",obj.cpuset.toString().length,cpuset.toString().ptr);
-        printf("post singlify %.*s\n",cpuset.toString().length,cpuset.toString().ptr);
-//        hwloc_cpuset_singlify(&cpuset);
+        hwloc_cpuset_t cpuset = obj.cpuset.singlify();
 
         /* And try to bind ourself there.  */
         if (hwloc_set_cpubind(topology, &cpuset, 0)) {

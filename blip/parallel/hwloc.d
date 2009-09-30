@@ -23,8 +23,8 @@ version(Windows){
  * \brief The hwloc API.
  */
 
-enum { TOPO_NBMAXCPUS=1024}
-enum {HWLOC_CPUSET_STRING_LENGTH=TOPO_NBMAXCPUS/4}
+enum { TOPO_NBMAXCPUS=1024 }
+enum { HWLOC_CPUSET_STRING_LENGTH=TOPO_NBMAXCPUS/4 }
 
 alias BitVector!(TOPO_NBMAXCPUS) hwloc_cpuset_t;
 
@@ -122,7 +122,7 @@ extern(C) int hwloc_compare_types (hwloc_obj_type_t type1, hwloc_obj_type_t type
      c_ulong memory_kB;          /**< \brief Size of cache */
      uint depth;           /**< \brief Depth of cache */
    }
-   hwloc_memory_attr_u cache;
+   hwloc_cache_attr_u cache;
    /** \brief Node-specific Object Attributes */
    struct hwloc_memory_attr_u {
      c_ulong memory_kB;          /**< \brief Size of memory node */

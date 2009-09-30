@@ -732,29 +732,32 @@ class Task:TaskI{
     }
     /// waits for the task to finish
     void wait(){
-        if (status!=TaskStatus.Finished && waitSem is null) {
-            version(NoTaskLock){
-                volatile auto statusAtt=statusAtt;
-                if (statusAtt!=TaskStatus.Finished){
-                    if (waitSem is null){
-                        auto waitSemNew=new Semaphore();
-                        if (!atomicCAS(waitSem,waitSemNew,null)){
-                            delete waitSemNew;
+        if (status!=TaskStatus.Finished){
+            if (waitSem is null) {
+                version(NoTaskLock){
+                    volatile auto statusAtt=statusAtt;
+                    if (statusAtt!=TaskStatus.Finished){
+                        if (waitSem is null){
+                            auto waitSemNew=new Semaphore();
+                            if (!atomicCAS(waitSem,waitSemNew,null)){
+                                delete waitSemNew;
+                            }
                         }
                     }
-                }
-            } else {
-                synchronized(taskLock) {
-                     if (status!=TaskStatus.Finished && waitSem is null) {
-                         waitSem=new Semaphore();
-                     }
+                } else {
+                    synchronized(taskLock) {
+                         if (status!=TaskStatus.Finished && waitSem is null) {
+                             waitSem=new Semaphore();
+                         }
+                    }
                 }
             }
-        }
-        if (status!=TaskStatus.Finished) {
-            waitSem.wait();
-            assert(status==TaskStatus.Finished,"unexpected status after wait");
-            waitSem.notify();
+            if (status!=TaskStatus.Finished) {
+                assert(waitSem !is null);
+                waitSem.wait();
+                assert(status==TaskStatus.Finished,"unexpected status after wait");
+                waitSem.notify();
+            }
         }
     }
     
