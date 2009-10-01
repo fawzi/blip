@@ -105,8 +105,8 @@ template typeKindForType(T){
         }
     } else static if(is(T==struct)){
         const typeKindForType=TypeKind.StructK;
-    } else static if (is(typeof(*T))){
-        const typeKindForType=typeKindForType!(*T);
+    } else static if (is(typeof(*T.init))){
+        const typeKindForType=typeKindForType!(typeof(*T.init));
     } else {
         static assert(0,"unsupported type "~T.stringof);
     }

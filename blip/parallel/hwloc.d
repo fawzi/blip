@@ -575,6 +575,7 @@ uint hwloc_get_type_or_below_depth (hwloc_topology_t topology, hwloc_obj_type_t 
 
   /* Shouldn't ever happen, as there is always a SYSTEM level with lower order and known depth.  */
   abort();
+  return 0;
 }
 
 /** \brief Returns the depth of objects of type \p type or above
@@ -597,6 +598,7 @@ uint hwloc_get_type_or_above_depth (hwloc_topology_t topology, hwloc_obj_type_t 
 
   /* Shouldn't ever happen, as there is always a PROC level with higher order and known depth.  */
   abort();
+  return 0;
 }
 
 /** @} */

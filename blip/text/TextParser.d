@@ -40,10 +40,19 @@ class TextParser(T) : InputFilter
     bool newlineIsSpace; /// newline counts as space
     T[] delims;
     long line,col;
-    long oldLine,oldCol;
+    long oldLine,oldCol,charPos,oldCharPos;
     enum CommentType{ None, Whitespace, Line } // add nested comments?
     CommentType inComment;
     bool skipComments;
+    
+    /// gives back the current slice
+    void unget(){
+        line=oldLine;
+        col=oldCol;
+        source.seek (-cast(long)max(slice.length,charPos-oldCharPos), IOStream.Anchor.Current);
+        charPos=oldCharPos;
+        slice=slice[0..0];
+    }
     
     /// position of the parsed token
     FormatOutput!(T) parserPos(FormatOutput!(T)s){
@@ -57,19 +66,19 @@ class TextParser(T) : InputFilter
         return getString(parserPos(s));
     }
     /// exception during parsing (adds parser position info)
-    class ParsingException:Exception{
+    static class ParsingException:Exception{
         this(TextParser p,char[]desc,char[]filename,long line){
             super(desc~" parsing "~convertToString!()(p.parserPos()),filename,line);
         }
     }
     /// exception for when the cached part is too small
-    class SmallCacheException:ParsingException{
+    static class SmallCacheException:ParsingException{
         this(TextParser p,char[]desc,char[]filename,long line){
             super(p,desc,filename,line);
         }
     }
     /// exception for when eof is found unexpectedly
-    class EofException:ParsingException{
+    static class EofException:ParsingException{
         this(TextParser p,char[]desc,char[]filename,long line){
             super(p,desc,filename,line);
         }
@@ -86,6 +95,8 @@ class TextParser(T) : InputFilter
     void updatePos(T[] str){
         oldLine=line;
         oldCol=col;
+        oldCharPos=charPos;
+        charPos+=str.length;
         foreach(c;str){
             if (c=='\n'){
                 ++line; col=0;
@@ -170,7 +181,6 @@ class TextParser(T) : InputFilter
                 default:
                     throw new Exception("unknown slice extent",__FILE__,__LINE__);
                 }
-                return 0;
             }
             auto c=data[0];
             for (size_t j=0;j!=delims.length;++j){
@@ -262,8 +272,6 @@ class TextParser(T) : InputFilter
             default:
                 throw new Exception("unknown SliceExtent",__FILE__,__LINE__);
         }
-        parseError("invalid SliceExtent",__FILE__,__LINE__);
-        return 0;
     }
     /// skips whitespace
     bool skipWhitespace(){
@@ -424,8 +432,9 @@ class TextParser(T) : InputFilter
             smallCacheError("int did not terminate within buffer window ("~Integer.toString(data.length)~")",__FILE__,__LINE__);
             case SliceExtent.ToEnd :
                 return data.length;
+            default:
+                parseError("invalid SliceExtent",__FILE__,__LINE__);
         }
-        parseError("invalid SliceExtent",__FILE__,__LINE__);
     }
     /// scans a float string
     protected size_t scanFloat(T[] data,SliceExtent se){
@@ -471,9 +480,8 @@ class TextParser(T) : InputFilter
             case SliceExtent.ToEnd :
                 return data.length;
             default:
-                throw new Exception("unknown SliceExtent",__FILE__,__LINE__);
+                parseError("invalid SliceExtent",__FILE__,__LINE__);
         }
-        parseError("invalid SliceExtent",__FILE__,__LINE__);
     }
     /// scans either a double quoted string or a token delimited by whitespace and ,;:{}
     protected size_t scanString (T[] data,SliceExtent se){
