@@ -1,0 +1,196 @@
+# script to quickly build d code that uses dchem, blip, tango, lapack (through NArray) and mpi
+#!/bin/bash
+
+die() {
+    echo "$1"
+    exit $2
+}
+
+version=opt
+clean=
+relink=
+out=
+compiler=
+out_name=
+verbose=
+run=
+mpi=
+remote=1
+if [ -z "$D_HOME" ] ; then
+    D_HOME=$HOME
+fi
+while [ $# -gt 0 ]
+do
+    case $1 in
+        --help)
+            echo "usage: build [--version x] [--full] [--d-home d_home] [--dchem-home dchemHome]"
+            echo "           [--run] [--tango-home tangoHome] [--blip-home blipHome]"
+            echo "           [--out outName] [--verbose] [--mpi] mainDFile.d [compiler options]"
+            echo ""
+            echo "  builds mainDFile.d linking tango, blip and all needed libs (lapack, bz2,...)"
+            echo "  --version x     builds the version x (typically dbg or opt"
+            echo "  --run           runs the executable if sucessfully created"
+            echo "  --full          forces a clean before rebuilding"
+            echo "  --mpi           builds an mpi executable"
+            echo "  --verbose       verbose building"
+            echo "  --d-home x      uses x as d home (default is $D_HOME )"
+            echo "  --dchem-home x  uses x as tango home (default is $D_HOME/dchem )"
+            echo "  --tango-home x  uses x as tango home (default is $D_HOME/tango )"
+            echo "  --blip-home x   uses x as blip home (default is $D_HOME/blip )"
+            exit 0
+            ;;
+        --version)
+        shift
+            version=$1
+            ;;
+        --mpi)
+            mpi=1
+            ;;
+        --run)
+            run=1
+            ;;
+        --full)
+            clean=1
+            ;;
+        --verbose)
+            verbose="+v"
+            ;;
+        --dchem-home)
+            shift
+            DCHEM_HOME=$1
+            ;;
+        --d-home)
+            shift
+            D_HOME=$1
+            ;;
+        --tango-home)
+            shift
+            TANGO_HOME=$1
+            ;;
+        --blip-home)
+            shift
+            BLIP_HOME=$1
+            ;;
+        --out)
+            shift
+            out_name=$1
+            ;;
+        *.d)
+            main_d=$1
+            shift
+            break
+            ;;
+        *)
+            die "expected a .d file, got $1"
+            break
+            ;;
+    esac
+    shift
+done
+
+if [ -z "$TANGO_HOME" ] ; then
+    TANGO_HOME="$D_HOME/tango"
+fi
+if [ -z "$BLIP_HOME" ] ; then
+    BLIP_HOME="$D_HOME/blip"
+fi
+if [ -z "$DCHEM_HOME" ] ; then
+    DCHEM_HOME="$D_HOME/dchem"
+fi
+
+if [ -z "$compiler" ]; then
+    compiler=`$TANGO_HOME/build/tools/guessCompiler.sh --path $DC`
+fi
+compShort=`$TANGO_HOME/build/tools/guessCompiler.sh $compiler`
+
+if [ "$version" == "opt" ]; then
+    libExt=
+else
+    libExt="-$version"
+fi
+
+case $compShort in
+    dmd)
+    linkFlag="-L"
+    compFlags=
+    versionFlag="-version="
+    ;;
+    ldc)
+    linkFlag="-L="
+    compFlags="+q"
+    versionFlag="-d-version="
+    ;;
+    *)
+    die "unsupported compiler"
+esac
+mpiVersion=
+mpiFlags=
+if [ -n "$mpi" ] ; then
+    mpiFlags=
+    for f in `mpicc --showme:link` ; do
+        mpiFlags="$mpiFlags ${linkFlag}$f"
+    done
+    mpiFlags="$mpiFlags ${versionFlag}mpi"
+    mpiVersion="-mpi"
+fi
+case `uname` in
+  Darwin)
+  extra_libs_os="${linkFlag}-lhwloc ${linkFlag}-framework ${linkFlag}Accelerate ${linkFlag}-lz ${linkFlag}-lbz2"
+  ;;
+  Linux)
+  extra_libs_os="${linkFlag}-lhwloc ${linkFlag}-lgoto2 ${linkFlag}-ldl ${linkFlag}-lz ${linkFlag}-lbz2 ${linkFlag}-lg2c"
+  ;;
+  *)
+  die "unknown platform, you need to set extra_libs_os"
+esac
+extra_libs="${linkFlag}-L${D_HOME}/lib ${linkFlag}-lblip-${compShort}${mpiVersion}$libExt ${linkFlag}-ltango-user-${compShort}$libExt $mpiFlags $extra_libs_os"
+
+case $version in
+    opt)
+    flags="-release -O"
+    ;;
+    dbg)
+    flags="-g"
+    ;;
+    *)
+    die "unknown version"
+    ;;
+esac
+if [ -z "$out_name" ]; then
+    out_name=`basename ${main_d%%d}`$version
+fi
+if [ -z "$D_BUILD_DIR" ] ; then
+    D_BUILD_DIR=.
+fi
+if [ -z "$remote" ] ; then
+    D_BUILD_DIR=.
+    out2=out_name
+fi
+mkdir -p $D_BUILD_DIR
+MAIN_DIR=`pwd`
+if [ -n "$clean" ]; then
+    echo "rm $D_BUILD_DIR/deps_${out_name} $D_BUILD_DIR/objs_${out_name}"
+    rm -rf "$D_BUILD_DIR/deps_${out_name}" "$D_BUILD_DIR/objs_${out_name}"
+fi
+rm -f $D_BUILD_DIR/_$out_name
+if [ -n "$remote" ] ; then
+  MAIN_DIR=`pwd`
+fi
+
+cmd="xfbuild +c$compiler $compFlags +xtango +xblip +xstd +xldc +xgobo +Ddeps_${out_name} +Oobjs_${out_name} $verbose +o_$out_name $MAIN_DIR/$main_d -I$MAIN_DIR -I$TANGO_HOME/user -I$BLIP_HOME -I$DCHEM_HOME $flags $extra_libs $*"
+
+if [ -n "$verbose" ] ; then
+    echo "$cmd"
+fi
+if [ -n "$remote" ] ; then
+  pushd $D_BUILD_DIR
+fi
+$cmd || exit 1
+mv _$out_name $MAIN_DIR/$out_name
+if [ -n "$remote" ] ; then
+  popd
+fi
+
+if [ -n "$run" ] ; then
+    ./$out_name
+fi
