@@ -1,3 +1,7 @@
+/// wrapping of the fftw library 3.2.2
+///
+/// author: fawzi
+/// license: apache 2.0
 module gobo.fft.fftw;
 
 import tango.stdc.stdio;
@@ -5,34 +9,10 @@ import tango.stdc.stddef;
 
 
 /*
+ * This header was derived from fftw.h, which is released with a BSD license
  * Copyright (c) 2003, 2007-8 Matteo Frigo
  * Copyright (c) 2003, 2007-8 Massachusetts Institute of Technology
  *
- * The following statement of license applies *only* to this header file,
- * and *not* to the other files distributed with FFTW or derived therefrom:
- * 
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
- * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
- * GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
- * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /***************************** NOTE TO USERS *********************************
  *
@@ -90,6 +70,39 @@ typedef void *fftwl_plan;
 typedef fftw_iodim_do_not_use_me fftwl_iodim;
 typedef fftw_iodim64_do_not_use_me fftwl_iodim64;
 alias fftw_r2r_kind_do_not_use_me fftwl_r2r_kind;
+
+enum{
+ FFTW_FORWARD=-1,
+ FFTW_BACKWARD=1,
+}
+const double FFTW_NO_TIMELIMIT=-1.0;
+enum:uint{
+/* documented flags */
+ FFTW_MEASURE=0U,
+ FFTW_DESTROY_INPUT=1U << 0,
+ FFTW_UNALIGNED=1U << 1,
+ FFTW_CONSERVE_MEMORY=1U << 2,
+ FFTW_EXHAUSTIVE=1U << 3,
+ FFTW_PRESERVE_INPUT=1U << 4,
+ FFTW_PATIENT=1U << 5,
+ FFTW_ESTIMATE=1U << 6,
+/* undocumented beyond-guru flags */
+ FFTW_ESTIMATE_PATIENT=1U << 7,
+ FFTW_BELIEVE_PCOST=1U << 8,
+ FFTW_NO_DFT_R2HC=1U << 9,
+ FFTW_NO_NONTHREADED=1U << 10,
+ FFTW_NO_BUFFERING=1U << 11,
+ FFTW_NO_INDIRECT_OP=1U << 12,
+ FFTW_ALLOW_LARGE_GENERIC=1U << 13,
+ FFTW_NO_RANK_SPLITS=1U << 14,
+ FFTW_NO_VRANK_SPLITS=1U << 15,
+ FFTW_NO_VRECURSE=1U << 16,
+ FFTW_NO_SIMD=1U << 17,
+ FFTW_NO_SLOW=1U << 18,
+ FFTW_NO_FIXED_RADIX_LARGE_N=1U << 19,
+ FFTW_ALLOW_PRUNING=1U << 20,
+ FFTW_WISDOM_ONLY=1U << 21,
+}
 
 extern(C):
 
@@ -290,36 +303,3 @@ extern(C):
  extern char[1] fftwl_version;
  extern char[1] fftwl_cc;
  extern char[1] fftwl_codelet_optim;
-
-enum{
- FFTW_FORWARD=-1,
- FFTW_BACKWARD=1,
-}
-const double FFTW_NO_TIMELIMIT=-1.0;
-enum:uint{
-/* documented flags */
- FFTW_MEASURE=0U,
- FFTW_DESTROY_INPUT=1U << 0,
- FFTW_UNALIGNED=1U << 1,
- FFTW_CONSERVE_MEMORY=1U << 2,
- FFTW_EXHAUSTIVE=1U << 3,
- FFTW_PRESERVE_INPUT=1U << 4,
- FFTW_PATIENT=1U << 5,
- FFTW_ESTIMATE=1U << 6,
-/* undocumented beyond-guru flags */
- FFTW_ESTIMATE_PATIENT=1U << 7,
- FFTW_BELIEVE_PCOST=1U << 8,
- FFTW_NO_DFT_R2HC=1U << 9,
- FFTW_NO_NONTHREADED=1U << 10,
- FFTW_NO_BUFFERING=1U << 11,
- FFTW_NO_INDIRECT_OP=1U << 12,
- FFTW_ALLOW_LARGE_GENERIC=1U << 13,
- FFTW_NO_RANK_SPLITS=1U << 14,
- FFTW_NO_VRANK_SPLITS=1U << 15,
- FFTW_NO_VRECURSE=1U << 16,
- FFTW_NO_SIMD=1U << 17,
- FFTW_NO_SLOW=1U << 18,
- FFTW_NO_FIXED_RADIX_LARGE_N=1U << 19,
- FFTW_ALLOW_PRUNING=1U << 20,
- FFTW_WISDOM_ONLY=1U << 21,
-}

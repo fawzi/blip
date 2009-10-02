@@ -2,6 +2,22 @@
 ///
 /// at the moment this wraps openmpi, the constants and some things are specific
 /// maybe we should wrap only the basic calls that are easier to make cross library...
+///
+/// author: fawzi
+/// license: apache 2.0
+/// derived from openmpi 1.3.3 mpi.h which is
+/// Copyright (c) 2004-2005 The Trustees of Indiana University and Indiana
+///                         University Research and Technology
+///                         Corporation.  All rights reserved.
+/// Copyright (c) 2004-2006 The University of Tennessee and The University
+///                         of Tennessee Research Foundation.  All rights
+///                         reserved.
+/// Copyright (c) 2004-2007 High Performance Computing Center Stuttgart, 
+///                         University of Stuttgart.  All rights reserved.
+/// Copyright (c) 2004-2005 The Regents of the University of California.
+///                         All rights reserved.
+/// Copyright (c) 2007-2009 Cisco Systems, Inc.  All rights reserved.
+/// Copyright (c) 2008-2009 Sun Microsystems, Inc.  All rights reserved.
 module gobo.mpi.mpi;
 version(mpi){} else {
 import tango.stdc.stddef;
