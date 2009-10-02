@@ -323,11 +323,6 @@ class TextParser(T) : InputFilter
             if (!next(delegate size_t(T[]t,SliceExtent se){
                     size_t i=0;
                     for (;i<t.length;++i){
-                        if (t[i]=='\n') {
-                            --nlines;
-                            checkCr=true;
-                            if (nlines==0) break;
-                        }
                         if (t[i]=='\r' || checkCr){
                             if (checkCr){
                                 checkCr=false;
@@ -336,8 +331,13 @@ class TextParser(T) : InputFilter
                                 if (nlines==0) break;
                             }
                         }
+                        if (t[i]=='\n') {
+                            --nlines;
+                            checkCr=true;
+                            if (nlines==0) break;
+                        }
                     }
-                    if (checkCr && i<t.length){
+                    if (checkCr && i+1<t.length){
                         if (t[i+1]=='\r'){
                             return i+2;
                         } else {
@@ -347,18 +347,19 @@ class TextParser(T) : InputFilter
                     if (nlines==0 && ! checkCr) return i+1;
                     switch(se){
                         case SliceExtent.Partial :
+                        return Eof;
                         case SliceExtent.Maximal :
-                        return i+1;
+                        return t.length;
                         case SliceExtent.ToEnd :
                             if (nlines==0 || nlines==1) { // accept missing newline at end of file
                                 nlines=0;
                                 checkCr=false;
-                                return i+1;
+                                return t.length;
                             }
                             if (shouldThrow) {
                                 throw new EofException(this,"unexpected EOF",__FILE__,__LINE__);
                             }
-                            return 0;
+                            return t.length;
                         default:
                             throw new ParsingException(this,"unknown SliceExtent",__FILE__,__LINE__);
                     }
@@ -374,29 +375,34 @@ class TextParser(T) : InputFilter
     /// scans a line
     protected size_t scanLine (T[] data,SliceExtent se){
         size_t i=0;
+        bool checkCr=false;
         for(;i!=data.length;++i){
             auto c=data[i];
             if (c=='\r'){
                 return i+1;
             }
             if (c=='\n'){
-                break;
+                if (i+1<data.length){
+                    if (data[i+1]=='\r'){
+                        return i+2;
+                    } else {
+                        return i+1;
+                    }
+                } else{
+                    break;
+                }
             }
-        }
-        if (i+1<data.length){
-            if (data[i]=='\n' && data[i+1]=='\r')
-                return i+2;
         }
         switch(se){
             case SliceExtent.Partial : return Eof;
             case SliceExtent.Maximal :
-                smallCacheError("int did not terminate within buffer window ("~Integer.toString(data.length)~")",__FILE__,__LINE__);
+                smallCacheError("line did not terminate within buffer window ("~Integer.toString(data.length)~")",__FILE__,__LINE__);
             case SliceExtent.ToEnd :
                 return data.length;
             default:
             parseError("invalid SliceExtent",__FILE__,__LINE__);
         }
-        return 0;
+        assert(false);
     }
     /// returns the next line (as slice in local storage)
     T[]nextLine(){
@@ -435,6 +441,7 @@ class TextParser(T) : InputFilter
             default:
                 parseError("invalid SliceExtent",__FILE__,__LINE__);
         }
+        assert(false);
     }
     /// scans a float string
     protected size_t scanFloat(T[] data,SliceExtent se){
@@ -482,6 +489,7 @@ class TextParser(T) : InputFilter
             default:
                 parseError("invalid SliceExtent",__FILE__,__LINE__);
         }
+        assert(false);
     }
     /// scans either a double quoted string or a token delimited by whitespace and ,;:{}
     protected size_t scanString (T[] data,SliceExtent se){
