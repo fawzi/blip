@@ -182,9 +182,8 @@ class Task:TaskI{
     
     TaskFlags flags; /// various flags wrt. the task
     int refCount; /// number of references to this task
-    int spawnTasks; /// number of spawn tasks
+    int spawnTasks; /// number of spawn tasks executing at the moment
     version(NoTaskLock){ } else {
-        int finishedTasks; /// number of finished subtasks
         Mutex taskLock; /// lock to update task numbers and status (remove and use atomic ops)
     }
     TaskSchedulerI _scheduler; /// scheduer of the current task
@@ -224,9 +223,6 @@ class Task:TaskI{
         _taskName=null;
         holdedSubtasks=null;
         spawnTasks=0;
-        version(NoTaskLock){} else{
-            finishedTasks=0;
-        }
         refCount=1;
         flags=TaskFlags.None;
         _scheduler=null;
@@ -247,7 +243,7 @@ class Task:TaskI{
     /// return the superTask of this task
     TaskI superTask(){ return _superTask; }
     /// sets the superTask of this task
-    void superTask(TaskI task){ assert(status==TaskStatus.Building); _superTask=task; }
+    void superTask(TaskI task){ assert(status==TaskStatus.Building,"unexpected status when setting superTask:"~to!(char[])(status)); _superTask=task; }
     /// return the scheduler of this task
     TaskSchedulerI scheduler(){ return _scheduler; }
     /// sets the scheduler of this task
@@ -339,7 +335,6 @@ class Task:TaskI{
         this.holdSubtasks=false;
         this.holdedSubtasks=[];
         version(NoTaskLock){} else {
-            this.finishedTasks=0;
             this.taskLock=new Mutex();
         }
         this.refCount=1;
@@ -429,7 +424,7 @@ class Task:TaskI{
             }
         } else {
             synchronized(taskLock){
-                if (status==TaskStatus.WaitingEnd && spawnTasks==finishedTasks){
+                if (status==TaskStatus.WaitingEnd && spawnTasks==0){
                     status=TaskStatus.PostExec;
                     callOnFinish=true;
                 }
@@ -485,7 +480,7 @@ class Task:TaskI{
     void subtaskEnded(TaskI st){
         bool callOnFinish=false;
         version(NoTaskLock){ // mmh suspicious, I should recheck this... especially barriers wrt. to the rest
-            volatile auto oldTasks=flagAdd(spawnTasksAtt,-1);
+            volatile auto oldTasks=flagAdd(spawnTasks,-1);
             if (oldTasks==1){
                 if (atomicCAS(statusAtt,TaskStatus.PostExec,TaskStatus.WaitingEnd)){
                     callOnFinish=true;
@@ -502,8 +497,8 @@ class Task:TaskI{
             }
         } else {
             synchronized(taskLock){
-                ++finishedTasks;
-                if (spawnTasks==finishedTasks){
+                --spawnTasks;
+                if (spawnTasks==0){
                     if (status==TaskStatus.WaitingEnd){
                         status=TaskStatus.PostExec;
                         callOnFinish=true;
@@ -605,7 +600,7 @@ class Task:TaskI{
         assert(mightSpawn,"task '"~taskName~"' tried to spawn '"~task.taskName~"' and has mightSpawn false");
         assert(task.status==TaskStatus.Building,"spawnTask argument should have building status");
         if (task.superTask is null) task.superTask=this;
-        assert(task.superTask is this,"task '"~taskName~"' tried to spawn '"~task.taskName~"' that has different superTask");
+        assert(cast(Object)task.superTask is this,"task '"~taskName~"' tried to spawn '"~task.taskName~"' that has different superTask:"~task.superTask.taskName);
         if (task.scheduler is null) task.scheduler=scheduler;
         assert(task.scheduler is scheduler,"task '"~taskName~"' tried to spawn '"~task.taskName~"' that has different scheduler");
         if (task.mightSpawn){
@@ -783,7 +778,7 @@ class Task:TaskI{
                 
             } else {
                 synchronized(taskLock){
-                    if (spawnTasks==finishedTasks){
+                    if (spawnTasks==0){
                         return;
                     }
                     flags|=TaskFlags.Resubmit|TaskFlags.Delaying|TaskFlags.WaitingSubtasks;
@@ -796,7 +791,7 @@ class Task:TaskI{
                 noSubT=(flagGet(spawnTasks)==0);
             } else {
                 synchronized(taskLock){
-                    noSubT=(spawnTasks==finishedTasks);
+                    noSubT=(spawnTasks==0);
                 }
             }
             // this is not so nice, with some status hacking it should be possible to make it
@@ -871,9 +866,6 @@ class Task:TaskI{
         s("  holdSubtasks:")(holdSubtasks)(",").newline;
         s("  holdedSubtasks:")(holdedSubtasks)(",").newline;
         s("  spawnTasks:")(spawnTasks)(",").newline;
-        version(NoTaskLock){}else{
-            s("  finishedTasks:")(finishedTasks)(",").newline;
-        }
         writeDesc(s("  scheduler:"),scheduler,true)(",").newline;
         version(NoTaskLock){} else {
             bool lokD=taskLock.tryLock();
