@@ -80,7 +80,7 @@ EXCLUDE_DEP_ALL=$(EXCLUDE_DEP_COMP) ^tango.*
 
 OBJS=$(MODULES:%=%.$(OBJ_EXT))
 
-TESTS=testTextParsing testRTest testSerial testNArray testNArrayPerf testNuma
+TESTS=testTextParsing testRTest testSerial testNArray testNArrayPerf testNuma testHwloc
 
 .PHONY: _genDeps newFiles build clean distclean _tests tests lib $(TESTS)
 

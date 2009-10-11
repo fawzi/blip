@@ -1,6 +1,6 @@
 module testHwloc;
 /* topo-hello.c */
-import blip.parallel.hwloc;
+import blip.parallel.hwloc.hwloc;
 import tango.stdc.stdio;
 
 static void print_children(hwloc_topology_t topology, hwloc_obj_t obj, int depth)
@@ -76,7 +76,7 @@ int main()
         hwloc_cpuset_t cpuset = obj.cpuset.singlify();
 
         /* And try to bind ourself there.  */
-        if (hwloc_set_cpubind(topology, &cpuset, 0)) {
+        if (hwloc_set_cpubind(topology, cpuset, 0)) {
                 auto s=obj.cpuset.toString();
                 printf("Couldn't bind to cpuset %.*s\n", s.length,s.ptr);
         }

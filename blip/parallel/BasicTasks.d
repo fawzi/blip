@@ -7,6 +7,7 @@ import tango.math.Math;
 import tango.io.Stdout;
 import tango.util.log.Log;
 import tango.util.Convert;
+import tango.stdc.string;
 import tango.util.container.LinkedList;
 import tango.io.stream.Format;
 import blip.text.Stringify;
@@ -17,6 +18,7 @@ import blip.BasicModels;
 import blip.container.Pool;
 import tango.core.sync.Atomic;
 import blip.container.FiberPool;
+import tango.core.Memory:GC;
 
 enum TaskFlags:uint{
     None=0, // no flags
@@ -181,8 +183,8 @@ class Task:TaskI{
     TaskFlags flags; /// various flags wrt. the task
     int refCount; /// number of references to this task
     int spawnTasks; /// number of spawn tasks
-    int finishedTasks; /// number of finished subtasks
     version(NoTaskLock){ } else {
+        int finishedTasks; /// number of finished subtasks
         Mutex taskLock; /// lock to update task numbers and status (remove and use atomic ops)
     }
     TaskSchedulerI _scheduler; /// scheduer of the current task
@@ -222,7 +224,9 @@ class Task:TaskI{
         _taskName=null;
         holdedSubtasks=null;
         spawnTasks=0;
-        finishedTasks=0;
+        version(NoTaskLock){} else{
+            finishedTasks=0;
+        }
         refCount=1;
         flags=TaskFlags.None;
         _scheduler=null;
@@ -335,12 +339,12 @@ class Task:TaskI{
         this.holdSubtasks=false;
         this.holdedSubtasks=[];
         version(NoTaskLock){} else {
+            this.finishedTasks=0;
             this.taskLock=new Mutex();
         }
         this.refCount=1;
         this.status=TaskStatus.Building;
         this.spawnTasks=0;
-        this.finishedTasks=0;
         this.flags=f;
         this.fPool=fPool;
     }
@@ -418,7 +422,7 @@ class Task:TaskI{
         status=TaskStatus.WaitingEnd;
         bool callOnFinish=false;
         version(NoTaskLock){
-            if (spawnTasks==flagGet(finishedTasks)){
+            if (0==flagGet(spawnTasks)){
                 if (atomicCAS(status,TaskStatus.PostExec,TaskStatus.WaitingEnd)){
                     callOnFinish=true;
                 }
@@ -481,17 +485,14 @@ class Task:TaskI{
     void subtaskEnded(TaskI st){
         bool callOnFinish=false;
         version(NoTaskLock){ // mmh suspicious, I should recheck this... especially barriers wrt. to the rest
-            volatile auto oldTasks=flagAdd(finishedTasks,1);
-            volatile memoryBarrier!(true,false,false,false)();// probably excessive
-            volatile auto spawnTasksAtt=spawnTasks;
-            volatile auto statusAtt=status;
-            if ((statusAtt==TaskStatus.WaitingEnd || (flags & TaskFlags.Delayed)!=0) && spawnTasksAtt==oldTasks+1){
+            volatile auto oldTasks=flagAdd(spawnTasksAtt,-1);
+            if (oldTasks==1){
                 if (atomicCAS(statusAtt,TaskStatus.PostExec,TaskStatus.WaitingEnd)){
                     callOnFinish=true;
                     assert(flags & (TaskFlags.WaitingSubtasks|TaskFlags.Delayed|TaskFlags.Delaying)==0);
                 } else {
-                    volatile auto flagsAtt=flags;
-                    while ((flagsAtt & TaskFlags.WaitingSubtasks)!=0){
+                    volatile memoryBarrier!(true,false,false,true)();
+                     while ((flagsAtt & TaskFlags.WaitingSubtasks)!=0){
                         if (atomicCAS(flags,flagsAtt & (~TaskFlags.WaitingSubtasks),flagsAtt)){
                             callOnFinish=true;
                         }
@@ -767,11 +768,11 @@ class Task:TaskI{
         }
         if (mightYield){
             version(NoTaskLock){
-                if (spawnTasks==finishedTasks){
+                if (spawnTasks==0){
                     return;
                 }
                 atomicOp(tAtt.flags,delegate TaskFlags(TaskFlags f){ return f|TaskFlags.Resubmit|TaskFlags.Delaying;});
-                if (spawnTasks==flagGet(finishedTasks)){
+                if (0==flagGet(spawnTasks)){
                     volatile auto flagsAtt=flags;
                     while ((flagsAtt & TaskFlags.WaitingSubtasks)!=0){
                         if (atomicCAS(flags,flagsAtt & (~(TaskFlags.Delaying|TaskFlags.WaitingSubtasks)),flagsAtt)){
@@ -792,10 +793,7 @@ class Task:TaskI{
         } else {
             bool noSubT=false;
             version(NoTaskLock){
-                volatile auto oldTasks=finishedTasks;
-                volatile memoryBarrier!(true,false,false,false)();// probably excessive
-                volatile auto spawnTasksAtt=spawnTasks;
-                noSubT=(spawnTasksAtt==oldTasks);
+                noSubT=(flagGet(spawnTasks)==0);
             } else {
                 synchronized(taskLock){
                     noSubT=(spawnTasks==finishedTasks);
@@ -873,7 +871,9 @@ class Task:TaskI{
         s("  holdSubtasks:")(holdSubtasks)(",").newline;
         s("  holdedSubtasks:")(holdedSubtasks)(",").newline;
         s("  spawnTasks:")(spawnTasks)(",").newline;
-        s("  finishedTasks:")(finishedTasks)(",").newline;
+        version(NoTaskLock){}else{
+            s("  finishedTasks:")(finishedTasks)(",").newline;
+        }
         writeDesc(s("  scheduler:"),scheduler,true)(",").newline;
         version(NoTaskLock){} else {
             bool lokD=taskLock.tryLock();
@@ -971,3 +971,94 @@ class RootTask: Task{
     }
 }
 
+/// root task that enforces a sequential execution of the submitted tasks
+class SequentialTask:RootTask{
+    TaskI[] queue; // really a poor FIFO queue... if you expect lot of queue tasks then this should be improved
+    size_t nQueued;
+    int nExecuting;
+    Mutex FIFOQueueLock;
+    
+    this(char[] name,TaskSchedulerI scheduler, int level=0){
+        super(scheduler,level,name,false);
+        this.scheduler=scheduler;
+        this.level=level;
+        this.status=TaskStatus.Started;
+        log=Log.lookup("blip.parallel."~name);
+        this.warnSpawn=warnSpawn;
+    }
+    this(char[]name="Sequential Task",TaskI t=null){
+        if (t is null){
+            t=taskAtt.val;
+            if (t is null || t is noTask){
+                throw new ParaException("sequential task with no super task",__FILE__,__LINE__);
+            }
+        }
+        this(name,t.scheduler,t.level+1);
+    }
+
+    override void spawnTask(TaskI t)
+    in{
+        volatile auto nExecutingAtt=nExecuting;
+        assert(nExecutingAtt==0 || nExecutingAtt==1);
+    }
+    out{
+            volatile auto nExecutingAtt=nExecuting;
+            assert(nExecutingAtt==0 || nExecutingAtt==1);
+    }
+    body{
+        TaskI toExe;
+        synchronized(FIFOQueueLock){
+            flagAdd(spawnTasks,1);
+            if (atomicCAS(nExecuting,1,0)){
+                if (nQueued>0){
+                    toExe=queue[0];
+                    memmove(&(queue[0]),&(queue[1]),nQueued*TaskI.sizeof);
+                    queue[nQueued-1]=t;
+                } else {
+                    toExe=t;
+                }
+            } else {
+                if (nQueued==queue.length){
+                    queue.length=GC.growLength(queue.length+1,TaskI.sizeof)/TaskI.sizeof;
+                }
+                queue[nQueued]=t;
+                ++nQueued;
+            }
+        }
+        if (toExe){
+            super.spawnTask(toExe);
+        }
+    }
+    
+    override void willSpawn(TaskI st){ }
+    
+    void subtaskEnded(TaskI st)
+    in{
+        volatile auto nExecutingAtt=nExecuting;
+        assert(nExecutingAtt==0 || nExecutingAtt==1);
+    }
+    out{
+            volatile auto nExecutingAtt=nExecuting;
+            assert(nExecutingAtt==0 || nExecutingAtt==1);
+    }
+    body{
+        TaskI toExe;
+        super.subtaskEnded(st);
+        synchronized(FIFOQueueLock){
+            if (nQueued>0){
+                assert(nExecuting==1);
+                toExe=queue[0];
+                memmove(&(queue[0]),&(queue[1]),nQueued*TaskI.sizeof);
+                --nQueued;
+                queue[nQueued]=null;
+            } else {
+                if (!atomicCAS(nExecuting,1,0)){
+                    throw new ParaException("unexpected value for nExecuting "~to!(char[])(nExecuting),__FILE__,__LINE__);
+                }
+            }
+        }
+        if (toExe){
+            super.spawnTask(toExe);
+        }
+    }
+}

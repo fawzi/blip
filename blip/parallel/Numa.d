@@ -28,7 +28,7 @@ import tango.core.Thread;
 import blip.serialization.Serialization;
 import tango.math.random.Random;
 import tango.stdc.stringz;
-import blip.parallel.hwloc;
+import blip.parallel.hwloc.hwloc;
 import blip.serialization.StringSerialize;
 
 version(Windows){
@@ -935,7 +935,7 @@ class HwlocTopology: NumaTopology{
         }
 
         /* And try to bind ourself there.  */
-        if (hwloc_set_cpubind(topology, &cpuset, 0)) {
+        if (hwloc_set_cpubind(topology, cpuset, 0)) {
             return false;
         }
         return true;
