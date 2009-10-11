@@ -26,10 +26,17 @@ interface CopiableObjectI : BasicObjectI,DuplicableI,DeepDuplicableI { }
 
 /// object that can do a foreach loop
 interface ForeachableI(T){
-    /// loop without index, has to be implemented
-    int opApply(int delegate(T x) dlg);
-    /// loop with index, migh not be implemented (and throw)
-    int opApply(int delegate(size_t i,T x) dlg);
+    static if (is(T U:U*)){
+        /// loop without index, has to be implemented
+        int opApply(int delegate(ref U x) dlg);
+        /// loop with index, migh not be implemented (and throw)
+        int opApply(int delegate(size_t i,ref U x) dlg);
+    } else {
+        /// loop without index, has to be implemented
+        int opApply(int delegate(ref T x) dlg);
+        /// loop with index, migh not be implemented (and throw)
+        int opApply(int delegate(size_t i,ref T x) dlg);
+    }
 }
 
 /// forward iterator interface, and foreach support.

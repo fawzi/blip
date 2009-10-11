@@ -292,7 +292,7 @@ class TextParser(T) : InputFilter
                 switch(se){
                     case SliceExtent.Partial : return Eof;
                     case SliceExtent.Maximal :
-                    smallCacheError("int did not terminate within buffer window ("~Integer.toString(data.length)~")",__FILE__,__LINE__);
+                    smallCacheError("Newline did not terminate within buffer window ("~Integer.toString(data.length)~")",__FILE__,__LINE__);
                     case SliceExtent.ToEnd :
                         if (data.length==0){
                             return 0;
@@ -313,19 +313,26 @@ class TextParser(T) : InputFilter
         }) && source.slice.length!=0) {
             return true;
         }
-        if (shouldThrow) throw new Exception("no newline when expected");
+        if (shouldThrow) parseError("no newline when expected",__FILE__,__LINE__);
         return false;
     }
     /// skips the given number of lines, returns the left over lines
     size_t skipLines(size_t nlines,bool shouldThrow=true){
         bool checkCr=false;
-        while (nlines!=0 || checkCr){
+        while (1){
             if (!next(delegate size_t(T[]t,SliceExtent se){
                     size_t i=0;
                     for (;i<t.length;++i){
                         if (t[i]=='\r' || checkCr){
                             if (checkCr){
                                 checkCr=false;
+                                if (nlines==0){
+                                    if (t[i]=='\r'){
+                                        return i+1;
+                                    } else {
+                                        return i;
+                                    }
+                                }
                             } else {
                                 --nlines;
                                 if (nlines==0) break;
@@ -338,6 +345,7 @@ class TextParser(T) : InputFilter
                         }
                     }
                     if (checkCr && i+1<t.length){
+                        checkCr=false;
                         if (t[i+1]=='\r'){
                             return i+2;
                         } else {
@@ -357,20 +365,25 @@ class TextParser(T) : InputFilter
                                 return t.length;
                             }
                             if (shouldThrow) {
+                                Stdout("nlines:")(nlines)(" i:")(i);
                                 throw new EofException(this,"unexpected EOF",__FILE__,__LINE__);
                             }
                             return t.length;
                         default:
                             throw new ParsingException(this,"unknown SliceExtent",__FILE__,__LINE__);
                     }
-                })&& source.slice.length!=0)
+                }))
             {
-                if (shouldThrow) throw new Exception("no newline when expected");
+                if (nlines==0 && ! checkCr){
+                    return 0;
+                }
+                if (shouldThrow) parseError("no newline when expected",__FILE__,__LINE__);
                 return nlines;
             }
+            if (nlines==0 && ! checkCr){
+                return 0;
+            }
         }
-        if (shouldThrow) throw new Exception("no newline when expected");
-        return nlines;
     }
     /// scans a line
     protected size_t scanLine (T[] data,SliceExtent se){

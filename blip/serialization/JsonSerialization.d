@@ -179,7 +179,7 @@ class JsonSerializer(T=char) : Serializer {
     override void writeProxy(FieldMetaInfo *field, objectId objId){
         writeField(field);
         writer(cast(T[])`{ class:"proxy"`);
-        writer(cast(T[])`, id:`)(objId)(" }");
+        writer(cast(T[])`, id:`)(objId)("}");
     }
     /// write Struct
     override void writeStruct(FieldMetaInfo *field, ClassMetaInfo metaInfo, objectId objId,
@@ -204,7 +204,7 @@ class JsonSerializer(T=char) : Serializer {
         --depth;
         writer.newline;
         indent(depth);
-        writer(cast(T[])" }");
+        writer(cast(T[])"}");
     }
     /// writes a core type
     override void writeCoreType(FieldMetaInfo *field, void delegate() realWrite,void *t){

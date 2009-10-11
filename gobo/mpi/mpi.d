@@ -19,7 +19,8 @@
 /// Copyright (c) 2007-2009 Cisco Systems, Inc.  All rights reserved.
 /// Copyright (c) 2008-2009 Sun Microsystems, Inc.  All rights reserved.
 module gobo.mpi.mpi;
-version(mpi){} else {
+version(mpi)
+{
 import tango.stdc.stddef;
 /*
  * MPI version
@@ -1737,4 +1738,23 @@ int PMPI_Win_unlock(int rank, MPI_Win win);
 int PMPI_Win_wait(MPI_Win win);
 double PMPI_Wtick();
 double PMPI_Wtime();
+} else {
+    
+    typedef uint MPI_Op;
+    
+    enum :MPI_Op{
+        MPI_MAX    ,
+        MPI_MIN    ,
+        MPI_SUM    ,
+        MPI_PROD   ,
+        MPI_LAND   ,
+        MPI_BAND   ,
+        MPI_LOR    ,
+        MPI_BOR    ,
+        MPI_LXOR   ,
+        MPI_BXOR   ,
+        MPI_MAXLOC ,
+        MPI_MINLOC ,
+        MPI_REPLACE,
+    }
 }

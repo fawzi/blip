@@ -21,7 +21,7 @@ TaskI sequentialTask;
 
 static this(){
     version(SequentialWorkManager){
-        auto defaultExecuter=new SExecuter("defaultWorkManager");
+        auto defaultExecuter=new ImmediateExecuter("defaultWorkManager");
     } else {
         auto defaultExecuter=new PExecuter("defaultWorkManager");
     }
@@ -29,7 +29,7 @@ static this(){
     defaultTask=defaultScheduler.rootTask();
     // tasks submitted to noTask print a warning, and are routed to the default executer
     (cast(RootTask)noTask)._scheduler=defaultScheduler;
-    sequentialScheduler=new SExecuter("sequentialWorkManager");
+    sequentialScheduler=new ImmediateExecuter("sequentialWorkManager");
     sequentialTask=sequentialScheduler.rootTask();
     Log.lookup("blip.parallel").level(Logger.Level.Warn,true);
 }

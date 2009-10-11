@@ -15,10 +15,6 @@ enum TaskStatus:int{
 }
 
 interface ExecuterI:BasicObjectI {
-    /// number of simple tasks wanted
-    int nSimpleTasksWanted();
-    /// number of tasks (unknown if simple or not) wanted
-    int nTaskWanted();
     /// logger for task execution messages
     Logger execLogger();
 }
@@ -52,12 +48,16 @@ interface TaskSchedulerI:BasicObjectI {
     Logger logger();
     /// yields the current fiber if the scheduler is not sequential
     void yield();
+    /// maybe yields the current fiber (use this to avoid creating too many tasks)
+    void maybeYield();
     /// root task, the easy way to add tasks to this scheduler
     TaskI rootTask();
     /// possibly short description
     FormatOutput!(char) desc(FormatOutput!(char) s,bool shortVersion);
     /// if there are many queued tasks (and one should try not to queue too many of them)
     bool manyQueued();
+    /// number of simple tasks wanted
+    int nSimpleTasksWanted();
 }
 
 // the following subtivisions are more to structure the methods of a task
@@ -118,7 +118,7 @@ interface SubtaskNotificationsI:BasicObjectI {
 interface SubmittingI:BasicObjectI {
     /// submits this task (with the given supertask, or with the actual task as supertask)
     TaskI submit(TaskI t=null);
-    /// submits the current task and yields the current one (if not SequentialWorkManager)
+    /// submits the current task and maybe yields the current one (if not SequentialWorkManager)
     /// The current task must be a Fiber or Yieldable or RootTask
     TaskI submitYield(TaskI t=null);
     /// spawns the task t from the present task

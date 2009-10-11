@@ -18,7 +18,8 @@ static this(){
     Log.lookup("blip.parallel.exec").level(Logger.Level.Warn,true);
 }
 
-class SExecuter:ExecuterI,TaskSchedulerI{
+/// executes the task immediately in the current context
+class ImmediateExecuter:ExecuterI,TaskSchedulerI{
     /// logger for problems/info
     Logger log;
     /// run level
@@ -55,7 +56,7 @@ class SExecuter:ExecuterI,TaskSchedulerI{
     /// (might not be a snapshot if other threads modify it while printing)
     /// non threadsafe
     FormatOutput!(char) desc(FormatOutput!(char)s,bool shortVersion){
-        s.format("<SExecuter@{} ",cast(void*)this)(name);
+        s.format("<ImmediateExecuter@{} ",cast(void*)this)(name);
         if (shortVersion) {
             s(" >");
             return s;
@@ -106,12 +107,14 @@ class SExecuter:ExecuterI,TaskSchedulerI{
     ExecuterI executer() { return this; }
     /// returns the executer for this task
     void executer(ExecuterI e) {
-        throw new ParaException("cannot set executer of SExecuter",__FILE__,__LINE__);
+        throw new ParaException("cannot set executer of ImmediateExecuter",__FILE__,__LINE__);
     }
     /// logger for task/scheduling messages
     Logger logger() { return log; }
     /// yields the current fiber if the scheduler is not sequential
     void yield() { }
+    /// yields the current fiber if the scheduler is not sequential
+    void maybeYield() { }
     /// number of simple tasks wanted
     int nSimpleTasksWanted(){
         return 1;

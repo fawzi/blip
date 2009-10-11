@@ -6,6 +6,7 @@ import tango.core.sync.Mutex;
 import tango.math.Math;
 import tango.io.Stdout;
 import tango.util.log.Log;
+import tango.util.Convert;
 import tango.util.container.LinkedList;
 import tango.io.stream.Format;
 import blip.text.Stringify;
@@ -20,12 +21,16 @@ import blip.container.FiberPool;
 enum TaskFlags:uint{
     None=0, // no flags
     NoSpawn=1, // the task will not spawn other tasks
-    NoYield=2, // the task will not yield
-    TaskSet=4, // the task is basically just a collection of other tasks
-    Pin=8,    // the task should be pinned (i.e. cannot be stealed)
-    HoldTasks=16, // tasks are holded
-    FiberPoolTransfer=32, // the fiber pool is transferred to subtasks
-    Resubmit=64, // the task should be resubmitted
+    NoYield=1<<1, // the task will not yield
+    TaskSet=1<<2, // the task is basically just a collection of other tasks
+    Pin=1<<3,    // the task should be pinned (i.e. cannot be stealed)
+    HoldTasks=1<<4, // tasks are holded
+    FiberPoolTransfer=1<<5, // the fiber pool is transferred to subtasks
+    Resubmit=1<<6,          // the task should be resubmitted
+    ThreadPinned=1<<7,      // the task should stay pinned to the same thread
+    Delaying=1<<8,          // the task is being put on hold
+    Delayed=1<<9,           // the task is on hold
+    WaitingSubtasks=1<<10,  // the task is waiting for subtasks to end
 }
 
 class TaskPoolT(int batchSize=16):Pool!(Task,batchSize){
@@ -156,6 +161,7 @@ static this(){
 
 class Task:TaskI{
     int _level; /// priority level of the task, the higher the better
+    int optAffinityLevel; /// optimal affinity level of the task (0 thread, 1 core, 2 numa node/socket)
     TaskStatus _status; /// execution status of the task
     
     void delegate() taskOp; /// task to execute
@@ -377,7 +383,27 @@ class Task:TaskI{
                 internalExe();
             }
             if (resubmit) {
-                scheduler.addTask(this);
+                bool resub=true;
+                assert((flags & TaskFlags.Delayed)==0);
+                version(NoTaskLock){
+                    volatile auto flagsAtt=flags;
+                    while (flagsAtt & TaskFlags.Delaying){
+                        if (atomicCAS(flags,(flagsAtt & ~TaskFlags.Delaying)|TaskFlags.Delayed,flagsAtt)){
+                            assert((flagsAtt & TaskFlags.Delayed)==0);
+                            resub=false;
+                            break;
+                        }
+                    }
+                } else {
+                    synchronized(taskLock){
+                        if (flags & TaskFlags.Delaying){
+                            flags=(flags & ~TaskFlags.Delaying)|TaskFlags.Delayed;
+                            resub=false;
+                        }
+                    }
+                }
+                if (resub)
+                    scheduler.addTask(this);
             } else {
                 startWaiting();
             }
@@ -392,14 +418,9 @@ class Task:TaskI{
         status=TaskStatus.WaitingEnd;
         bool callOnFinish=false;
         version(NoTaskLock){
-            volatile auto finishTaskAtt=finishTask;
-            volatile memoryBarrier!(true,false,false,false)(); // probably excessive
-            volatile auto spawnTasksAtt=spawnTasks;
-            volatile statusAtt=status;
-            if (status==TaskStatus.WaitingEnd){
-                if (spawnTasksAtt==finishTaskAtt){
-                    if (atomicCAS(status,TaskStatus.PostExec,statusAtt))
-                        callOnFinish=true;
+            if (spawnTasks==flagGet(finishedTasks)){
+                if (atomicCAS(status,TaskStatus.PostExec,TaskStatus.WaitingEnd)){
+                    callOnFinish=true;
                 }
             }
         } else {
@@ -459,29 +480,115 @@ class Task:TaskI{
     /// called when a subtasks has finished
     void subtaskEnded(TaskI st){
         bool callOnFinish=false;
-        version(NoTaskLock){
+        version(NoTaskLock){ // mmh suspicious, I should recheck this... especially barriers wrt. to the rest
             volatile auto oldTasks=flagAdd(finishedTasks,1);
             volatile memoryBarrier!(true,false,false,false)();// probably excessive
             volatile auto spawnTasksAtt=spawnTasks;
             volatile auto statusAtt=status;
-            if (statusAtt==TaskStatus.WaitingEnd && spawnTasksAtt==oldTasks+1){
-                if (atomicCAS(statusAtt,TaskStatus.PostExec,statusAtt)){
+            if ((statusAtt==TaskStatus.WaitingEnd || (flags & TaskFlags.Delayed)!=0) && spawnTasksAtt==oldTasks+1){
+                if (atomicCAS(statusAtt,TaskStatus.PostExec,TaskStatus.WaitingEnd)){
                     callOnFinish=true;
+                    assert(flags & (TaskFlags.WaitingSubtasks|TaskFlags.Delayed|TaskFlags.Delaying)==0);
+                } else {
+                    volatile auto flagsAtt=flags;
+                    while ((flagsAtt & TaskFlags.WaitingSubtasks)!=0){
+                        if (atomicCAS(flags,flagsAtt & (~TaskFlags.WaitingSubtasks),flagsAtt)){
+                            callOnFinish=true;
+                        }
+                        volatile flagsAtt=flags;
+                    }
                 }
             }
         } else {
             synchronized(taskLock){
                 ++finishedTasks;
-                if (status==TaskStatus.WaitingEnd && spawnTasks==finishedTasks){
-                    status=TaskStatus.PostExec;
-                    callOnFinish=true;
+                if (spawnTasks==finishedTasks){
+                    if (status==TaskStatus.WaitingEnd){
+                        status=TaskStatus.PostExec;
+                        callOnFinish=true;
+                        assert((flags & (TaskFlags.WaitingSubtasks|TaskFlags.Delayed|TaskFlags.Delaying))==0,"flags="~to!(char[])(flags));
+                    } else if ((flags & TaskFlags.WaitingSubtasks)!=0){
+                        flags=flags & (~TaskFlags.WaitingSubtasks);
+                        callOnFinish=true;
+                    }
                 }
             }
         }
         if (callOnFinish){
-            finishTask();
+            if (status==TaskStatus.PostExec){
+                finishTask();
+            } else {
+                resubmitDelayed();
+            }
         }
     }
+    /// resubmits this task that has been delayed, returns true if resubmission was actually performed
+    /// by default it throws if the task wasn't delayed
+    bool resubmitDelayed(bool shouldThrow=true){
+        version(NoTaskLock){
+            volatile auto flagsAtt=flags;
+            while ((flagsAtt & (TaskFlags.Delaying | TaskFlags.Delayed))!=0){
+                if (flagsAtt & TaskFlags.Delaying){
+                    if (atomicCAS(flags,flagsAtt & (~TaskFlags.Delaying),flagsAtt)){
+                        assert((flagsAtt& TaskFlags.Delayed)==0);
+                        return true;
+                    }
+                } else { // (flags & TaskFlags.Delayed)!=0
+                    if (atomicCAS(flags,flagsAtt & (~TaskFlags.Delayed),flagsAtt)){
+                        assert((flagsAtt& TaskFlags.Delaying)==0);
+                        scheduler.addTask(this);
+                        return true;
+                    }
+                }
+            }
+        } else {
+            bool resub=false;
+            synchronized(taskLock){
+                if ((flags & TaskFlags.Delaying)!=0){
+                    flags= flags & (~TaskFlags.Delaying);
+                    assert((flags & TaskFlags.Delayed)==0);
+                    return true;
+                } else if ((flags & TaskFlags.Delayed)!=0){
+                    flags=flags & (~TaskFlags.Delayed);
+                    assert((flags & TaskFlags.Delaying)==0);
+                    resub=true;
+                }
+            }
+            if (resub){
+                scheduler.addTask(this);
+                return true;
+            }
+        }
+        if (shouldThrow) {
+            throw new ParaException("resubmitDelayed called on non delayed task ("~taskName~")",
+                __FILE__,__LINE__);
+        }
+        return false;
+    }
+    /// delays the current task (which should be yieldable)
+    void delay(bool shouldThrow=true){
+        auto tAtt=taskAtt.val;
+        if (tAtt !is this){
+            throw new ParaException("delay '"~taskName~"' called while executing '"~((tAtt is null)?"*null*":tAtt.taskName),
+                __FILE__,__LINE__);
+        }
+        assert((flags & (TaskFlags.Delaying | TaskFlags.Delayed))==0);
+        version(NoTaskLock){
+            atomicOp(flags,delegate TaskFlags(TaskFlags f){ return t|TaskFlags.Resubmit|TaskFlags.Delaying; });
+        } else {
+            synchronized(taskLock){
+                flags|= TaskFlags.Resubmit|TaskFlags.Delaying;
+            }
+        }
+        if (!mightSpawn) {
+            if (shouldThrow)
+                throw new ParaException("delay called on non yieldable task ("~taskName~")",
+                    __FILE__,__LINE__);
+        } else {
+            scheduler.yield();
+        }
+    }
+    
     /// called before spawning a new subtask
     void willSpawn(TaskI st){
         version(NoTaskLock){
@@ -528,7 +635,7 @@ class Task:TaskI{
         fiber.call;
         resubmit=(fiber.state!=Fiber.State.TERM);
         if (resubmit && (flags & TaskFlags.TaskSet) && !scheduler.manyQueued()
-            && scheduler.executer.nSimpleTasksWanted()>1)
+            && scheduler.nSimpleTasksWanted()>1)
         {
             // to be smarter should store the cost and update it in willSpawn
             fiber.call;
@@ -540,7 +647,7 @@ class Task:TaskI{
         assert(generator!is null);
         resubmit=generator();
         if (resubmit && !scheduler.manyQueued()
-            && scheduler.executer.nSimpleTasksWanted()>1) {
+            && scheduler.nSimpleTasksWanted()>1) {
                 // to be smarter should store the cost and update it in willSpawn
                 resubmit=generator();
         }
@@ -549,7 +656,7 @@ class Task:TaskI{
     /// runs a generator that returns a pointer to a task (can be used as taskOp)
     void runGenerator2(){
         assert(generator2!is null);
-        long subCost=0,maxCost=scheduler.executer.nSimpleTasksWanted();
+        long subCost=0,maxCost=scheduler.nSimpleTasksWanted();
         do {
             TaskI t=generator2();
             resubmit=t !is null;
@@ -642,13 +749,64 @@ class Task:TaskI{
         submit(superTask);
         auto tAtt=taskAtt.val;
         if (tAtt.mightYield)
-            scheduler.yield();
+            scheduler.maybeYield();
         else if ((cast(RootTask)tAtt)is null){
             throw new ParaException(taskName
                 ~" submitYield called with non yieldable executing task ("~tAtt.taskName~")",
                 __FILE__,__LINE__); // allow?
         }
         return this;
+    }
+    /// yields until the subtasks have finished (or waits if Yielding is not possible),
+    /// then adds to the tasks to do at the end a task that continues the fiber of the current one
+    void finishSubtasks(){
+        auto tAtt=taskAtt.val;
+        if (cast(Object)tAtt !is this){
+            throw new ParaException("finishSubtasks called on task '"~taskName~"' while executing '"~((tAtt is null)?"*null*"[]:tAtt.taskName),
+                __FILE__,__LINE__);
+        }
+        if (mightYield){
+            version(NoTaskLock){
+                if (spawnTasks==finishedTasks){
+                    return;
+                }
+                atomicOp(tAtt.flags,delegate TaskFlags(TaskFlags f){ return f|TaskFlags.Resubmit|TaskFlags.Delaying;});
+                if (spawnTasks==flagGet(finishedTasks)){
+                    volatile auto flagsAtt=flags;
+                    while ((flagsAtt & TaskFlags.WaitingSubtasks)!=0){
+                        if (atomicCAS(flags,flagsAtt & (~(TaskFlags.Delaying|TaskFlags.WaitingSubtasks)),flagsAtt)){
+                            return;
+                        }
+                    }
+                }
+                
+            } else {
+                synchronized(taskLock){
+                    if (spawnTasks==finishedTasks){
+                        return;
+                    }
+                    flags|=TaskFlags.Resubmit|TaskFlags.Delaying|TaskFlags.WaitingSubtasks;
+                }
+            }
+            scheduler.yield();
+        } else {
+            bool noSubT=false;
+            version(NoTaskLock){
+                volatile auto oldTasks=finishedTasks;
+                volatile memoryBarrier!(true,false,false,false)();// probably excessive
+                volatile auto spawnTasksAtt=spawnTasks;
+                noSubT=(spawnTasksAtt==oldTasks);
+            } else {
+                synchronized(taskLock){
+                    noSubT=(spawnTasks==finishedTasks);
+                }
+            }
+            // this is not so nice, with some status hacking it should be possible to make it
+            // work in general, but as it is tricky, and the payoff small I haven't done it for now.
+            // this works in an immediate or a sequential executer.
+            // it will also normally trigger the notification of possibly waiting tasks
+            if (!noSubT) throw new ParaException("finishSubtasks called on non yieldable task ("~taskName~")",__FILE__,__LINE__);
+        }
     }
     /// description (for debugging)
     /// non threadsafe
@@ -754,9 +912,10 @@ class Task:TaskI{
             }
             if (status!=TaskStatus.Finished) {
                 assert(waitSem !is null);
-                waitSem.wait();
-                assert(status==TaskStatus.Finished,"unexpected status after wait");
-                waitSem.notify();
+                volatile auto wSem=waitSem;
+                wSem.wait();
+                //assert(status==TaskStatus.Finished,"unexpected status after wait");
+                wSem.notify();
             }
         }
     }

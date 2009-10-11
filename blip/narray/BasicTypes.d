@@ -1090,34 +1090,36 @@ else {
             bool atEnd() {
                 return it.end();
             }
-            int opApply(int delegate(V* x) loop_body){
+            int opApply(int delegate(ref V x) loop_body){
                 NArray a=it.baseArray;
                 const char[] loopBody=`
-                int ret=loop_body(aPtr0);
+                int ret=loop_body(*aPtr0);
                 if (ret) return ret;
                 `;
                 index_type iPos=0;
                 index_type optimalChunkSize_i=optimalChunkSize;
                 if (parallel){
-//                    mixin(pLoopPtr(rank,["a"],loopBody,"i"));
+                    mixin(pLoopPtr(rank,["a"],loopBody,"i"));
                 } else {
-//                    mixin(sLoopPtr(rank,["a"],loopBody,"i"));
+                    mixin(sLoopPtr(rank,["a"],loopBody,"i"));
                 }
                 return 0;
             }
-            int opApply(int delegate(size_t i,V* x) loop_body){
+            int opApply(int delegate(size_t i,ref V x) loop_body){
                 NArray a=it.baseArray;
                 index_type optimalChunkSize_i=optimalChunkSize;
                 size_t iPos=0;
                 const char[] loopBody=`
-                int ret=loop_body(iPos,aPtr0);
+                int ret=loop_body(iPos,*aPtr0);
                 if (ret) return ret;
                 ++iPos;
                 `;
                 if (parallel){
                     /// should use the pLoopIdx with one initial fixup
+                    size_t ii=0;
                     mixin(sLoopPtr(rank,["a"],loopBody,"i"));
                 } else {
+                    size_t ii=0;
                     mixin(sLoopPtr(rank,["a"],loopBody,"i"));
                 }
                 return 0;
@@ -1137,78 +1139,12 @@ else {
                 return this;
             }
         }
-        /// forward iterator compatible class on the values (FIteratorI!(V))
-        class FIteratorVals:FIteratorI!(V){
-            FlatIterator it;
-            bool parallel;
-            index_type optimalChunkSize;
-            this(NArray a){
-                it=FlatIterator(a);
-                parallel=false;
-                optimalChunkSize=defaultOptimalChunkSize;
-            }
-            V next(){
-                it.next();
-                return *it.p;
-            }
-            bool atEnd() {
-                return it.end();
-            }
-            int opApply(int delegate(V x) loop_body){
-                NArray a=it.baseArray;
-                const char[] loopBody=`
-                int ret=loop_body(*aPtr0);
-                if (ret) return ret;
-                `;
-                index_type iPos=0;
-                if (parallel){
-                    index_type optimalChunkSize_i=optimalChunkSize;
-                    mixin(pLoopPtr(rank,["a"],loopBody,"i"));
-                } else {
-                    mixin(sLoopPtr(rank,["a"],loopBody,"i"));
-                }
-                return 0;
-            }
-            int opApply(int delegate(size_t i,V x) loop_body){
-                NArray a=it.baseArray;
-                const char[] loopBody=`
-                int ret=loop_body(iPos,*aPtr0);
-                if (ret) return ret;
-                ++iPos;
-                `;
-                size_t iPos=0;
-                if (parallel){
-                    index_type optimalChunkSize_i=optimalChunkSize;
-                    /// needs pLoopIdx with initial fixup
-                    mixin(sLoopPtr(rank,["a"],loopBody,"i"));
-                } else {
-                    mixin(sLoopPtr(rank,["a"],loopBody,"i"));
-                }
-                return 0;
-            }
-            /// makes opApply parallel (if the work amount is larger than
-            /// optimalChunkSize)
-            FIteratorVals parallelLoop(size_t myOptimalChunkSize){
-                optimalChunkSize=cast(index_type)myOptimalChunkSize;
-                parallel=true;
-                return this;
-            }
-            /// makes opApply parallel.
-            FIteratorVals parallelLoop(){
-                parallel=true;
-                return this;
-            }
-        }
         
         /// forward iterator on adresses compatible interface (FIteratorI!(V*))
         FIterator fiterator(){
             return new FIterator(this);
         }
         
-        /// forward iterator on values compatible interface (FIteratorI!(V))
-        FIteratorVals fiteratorVals(){
-            return new FIteratorVals(this);
-        }
         /+ --------------------------------------------------- +/
         
         /// Return a shallow copy of the array

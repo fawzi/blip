@@ -15,6 +15,7 @@ import blip.parallel.PriQueue;
 import blip.parallel.Models;
 import blip.parallel.BasicTasks;
 import blip.BasicModels;
+import tango.math.random.Random;
 
 /// task scheduler that tries to perform a depth first reduction of the task
 /// using the maximum parallelization available.
@@ -29,6 +30,8 @@ import blip.BasicModels;
 /// integrate PriQueue in this? it would be slighly more efficient, and already now
 /// depends on its implementation details, or they should be better separated
 class PriQTaskScheduler:TaskSchedulerI {
+    /// random source for scheduling
+    RandomSync rand;
     /// queue for tasks to execute
     PriQueue!(TaskI) queue;
     /// logger for problems/info
@@ -59,6 +62,7 @@ class PriQTaskScheduler:TaskSchedulerI {
         } else {
             queue=new PriQueue!(TaskI)();
         }
+        this.rand=new RandomSync();
         log=Log.lookup(loggerPath);
         _rootTask=new RootTask(this,0,name~"RootTask");
         runLevel=SchedulerRunLevel.Running;
@@ -166,6 +170,13 @@ class PriQTaskScheduler:TaskSchedulerI {
     void yield(){
         Fiber.yield();
     }
+    /// maybe yields the current task if the scheduler is not sequential
+    /// at the moment it is quite crude (50%, i.e. 25% less switches when the queue is full,
+    /// and 25% (37.5% less switches) when the queue is empty)
+    void maybeYield(){
+        if (((!manyQueued()) || rand.uniform!(bool)()) && rand.uniform!(bool)())
+            Fiber.yield();
+    }
     /// sets the executer
     void executer(ExecuterI nExe){
         _executer=nExe;
@@ -223,4 +234,6 @@ class PriQTaskScheduler:TaskSchedulerI {
     Logger logger(){ return log; }
     /// if there are many queued tasks (and one should try not to queue too many of them)
     bool manyQueued() { return queue.nEntries>15; }
+    /// number of simple tasks wanted
+    int nSimpleTasksWanted(){ return 4; }
 }
