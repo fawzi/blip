@@ -559,7 +559,10 @@ class Task:TaskI{
             __FILE__,__LINE__);
     }
     /// delays the current task (which should be yieldable)
-    void delay(){
+    /// opStart is executed after the task has been flagged as delayed, but before
+    /// stopping the current execution. Use it to start the operation that will resume
+    /// the task (so that it is not possible to resume before the delay is effective)
+    void delay(void delegate() opStart=null){
         auto tAtt=taskAtt.val;
         if (tAtt !is this){
             throw new ParaException("delay '"~taskName~"' called while executing '"~((tAtt is null)?"*null*":tAtt.taskName),
@@ -577,6 +580,9 @@ class Task:TaskI{
             throw new ParaException("delay called on non yieldable task ("~taskName~")",
                 __FILE__,__LINE__);
         } else {
+            if (opStart!is null){
+                opStart();
+            }
             scheduler.yield();
         }
     }
@@ -734,8 +740,7 @@ class Task:TaskI{
         }
         if (tAtt is null || ((cast(RootTask)tAtt)!is null) || tAtt is noTask || !tAtt.mightYield){
             onFinish.append(&tAtt.resubmitDelayed);
-            tAtt.delay();
-            this.superTask.spawnTask(this);
+            tAtt.delay({this.superTask.spawnTask(this);});
         } else {
             this.superTask.spawnTask(this);
             this.wait();
@@ -774,6 +779,7 @@ class Task:TaskI{
     }
     /// yields until the subtasks have finished (or waits if Yielding is not possible),
     /// then adds to the tasks to do at the end a task that continues the fiber of the current one
+    /// remove? not really worth having...
     void finishSubtasks(){
         auto tAtt=taskAtt.val;
         if (cast(Object)tAtt !is this){

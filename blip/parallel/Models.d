@@ -123,8 +123,11 @@ interface SubmittingI:BasicObjectI {
     TaskI submitYield(TaskI t=null);
     /// spawns the task t from the present task
     void spawnTask(TaskI t);
-    /// delay the task (should be executing, can be called only by the task itself)
-    void delay();
+    /// delays the current task (which should be yieldable)
+    /// opStart is executed after the task has been flagged as delayed, but before
+    /// stopping the current execution. Use it to start the operation that will resume
+    /// the task (so that it is not possible to resume before the delay is effective)
+    void delay(void delegate()opStart=null);
     /// resubmit a delayed task
     void resubmitDelayed();
     /// executes the task, and waits for its completion
