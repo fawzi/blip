@@ -10,6 +10,8 @@ import tango.stdc.string;
 import tango.core.Traits;
 import blip.serialization.Serialization;
 import blip.serialization.SerializationMixins;
+import blip.container.AtomicSLink;
+import blip.parallel.WorkManager;
 
 /// guard object to deallocate large arrays that contain inner pointers
 class Guard{
@@ -42,6 +44,7 @@ struct BulkArray(T){
     Guard guard;
     Flags flags=Flags.Dummy;
     static const BulkArray dummy={null,null,null,Flags.Dummy};
+    alias T dtype;
     
     // ---- Serialization ---
     static ClassMetaInfo metaI;
@@ -262,7 +265,7 @@ struct BulkArray(T){
             T* end;
             int delegate(size_t index,ref DynamicArrayType!(T) v) loopBody;
             size_t index;
-            Slice1 *next;
+            Slice2 *next;
             void exec(){
                 for (T*tPtr=start;tPtr!=end;++tPtr){
                     auto res=loopBody(index,*tPtr);
@@ -304,12 +307,11 @@ struct BulkArray(T){
                             newChunk.start=start;
                             start+=optimalBlockSize;
                             newChunk.end=start;
-                            newChunk.index=index;
                             index+=optimalBlockSize;
-                            Task("BulkArrayPLoop0sub",&newChunk.exec2).submitYield();
+                            Task("BulkArrayPLoop0sub",&newChunk.exec2).autorelease.submitYield();
                         }
                         if (res==0){
-                            for (T*aPtr=array.ptr;aPtr!=aEnd;++aPtr){
+                            for (T*aPtr=start;aPtr!=end;++aPtr){
                                 int ret=loopBody(*aPtr);
                                 if (ret) {
                                     res=ret;
@@ -332,9 +334,9 @@ struct BulkArray(T){
                 Task("BulkArrayPLoop1",
                     delegate void(){
                         while(start-end>optimalBlockSize*3/2 && res==0){
-                            auto newChunk=popFrom(freeList1);
+                            auto newChunk=popFrom(freeList2);
                             if (newChunk is null){
-                                newChunk=new Slice1;
+                                newChunk=new Slice2;
                                 newChunk.loopBody=loopBody;
                                 newChunk.context=this;
                             }
@@ -343,21 +345,23 @@ struct BulkArray(T){
                             newChunk.end=start;
                             newChunk.index=index;
                             index+=optimalBlockSize;
-                            Task(&newChunk.exec2).submitYield();
+                            Task("BulkArrayPLoop1sub",&newChunk.exec2).autorelease.submitYield();
                         }
                         if (res==0){
-                            for (T*aPtr=array.ptr;aPtr!=aEnd;++aPtr){
-                                int ret=loopBody(*aPtr);
+                            for (T*aPtr=start;aPtr!=end;++aPtr){
+                                int ret=loopBody(index,*aPtr);
                                 if (ret) {
                                     res=ret;
                                     break; // needs to keep the context valid while sub runs might use it...
                                 }
+                                ++index;
                             }
                         }
                     }).executeNow();
                 return res;
             } else {
                 size_t len=end-start;
+                T*aPtr=start;
                 for (size_t i=0;i!=len;++i,++aPtr){
                     int ret=loopBody(i,*aPtr);
                     if (ret) return ret;
