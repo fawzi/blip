@@ -520,20 +520,20 @@ class Task:TaskI{
     }
     /// resubmits this task that has been delayed, returns true if resubmission was actually performed
     /// by default it throws if the task wasn't delayed
-    bool resubmitDelayed(bool shouldThrow=true){
+    void resubmitDelayed(){
         version(NoTaskLock){
             volatile auto flagsAtt=flags;
             while ((flagsAtt & (TaskFlags.Delaying | TaskFlags.Delayed))!=0){
                 if (flagsAtt & TaskFlags.Delaying){
                     if (atomicCAS(flags,flagsAtt & (~TaskFlags.Delaying),flagsAtt)){
                         assert((flagsAtt& TaskFlags.Delayed)==0);
-                        return true;
+                        return;
                     }
                 } else { // (flags & TaskFlags.Delayed)!=0
                     if (atomicCAS(flags,flagsAtt & (~TaskFlags.Delayed),flagsAtt)){
                         assert((flagsAtt& TaskFlags.Delaying)==0);
                         scheduler.addTask(this);
-                        return true;
+                        return;
                     }
                 }
             }
@@ -543,7 +543,7 @@ class Task:TaskI{
                 if ((flags & TaskFlags.Delaying)!=0){
                     flags= flags & (~TaskFlags.Delaying);
                     assert((flags & TaskFlags.Delayed)==0);
-                    return true;
+                    return;
                 } else if ((flags & TaskFlags.Delayed)!=0){
                     flags=flags & (~TaskFlags.Delayed);
                     assert((flags & TaskFlags.Delaying)==0);
@@ -552,17 +552,14 @@ class Task:TaskI{
             }
             if (resub){
                 scheduler.addTask(this);
-                return true;
+                return;
             }
         }
-        if (shouldThrow) {
-            throw new ParaException("resubmitDelayed called on non delayed task ("~taskName~")",
-                __FILE__,__LINE__);
-        }
-        return false;
+        throw new ParaException("resubmitDelayed called on non delayed task ("~taskName~")",
+            __FILE__,__LINE__);
     }
     /// delays the current task (which should be yieldable)
-    void delay(bool shouldThrow=true){
+    void delay(){
         auto tAtt=taskAtt.val;
         if (tAtt !is this){
             throw new ParaException("delay '"~taskName~"' called while executing '"~((tAtt is null)?"*null*":tAtt.taskName),
@@ -577,14 +574,12 @@ class Task:TaskI{
             }
         }
         if (!mightSpawn) {
-            if (shouldThrow)
-                throw new ParaException("delay called on non yieldable task ("~taskName~")",
-                    __FILE__,__LINE__);
+            throw new ParaException("delay called on non yieldable task ("~taskName~")",
+                __FILE__,__LINE__);
         } else {
             scheduler.yield();
         }
     }
-    
     /// called before spawning a new subtask
     void willSpawn(TaskI st){
         version(NoTaskLock){
@@ -722,6 +717,30 @@ class Task:TaskI{
             return fPool;
         else
             return defaultFiberPool(fPool);
+    }
+    /// executes this task synchroneously
+    void executeNow(TaskI supertask=null){
+        auto tAtt=taskAtt.val;
+        if (superTask !is null){
+            assert(this.superTask is null || this.superTask is superTask,"superTask was already set");
+            this.superTask=superTask;
+        }
+        if (this.superTask is null){
+            if (scheduler !is null){
+                this.superTask=scheduler.rootTask;
+            } else {
+                this.superTask=taskAtt.val;
+            }
+        }
+        if (tAtt is null || ((cast(RootTask)tAtt)!is null) || tAtt is noTask || !tAtt.mightYield){
+            onFinish.append(&tAtt.resubmitDelayed);
+            tAtt.delay();
+            this.superTask.spawnTask(this);
+        } else {
+            this.superTask.spawnTask(this);
+            this.wait();
+        }
+        return this;
     }
     /// submits this task (with the given supertask, or with the actual task as supertask)
     Task submit(TaskI superTask=null){

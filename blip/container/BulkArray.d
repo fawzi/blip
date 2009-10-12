@@ -292,30 +292,32 @@ struct BulkArray(T){
         }
         int opApply(int delegate(ref DynamicArrayType!(T) v) loopBody){
             if (end-start>optimalBlockSize*2){
-                while(start-end>optimalBlockSize*3/2 && res==0){
-                    auto newChunk=popFrom(freeList1);
-                    if (newChunk is null){
-                        newChunk=new Slice1;
-                        newChunk.loopBody=loopBody;
-                        newChunk.context=this;
-                    }
-                    newChunk.start=start;
-                    start+=optimalBlockSize;
-                    newChunk.end=start;
-                    newChunk.index=index;
-                    index+=optimalBlockSize;
-                    Task(&newChunk.exec2).submitYield();
-                }
-                if (res==0){
-                    for (T*aPtr=array.ptr;aPtr!=aEnd;++aPtr){
-                        int ret=loopBody(*aPtr);
-                        if (ret) {
-                            res=ret;
-                            break; // needs to keep the context valid while sub runs might use it...
+                Task("BulkArrayPLoop0",
+                    delegate void(){
+                        while(start-end>optimalBlockSize*3/2 && res==0){
+                            auto newChunk=popFrom(freeList1);
+                            if (newChunk is null){
+                                newChunk=new Slice1;
+                                newChunk.loopBody=loopBody;
+                                newChunk.context=this;
+                            }
+                            newChunk.start=start;
+                            start+=optimalBlockSize;
+                            newChunk.end=start;
+                            newChunk.index=index;
+                            index+=optimalBlockSize;
+                            Task("BulkArrayPLoop0sub",&newChunk.exec2).submitYield();
                         }
-                    }
-                }
-                Task.finishSubtasks();
+                        if (res==0){
+                            for (T*aPtr=array.ptr;aPtr!=aEnd;++aPtr){
+                                int ret=loopBody(*aPtr);
+                                if (ret) {
+                                    res=ret;
+                                    break; // needs to keep the context valid while sub runs might use it...
+                                }
+                            }
+                        }
+                    }).executeNow();
                 return res;
             } else {
                 for (T*aPtr=start;aPtr!=end;++aPtr){
@@ -327,30 +329,32 @@ struct BulkArray(T){
         }
         int opApply(int delegate(size_t i,ref DynamicArrayType!(T) v) loopBody){
             if (end-start>optimalBlockSize*2){
-                while(start-end>optimalBlockSize*3/2 && res==0){
-                    auto newChunk=popFrom(freeList1);
-                    if (newChunk is null){
-                        newChunk=new Slice1;
-                        newChunk.loopBody=loopBody;
-                        newChunk.context=this;
-                    }
-                    newChunk.start=start;
-                    start+=optimalBlockSize;
-                    newChunk.end=start;
-                    newChunk.index=index;
-                    index+=optimalBlockSize;
-                    Task(&newChunk.exec2).submitYield();
-                }
-                if (res==0){
-                    for (T*aPtr=array.ptr;aPtr!=aEnd;++aPtr){
-                        int ret=loopBody(*aPtr);
-                        if (ret) {
-                            res=ret;
-                            break; // needs to keep the context valid while sub runs might use it...
+                Task("BulkArrayPLoop1",
+                    delegate void(){
+                        while(start-end>optimalBlockSize*3/2 && res==0){
+                            auto newChunk=popFrom(freeList1);
+                            if (newChunk is null){
+                                newChunk=new Slice1;
+                                newChunk.loopBody=loopBody;
+                                newChunk.context=this;
+                            }
+                            newChunk.start=start;
+                            start+=optimalBlockSize;
+                            newChunk.end=start;
+                            newChunk.index=index;
+                            index+=optimalBlockSize;
+                            Task(&newChunk.exec2).submitYield();
                         }
-                    }
-                }
-                Task.finishSubtasks();
+                        if (res==0){
+                            for (T*aPtr=array.ptr;aPtr!=aEnd;++aPtr){
+                                int ret=loopBody(*aPtr);
+                                if (ret) {
+                                    res=ret;
+                                    break; // needs to keep the context valid while sub runs might use it...
+                                }
+                            }
+                        }
+                    }).executeNow();
                 return res;
             } else {
                 size_t len=end-start;

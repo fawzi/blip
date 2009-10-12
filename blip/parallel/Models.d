@@ -123,6 +123,12 @@ interface SubmittingI:BasicObjectI {
     TaskI submitYield(TaskI t=null);
     /// spawns the task t from the present task
     void spawnTask(TaskI t);
+    /// delay the task (should be executing, can be called only by the task itself)
+    void delay();
+    /// resubmit a delayed task
+    void resubmitDelayed();
+    /// executes the task, and waits for its completion
+    void executeNow(TaskI t=null);
 }
 
 /// exception for parallelization problems
