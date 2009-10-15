@@ -319,7 +319,7 @@ struct BulkArray(T){
                                 }
                             }
                         }
-                    }).executeNow();
+                    },TaskFlags.TaskSet).executeNow();
                 return res;
             } else {
                 for (T*aPtr=start;aPtr!=end;++aPtr){

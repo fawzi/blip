@@ -48,7 +48,7 @@ import blip.rtest.RTest;
 import blip.BasicModels;
 import blip.serialization.Serialization;
 import blip.text.Stringify;
-import tango.core.sync.Atomic;
+import blip.sync.Atomic;
 //import tango.io.Stdout;
 
 /// flags for fast checking of 

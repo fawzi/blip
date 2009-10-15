@@ -7,7 +7,7 @@
 /// author: fawzi
 /// license: apache 2.0
 module blip.container.AtomicSLink;
-import tango.core.sync.Atomic: atomicOp;
+import blip.sync.Atomic: atomicOp;
 
 /// inserts newHead before head, and returns the value at head when the insertion took place
 T insertAt(T)(ref T head,T newHead){

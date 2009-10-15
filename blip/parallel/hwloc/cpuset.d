@@ -5,6 +5,7 @@
  * build on the exported functions
  */
 module blip.parallel.hwloc.cpuset;
+version(noHwloc){} else {
 import tango.stdc.config;
 import tango.stdc.stringz;
 /** \defgroup hwlocality_cpuset The Cpuset API
@@ -366,3 +367,4 @@ int hwloc_cpuset_compar(hwloc_cpuset_t set1, hwloc_cpuset_t set2);
 
 /** \brief Compute the weight of CPU set \p set */
 int hwloc_cpuset_weight(hwloc_cpuset_t set);
+}

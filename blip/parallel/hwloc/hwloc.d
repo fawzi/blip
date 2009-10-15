@@ -5,7 +5,7 @@
  * released under the BSD license.
  */
 module blip.parallel.hwloc.hwloc;
-import tango.core.BitVector;
+version(noHwloc){} else {
 import tango.stdc.config;
 import tango.stdc.stdlib:abort;
 import blip.parallel.hwloc.cpuset;
@@ -600,4 +600,5 @@ uint hwloc_get_type_or_above_depth (hwloc_topology_t topology, hwloc_obj_type_t 
 hwloc_obj_t hwloc_get_system_obj (hwloc_topology_t topology)
 {
   return hwloc_get_obj_by_depth (topology, 0, 0);
+}
 }

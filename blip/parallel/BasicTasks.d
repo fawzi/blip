@@ -16,7 +16,7 @@ import blip.TemplateFu:ctfe_i2a;
 import blip.parallel.Models;
 import blip.BasicModels;
 import blip.container.Pool;
-import tango.core.sync.Atomic;
+import blip.sync.Atomic;
 import blip.container.FiberPool;
 import tango.core.Memory:GC;
 

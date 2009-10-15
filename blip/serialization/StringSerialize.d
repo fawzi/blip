@@ -5,6 +5,7 @@ import blip.text.Stringify;
 import blip.serialization.JsonSerialization;
 import blip.serialization.SerializationBase;
 import tango.io.stream.Format;
+public import tango.io.stream.Format: FormatOutput;
 
 /// serializes to string
 class StringSerializeT(T=char){
@@ -40,7 +41,7 @@ char[] serializeToString(T)(T t){
 FormatOutput!(T) serializeToFormatter(U,T)(FormatOutput!(T)formatter,U t){
     scope serializer=new JsonSerializer!(T)(formatter);
     serializer(t);
-    return serializer;
+    return formatter;
 }
 
 template printOut(){
@@ -53,8 +54,8 @@ template printOut(){
     
     FormatOutput!(char)desc(FormatOutput!(char)f){
         static if (is(typeof(*T.init)==struct))
-            serializeToFormatter(f,*this);
+            return serializeToFormatter(f,*this);
         else
-            serializeToFormatter(f,this);
+            return serializeToFormatter(f,this);
     }
 }
