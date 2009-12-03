@@ -1,21 +1,21 @@
 /// executers (sequential and parallel)
-module blip.parallel.BasicExecuters;
+module blip.parallel.smp.BasicExecuters;
 import tango.core.Thread;
 import tango.math.Math;
 import tango.io.Stdout;
-import tango.util.log.Log;
-import tango.io.stream.Format;
+import blip.t.util.log.Log;
+import blip.t.io.stream.Format:FormatOut;
 import blip.text.Stringify;
 import blip.TemplateFu:ctfe_i2a;
-import blip.parallel.Models;
-import blip.parallel.BasicSchedulers;
-import blip.parallel.BasicTasks;
-import blip.parallel.PriQueue;
+import blip.parallel.smp.SmpModels;
+import blip.parallel.smp.BasicSchedulers;
+import blip.parallel.smp.BasicTasks;
+import blip.parallel.smp.PriQueue;
 import blip.BasicModels;
-import blip.parallel.Numa;
+import blip.parallel.smp.Numa;
 
 static this(){
-    Log.lookup("blip.parallel.exec").level(Logger.Level.Warn,true);
+    Log.lookup("blip.parallel.smp.exec").level(Logger.Level.Warn,true);
 }
 
 /// executes the task immediately in the current context
@@ -35,7 +35,7 @@ class ImmediateExecuter:ExecuterI,TaskSchedulerI{
         return _name;
     }
     /// creates a new executer
-    this(char[] name,char[]loggerPath="blip.parallel.exec"){
+    this(char[] name,char[]loggerPath="blip.parallel.smp.exec"){
         this._name=name;
         log=Log.lookup(loggerPath);
         runLevel=SchedulerRunLevel.Running;
@@ -51,11 +51,11 @@ class ImmediateExecuter:ExecuterI,TaskSchedulerI{
         return getString(desc(new Stringify()).newline);
     }
     /// description (for debugging)
-    FormatOutput!(char) desc(FormatOutput!(char)s){ return desc(s,false); }
+    FormatOut desc(FormatOut s){ return desc(s,false); }
     /// description (for debugging)
     /// (might not be a snapshot if other threads modify it while printing)
     /// non threadsafe
-    FormatOutput!(char) desc(FormatOutput!(char)s,bool shortVersion){
+    FormatOut desc(FormatOut s,bool shortVersion){
         s.format("<ImmediateExecuter@{} ",cast(void*)this)(name);
         if (shortVersion) {
             s(" >");
@@ -147,7 +147,7 @@ class PExecuter:ExecuterI{
     }
     TaskSchedulerI scheduler(){ return _scheduler; }
     /// creates a new executer
-    this(char[] name,TaskSchedulerI scheduler=null,int nproc=-1,char[]loggerPath="blip.parallel.exec"){
+    this(char[] name,TaskSchedulerI scheduler=null,int nproc=-1,char[]loggerPath="blip.parallel.smp.exec"){
         this._name=name;
         this._scheduler=scheduler;
         if (scheduler is null) {
@@ -197,11 +197,11 @@ class PExecuter:ExecuterI{
         return getString(desc(new Stringify()).newline);
     }
     /// description (for debugging)
-    FormatOutput!(char) desc(FormatOutput!(char)s){ return desc(s,false); }
+    FormatOut desc(FormatOut s){ return desc(s,false); }
     /// description (for debugging)
     /// (might not be a snapshot if other threads modify it while printing)
     /// non threadsafe
-    FormatOutput!(char) desc(FormatOutput!(char)s,bool shortVersion){
+    FormatOut desc(FormatOut s,bool shortVersion){
         s.format("<PExecuter@{}",cast(void*)this);
         if (shortVersion) {
             s(" >");
@@ -291,11 +291,11 @@ class TExecuter:ExecuterI{
     }
     TaskSchedulerI scheduler(){ return rootScheduler; }
     /// creates a new executer
-    this(char[] name,NumaTopology topology,char[]loggerPath="blip.parallel.exec"){
+    this(char[] name,NumaTopology topology,char[]loggerPath="blip.parallel.smp.exec"){
         this._name=name;
         int level=topology.maxLevel();
         this.rootScheduler=new PriQTaskScheduler(this.name~"sched_"~ctfe_i2a(level)~"_"~ctfe_i2a(0),
-            "blip.parallel.queue",level);
+            "blip.parallel.smp.queue",level);
         schedulers[NumaNode(level,0)]=this.rootScheduler;
         this.rootScheduler.level=level;
         this.rootScheduler.executer=this;
@@ -305,7 +305,7 @@ class TExecuter:ExecuterI{
                 auto superN=topology.superNode(nodeAtt);
                 auto superS=schedulers[superN];
                 auto newS=new PriQTaskScheduler(this.name~"sched_"~ctfe_i2a(level)~"_"~ctfe_i2a(nodeAtt.pos),
-                    "blip.parallel.queue",level,superS);
+                    "blip.parallel.smp.queue",level,superS);
                 schedulers[nodeAtt]=newS;
                 newS.executer=this;
             }
@@ -332,11 +332,11 @@ class TExecuter:ExecuterI{
         return getString(desc(new Stringify()).newline);
     }
     /// description (for debugging)
-    FormatOutput!(char) desc(FormatOutput!(char)s){ return desc(s,false); }
+    FormatOut desc(FormatOut s){ return desc(s,false); }
     /// description (for debugging)
     /// (might not be a snapshot if other threads modify it while printing)
     /// non threadsafe
-    FormatOutput!(char) desc(FormatOutput!(char)s,bool shortVersion){
+    FormatOut desc(FormatOut s,bool shortVersion){
         s.format("<TExecuter@{}",cast(void*)this);
         if (shortVersion) {
             s(" >");

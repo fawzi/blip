@@ -3,11 +3,11 @@ module testRTest;
 import tango.io.Stdout;
 import blip.rtest.RTest;
 import blip.NullStream;
-import tango.io.stream.Format;
+import blip.t.io.stream.Format:FormatOut;
 import blip.TemplateFu;
-import blip.parallel.WorkManager;
+import blip.parallel.smp.WorkManager;
 import tango.util.log.Config;
-import tango.util.log.Log;
+import blip.t.util.log.Log;
 
 private int[4] specialNrs=[0,2,5,8];
 
@@ -19,11 +19,11 @@ private mixin testInit!("",`arg0=specialNrs[arg0_i]; arg0_nEl=specialNrs.length;
 arg1=specialNrs[arg1_i]; arg1_nEl=specialNrs.length;`) combNrTst; // combinatorial cases
 
 void main(char[][]argv){
-    Stdout("blip.parallel:")(Log.lookup("blip.parallel").level).newline;
-    Log.lookup("blip.parallel").info("pippo");
-    Stdout("blip.parallel.queue:")(Log.lookup("blip.parallel.queue").level).newline;
-    Log.lookup("blip.parallel.queue").info("pippo");
-    FormatOutput!(char) nullPrt=new FormatOutput!(char)(nullStream());
+    Stdout("blip.parallel.smp:")(Log.lookup("blip.parallel.smp").level).newline;
+    Log.lookup("blip.parallel.smp").info("pippo");
+    Stdout("blip.parallel.smp.queue:")(Log.lookup("blip.parallel.smp.queue").level).newline;
+    Log.lookup("blip.parallel.smp.queue").info("pippo");
+    FormatOut nullPrt=new FormatOut(nullStream());
     nullPrt=Stdout;
     SingleRTest.defaultTestController=new TextController(TextController.OnFailure.StopTest,
         TextController.PrintLevel.AllShort,nullPrt,nullPrt,1,false);
@@ -80,7 +80,7 @@ void main(char[][]argv){
     ];
 
     auto expectedFailures=[0,0,0,1,1,0,0,0,0,1,0,0,0,1,0,0,0,2,0,0,0,1,1];
-    failTests.runTestsTask().submit(defaultTask).wait();
+    failTests.runTestsTask().autorelease.submit(defaultTask).wait();
     foreach (i,t;tests){
         t.runTestsTask().submit(sequentialTask);
         if(t.stat.failedTests!=expectedFailures[i])

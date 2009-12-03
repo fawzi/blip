@@ -1,23 +1,25 @@
-NArray a multidimensional array in D.
-
+Blip is undergoing a reorganization, so building might be a little more complex than it should:
+* you need a specific version of tango, this is given as a tar.gz in the blip site or from http://files.me.com/fmohamed/3jk7r3 the next release of tango will be supported
+* 
 Git repositories is available at
     http://github.com/fawzi/
 
-You need to take both rtest (the testing framework and basic utils) and narray (the actual multidimensional array library).
 If you have git you can
 
     git clone git://github.com/fawzi/blip.git
 
 to install
-
+    cd tango/build
+    ./build.sh
+    cd ../..
+    
     cd blip
-    dsss build
-    dsss install
+    ./build.sh
     cd ..
     
-blas/lapack are used by default, and are part of the distribution, they come from the 
+blas/lapack wrappers are used by default, and are part of the distribution, they come from the 
     http://dsource.org/projects/multiarray
-project.
+project, but the blas and lapack library themselves have to be installed by yourself (goto2 is a good choice)
 
 you can also use the included makefile, for example on mac I do
 
@@ -35,6 +37,8 @@ so if you do not want to link blas/lapack do something like
 other useful flags are
     -debug=TestNArray   // activates extra internal consistency checks in NArray
     -version=multiarray // in perf_test times also multiarray performace (that you need to install separately)
+
+mpi has wrappers to the open mpi routines, but that has to be activatd.
 
 The serialization routine can use xpose to automatically define a serialization routine.
 Xpose comes from

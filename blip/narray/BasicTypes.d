@@ -42,13 +42,14 @@ import tango.core.Array: sort;
 import tango.stdc.string: memset,memcpy,memcmp;
 import blip.TemplateFu;
 import tango.core.Traits;
-import tango.io.stream.Format: FormatOutput;
+import blip.t.io.stream.Format:FormatOut;
 import tango.math.Math: abs;
 import blip.rtest.RTest;
 import blip.BasicModels;
 import blip.serialization.Serialization;
 import blip.text.Stringify;
 import blip.sync.Atomic;
+import blip.parallel.smp.WorkManager;
 //import tango.io.Stdout;
 
 /// flags for fast checking of 
@@ -191,7 +192,7 @@ else {
     final class NArray : CopiableObjectI, Serializable
     {
         // default optimal chunk size for parallel looping
-        static index_type defaultOptimalChunkSize=200*1024/V.sizeof;
+        static index_type defaultOptimalChunkSize=defaultSimpleLoopSize/V.sizeof;
         /// pointer to the element 0,...0 (not necessarily the start of the slice)
         V* startPtrArray;
         /// strides multiplied by V.sizeof (can be negative)
@@ -208,16 +209,16 @@ else {
         alias ArrayFlags Flags;
         /// the underlying data slice
         V[] data() {
-            if (nElArray==0) return null;
+            if (this.nElArray==0) return null;
             index_type minExt=0,maxExt=0;
             for (int i=0;i<rank;++i){
-                if (bStrides[i]>=0){
-                    maxExt+=bStrides[i]*(shape[i]-1);
+                if (this.bStrides[i]>=0){
+                    maxExt+=this.bStrides[i]*(this.shape[i]-1);
                 } else {
-                    minExt+=bStrides[i]*(shape[i]-1);
+                    minExt+=this.bStrides[i]*(this.shape[i]-1);
                 }
             }
-            return (cast(V*)(cast(size_t)startPtrArray+minExt))[0..((maxExt-minExt)/cast(index_type)V.sizeof+1)];
+            return (cast(V*)(cast(size_t)this.startPtrArray+minExt))[0..((maxExt-minExt)/cast(index_type)V.sizeof+1)];
         }
         /// calulates the base flags (Contiguos,Fortran,Compact1,Compact2,Small,Large)
         static uint calcBaseFlags(index_type[rank] strides, index_type[rank] shape)
@@ -681,48 +682,48 @@ else {
                     return res;
                 }
                 bool next(){
-                    iPos++;
-                    if (iPos<iDim){
-                        iIdx+=stride;
+                    this.iPos++;
+                    if (this.iPos<this.iDim){
+                        this.iIdx+=this.stride;
                         return false;
                     } else {
-                        iPos=iDim;
+                        this.iPos=this.iDim;
                         return false;
                     }
                 }
                 V value()
-                in { assert(iPos<iDim); }
+                in { assert(this.iPos<this.iDim); }
                 body {
-                    return *cast(V*)(cast(size_t)baseArray.startPtrArray+iIdx);
+                    return *cast(V*)(cast(size_t)this.baseArray.startPtrArray+this.iIdx);
                 }
                 void value(V val)
-                in { assert(iPos<iDim); }
+                in { assert(this.iPos<this.iDim); }
                 body {
-                    *cast(V*)(cast(size_t)baseArray.startPtrArray+iIdx)=val;
+                    *cast(V*)(cast(size_t)this.baseArray.startPtrArray+this.iIdx)=val;
                 }
                 V get(index_type index)
-                in { assert(0<=index && index<iDim,"invalid index in SubView.get"); }
+                in { assert(0<=index && index<this.iDim,"invalid index in SubView.get"); }
                 body {
-                    iIdx+=(index-iIdx)*stride;
-                    iPos=index;
-                    return *cast(V*)(cast(size_t)baseArray.startPtrArray+iIdx);
+                    this.iIdx+=(index-this.iIdx)*this.stride;
+                    this.iPos=index;
+                    return *cast(V*)(cast(size_t)this.baseArray.startPtrArray+this.iIdx);
                 }
                 int opApply( int delegate(ref V) loop_body ) {
-                    if (iPos<iDim){
-                        V* pos=cast(V*)(cast(size_t)baseArray.startPtrArray+iIdx);
-                        for (index_type i=iPos;i!=iDim;++i){
+                    if (this.iPos<this.iDim){
+                        V* pos=cast(V*)(cast(size_t)this.baseArray.startPtrArray+this.iIdx);
+                        for (index_type i=this.iPos;i!=this.iDim;++i){
                             if (auto r=loop_body(*pos)) return r;
-                            pos=cast(V*)(cast(size_t)pos+stride);
+                            pos=cast(V*)(cast(size_t)pos+this.stride);
                         }
                     }
                     return 0;
                 }
                 int opApply( int delegate(ref index_type,ref V) loop_body ) {
-                    if (iPos<iDim){
-                        V* pos=cast(V*)(cast(size_t)baseArray.startPtrArray+iIdx);
-                        for (index_type i=iPos;i!=iDim;i++){
+                    if (this.iPos<this.iDim){
+                        V* pos=cast(V*)(cast(size_t)this.baseArray.startPtrArray+this.iIdx);
+                        for (index_type i=this.iPos;i!=this.iDim;i++){
                             if (auto r=loop_body(i,*pos)) return r;
-                            pos=cast(V*)(cast(size_t)pos+stride);
+                            pos=cast(V*)(cast(size_t)pos+this.stride);
                         }
                     }
                     return 0;
@@ -811,7 +812,7 @@ else {
                     }
                     return 0;
                 }
-                FormatOutput!(char)desc(FormatOutput!(char)s){
+                FormatOut desc(FormatOut s){
                     if (this is null){
                         return s("<SubView *null*>").newline;
                     }
@@ -831,7 +832,7 @@ else {
          +  Usage is:  for(; !iter.end; iter.next) { ... } or (better and faster)
          +  foreach(v;iter) foreach(i,v;iter)
          +/
-        struct FlatIterator{
+        static struct FlatIterator{
             V* p;
             NArray baseArray;
             index_type [rank] left;
@@ -858,37 +859,37 @@ else {
             }
             /// Advance to the next item.  Return false if there is no next item.
             bool next(){
-                if (left[0]!=0){
-                    left[0]-=1;
-                    p=cast(V*)(cast(size_t)p+adds[0]);
+                if (this.left[0]!=0){
+                    this.left[0]-=1;
+                    this.p=cast(V*)(cast(size_t)this.p+this.adds[0]);
                     return true;
                 } else {
                     static if (rank==1){
-                        p=null;
+                        this.p=null;
                         return false;
                     } else static if (rank==2){
-                        if (left[1]!=0){
-                            left[0]=baseArray.shape[rank-1]-1;
-                            left[1]-=1;
-                            p=cast(V*)(cast(size_t)p+adds[1]);
+                        if (this.left[1]!=0){
+                            this.left[0]=this.baseArray.shape[rank-1]-1;
+                            this.left[1]-=1;
+                            this.p=cast(V*)(cast(size_t)this.p+this.adds[1]);
                             return true;
                         } else {
-                            p=null;
+                            this.p=null;
                             return false;
                         }
                     } else {
-                        if (!p) return false; // remove?
-                        left[0]=baseArray.shape[rank-1]-1;
+                        if (!this.p) return false; // remove?
+                        this.left[0]=this.baseArray.shape[rank-1]-1;
                         for (int i=1;i<rank;i++){
-                            if (left[i]!=0){
-                                left[i]-=1;
-                                p=cast(V*)(cast(size_t)p+adds[i]);
+                            if (this.left[i]!=0){
+                                this.left[i]-=1;
+                                this.p=cast(V*)(cast(size_t)this.p+this.adds[i]);
                                 return true;
                             } else{
-                                left[i]=baseArray.shape[rank-1-i]-1;
+                                this.left[i]=this.baseArray.shape[rank-1-i]-1;
                             }
                         }
-                        p=null;
+                        this.p=null;
                         return false;
                     }
                 }
@@ -896,76 +897,78 @@ else {
             /// Advance to the next item.  Return false if there is no next item.
             bool opAddAssign(int i) {
                 assert(i==1, "+=1, or ++ are the only allowed increments");
-                return next();
+                return this.next();
             }
             /// Assign a value to the element the iterator points at using 
             /// The syntax  iter[] = value.
             /// Equivalent to  *iter.ptr = value
             /// This is an error if the iter.end() is true.
-            void opSliceAssign(V v) { *p = v; }
+            void opSliceAssign(V v) { *this.p = v; }
             /// Advance to the next item.  Return false if there is no next item.
-            bool opPostInc() {  return next(); }
+            bool opPostInc() {  return this.next(); }
             /// Return true if at the end, false otherwise.
-            bool end() { return p is null; }
+            bool end() { return this.p is null; }
             /// Return the value at the current location of the iterator
-            V value() { return *p; }
+            V value() { return *this.p; }
             /// Sets the value at the current location of the iterator
-            void value(V val) { *p=val; }
+            void value(V val) { *this.p=val; }
             /// Return a pointer to the value at the current location of the iterator
-            V* ptr() { return p; }
+            V* ptr() { return this.p; }
             /// Return the array over which this iterator is iterating
-            NArray array() { return baseArray; }
+            NArray array() { return this.baseArray; }
 
             int opApply( int delegate(ref V) loop_body ) 
             {
-                if (p is null) return 0;
-                if (left!=baseArray.shape){
-                    for(;!end(); next()) {
-                        int ret = loop_body(*p);
+                if (this.p is null) return 0;
+                if (this.left!=this.baseArray.shape){
+                    for(;!this.end(); this.next()) {
+                        int ret = loop_body(*this.p);
                         if (ret) return ret;
                     }
                 } else {
+                    auto bArray=this.baseArray;
                     const char[] loopBody=`
-                    int ret=loop_body(*baseArrayPtr0);
+                    int ret=loop_body(*bArrayPtr0);
                     if (ret) return ret;
                     `;
-                    mixin(sLoopPtr(rank,["baseArray"],loopBody,"i"));
+                    mixin(sLoopPtr(rank,["bArray"],loopBody,"i"));
                 }
                 return 0;
             }
             int opApply( int delegate(ref index_type,ref V) loop_body ) 
             {
-                if (p is null) return 0;
-                if (left==baseArray.shape) {
-                    for(index_type i=0; !end(); next(),i++) {
-                        int ret = loop_body(i,*p);
+                if (this.p is null) return 0;
+                if (this.left==this.baseArray.shape) {
+                    for(index_type i=0; !this.end(); this.next(),i++) {
+                        int ret = loop_body(i,*this.p);
                         if (ret) return ret;
                     }
                 } else {
+                    auto bArray=this.baseArray;
                     const char[] loopBody=`
-                    int ret=loop_body(iPos,*baseArrayPtr0);
+                    int ret=loop_body(iPos,*bArrayPtr0);
                     if (ret) return ret;
                     ++iPos;
                     `;
                     index_type iPos=0;
-                    mixin(sLoopPtr(rank,["baseArray"],loopBody,"i"));
+                    mixin(sLoopPtr(rank,["bArray"],loopBody,"i"));
                 }
                 return 0;
             }
-            FormatOutput!(char)desc(FormatOutput!(char)s){
+            FormatOut desc(FormatOut s){
                 if (this is null){
                     return s("<FlatIterator *null*>").newline;
                 }
-                s("<FlatIterator rank:")(rank)(", p:")(p)(",").newline;
-                s("left:")(left)(",").newline;
-                s("adds:")(adds).newline;
-                baseArray.desc(s("baseArray:"))(",").newline;
+                s("<FlatIterator rank:")(rank)(", p:")(this.p)(",").newline;
+                s("left:")(this.left)(",").newline;
+                s("adds:")(this.adds).newline;
+                this.baseArray.desc(s("baseArray:"))(",").newline;
                 s(">").newline;
                 return s;
             }
         }
         
-        struct SFlatLoop{
+        static struct SFlatLoop{
             NArray a;
             static SFlatLoop opCall(NArray a){
                 SFlatLoop res;
@@ -974,22 +977,24 @@ else {
             }
             int opApply( int delegate(inout V) loop_body ) 
             {
+                auto aa=this.a;
                 const char[] loopBody=`
-                int ret=loop_body(*aPtr0);
+                int ret=loop_body(*aaPtr0);
                 if (ret) return ret;
                 `;
-                mixin(sLoopPtr(rank,["a"],loopBody,"i"));
+                mixin(sLoopPtr(rank,["aa"],loopBody,"i"));
                 return 0;
             }
             int opApply( int delegate(ref index_type,ref V) loop_body ) 
             {
+                auto aa=this.a;
                 const char[] loopBody=`
-                int ret=loop_body(iPos,*aPtr0);
+                int ret=loop_body(iPos,*aaPtr0);
                 if (ret) return ret;
                 ++iPos;
                 `;
                 index_type iPos=0;
-                mixin(sLoopPtr(rank,["a"],loopBody,"i"));
+                mixin(sLoopPtr(rank,["aa"],loopBody,"i"));
                 return 0;
             }
             static if (rank>1){
@@ -997,7 +1002,7 @@ else {
             }
         }
 
-        struct PFlatLoop{
+        static struct PFlatLoop{
             NArray a;
             index_type optimalChunkSize;
             static PFlatLoop opCall(NArray a,index_type optimalChunkSize=defaultOptimalChunkSize){
@@ -1008,24 +1013,26 @@ else {
             }
             int opApply( int delegate(ref V) loop_body ) 
             {
+                auto aa=this.a;
                 const char[] loopBody=`
-                int ret=loop_body(*aPtr0);
+                int ret=loop_body(*aaPtr0);
                 if (ret) return ret;
                 `;
-                index_type optimalChunkSize_i=optimalChunkSize;
-                mixin(pLoopPtr(rank,["a"],loopBody,"i"));
+                index_type optimalChunkSize_i=this.optimalChunkSize;
+                mixin(pLoopPtr(rank,["aa"],loopBody,"i"));
                 return 0;
             }
             int opApply( int delegate(ref index_type,ref V) loop_body ) 
             {
+                auto aa=this.a;
                 const char[] loopBody=`
-                int ret=loop_body(iPos,*aPtr0);
+                int ret=loop_body(iPos,*aaPtr0);
                 if (ret) return ret;
                 ++iPos;
                 `;
                 index_type iPos=0;
-                index_type optimalChunkSize_i=optimalChunkSize;
-                mixin(pLoopPtr(rank,["a"],loopBody,"i"));
+                index_type optimalChunkSize_i=this.optimalChunkSize;
+                mixin(pLoopPtr(rank,["aa"],loopBody,"i"));
                 return 0;
             }
             static if (rank>1){
@@ -1074,47 +1081,47 @@ else {
         }
 
         /// forward iterator compatible class on the adresses (FIteratorI!(V*))
-        class FIterator:FIteratorI!(V*){
+        static class FIterator:FIteratorI!(V*),ForeachableI!(V*){
             FlatIterator it;
             bool parallel;
             index_type optimalChunkSize;
             this(NArray a){
-                it=FlatIterator(a);
-                parallel=false;
-                optimalChunkSize=defaultOptimalChunkSize;
+                this.it=FlatIterator(a);
+                this.parallel=false;
+                this.optimalChunkSize=defaultOptimalChunkSize;
             }
             V *next(){
-                it.next();
-                return it.p;
+                this.it.next();
+                return this.it.p;
             }
             bool atEnd() {
-                return it.end();
+                return this.it.end();
             }
             int opApply(int delegate(ref V x) loop_body){
-                NArray a=it.baseArray;
+                NArray a=this.it.baseArray;
                 const char[] loopBody=`
                 int ret=loop_body(*aPtr0);
                 if (ret) return ret;
                 `;
                 index_type iPos=0;
-                index_type optimalChunkSize_i=optimalChunkSize;
-                if (parallel){
+                index_type optimalChunkSize_i=this.optimalChunkSize;
+                if (this.parallel){
                     mixin(pLoopPtr(rank,["a"],loopBody,"i"));
                 } else {
                     mixin(sLoopPtr(rank,["a"],loopBody,"i"));
                 }
                 return 0;
             }
-            int opApply(int delegate(size_t i,ref V x) loop_body){
-                NArray a=it.baseArray;
-                index_type optimalChunkSize_i=optimalChunkSize;
+            int opApply(int delegate(ref size_t i,ref V x) loop_body){
+                NArray a=this.it.baseArray;
+                index_type optimalChunkSize_i=this.optimalChunkSize;
                 size_t iPos=0;
                 const char[] loopBody=`
                 int ret=loop_body(iPos,*aPtr0);
                 if (ret) return ret;
                 ++iPos;
                 `;
-                if (parallel){
+                if (this.parallel){
                     /// should use the pLoopIdx with one initial fixup
                     size_t ii=0;
                     mixin(sLoopPtr(rank,["a"],loopBody,"i"));
@@ -1127,16 +1134,16 @@ else {
             /// might make opApply parallel (if the work amount is larger than
             /// pThreshold. chunks are, if possible, optimalChunkSize)
             /// might modify the current iterator or return a new one
-            FIterator parallelLoop(size_t myOptimalChunkSize){
-                optimalChunkSize=cast(index_type)myOptimalChunkSize;
-                parallel=true;
-                return this;
+            ForeachableI!(V*) parallelLoop(size_t myOptimalChunkSize){
+                this.optimalChunkSize=cast(index_type)myOptimalChunkSize;
+                this.parallel=true;
+                return cast(ForeachableI!(V*))this;
             }
             /// might make opApply parallel.
             /// might modify the current iterator or return a new one
-            FIterator parallelLoop(){
-                parallel=true;
-                return this;
+            ForeachableI!(V*) parallelLoop(){
+                this.parallel=true;
+                return cast(ForeachableI!(V*))this;
             }
         }
         
@@ -1153,9 +1160,9 @@ else {
         NArray dup(bool fortran)
         {
             NArray res=empty(this.shape,fortran);
-            if ( flags & res.flags & (Flags.Fortran | Flags.Contiguous) ) 
+            if ( this.flags & res.flags & (Flags.Fortran | Flags.Contiguous) ) 
             {
-                memcpy(res.startPtrArray, startPtrArray, cast(index_type)V.sizeof * nElArray);
+                memcpy(res.startPtrArray, this.startPtrArray, cast(index_type)V.sizeof * this.nElArray);
             }
             else
             {
@@ -1164,7 +1171,7 @@ else {
             return res;
         }
         /// ditto
-        NArray dup() { return dup(false); }
+        NArray dup() { return this.dup(false); }
 
         /// Return a deep copy of the array
         /// (but as normally one stores values this is often equivalent to dup)
@@ -1177,9 +1184,9 @@ else {
             } else static if (is(typeof(V.init.dup()))){
                 binaryOpStr!("*aPtr0=(*bPtr0).dup();",rank,V,V)(res,this);
             } else{
-                if ( flags & res.flags & (Flags.Fortran | Flags.Contiguous) ) 
+                if ( this.flags & res.flags & (Flags.Fortran | Flags.Contiguous) ) 
                 {
-                    memcpy(res.startPtrArray, startPtrArray, cast(index_type)V.sizeof * nElArray);
+                    memcpy(res.startPtrArray, this.startPtrArray, cast(index_type)V.sizeof * this.nElArray);
                 }
                 else
                 {
@@ -1189,7 +1196,7 @@ else {
             return res;
         }
         /// ditto
-        NArray deepdup() { return deepdup(false); }
+        NArray deepdup() { return this.deepdup(false); }
         
         /// Returns a copy of the given type (if the type is the same return itself)
         NArray!(S,rank)asType(S)(){
@@ -1378,9 +1385,9 @@ else {
         
         /// Compare with another array for value equality
         bool opEquals(NArray o) { 
-            if (shape!=o.shape) return false;
-            if (flags & o.flags & Flags.Compact1){
-                return !memcmp(startPtrArray,o.startPtrArray,nElArray*cast(index_type)V.sizeof);
+            if (this.shape!=o.shape) return false;
+            if (this.flags & o.flags & Flags.Compact1){
+                return !memcmp(this.startPtrArray,o.startPtrArray,this.nElArray*cast(index_type)V.sizeof);
             }
             mixin(sLoopPtr(rank,["","o"],"if (*Ptr0 != *oPtr0) return false;","i"));
             return true; 
@@ -1393,14 +1400,14 @@ else {
         }
 
         char[] toString(){
-            return getString(printData(new Stringify()));
+            return getString(this.printData(new Stringify()));
         }
         
-        FormatOutput!(char) printData(FormatOutput!(char)s,char[] formatEl="{,10}", index_type elPerLine=10,
+        FormatOut printData(FormatOut s,char[] formatEl="{,10}", index_type elPerLine=10,
             char[] indent=""){
             s("[");
             static if(rank==1) {
-                index_type lastI=shape[0]-1;
+                index_type lastI=this.shape[0]-1;
                 foreach(index_type i,V v;SubView(this)){
                     static if (isComplexType!(V)){
                         s.format(formatEl,v.re)("+1i*").format(formatEl,v.im);
@@ -1415,7 +1422,7 @@ else {
                     }
                 }
             } else {
-                index_type lastI=shape[0]-1;
+                index_type lastI=this.shape[0]-1;
                 foreach(i,v;this){
                     v.printData(s,formatEl,elPerLine,indent~" ");
                     if (i!=lastI){
@@ -1428,13 +1435,13 @@ else {
         }
             
         /// description of the NArray wrapper, not of the contents, for debugging purposes...
-        FormatOutput!(char) desc(FormatOutput!(char)s){
+        FormatOut desc(FormatOut s){
             if (this is null){
                 return s("<NArray *null*>").newline;
             }
             s("<NArray @:")(&this)(",").newline;
             s("  bStrides:")(bStrides)(",").newline;
-            s("  shape:")(shape)(",").newline;
+            s("  shape:")(this.shape)(",").newline;
             s("  flags:")(flags)("=None");
             if (flags&Flags.Contiguous) s("|Contiguos");
             if (flags&Flags.Fortran) s("|Fortran");
@@ -1465,7 +1472,7 @@ else {
             int i=rank-1;
             while (i>=0) {
                 ++index[i];
-                if (index[i]<shape[i]) break;
+                if (index[i]<this.shape[i]) break;
                 index[i]=0;
                 --i;
             }
@@ -1475,7 +1482,7 @@ else {
         index_type size(){
             index_type res=1;
             for (int i=0;i<rank;++i){
-                res*=shape[i];
+                res*=this.shape[i];
             }
             return res;
         }
@@ -1483,7 +1490,7 @@ else {
         NArray T(){
             index_type[rank] newshape,newstrides;
             for (int i=0;i<rank;++i){
-                newshape[i]=shape[rank-1-i];
+                newshape[i]=this.shape[rank-1-i];
             }
             for (int i=0;i<rank;++i){
                 newstrides[i]=bStrides[rank-1-i];
@@ -1500,7 +1507,7 @@ else {
             }
             /// returns a conjugated copy of the array
             NArray conj(){
-                NArray res=NArray.empty(shape);
+                NArray res=NArray.empty(this.shape);
                 binaryOpStr!("*aPtr0=cast(T)((*bPtr0).re-(*bPtr0).im*1i);",rank,V,V)(res,this);
                 return res;
             }
@@ -1513,7 +1520,7 @@ else {
             }
             /// returns a conjugated copy of the array
             NArray conj(){
-                NArray res=NArray.empty(shape);
+                NArray res=NArray.empty(this.shape);
                 binaryOpStr!("*aPtr0=-(*bPtr0);",rank,V,V)(res,this);
                 return res;
             }
@@ -1535,7 +1542,7 @@ else {
         NArray optAxisOrder()
         in {
             for (int i=0;i<rank;++i)
-                assert(shape[i]>0,"zero sized arrays not accepted");
+                assert(this.shape[i]>0,"zero sized arrays not accepted");
         }
         out(res){
             debug(TestNArray){
@@ -1547,8 +1554,8 @@ else {
             static if(rank==1){
                 if (bStrides[0]>=0)
                     return this;
-                return NArray([-bStrides[0]],shape,
-                    cast(V*)(cast(size_t)startPtrArray+bStrides[0]*(shape[0]-1)),
+                return NArray([-bStrides[0]],this.shape,
+                    cast(V*)(cast(size_t)startPtrArray+bStrides[0]*(this.shape[0]-1)),
                     newFlags,newBase);
             } else static if(rank==2){
                 if (bStrides[0]>=bStrides[1] && bStrides[0]>=0){
@@ -1560,21 +1567,21 @@ else {
                         newstrides[0]=bStrides[0];
                     } else {
                         newstrides[0]=-bStrides[0];
-                        newStartIdx+=bStrides[0]*(shape[0]-1);
+                        newStartIdx+=bStrides[0]*(this.shape[0]-1);
                     }
                     if (bStrides[1]>0){
                         newstrides[1]=bStrides[1];
                     } else {
                         newstrides[1]=-bStrides[1];
-                        newStartIdx+=bStrides[1]*(shape[1]-1);
+                        newStartIdx+=bStrides[1]*(this.shape[1]-1);
                     }
                     index_type[rank] newshape;
                     if(newstrides[0]>=newstrides[1]){
-                        newshape[0]=shape[0];
-                        newshape[1]=shape[1];
+                        newshape[0]=this.shape[0];
+                        newshape[1]=this.shape[1];
                     } else {
-                        newshape[0]=shape[1];
-                        newshape[1]=shape[0];
+                        newshape[0]=this.shape[1];
+                        newshape[1]=this.shape[0];
                         auto tmp=newstrides[0];
                         newstrides[0]=newstrides[1];
                         newstrides[1]=tmp;
@@ -1594,7 +1601,7 @@ else {
                         pstrides[i]=bStrides[i];
                     } else {
                         pstrides[i]=-bStrides[i];
-                        newStartIdx+=bStrides[i]*(shape[i]-1);
+                        newStartIdx+=bStrides[i]*(this.shape[i]-1);
                     }
                 }
                 int[rank] sortIdx;
@@ -1603,7 +1610,7 @@ else {
                 sortIdx.sort((int x,int y){return pstrides[x]>pstrides[y];});
                 index_type[rank] newshape,newstrides;
                 for (int i=0;i<rank;i++)
-                    newshape[i]=shape[sortIdx[i]];
+                    newshape[i]=this.shape[sortIdx[i]];
                 for (int i=0;i<rank;i++)
                     newstrides[i]=pstrides[sortIdx[i]];
                 return NArray(newstrides,newshape,
@@ -1643,12 +1650,12 @@ else {
                     pstrides[i]=-bStrides[i];
                 } else {
                     pstrides[i]=-bStrides[i];
-                    newStartIdx+=bStrides[i]*(shape[i]-1);
+                    newStartIdx+=bStrides[i]*(this.shape[i]-1);
                 }
             }
             for (int i=0;i<rank;++i){
                 newstrides[i]=pstrides[perm[i]];
-                newshape[i]=shape[perm[i]];
+                newshape[i]=this.shape[perm[i]];
             }
             return NArray(newstrides,newshape,
                 cast(V*)(cast(size_t)startPtrArray+newStartIdx),newFlags,newBase);
@@ -1700,7 +1707,7 @@ else {
         }
         /// the actual serialization function;
         void serialize(Serializer s){
-            index_type[] shp=shape;
+            index_type[] shp=this.shape;
             s.field(metaI[0],shp);
             s.customField(metaI[1],{
                 auto ac=s.writeArrayStart(null,size());
@@ -1713,8 +1720,8 @@ else {
             index_type[] shp;
             s.field(metaI[0],shp);
             if (shp.length>0) {
-                shape[]=shp;
-                scope tmp=empty(shape,false);
+                this.shape[]=shp;
+                scope tmp=empty(this.shape,false);
                 this.shape[] = tmp.shape;
                 this.bStrides[] = tmp.bStrides;
                 this.startPtrArray=tmp.startPtrArray;
@@ -1832,7 +1839,7 @@ body {
 
 /+ -------------- looping mixin constructs ---------------- +/
 
-/// if baseName is not empty adds a dot (somethime this.xxx does not work and xxx works)
+/// if baseName is not empty adds a dot (sometime this.xxx does not work and xxx works)
 char [] arrayNameDot(char[] baseName){
     if (baseName=="") {
         return "";
@@ -1848,7 +1855,7 @@ char [] arrayNameDot(char[] baseName){
 +/
 char [] sLoopGenIdx(int rank,char[][] arrayNames,char[] loop_body,char[]ivarStr,char[]indent="    ",
     char[][] idxPre=[], char[][] idxPost=[]){
-    char[] res="".dup;
+    char[] res="";
     char[] indentInc="    ";
     char[] indent2=indent~indentInc;
 
@@ -1898,7 +1905,7 @@ char [] sLoopGenIdx(int rank,char[][] arrayNames,char[] loop_body,char[]ivarStr,
 +/
 char [] sLoopGenPtr(int rank,char[][] arrayNames,
         char[] loop_body,char[]ivarStr,char[] indent="    "){
-    char[] res="".dup;
+    char[] res="";
     char[] indInc="    ";
     char[] indent2=indent~indInc;
 
@@ -1948,8 +1955,8 @@ char [] pLoopIdx(int rank,char[][] arrayNames,
         char[] loopBody,char[]ivarStr,char[][] arrayNamesDot=[],int[] optAccess=[],char[] indent="    ",
         char[][] idxPre=[], char[][] idxPost=[]){
     if (arrayNames.length==0)
-        return "".dup;
-    char[] res="".dup;
+        return "";
+    char[] res="";
     char[] indent2=indent~"    ";
     char[] indent3=indent2~"    ";
     bool hasNamesDot=true;
@@ -2030,8 +2037,8 @@ char [] pLoopIdx(int rank,char[][] arrayNames,
 char [] pLoopPtr(int rank,char[][] arrayNames,
         char[] loopBody,char[]ivarStr,char[][] arrayNamesDot=[],int[] optAccess=[],char[] indent="    "){
     if (arrayNames.length==0)
-        return "".dup;
-    char[] res="".dup;
+        return "";
+    char[] res="";
     char[] indent2=indent~"    ";
     char[] indent3=indent2~"    ";
     bool hasNamesDot=true;
@@ -2111,8 +2118,8 @@ char [] pLoopPtr(int rank,char[][] arrayNames,
 +/
 char [] sLoopPtr(int rank,char[][] arrayNames, char[] loopBody,char[]ivarStr){
     if (arrayNames.length==0)
-        return "".dup;
-    char[] res="".dup;
+        return "";
+    char[] res="";
     res~="    uint commonFlags"~ivarStr~"=";
     foreach (i,arrayName;arrayNames){
         res~=arrayNameDot(arrayName)~"flags";
@@ -2136,7 +2143,7 @@ char [] sLoopPtr(int rank,char[][] arrayNames, char[] loopBody,char[]ivarStr){
 
 /// array to Sequence (for arrayIndex,arrayIndexAssign)
 char[] arrayToSeq(char[] arrayName,int dim){
-    char[] res="".dup;
+    char[] res="";
     for (int i=0;i<dim;++i){
         res~=arrayName~"["~ctfe_i2a(i)~"]";
         if (i!=dim-1)
@@ -2146,25 +2153,26 @@ char[] arrayToSeq(char[] arrayName,int dim){
 }
 
 char[] opApplyIdxAll(int rank,char[] arrayName,bool sequential){
-    char[] res="".dup;
+    char[] res="";
     char[] indent="    ";
     res~="int opApply(int delegate(";
     for (int i=0;i<rank;++i){
         res~="ref index_type, ";
     }
     res~="ref V) loop_body) {\n";
-    char[] loopBody="".dup;
+    res~="    auto aa=this."~arrayName~";\n";
+    char[] loopBody="";
     loopBody~=indent~"int ret=loop_body(";
     for (int i=0;i<rank;++i){
         loopBody~="i_"~ctfe_i2a(i)~"_, ";
     }
-    loopBody~="*aPtr0);\n";
+    loopBody~="*aaPtr0);\n";
     loopBody~=indent~"if (ret) return ret;\n";
     if (sequential) {
-        res~=sLoopGenIdx(rank,["a"],loopBody,"i");
+        res~=sLoopGenIdx(rank,["aa"],loopBody,"i");
     } else {
         res~=indent~"index_type optimalChunkSize_i=optimalChunkSize;\n";
-        res~=pLoopIdx(rank,["a"],loopBody,"i");
+        res~=pLoopIdx(rank,["aa"],loopBody,"i");
     }
     res~="    return 0;";
     res~="}\n";

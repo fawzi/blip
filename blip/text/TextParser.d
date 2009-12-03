@@ -16,7 +16,7 @@ import tango.core.Traits: RealTypeOf, ImaginaryTypeOf, ElementTypeOfArray;
 import tango.io.Stdout;
 import tango.math.Math;
 import tango.io.model.IConduit;
-import tango.io.stream.Format;
+import blip.t.io.stream.Format;
 import tango.text.Regex;
 import blip.text.Stringify;
 import blip.text.UtfUtils;
@@ -384,6 +384,7 @@ class TextParser(T) : InputFilter
                 return 0;
             }
         }
+        return nlines; // what should be done with checkCr ??? anyway being here will probably be treated as an error...
     }
     /// scans a line
     protected size_t scanLine (T[] data,SliceExtent se){
@@ -553,7 +554,6 @@ class TextParser(T) : InputFilter
                     throw new Exception("unknown SliceExtent",__FILE__,__LINE__);
             }
         }
-        parseError("invalid SliceExtent",__FILE__,__LINE__);
     }
     /// if longLived is true the result is guaranteed not to contain slices of the buffer
     /// (that might become invalid)
@@ -659,7 +659,7 @@ class TextParser(T) : InputFilter
             }
         } else {
             T.triggerError;
-            // static assert(0,"unsupported type "~U.stringof);
+            static assert(0,"unsupported type "~U.stringof);
         }
     }
     
@@ -726,6 +726,8 @@ class TextParser(T) : InputFilter
                             smallCacheError("skipString string is larger than buffer window ("~Integer.toString(data.length)~")",__FILE__,__LINE__);
                         case SliceExtent.ToEnd:
                             return 0;
+                        default:
+                            throw new Exception("unknown SliceExtent",__FILE__,__LINE__);
                         }
                     }
                     if (data[1..str2.length+1]==str2){

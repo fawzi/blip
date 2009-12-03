@@ -1,8 +1,8 @@
 /// tskas that can be transferred from a processor to another
-module blip.parallel.TransferrableTasks;
+module blip.parallel.smp.TransferrableTasks;
 import tango.io.protocol.model.IWriter;
 import tango.io.protocol.model.IReader;
-import blip.parallel.Models;
+import blip.parallel.smp.SmpModels;
 
 // task register
 class TTaskRegister{

@@ -11,6 +11,7 @@ import tango.core.stacktrace.TraceExceptions;
 version(Xpose){
     public import blip.serialization.SerializationExpose;
 }
+
 class A: Serializable{
     int x;
     int y;
@@ -238,7 +239,7 @@ void testUnserial(T)(T a){
 void testJsonUnserial(T)(T a){
     version(UnserializationTrace) Stdout("testing unserialization of "~T.stringof).newline;
     auto buf=new Array(1000,1000);
-    auto js=new JsonSerializer!()(new FormatOutput!(char)(buf));
+    auto js=new JsonSerializer!()(new FormatOut(buf));
     js(a);
     auto jus=new JsonUnserializer!()(buf);
     T sOut;
@@ -301,7 +302,7 @@ void testUnserial2(T,U)(void delegate(void function(T,U)) testF){
 void testJsonUnserial2(T,U)(T a,ref U sOut){
     version(UnserializationTrace) Stdout("testing json unserialization of "~T.stringof).newline;
     auto buf=new Array(1000,1000);
-    auto js=new JsonSerializer!()(new FormatOutput!(char)(buf));
+    auto js=new JsonSerializer!()(new FormatOut(buf));
     js(a);
     auto jus=new JsonUnserializer!()(buf);
     version(UnserializationTrace) Stdout("XXXXXX Unserialization start").newline;
@@ -345,8 +346,8 @@ void testBinUnserial2(T,U)(T a,ref U b){
 
 void main(){
     CoreHandlers ch;
-
-    auto fh=new FormattedWriteHandlers(Stdout);
+    auto stream=new StreamStrWriter!(char)(Stdout);
+    auto fh=new FormattedWriteHandlers!(char)(&stream.writeExactStr);
     auto i=4;
     fh.handle(i);
     auto s="abc".dup;

@@ -23,7 +23,7 @@
 ///   the topology representation that did inspire the current interface
 ///
 ///  author: Fawzi Mohamed
-module blip.parallel.Numa;
+module blip.parallel.smp.Numa;
 import tango.core.Thread;
 import blip.serialization.Serialization;
 import tango.math.random.Random;

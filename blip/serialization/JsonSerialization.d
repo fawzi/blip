@@ -3,7 +3,7 @@ module blip.serialization.JsonSerialization;
 import blip.serialization.SerializationBase;
 import blip.serialization.Handlers;
 import tango.io.Stdout : Stdout;
-import tango.io.stream.Format;
+import blip.t.io.stream.Format;
 import tango.io.model.IConduit:IOStream;
 import tango.core.Variant;
 import blip.BasicModels;
@@ -16,8 +16,10 @@ class JsonSerializer(T=char) : Serializer {
     bool atStart;
     bool compact; // skips class, id when possible
     FormatOutput!(T) writer;
+    void dumpStr(char[] s){ writer(s); }
     this(FormatOutput!(T)w){
-        super(new FormattedWriteHandlers(w));
+        auto stream=new StreamStrWriter!(char)(w);
+        super(new FormattedWriteHandlers!()(&stream.writeExactStr));
         writer=w;
         writeCount=0;
         atStart=true;
@@ -58,7 +60,7 @@ class JsonSerializer(T=char) : Serializer {
         writer(cast(T[])"null");
     }
     /// writes the start of an array of the given size
-    override PosCounter writeArrayStart(FieldMetaInfo *field,size_t size){
+    override PosCounter writeArrayStart(FieldMetaInfo *field,ulong size){
         atStart=true;
         writeField(field);
         writer(cast(T[])`[`);
@@ -99,7 +101,7 @@ class JsonSerializer(T=char) : Serializer {
         --depth;
     }
     /// start of a dictionary
-    override PosCounter writeDictStart(FieldMetaInfo *field,size_t length, bool stringKeys=false) {
+    override PosCounter writeDictStart(FieldMetaInfo *field,ulong l, bool stringKeys=false) {
         writeField(field);
         if (compact){
             writer(cast(T[])`{`);
@@ -111,7 +113,7 @@ class JsonSerializer(T=char) : Serializer {
                 writer(cast(T[])`{ class:"associativeArray"`);
             atStart=false;
         }
-        auto res=PosCounter(length);
+        auto res=PosCounter(l);
         res.data=Variant(stringKeys);
         ++depth;
         return res;
@@ -282,7 +284,7 @@ class JsonUnserializer(T=char) : Unserializer {
     override PosCounter readArrayStart(FieldMetaInfo *field){
         readField(field);
         reader.skipString(cast(S)"[");
-        return PosCounter(size_t.max);
+        return PosCounter(ulong.max);
     }
     /// reads an element of the array (or its end)
     /// returns true if an element was read
@@ -308,7 +310,7 @@ class JsonUnserializer(T=char) : Unserializer {
     /// start of a dictionary
     override PosCounter readDictStart(FieldMetaInfo *field, bool stringKeys=false) {
         readField(field);
-        auto res=PosCounter(size_t.max);
+        auto res=PosCounter(ulong.max);
         res.data=Variant(stringKeys);
         reader.skipString(cast(S)"{");
         if (reader.skipString2(cast(S)`class`,false)){

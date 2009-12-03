@@ -15,14 +15,14 @@ import blip.narray.TestSupport;
 import tango.math.random.Random: rand;
 import blip.narray.Convolve;
 import blip.TemplateFu;
-import blip.parallel.WorkManager;
+import blip.parallel.smp.WorkManager;
 import tango.util.log.Config;
 import blip.text.Stringify;
 import tango.math.Math: abs,min,max,sqrt;
 import tango.math.IEEE: feqrel;
 import blip.serialization.Serialization;
 import tango.io.device.Array;
-import tango.io.stream.Format;
+import blip.t.io.stream.Format:FormatOut;
 import blip.BasicModels;
 import tango.core.Traits;
 import tango.core.stacktrace.TraceExceptions;
@@ -591,7 +591,7 @@ void testConvolveNN(T,int rank,Border border)(NArray!(T,rank)inA,NArray!(T,rank)
 
 void testSerial(T,int rank)(NArray!(T,rank)a){
     auto buf=new Array(1000,1000);
-    auto s=new JsonSerializer!(char)(new FormatOutput!(char)(buf));
+    auto s=new JsonSerializer!(char)(new FormatOut(buf));
     auto u=new JsonUnserializer!(char)(buf);
     s(a);
     NArray!(T,rank) b;

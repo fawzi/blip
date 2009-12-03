@@ -1,5 +1,5 @@
 /**
- * Implements a fast global counters
+ * Implements a fast object used as a flag (to communicate state between threads)
  *
  * Copyright: Copyright (C) 2009 Fawzi Mohamed.  All rights reserved.
  * License:   BSD style: $(LICENSE)

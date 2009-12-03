@@ -1,6 +1,6 @@
 module testNuma;
 import tango.io.Stdout;
-import blip.parallel.Numa;
+import blip.parallel.smp.Numa;
 import blip.serialization.Serialization;
 import tango.core.stacktrace.TraceExceptions;
 

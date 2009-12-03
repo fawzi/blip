@@ -146,10 +146,11 @@ import tango.util.Convert;
 import tango.util.ArgParser;
 import tango.text.Util;
 import tango.io.Stdout;
-import blip.parallel.WorkManager;
+import tango.stdc.stdlib: exit;
+import blip.parallel.smp.WorkManager;
 
 import blip.NullStream;
-import tango.io.stream.Format;
+import blip.t.io.stream.Format:FormatOut;
 
 mixin testInit!() autoInitTst; 
 
@@ -207,7 +208,7 @@ int mainTestFun(char[][] argStr,SingleRTest testSuite){
                 // use Stderr?
                 Stdout("ERROR invalid options for on-failure: '")(arg)("'").newline;
                 Stdout(helpStr).newline;
-                return -1;
+                exit(-1);
         }
     });
     args.bind("--","print-level",delegate void(char[]arg){
@@ -221,7 +222,7 @@ int mainTestFun(char[][] argStr,SingleRTest testSuite){
             default:
                 Stderr("ERROR invalid options for print-level: '")(arg)("'").newline;
                 Stdout(helpStr).newline;
-                return -2;
+                exit(-2);
         }
     });
     
@@ -236,7 +237,7 @@ int mainTestFun(char[][] argStr,SingleRTest testSuite){
         onFailure, printLevel,Stdout,Stdout,1,trace);
     if (test.length==0){
         // testSuite.runTests(runs,seed,counter);
-        testSuite.runTestsTask(runs,seed,counter).submit(defaultTask).wait();
+        testSuite.runTestsTask(runs,seed,counter).autorelease.submit(defaultTask).wait();
     } else{
         auto tst=testSuite.findTest(test);
         if (tst is null){
@@ -244,7 +245,7 @@ int mainTestFun(char[][] argStr,SingleRTest testSuite){
             return -3;
         }
         //tst.runTests(runs,seed,counter);
-        tst.runTestsTask(runs,seed,counter).submit(defaultTask).wait();
+        tst.runTestsTask(runs,seed,counter).autorelease.submit(defaultTask).wait();
         return tst.stat.failedTests;
     }
     return testSuite.stat.failedTests;
@@ -260,7 +261,7 @@ debug(UnitTest){
     arg1=specialNrs[arg1_i]; arg1_nEl=specialNrs.length;`) combNrTst; // combinatorial cases
 
     unittest{
-        FormatOutput!(char) nullPrt=new FormatOutput!(char)(nullStream());
+        FormatOut nullPrt=new FormatOut(nullStream());
         // nullPrt=Stdout;
         SingleRTest.defaultTestController=new TextController(TextController.OnFailure.StopTest,
             TextController.PrintLevel.AllShort,nullPrt,nullPrt);
@@ -317,7 +318,7 @@ debug(UnitTest){
         ];
 
         auto expectedFailures=[0,0,0,1,1,0,0,0,0,1,0,0,0,1,0,0,0,2,0,0,0,1,1];
-        failTests.runTestsTask().submit(defaultTask).wait();
+        failTests.runTestsTask().autorelease.submit(defaultTask).wait();
         foreach (i,t;tests){
             t.runTestsTask().submit(sequentialTask);
             if(t.stat.failedTests!=expectedFailures[i])

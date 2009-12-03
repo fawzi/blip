@@ -562,13 +562,12 @@ uint hwloc_get_type_or_below_depth (hwloc_topology_t topology, hwloc_obj_type_t 
     return depth;
 
   /* find the highest existing level with type order >= */
-  for(depth = hwloc_get_type_depth(topology, HWLOC_OBJ.PROC); ; depth--)
+  for(depth = hwloc_get_type_depth(topology, HWLOC_OBJ.PROC); ; depth--){
     if (hwloc_compare_types(hwloc_get_depth_type(topology, depth), type) < 0)
       return depth+1;
+    if (depth==0) assert(0);/* Shouldn't ever happen, as there is always a SYSTEM level with lower order and known depth.  */
+  }
 
-  /* Shouldn't ever happen, as there is always a SYSTEM level with lower order and known depth.  */
-  abort();
-  return 0;
 }
 
 /** \brief Returns the depth of objects of type \p type or above
@@ -585,13 +584,11 @@ uint hwloc_get_type_or_above_depth (hwloc_topology_t topology, hwloc_obj_type_t 
     return depth;
 
   /* find the lowest existing level with type order <= */
-  for(depth = 0; ; depth++)
+  for(depth = 0; ; depth++){
     if (hwloc_compare_types(hwloc_get_depth_type(topology, depth), type) > 0)
       return depth-1;
-
-  /* Shouldn't ever happen, as there is always a PROC level with higher order and known depth.  */
-  abort();
-  return 0;
+    if (depth>1000) assert(0); /* Shouldn't ever happen, as there is always a PROC level with higher order and known depth.  */
+  }
 }
 
 /** @} */

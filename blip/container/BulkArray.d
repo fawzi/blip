@@ -11,7 +11,7 @@ import tango.core.Traits;
 import blip.serialization.Serialization;
 import blip.serialization.SerializationMixins;
 import blip.container.AtomicSLink;
-import blip.parallel.WorkManager;
+import blip.parallel.smp.WorkManager;
 
 /// guard object to deallocate large arrays that contain inner pointers
 class Guard{
@@ -81,7 +81,7 @@ struct BulkArray(T){
             getSerializationInfoForType!(T)());
         elMetaInfo.pseudo=true;
         auto ac=s.readArrayStart(null);
-        dArray.length=ac.sizeHint();
+        dArray.length=cast(size_t)ac.sizeHint();
         size_t pos=0;
         while(s.readArrayEl(ac,
             {

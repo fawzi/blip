@@ -14,7 +14,7 @@ import tango.io.Stdout;
 import blip.text.Stringify;
 import tango.math.Math: abs,min,max;
 import blip.rtest.RTest;
-import blip.parallel.WorkManager;
+import blip.parallel.smp.WorkManager;
 
 /// creates arrays that can be dotted with each other along the given axis
 /// useful mainly for random tests
@@ -95,7 +95,7 @@ class Dottable(T,int rank1,S,int rank2,bool scanAxis=false, bool randomLayout=fa
     char[] toString(){
         return getString(printData(new Stringify()));
     }
-    FormatOutput!(char) printData(FormatOutput!(char)s,char[] formatEl="{,10}", index_type elPerLine=10,
+    FormatOut printData(FormatOut s,char[] formatEl="{,10}", index_type elPerLine=10,
         char[] indent=""){
         s(indent)("Dottable{").newline;
         s(indent)("axis1=")(axis1).newline;

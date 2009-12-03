@@ -8,7 +8,7 @@ module blip.serialization.SerializationBase;
 import blip.serialization.Handlers;
 import tango.io.Stdout : Stdout;
 import tango.core.Tuple;
-import tango.io.stream.Format;
+import blip.t.io.stream.Format:FormatOut;
 import tango.core.Variant;
 import blip.BasicModels;
 import tango.util.container.HashSet;
@@ -45,9 +45,6 @@ class SerializationException: Exception{
 // speeding up the getting of meta info if the elements are not subclasses, but seems to
 // give a compiler error when raising exceptions with gdc (the unwinding mechanism fails)
 // version=PseudoFieldMetaInfo
-alias Tuple!(bool,byte,ubyte,short,ushort,int,uint,long,ulong,
-    float,double,real,ifloat,idouble,ireal,cfloat,cdouble,creal,ubyte[],
-    char[],wchar[],dchar[]) CoreTypes2;
 
 /// serialization level (if a field has to be serialized or not)
 enum SerializationLevel{
@@ -75,7 +72,7 @@ struct FieldMetaInfo {
         return res;
     }
     /// describes a field meta info
-    FormatOutput!(char) desc(FormatOutput!(char) s){
+    FormatOut desc(FormatOut s){
         s("<FieldMetaInfo name:'")(name)("',");
         s("level:")(serializationLevel)(",");
         s("metaInfo:")((metaInfo is null) ? "*NULL*" : metaInfo.className)(">");
@@ -237,7 +234,7 @@ class ClassMetaInfo {
         return fields.length;
     }
     /// description (for debugging purposes)
-    FormatOutput!(char) desc(FormatOutput!(char) s){
+    FormatOut desc(FormatOut s){
         s("<ClassMetaInfo@")(cast(void*)this).newline;
         s(" className:'")(className)("',").newline;
         s(" kind:")(kind)(",").newline;
@@ -375,7 +372,7 @@ static this(){
 
 char[] coreTypesMetaInfoMixStr(){
     char[] res="".dup;
-    foreach(T;CoreTypes2){
+    foreach(T;CoreTypes){
         res~="ClassMetaInfo "~strForCoreType!(T)~"MetaInfo;\n";
     }
     res~="static this(){\n";
@@ -391,28 +388,28 @@ mixin(coreTypesMetaInfoMixStr());
 
 /// struct that helps the reading of an array and dictionaries
 struct PosCounter{
-    size_t pos,length;
+    ulong pos,length;
     Variant data;
-    static PosCounter opCall(size_t length){
+    static PosCounter opCall(ulong length){
         PosCounter ac;
         ac.length=length;
         ac.pos=0;
         return ac;
     }
     void next(){
-        assert(pos<length || length==size_t.max);
+        assert(pos<length || length==ulong.max);
         ++pos;
     }
     void end(){
-        assert(pos==length || length==size_t.max);
+        assert(pos==length || length==ulong.max);
         length=pos;
     }
     bool atEnd(){
-        assert(length!=size_t.max,"asked atEnd with undefined length");
+        assert(length!=ulong.max,"asked atEnd with undefined length");
         return pos<length;
     }
-    size_t sizeHint(){
-        if (length==size_t.max){
+    ulong sizeHint(){
+        if (length==ulong.max){
             return 0; // change?
         } else {
             return length;
@@ -421,8 +418,8 @@ struct PosCounter{
 }
 
 class SerializationRegistry {
-    ClassMetaInfo[Object]                                           type2metaInfos;
-    ClassMetaInfo[char[]]                                           name2metaInfos;
+    ClassMetaInfo[Object] type2metaInfos;
+    ClassMetaInfo[char[]] name2metaInfos;
 
     Object keyOf(T)() {
         static if (is(T == class)) {
@@ -497,6 +494,9 @@ class Serializer {
     typedef size_t classId;
     typedef size_t objectId;
     WriteHandlers handlers;
+    void delegate(Serializer) rootObjStartCallback;
+    void delegate(Serializer) rootObjEndCallback;
+    void delegate(Serializer) serializerCloseCallback;
     
     objectId[void*]             ptrToObjectId;
     objectId                        lastObjectId;
@@ -531,13 +531,24 @@ class Serializer {
         ptrToObjectId[null] = cast(objectId)0;
         lastObjectId=cast(objectId)1;
     }
-    
+    /// closes the serializer, after this it one could recyle the serializer
+    void close(){
+        if (serializerCloseCallback){
+            serializerCloseCallback(this);
+        }
+    }
     /// writes the given root object
     /// you should only use the field method to write in the serialization methods
     typeof(this) opCall(T)(T o) {
+        if (rootObjStartCallback){
+            rootObjStartCallback(this);
+        }
         writeStartRoot();
         field!(T)(cast(FieldMetaInfo *)null,o);
         writeEndRoot();
+        if (rootObjEndCallback){
+            rootObjEndCallback(this);
+        }
         switch(autoReset){
             case AutoReset.None:
             break;
@@ -674,11 +685,11 @@ class Serializer {
                         version(SerializationTrace) Stdout("X using external handlers").newline;
                         ExternalSerializationHandlers *h=metaInfo.externalHandlers;
                         void realWrite2(){
-                            if (metaInfo.externalHandlers.preSerialize){
+                            if (h.preSerialize){
                                 h.preSerialize(this,metaInfo,cast(void*)t);
                             }
                             scope(exit){
-                                if (metaInfo.externalHandlers.postSerialize){
+                                if (h.postSerialize){
                                     h.postSerialize(this,metaInfo,cast(void*)t);
                                 }
                             }
@@ -852,6 +863,10 @@ class Serializer {
                         writeDebugPtr(fieldMeta,cast(void*)t);
                     }
                 }
+            } else static if (is(T==OutWriter)) {
+                writeOutWriter(fieldMeta,t);
+            } else static if (is(T==BinWriter)) {
+                writeBinWriter(fieldMeta,t);
             } else {
                 /// try to get meta info
                 auto metaInfo=getSerializationInfoForType!(T)();
@@ -861,12 +876,12 @@ class Serializer {
                     version(SerializationTrace) Stdout("X using external handlers").newline;
                     ExternalSerializationHandlers *h=metaInfo.externalHandlers;
                     void realWrite6(){
-                        if (metaInfo.externalHandlers.preSerialize){
+                        if (h.preSerialize){
                             h.preSerialize(this,metaInfo,cast(void*)&t);
                         }
                         assert(h.serialize);
                         h.serialize(this,metaInfo,cast(void*)&t);
-                        if (metaInfo.externalHandlers.postSerialize){
+                        if (h.postSerialize){
                             h.postSerialize(this,metaInfo,cast(void*)&t);
                         }
                     }
@@ -881,6 +896,14 @@ class Serializer {
             }
         }
     }
+    /// writes a curstom text writer
+    void writeOutWriter(FieldMetaInfo *field, OutWriter w){
+        handlers.handle(w);
+    }
+    /// writes a curstom binary writer
+    void writeBinWriter(FieldMetaInfo *field, BinWriter w){
+        handlers.handle(w);
+    }
     /// writes something that has a custom write operation
     void writeCustomField(FieldMetaInfo *field, void delegate()writeOp){
         writeOp();
@@ -894,8 +917,8 @@ class Serializer {
         assert(0,"unimplemented");
     }
     /// writes the start of an array of the given size
-    PosCounter writeArrayStart(FieldMetaInfo *field, size_t length){
-        return PosCounter(length);
+    PosCounter writeArrayStart(FieldMetaInfo *field, ulong l){
+        return PosCounter(l);
     }
     /// writes a separator of the array
     void writeArrayEl(ref PosCounter ac, void delegate() writeEl) {
@@ -907,9 +930,9 @@ class Serializer {
         ac.end();
     }
     /// start of a dictionary
-    PosCounter writeDictStart(FieldMetaInfo *field, size_t length, 
+    PosCounter writeDictStart(FieldMetaInfo *field, ulong l, 
         bool stringKeys=false) {
-        return PosCounter(length);
+        return PosCounter(l);
     }
     /// writes an entry of the dictionary
     void writeEntry(ref PosCounter ac, void delegate() writeKey,void delegate() writeVal) {
@@ -959,6 +982,9 @@ class Unserializer {
     SerializationLevel serializationLevel;
     bool recoverCycles;
     bool readStructProxy;
+    void delegate(Unserializer) rootObjStartCallback;
+    void delegate(Unserializer) rootObjEndCallback;
+    void delegate(Unserializer) unserializerCloseCallback;
     
     struct StackEntry{
         TypeKind kind;
@@ -1043,9 +1069,15 @@ class Unserializer {
     /// writes the given root object
     /// you should only use the field method to write in the serialization methods
     typeof(this) opCall(T)(ref T o) {
+        if (rootObjStartCallback !is null){
+            rootObjStartCallback(this);
+        }
         readStartRoot();
         field!(T)(cast(FieldMetaInfo *)null,o);
         readEndRoot();
+        if (rootObjEndCallback !is null){
+            rootObjEndCallback(this);
+        }
         return this;
     }
     /// reads a custom field
@@ -1284,11 +1316,11 @@ class Unserializer {
                     version(UnserializationTrace) Stdout("Y using external handlers").newline;
                     ExternalSerializationHandlers *h=metaInfo.externalHandlers;
                     assert(h.unserialize!is null,"externalHandlers without valid unserialize");
-                    if (metaInfo.externalHandlers.preUnserialize){
+                    if (h.preUnserialize){
                         h.preUnserialize(this,metaInfo,cast(void*)&t);
                     }
                     scope(exit){
-                        if (metaInfo.externalHandlers.postUnserialize){
+                        if (h.postUnserialize){
                             h.postUnserialize(this,metaInfo,cast(void*)&t);
                         }
                     }
@@ -1322,7 +1354,7 @@ class Unserializer {
                             readStruct(fieldMeta,metaInfo,&realRead5,&t);
                         }
                     } else {
-                        assert(0,"no serialization function for "
+                        assert(0,"no unserialization function for "
                             ~typeid(T).toString~"'("~T.stringof~")");
                     }
                 }
@@ -1334,7 +1366,7 @@ class Unserializer {
                 elMetaInfo.pseudo=true;
                 auto ac=readArrayStart(fieldMeta);
                 static if (!isStaticArrayType!(T)) {
-                    t=new T(ac.sizeHint());
+                    t=new T(cast(size_t)ac.sizeHint());
                 }
                 size_t pos=0;
                 while(readArrayEl(ac,
@@ -1400,6 +1432,10 @@ class Unserializer {
                         readDebugPtr(fieldMeta,cast(void*)&t);
                     }
                 }
+            } else static if (is(T==OutReader)) {
+                readOutReader(fieldMeta,t);
+            } else static if (is(T==BinReader)) {
+                readBinReader(fieldMeta,t);
             } else {
                 // try to get meta info
                 metaInfo=getSerializationInfoForType!(T)();
@@ -1409,11 +1445,11 @@ class Unserializer {
                     version(UnserializationTrace) Stdout("Y using external handlers").newline;
                     ExternalSerializationHandlers *h=metaInfo.externalHandlers;
                     assert(h.unserialize!is null,"externalHandlers without valid unserialize");
-                    if (metaInfo.externalHandlers.preUnserialize){
+                    if (h.preUnserialize){
                         h.preUnserialize(this,metaInfo,cast(void*)&t);
                     }
                     scope(exit){
-                        if (metaInfo.externalHandlers.postUnserialize){
+                        if (h.postUnserialize){
                             h.postUnserialize(this,metaInfo,cast(void*)&t);
                         }
                     }
@@ -1433,7 +1469,21 @@ class Unserializer {
     
     void readStartRoot() { }
     void readEndRoot() { }
+    /// closes the serializer, after this it one could recyle the serializer
+    void close(){
+        if (unserializerCloseCallback){
+            unserializerCloseCallback(this);
+        }
+    }
     
+    /// reads with a generic text reader
+    void readOutReader(FieldMetaInfo f,OutReader r){
+        handlers.handle(r);
+    }
+    /// reads with a generic binary reader
+    void readOutReader(FieldMetaInfo f,BinReader r){
+        handlers.handle(r);
+    }
     /// reads something that has a custom write operation
     void readCustomField(FieldMetaInfo *field, void delegate()readOp){
         readOp();
@@ -1444,7 +1494,7 @@ class Unserializer {
     }
     /// reads the start of an array
     PosCounter readArrayStart(FieldMetaInfo *field){
-        return PosCounter(size_t.max);
+        return PosCounter(ulong.max);
     }
     /// reads an element of the array (or its end)
     /// returns true if an element was read
@@ -1456,7 +1506,7 @@ class Unserializer {
     }
     /// start of a dictionary
     PosCounter readDictStart(FieldMetaInfo *field, bool stringKeys=false) {
-        auto res=PosCounter(size_t.max);
+        auto res=PosCounter(ulong.max);
         res.data=Variant(stringKeys);
         return res;
     }

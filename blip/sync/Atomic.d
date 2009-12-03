@@ -685,5 +685,5 @@ T flagAdd(T)(ref T flag,T incV=cast(T)1){
 /// useful for counters, and to generate unique values (fast)
 /// no barriers are implied
 T nextValue(T)(ref T val){
-    return atomicAdd(flag,cast(T)1);
+    return atomicAdd(val,cast(T)1);
 }

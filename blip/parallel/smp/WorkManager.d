@@ -1,12 +1,16 @@
 /// module of the singleton (one per process) defaultScheduler
-module blip.parallel.WorkManager;
-public import blip.parallel.Models;
-public import blip.parallel.BasicTasks;
-import blip.parallel.BasicExecuters;
-import blip.parallel.BasicTasks;
+module blip.parallel.smp.WorkManager;
+public import blip.parallel.smp.SmpModels;
+public import blip.parallel.smp.BasicTasks;
+import blip.parallel.smp.BasicExecuters;
+import blip.parallel.smp.BasicTasks;
 import tango.util.log.Config;
-import tango.util.log.Log;
+import blip.t.util.log.Log;
 
+/// size_t the default size for simple work
+/// this is used to calculate the default block size for splitting up parallel tasks
+/// (this should probably be at least comparable to the l1 cache per thread)
+const size_t defaultSimpleLoopSize=64*1024;
 /// a real scheduler (unless one has version SequentialWorkManager)
 /// shares the work on a pool of threads
 TaskSchedulerI defaultScheduler;
@@ -18,6 +22,7 @@ TaskI defaultTask;
 TaskSchedulerI sequentialScheduler;
 /// the root task that can be used to add work to the sequentialScheduler
 TaskI sequentialTask;
+TaskI immediateTask;
 
 static this(){
     version(SequentialWorkManager){
@@ -29,8 +34,10 @@ static this(){
     defaultTask=defaultScheduler.rootTask();
     // tasks submitted to noTask print a warning, and are routed to the default executer
     (cast(RootTask)noTask)._scheduler=defaultScheduler;
+    auto immediateScheduler=new ImmediateExecuter("immediateWorkManager");
     sequentialScheduler=new ImmediateExecuter("sequentialWorkManager");
     sequentialTask=sequentialScheduler.rootTask();
-    Log.lookup("blip.parallel").level(Logger.Level.Warn,true);
+    immediateTask=immediateScheduler.rootTask();
+    Log.lookup("blip.parallel.smp").level(Logger.Level.Warn,true);
 }
 

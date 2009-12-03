@@ -1,5 +1,5 @@
 module blip.serialization.Citations;
-import tango.io.stream.Format;
+import blip.t.io.stream.Format:FormatOut;
 import tango.util.container.HashSet;
 import tango.text.Util;
 
@@ -21,7 +21,7 @@ class Citation{
             throw new Exception("comparing Citation to an incompatible class: "~o.classinfo.name);
         }
     }
-    FormatOutput!(char)desc(FormatOutput!(char)s){
+    FormatOut desc(FormatOut s){
         s("[")(key)("] ")(citation);
         if (refs.length>0){
             s(" refs:");
@@ -88,7 +88,7 @@ class CitationDB{
         }
     }
     /// prints the references that have been cited
-    FormatOutput!(char)printCited(FormatOutput!(char)s){
+    FormatOut printCited(FormatOut s){
         auto cits=toPrint.toArray();
         cits.sort;
         foreach(c;cits){

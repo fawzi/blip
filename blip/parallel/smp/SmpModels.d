@@ -1,8 +1,8 @@
 /// interfaces for tasks, schedulers and executers
-module blip.parallel.Models;
-import tango.util.log.Log;
+module blip.parallel.smp.SmpModels;
+import blip.t.util.log.Log;
 import blip.BasicModels;
-import tango.io.stream.Format;
+import blip.t.io.stream.Format:FormatOut;
 import blip.container.FiberPool;
 
 enum TaskStatus:int{
@@ -53,7 +53,7 @@ interface TaskSchedulerI:BasicObjectI {
     /// root task, the easy way to add tasks to this scheduler
     TaskI rootTask();
     /// possibly short description
-    FormatOutput!(char) desc(FormatOutput!(char) s,bool shortVersion);
+    FormatOut desc(FormatOut s,bool shortVersion);
     /// if there are many queued tasks (and one should try not to queue too many of them)
     bool manyQueued();
     /// number of simple tasks wanted
@@ -66,7 +66,7 @@ interface TaskSchedulerI:BasicObjectI {
 /// methods needed in a queued task
 interface TaskI:SubtaskNotificationsI,SubmittingI{
     /// executes the task
-    void execute(bool sequential);
+    void execute(bool sequential=false);
     /// returns the status of the task
     TaskStatus status();
     /// sets the status of the task
@@ -86,7 +86,7 @@ interface TaskI:SubtaskNotificationsI,SubmittingI{
     /// name of the task
     char[] taskName();
     /// possibly short description
-    FormatOutput!(char) desc(FormatOutput!(char) s,bool shortVersion);
+    FormatOut desc(FormatOut s,bool shortVersion);
     /// if this task might spawn
     bool mightSpawn();
     /// if this task might Yield
@@ -123,6 +123,8 @@ interface SubmittingI:BasicObjectI {
     TaskI submitYield(TaskI t=null);
     /// spawns the task t from the present task
     void spawnTask(TaskI t);
+    /// spawns the task t from the present task and waits for its completion
+    void spawnTaskSync(TaskI t);
     /// delays the current task (which should be yieldable)
     /// opStart is executed after the task has been flagged as delayed, but before
     /// stopping the current execution. Use it to start the operation that will resume

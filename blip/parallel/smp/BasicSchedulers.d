@@ -1,4 +1,4 @@
-module blip.parallel.BasicSchedulers;
+module blip.parallel.smp.BasicSchedulers;
 import tango.io.protocol.model.IWriter;
 import tango.io.protocol.model.IReader;
 import tango.core.Thread;
@@ -6,14 +6,14 @@ import tango.core.Variant:Variant;
 import tango.core.sync.Mutex;
 import tango.math.Math;
 import tango.io.Stdout;
-import tango.util.log.Log;
+import blip.t.util.log.Log;
 import tango.util.container.LinkedList;
-import tango.io.stream.Format;
+import blip.t.io.stream.Format:FormatOut;
 import blip.text.Stringify;
 import blip.TemplateFu:ctfe_i2a;
-import blip.parallel.PriQueue;
-import blip.parallel.Models;
-import blip.parallel.BasicTasks;
+import blip.parallel.smp.PriQueue;
+import blip.parallel.smp.SmpModels;
+import blip.parallel.smp.BasicTasks;
 import blip.BasicModels;
 import tango.math.random.Random;
 
@@ -53,7 +53,7 @@ class PriQTaskScheduler:TaskSchedulerI {
     /// super scheduler, only subclasses of this are accepted
     PriQTaskScheduler superScheduler;
     /// creates a new PriQTaskScheduler
-    this(char[] name,char[] loggerPath="blip.parallel.queue",int level=0,
+    this(char[] name,char[] loggerPath="blip.parallel.smp.queue",int level=0,
         PriQTaskScheduler superScheduler=null){
         this.name=name;
         if (superScheduler){
@@ -186,11 +186,11 @@ class PriQTaskScheduler:TaskSchedulerI {
         return _executer;
     }
     /// description (for debugging)
-    FormatOutput!(char) desc(FormatOutput!(char)s){ return desc(s,false); }
+    FormatOut desc(FormatOut s){ return desc(s,false); }
     /// description (for debugging)
     /// (might not be a snapshot if other threads modify it while printing)
     /// non threadsafe
-    FormatOutput!(char) desc(FormatOutput!(char)s,bool shortVersion){
+    FormatOut desc(FormatOut s,bool shortVersion){
         if (this is null){
             s("<PriQTaskScheduler *NULL*>").newline;
         } else {

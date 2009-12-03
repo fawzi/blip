@@ -1,9 +1,9 @@
 module blip.serialization.Handlers;
 import tango.core.Tuple;
-import tango.io.stream.Format;
+import blip.t.io.stream.Format:FormatOut;
 import tango.io.model.IConduit;
 import tango.text.json.JsonEscape: escape;
-import tango.io.encode.Base64: encode,decode;
+import tango.io.encode.Base64: encode,decode,allocateEncodeSize;
 import tango.core.Variant;
 import tango.core.ByteSwap;
 import tango.core.Traits: RealTypeOf,ctfe_i2a;
@@ -11,6 +11,7 @@ import tango.math.Math:min;
 import tango.core.Exception: IOException;
 import blip.text.TextParser;
 import blip.text.UtfUtils;
+import blip.BasicModels;
 
 /// the non array core types
 template isBasicCoreType(T){
@@ -27,12 +28,12 @@ template isCoreType(T){
      ||is(T==long)||is(T==ulong)||is(T==double)||is(T==real)
      ||is(T==ifloat)||is(T==idouble)||is(T==ireal)||is(T==cfloat)
      ||is(T==cdouble)||is(T==creal)||is(T==char[])||is(T==wchar[])
-     ||is(T==dchar[])||is(T==ubyte[]);
+     ||is(T==dchar[])||is(T==ubyte[])||is(T==void[]);
 }
 
 alias Tuple!(bool,byte,ubyte,short,ushort,int,uint,long,ulong,
     float,double,real,ifloat,idouble,ireal,cfloat,cdouble,creal,ubyte[],
-    char[],wchar[],dchar[]) CoreTypes;
+    char[],wchar[],dchar[],void[]) CoreTypes;
 alias Tuple!(char[],wchar[],dchar[]) CoreStringTypes;
 
 /// string suitable to build names for the core type T
@@ -40,6 +41,8 @@ template strForCoreType(T){
     static if (is(T S:S[])){
         static if (is(T==ubyte[])){
             const char[]strForCoreType="binaryBlob";
+        } else static if (is(T==void[])){
+            const char[]strForCoreType="binaryBlob2";
         } else {
             const char[]strForCoreType=S.stringof~"Str";
         }
@@ -79,8 +82,30 @@ class CoreHandlers{
     mixin(coreTypeDelegates());
 
     void handle(T)(ref T t){
-        static assert(isCoreType!(T),T.stringof~" is not a core type");
-        mixin("coreHandler_"~strForCoreType!(T)~"(t);");
+        static if (is(T==OutWriter)){
+            handleOutWriter(t);
+        } else static if (is(T==BinWriter)){
+            handleBinWriter(t);
+        } else static if (is(T==OutReader)){
+            handleOutReader(t);
+        } else static if (is(T==BinReader)){
+            handleBinReader(t);
+        } else {
+            static assert(isCoreType!(T),T.stringof~" is not a core type");
+            mixin("coreHandler_"~strForCoreType!(T)~"(t);");
+        }
+    }
+    void handleOutWriter(OutWriter w){
+        assert(0,"unimplemented");
+    }
+    void handleBinWriter(BinWriter w){
+        assert(0,"unimplemented");
+    }
+    void handleOutReader(OutReader w){
+        assert(0,"unimplemented");
+    }
+    void handleBinReader(BinReader w){
+        assert(0,"unimplemented");
     }
 }
 
@@ -99,12 +124,18 @@ class WriteHandlers: CoreHandlers{
         assert(0,"unimplemented");
     }
     /// writes a raw sequence of bytes
-    void rawWrite(ubyte[] data){
+    void rawWrite(void[] data){
         assert(0,"unimplemented");
     }
     /// writes a raw string
     void rawWriteStr(char[]data){
         assert(0,"unimplemented");
+    }
+    override void handleOutWriter(OutWriter w){
+        w(&rawWriteStr);
+    }
+    override void handleBinWriter(BinWriter w){
+        w(&rawWrite);
     }
 }
 
@@ -155,6 +186,12 @@ class ReadHandlers: CoreHandlers{
     char[] parserPos(){
         return "";
     }
+    void handleOutReader(OutReader r){
+        throw new Exception("unimplemented",__FILE__,__LINE__);
+    }
+    void handleBinReader(BinReader r){
+        throw new Exception("unimplemented",__FILE__,__LINE__);
+    }
 }
 
 version (BigEndian){
@@ -163,31 +200,11 @@ version (BigEndian){
     enum:bool{ isSmallEndian=true }
 }
 
-/// binary write handlers
-/// build it on the top of OutputBuffer? would spare a buffer and its copy if SwapBytes is true
-final class BinaryWriteHandlers(bool SwapBytes=isSmallEndian):WriteHandlers{
+class StreamWriter{
     OutputStream writer;
-    
-    this (OutputStream writer)
-    {
-        super();
-        this.writer=writer;
-        setCoreHandlersFrom_basicWrite();
+    this(OutputStream s){
+        writer=s;
     }
-    
-    /+ /// guartees the given alignment
-    void alignStream(int i){
-        assert(i>0&&i<=32);
-        if (i==1) return;
-        auto pos=writer.seek(0,Anchor.Current);
-        if (pos==Eof) return;
-        auto rest=pos & (~((~0)<<i));
-        if (rest==0) return;
-        ubyte u=0;
-        for (int j=(1<<(i-1))-rest;j!=0;--j)
-            writer.handle(u);
-    }+/
-    
     final void writeExact(void[] src){
         auto written=writer.write(src);
         if (written!=src.length){
@@ -212,6 +229,67 @@ final class BinaryWriteHandlers(bool SwapBytes=isSmallEndian):WriteHandlers{
             }
         }
     }
+}
+
+class StreamStrWriter(T){
+    OutputStream writer;
+    this(OutputStream s){
+        writer=s;
+    }
+    final void writeExactStr(T[] src){
+        auto written=writer.write(src);
+        if (written!=src.length*T.sizeof){
+            if (written==OutputStream.Eof){
+                throw new Exception("unexpected Eof",__FILE__,__LINE__);
+            }
+            uint countEmpty=0;
+            while (1){
+                auto writtenNow=writer.write(src[written..$]);
+                if (writtenNow==OutputStream.Eof){
+                    throw new Exception("unexpected Eof",__FILE__,__LINE__);
+                } else if (writtenNow==0){
+                    if (countEmpty==100)
+                        throw new Exception("unexpected suspension",__FILE__,__LINE__);
+                    else
+                        ++countEmpty;
+                } else {
+                    countEmpty=0;
+                }
+                written+=writtenNow;
+                if (written>=src.length*T.sizeof) break;
+            }
+        }
+    }
+}
+
+/// binary write handlers
+/// build it on the top of OutputBuffer? would spare a buffer and its copy if SwapBytes is true
+final class BinaryWriteHandlers(bool SwapBytes=isSmallEndian):WriteHandlers{
+    void delegate(void[]) writer;
+    
+    this (void delegate(void[]) writer)
+    {
+        super();
+        this.writer=writer;
+        setCoreHandlersFrom_basicWrite();
+    }
+    
+    /+ /// guartees the given alignment
+    void alignStream(int i){
+        assert(i>0&&i<=32);
+        if (i==1) return;
+        auto pos=writer.seek(0,Anchor.Current);
+        if (pos==Eof) return;
+        auto rest=pos & (~((~0)<<i));
+        if (rest==0) return;
+        ubyte u=0;
+        for (int j=(1<<(i-1))-rest;j!=0;--j)
+            writer.handle(u);
+    }+/
+    
+    void writeExact(void[]d){
+        writer(d);
+    }
     
     /// writes an ulong compressed, useful if the value is expected to be small
     void writeCompressed(ulong l){
@@ -230,12 +308,12 @@ final class BinaryWriteHandlers(bool SwapBytes=isSmallEndian):WriteHandlers{
 
     /// writes a core type
     void basicWrite(T)(ref T t){
-        static assert(isCoreType!(T),"only core types supported");
+        static assert(isCoreType!(T),"only core types supported, not "~T.stringof);
         static if (is(T==cfloat)||is(T==cdouble)||is(T==creal)){
             RealTypeOf!(T) tt=t.re;
-            basicWrite(tt);
+            basicWrite!(RealTypeOf!(T))(tt);
             tt=t.im;
-            basicWrite(tt);
+            basicWrite!(RealTypeOf!(T))(tt);
         } else static if (is(T U:U[])){
             if (!is(U==ubyte)){
                 writeCompressed(cast(ulong)t.length*U.sizeof);
@@ -279,7 +357,7 @@ final class BinaryWriteHandlers(bool SwapBytes=isSmallEndian):WriteHandlers{
         return true;
     }
     /// writes a raw sequence of bytes
-    void rawWrite(ubyte[] data){
+    void rawWrite(void[] data){
         basicWrite(data);
     }
     /// writes a raw string
@@ -291,7 +369,7 @@ final class BinaryWriteHandlers(bool SwapBytes=isSmallEndian):WriteHandlers{
 /// binary read handlers
 /// build it on the top of InputBuffer? would spare a buffer and its copy if SwapBytes
 final class BinaryReadHandlers(bool SwapBytes=isSmallEndian):ReadHandlers{
-    protected InputStream       reader;
+    InputStream       reader;
     
     this (InputStream reader)
     {
@@ -405,27 +483,32 @@ final class BinaryReadHandlers(bool SwapBytes=isSmallEndian):ReadHandlers{
     }
 }
 
-/// formatted write handlers written on the top of FormatOutput
-final class FormattedWriteHandlers: WriteHandlers{
-    FormatOutput!(char) writer;
-    this(FormatOutput!(char) w){
-        writer=w;
+/// formatted write handlers written on the top of a simple sink
+final class FormattedWriteHandlers(U=char): WriteHandlers{
+    void delegate(U[]) writer;
+    this(void delegate(U[]) writer){
+        super();
+        this.writer=writer;
         setCoreHandlersFrom_basicWrite();
     }
     /// writes a basic type (basic types are atomic types or strings)
     void basicWrite(T)(ref T t){
         static assert(!(is(T==char) || is(T==wchar) || is(T==dchar)),
             "single character writes not supported, only string writes");
-        static if (is(T==char[])||is(T==wchar[])||is(T==dchar[])){
+        static if (is(T==U[])){
             writer("\"");
-            writer(escape(t));//escape(t, cast(void delegate(T))&writer.stream.write);
+            writer(escape!(char)(t));//escape(t, cast(void delegate(T))&writer.stream.write);
             writer("\"");
-        } else static if (is(T==ubyte[])){
+        } else static if (is(T==char[])||is(T==wchar[])||is(T==dchar[])){
+            auto s=convertToString!(U)(t);
+            basicWrite(s);
+        } else static if (is(T==ubyte[])||is(T==void[])){
+            scope char[] buf=new char[](allocateEncodeSize(cast(ubyte[])t));
             writer("\"");
-            writer(encode(t));
+            writer(cast(U[])encode(cast(ubyte[])t,buf));
             writer("\"");
         } else static if (isBasicCoreType!(T)){
-            writer(t);
+            writeOut(writer,t);
         } else {
             static assert(0,"invalid basic type "~T.stringof);
         }
@@ -438,7 +521,7 @@ final class FormattedWriteHandlers: WriteHandlers{
         return false;
     }
     /// writes a raw sequence of bytes
-    void rawWrite(ubyte[] data){
+    void rawWrite(void[] data){
         basicWrite(data); // should encode it in base 64 or something like it
     }
     /// writes a raw string
@@ -463,13 +546,25 @@ final class FormattedReadHandlers(T):ReadHandlers{
     }
     /// reads a basic type
     void basicRead(U)(ref U t){
-        static assert(isCoreType!(U),"invalid non core type "~U.stringof);
-        static if (is(U==ubyte[])){
-            T[]str;
-            reader(str);
-            t=decode(str);
+        static if (is(U==OutReader)){
+            outRead(t);
+        } else static if (is(U==BinReader)){
+            binRead(t);
         } else {
-            reader(t);
+            static assert(isCoreType!(U),"invalid non core type "~U.stringof);
+            static if (is(U==ubyte[])||is(U==void[])){
+                T[]str;
+                reader(str);
+                t=decode(str);
+            } else static if (is(U==T[])){
+                reader(t);
+            } else static if (is(U==char[])||is(U==wchar[])||is(U==dchar[])){
+                T[] s;
+                reader(s);
+                t=convertToString!(ElementTypeOfArray!(U))(s,t);
+            } else {
+                reader(t);
+            }
         }
     }
     
@@ -490,3 +585,4 @@ final class FormattedReadHandlers(T):ReadHandlers{
         return reader.skipString(str,shouldThrow);
     }
 }
+

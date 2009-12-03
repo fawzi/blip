@@ -9,7 +9,7 @@ struct LazyArray(T) {
     ulong size; /// output size
     int delegate(int delegate(ref T)) loopOp; /// output loop
     void delegate(T) addOp; /// add one element
-    void delegate(size_t l) setLen; /// set the length (before addition with a guess, after with real size)
+    void delegate(ulong l) setLen; /// set the length (before addition with a guess, after with real size)
     
     /// if you just want to write out this is all that is needed
     static LazyArray opCall(int delegate(int delegate(ref T)) loopOp,ulong size=ulong.max){
@@ -19,7 +19,7 @@ struct LazyArray(T) {
         return res;
     }
     /// if you just want to readin this is all that is needed
-    static LazyArray opCall(void delegate(T) addOp,void delegate(size_t l) setLen=null){
+    static LazyArray opCall(void delegate(T) addOp,void delegate(ulong l) setLen=null){
         LazyArray res;
         res.addOp=addOp;
         res.setLen=setLen;
@@ -27,7 +27,7 @@ struct LazyArray(T) {
     }
     /// initialize a complete (input/output) wrapper
     static LazyArray opCall(int delegate(int delegate(ref T)) loopOp,void delegate(T) addOp,
-        ulong size=ulong.max,void delegate(size_t l) setLen=null){
+        ulong size=ulong.max,void delegate(ulong l) setLen=null){
         LazyArray res;
         res.size=size;
         res.loopOp=loopOp;
@@ -86,7 +86,7 @@ struct LazyAA(K,V) {
     ulong size; /// output size
     int delegate(int delegate(ref K,ref V)) loopOp; /// output loop
     void delegate(K,V) addOp; /// add one element
-    void delegate(size_t l) setLen; /// set the length (before addition with a guess, after with real size)
+    void delegate(ulong l) setLen; /// set the length (before addition with a guess, after with real size)
     
     /// if you just want to write out this is all that is needed
     static LazyAA opCall(int delegate(int delegate(ref K,ref V)) loopOp,ulong size=ulong.max){
@@ -96,7 +96,7 @@ struct LazyAA(K,V) {
         return res;
     }
     /// if you just want to readin this is all that is needed
-    static LazyAA opCall(void delegate(K,V) addOp,void delegate(size_t l) setLen=null){
+    static LazyAA opCall(void delegate(K,V) addOp,void delegate(ulong l) setLen=null){
         LazyAA res;
         res.addOp=addOp;
         res.setLen=setLen;
@@ -104,7 +104,7 @@ struct LazyAA(K,V) {
     }
     /// initialize a complete (input/output) wrapper
     static LazyAA opCall(int delegate(int delegate(ref K,ref V)) loopOp,void delegate(K,V) addOp,
-        ulong size=ulong.max,void delegate(size_t l) setLen=null){
+        ulong size=ulong.max,void delegate(ulong l) setLen=null){
         LazyAA res;
         res.size=size;
         res.loopOp=loopOp;

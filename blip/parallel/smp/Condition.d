@@ -1,9 +1,12 @@
-module blip.parallel.Condition;
-import blip.parallel.Models;
-import blip.parallel.BasicTasks;
+/// condition variables, try avoid their use
+module blip.parallel.smp.Condition;
+import blip.parallel.smp.SmpModels;
+import blip.parallel.smp.BasicTasks;
 import tango.core.Thread;
 
 /// waits for an OS lock
+/// WARNING this might deadlock if alwaysLock and the task that aquires the lock might
+/// be suspended non executing
 class WaitLock(T){
     T lockObj;
     bool alwaysLock;

@@ -4,7 +4,7 @@ module blip.serialization.SBinSerialization;
 import blip.serialization.SerializationBase;
 import blip.serialization.Handlers;
 import tango.io.Stdout : Stdout;
-import tango.io.stream.Format;
+import blip.t.io.stream.Format:FormatOut;
 import tango.io.model.IConduit;
 import tango.core.Variant;
 import blip.BasicModels;
@@ -54,8 +54,12 @@ class SBinSerializer : Serializer {
         lastMetaId=3; // 0: null, 1: default type, 2: proxy, 3: metaInfo
         compact=true;
     }
-    this(OutputStream s){
+    this(void delegate(void[]) s){
         this(new BinaryWriteHandlers!()(s));
+    }
+    this(OutputStream s){
+        auto stream=new StreamWriter(s);
+        this(new BinaryWriteHandlers!()(&stream.writeExact));
     }
     void writeField(FieldMetaInfo *field){ }
     /// writes something that has a custom write operation
@@ -74,19 +78,14 @@ class SBinSerializer : Serializer {
         writeCompressed(0u);
     }
     /// writes the start of an array of the given size
-    override PosCounter writeArrayStart(FieldMetaInfo *field,size_t size){
+    override PosCounter writeArrayStart(FieldMetaInfo *field,ulong l){
         writeField(field);
-        if (size==size_t.max){
-            ulong lSize=ulong.max;
-            writeCompressed(lSize);
-        } else {
-            writeCompressed(cast(ulong)size);
-        }
-        return PosCounter(size);
+        writeCompressed(l);
+        return PosCounter(l);
     }
     /// writes a separator of the array
     override void writeArrayEl(ref PosCounter ac, void delegate() writeEl) {
-        if (ac.length==size_t.max){
+        if (ac.length==ulong.max){
             writeCompressed(1u);
         }
         ac.next();
@@ -94,25 +93,20 @@ class SBinSerializer : Serializer {
     }
     /// writes the end of the array
     override void writeArrayEnd(ref PosCounter ac) {
-        if (ac.length==size_t.max){
+        if (ac.length==ulong.max){
             writeCompressed(0u);
         }
         ac.end();
     }
     /// start of a dictionary
-    override PosCounter writeDictStart(FieldMetaInfo *field,size_t size, bool stringKeys=false) {
+    override PosCounter writeDictStart(FieldMetaInfo *field,ulong l, bool stringKeys=false) {
         writeField(field);
-        if (size==size_t.max){
-            ulong lSize=ulong.max;
-            writeCompressed(lSize);
-        } else {
-            writeCompressed(cast(ulong)size);
-        }
-        return PosCounter(size);
+        writeCompressed(l);
+        return PosCounter(l);
     }
     /// writes an entry of the dictionary
     override void writeEntry(ref PosCounter ac, void delegate() writeKey,void delegate() writeVal) {
-        if (ac.length==size_t.max){
+        if (ac.length==ulong.max){
             writeCompressed(1u);
         }
         ac.next();
@@ -121,7 +115,7 @@ class SBinSerializer : Serializer {
     }
     /// end of dictionary
     override void writeDictEnd(ref PosCounter ac) {
-        if (ac.length==size_t.max){
+        if (ac.length==ulong.max){
             writeCompressed(0);
         }
         ac.end();
@@ -280,14 +274,14 @@ class SBinUnserializer: Unserializer {
         readField(field);
         ulong lSize;
         readCompressed(lSize);
-        size_t size;
+        ulong size;
         if (lSize==ulong.max){
-            size=size_t.max;
+            size=ulong.max;
         } else if (lSize>=size_t.max){
             Stdout.format("lSize:{:x}",lSize).newline;
             serializationError("trying to decode an array too large for 32 bit representation",__FILE__,__LINE__);
         } else {
-            size=cast(size_t)lSize;
+            size=lSize;
         }
         return PosCounter(size);
     }
@@ -298,7 +292,7 @@ class SBinUnserializer: Unserializer {
             ac.end;
             return false;
         }
-        if (ac.length==size_t.max){
+        if (ac.length==ulong.max){
             ulong cont;
             readCompressed(cont);
             if (cont==0){
@@ -316,10 +310,10 @@ class SBinUnserializer: Unserializer {
     override PosCounter readDictStart(FieldMetaInfo *field, bool stringKeys=false) {
         readField(field);
         ulong lSize;
-        size_t size;
+        ulong size;
         readCompressed(lSize);
         if (lSize==ulong.max){
-            size=size_t.max;
+            size=ulong.max;
         } else if (lSize>=size_t.max){
             serializationError("trying to decode an array too large for 32 bit representation",__FILE__,__LINE__);
         } else {
@@ -334,7 +328,7 @@ class SBinUnserializer: Unserializer {
             ac.end;
             return false;
         }
-        if (ac.length==size_t.max){
+        if (ac.length==ulong.max){
             uint cont;
             readCompressed(cont);
             if (cont==0) {

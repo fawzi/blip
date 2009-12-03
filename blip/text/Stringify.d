@@ -7,7 +7,7 @@
         author:         Fawzi Mohamed
 *******************************************************************************/
 module blip.text.Stringify;
-import tango.io.stream.Format;
+import blip.t.io.stream.Format;
 import tango.io.device.Array;
 import tango.text.convert.Format;
 import tango.text.convert.Layout;

@@ -1,5 +1,5 @@
-module blip.parallel.PriQueue;
-import tango.io.stream.Format;
+module blip.parallel.smp.PriQueue;
+import blip.t.io.stream.Format:FormatOut;
 import tango.core.sync.Mutex;
 import tango.core.sync.Semaphore;
 import tango.math.Math;
@@ -58,7 +58,7 @@ class PriQueue(T){
             return getString(desc(new Stringify()).newline);
         }
         /// description (for debugging)
-        FormatOutput!(char) desc(FormatOutput!(char)s){
+        FormatOut desc(FormatOut s){
             s.format("<PriQLevel@{} level={} entries=[",cast(void*)this,level);
             if (nEl>entries.length){
                 s("*ERROR* nEl=")(nEl);
@@ -98,7 +98,7 @@ class PriQueue(T){
             return getString(desc(new Stringify()).newline);
         }
         /// description (for debugging)
-        FormatOutput!(char) desc(FormatOutput!(char)s){
+        FormatOut desc(FormatOut s){
             if (this is null){
                 s("<PriQPool *NULL*>").newline;
             } else {
@@ -225,7 +225,7 @@ class PriQueue(T){
     /// description (for debugging)
     /// (might not be a snapshot if other thread modify it while printing)
     /// non threadsafe
-    FormatOutput!(char) desc(FormatOutput!(char)s){
+    FormatOut desc(FormatOut s){
         if (this is null){
             s("<PriQueue *NULL*>").newline;
         } else {

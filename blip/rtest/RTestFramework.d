@@ -9,12 +9,12 @@ module blip.rtest.RTestFramework;
 import tango.math.random.Random: Random;
 public import blip.TemplateFu: nArgs,ctfe_i2a,ctfe_hasToken, ctfe_replaceToken;
 public import tango.core.Traits:isStaticArrayType;
-public import tango.io.stream.Format;
+public import blip.t.io.stream.Format:FormatOut;
 import tango.io.Stdout: Stdout;
 public import tango.core.Variant:Variant;
 import tango.core.Array: find,remove;
 import tango.core.sync.Mutex: Mutex;
-import blip.parallel.WorkManager;
+import blip.parallel.smp.WorkManager;
 import tango.core.Thread;
 
 /// exception that causes a test to skip
@@ -143,11 +143,11 @@ enum TestResult : int{
     Fail=-1,
 }
 
-/// a test controller that writes out text to the given FormatOutput!(char) stream
+/// a test controller that writes out text to the given FormatOut stream
 class TextController: TestControllerI{
     Mutex _writeLock;
-    FormatOutput!(char) progressLog;
-    FormatOutput!(char) errorLog;
+    FormatOut progressLog;
+    FormatOut errorLog;
     bool _isStopping,trace;
     enum PrintLevel:int{ Error, Skip, AllShort, AllVerbose}
     PrintLevel printLevel;
@@ -164,7 +164,7 @@ class TextController: TestControllerI{
     OnFailure onFailure; /// what to do upon failure
     int testFactor; /// increase for a more throughly testing
     this(OnFailure onFailure=OnFailure.Throw,PrintLevel printLevel=PrintLevel.Skip,
-        FormatOutput!(char) progressLog=Stdout,FormatOutput!(char) errorLog=Stdout,int testFactor=1,
+        FormatOut progressLog=Stdout,FormatOut errorLog=Stdout,int testFactor=1,
         bool trace=false,Rand r=null){
         this._writeLock=new Mutex();
         this.progressLog=progressLog;
@@ -416,7 +416,7 @@ class SingleRTest{
     /// (valid only after at least one test attempt)
     bool hasRandom;
     int didCombinations; /// 0: in combinatorial sequence, 1: completed combinatorial sequence
-    FormatOutput!(char) failureLog; /// place to log failure description (if available)
+    FormatOut failureLog; /// place to log failure description (if available)
     float budgetLeft; /// budget left
     
     /// structure keeping statistic info
@@ -505,7 +505,7 @@ class SingleRTest{
     this(char[]testName,long sourceLine,char[]sourceFile,
         int nargs,TestResult delegate(SingleRTest) testDlg,
         TestSize testSize=TestSize(),TestControllerI testController=null,
-        FormatOutput!(char)failureLog=null, Rand r=null, Variant baseDelegate=Variant(null)){
+        FormatOut failureLog=null, Rand r=null, Variant baseDelegate=Variant(null)){
         this.testName=testName;
         this.sourceFile=sourceFile;
         this.sourceLine=sourceLine;
@@ -550,7 +550,7 @@ class TestCollection: SingleRTest, TestControllerI {
     Mutex statLock;
     /// constructor
     this(char[]testName,long sourceLine,char[]sourceFile,TestControllerI testController=null,
-        SingleRTest[] subTests=[],FormatOutput!(char)failureLog=null, Rand r=null)
+        SingleRTest[] subTests=[],FormatOut failureLog=null, Rand r=null)
     {
         super(testName,sourceLine,sourceFile,1,null,TestSize(1,1,1.5), testController,
             failureLog, r, Variant(null));
@@ -734,7 +734,7 @@ template testInit(char[] checkInit="", char[] manualInit=""){
     /// creates a test that executes the given function and fails if it throws an exception
     SingleRTest testNoFail(S...)(char[] testName, void delegate(S) testF,long sourceLine=-1,
         char[] sourceFile="unknown",TestControllerI testController=null,
-        TestSize testSize=TestSize(),FormatOutput!(char)failureLog=null,Rand r=null)
+        TestSize testSize=TestSize(),FormatOut failureLog=null,Rand r=null)
     {
         mixin checkTestInitArgs!(S);
         TestResult doTest(SingleRTest test){
@@ -766,7 +766,7 @@ template testInit(char[] checkInit="", char[] manualInit=""){
     /// creates a test that executes the given function and fails if no exception is raised
     SingleRTest testFail(S...)(char[] testName, void delegate(S) testF,long sourceLine=-1L,
         char[] sourceFile="unknown",TestControllerI testController=null,
-        TestSize testSize=TestSize(),FormatOutput!(char)failureLog=null,Rand r=null)
+        TestSize testSize=TestSize(),FormatOut failureLog=null,Rand r=null)
     {
         mixin checkTestInitArgs!(S);
         TestResult doTest(SingleRTest test){
@@ -794,7 +794,7 @@ template testInit(char[] checkInit="", char[] manualInit=""){
     /// creates a test that checks that the given function returns true
     SingleRTest testTrue(S...)(char[] testName, bool delegate(S) testF,long sourceLine=-1L,
         char[] sourceFile="unknown",TestControllerI testController=null,
-        TestSize testSize=TestSize(),FormatOutput!(char)failureLog=null,Rand r=null)
+        TestSize testSize=TestSize(),FormatOut failureLog=null,Rand r=null)
     {
         mixin checkTestInitArgs!(S);
         TestResult doTest(SingleRTest test){
@@ -832,7 +832,7 @@ template testInit(char[] checkInit="", char[] manualInit=""){
     /// creates a test that checks that the given function returns false
     SingleRTest testFalse(S...)(char[] testName, bool delegate(S) testF,long sourceLine=-1L,
         char[] sourceFile="unknown",TestControllerI testController=null,
-        TestSize testSize=TestSize(),FormatOutput!(char)failureLog=null,Rand r=null)
+        TestSize testSize=TestSize(),FormatOut failureLog=null,Rand r=null)
     {
         mixin checkTestInitArgs!(S);
         int nargs=nArgs!(S);
