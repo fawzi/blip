@@ -25,7 +25,7 @@ void main(char[][]argv){
     sout("blip.parallel.smp.queue:")(Log.lookup("blip.parallel.smp.queue").level)("\n");
     Log.lookup("blip.parallel.smp.queue").info("pippo");
     CharSink nullPrt=delegate void(char[]s){};
-    nullPrt=ssout.call;
+    nullPrt=sout.call;
     SingleRTest.defaultTestController=new TextController(TextController.OnFailure.StopTest,
         TextController.PrintLevel.AllShort,nullPrt,nullPrt,1,false);
     TestCollection failTests=new TestCollection("failTests",__LINE__,__FILE__);
@@ -88,8 +88,8 @@ void main(char[][]argv){
             throw new Exception("test `"~t.testName~"` had "~ctfe_i2a(t.stat.failedTests)~" failures, expected "~ctfe_i2a(expectedFailures[i]));
         }
     }
-    ssout("\n=============================================================\n\n");
+    sout("\n=============================================================\n\n");
     mainTestFun(argv,failTests);
-    ssout("test finished!\n");
+    sout("test finished!\n");
 }
 

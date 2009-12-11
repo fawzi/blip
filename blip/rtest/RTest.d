@@ -232,7 +232,7 @@ int mainTestFun(char[][] argStr,SingleRTest testSuite){
     }
     
     SingleRTest.defaultTestController=new TextController(
-        onFailure, printLevel,ssout.call,ssout.call,1,trace);
+        onFailure, printLevel,sout.call,sout.call,1,trace);
     if (test.length==0){
         // testSuite.runTests(runs,seed,counter);
         testSuite.runTestsTask(runs,seed,counter).autorelease.submit(defaultTask).wait();
@@ -260,7 +260,7 @@ debug(UnitTest){
 
     unittest{
         CharSink nullPrt=delegate void(char[]){};
-        // nullPrt=ssout;
+        // nullPrt=sout;
         SingleRTest.defaultTestController=new TextController(TextController.OnFailure.StopTest,
             TextController.PrintLevel.AllShort,nullPrt,nullPrt);
         TestCollection failTests=new TestCollection("failTests",__LINE__,__FILE__);

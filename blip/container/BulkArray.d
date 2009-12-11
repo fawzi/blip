@@ -220,7 +220,7 @@ struct BulkArray(T){
             if (ret) return ret;
         }
     }
-    int opApply(int delegate(size_t i,ref DynamicArrayType!(T) v) loopBody){
+    int opApply(int delegate(ref size_t i,ref DynamicArrayType!(T) v) loopBody){
         T*aPtr=ptr;
         for (size_t i=ptrEnd-aPtr;i!=0;--i,++aPtr){
             int ret=loopBody(i,*aPtr);
@@ -263,7 +263,7 @@ struct BulkArray(T){
             PLoop *context;
             T* start;
             T* end;
-            int delegate(size_t index,ref DynamicArrayType!(T) v) loopBody;
+            int delegate(ref size_t index,ref DynamicArrayType!(T) v) loopBody;
             size_t index;
             Slice2 *next;
             void exec(){
@@ -329,7 +329,7 @@ struct BulkArray(T){
             }
             return 0;
         }
-        int opApply(int delegate(size_t i,ref DynamicArrayType!(T) v) loopBody){
+        int opApply(int delegate(ref size_t i,ref DynamicArrayType!(T) v) loopBody){
             if (end-start>optimalBlockSize*2){
                 Task("BulkArrayPLoop1",
                     delegate void(){
@@ -401,7 +401,7 @@ struct BulkArray(T){
                 return it.sLoop().opApply(loopBody);
             }
         }
-        int opApply(int delegate(size_t i,ref DynamicArrayType!(T) v) loopBody){
+        int opApply(int delegate(ref size_t i,ref DynamicArrayType!(T) v) loopBody){
             if (parallel){
                 return it.pLoop(optimalChunkSize).opApply(loopBody);
             } else {

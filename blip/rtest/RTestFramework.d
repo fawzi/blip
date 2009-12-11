@@ -126,14 +126,14 @@ char[] callF(S...)(char[] retType){
 }
 
 /// tries to print the arguments of the test
-char[] printArgs(int nargs,char[] printC="ssout.call",char[] indent="    "){
+char[] printArgs(int nargs,char[] printC="sout.call",char[] indent="    "){
     char[] res="".dup;
     res~=indent~"try{\n";
     for (int i=0;i<nargs;++i){
         res~=indent~"    "~printC~"(\"arg"~ctfe_i2a(i)~": \"); writeOut("~printC~",arg["~ctfe_i2a(i)~"]); "~printC~"(\"\\n\");\n";
     }
     res~=indent~"}catch (Exception e) {\n";
-    res~=indent~"    ssout.call(collectAppender(delegate void(void delegate(char[])s){ s(\"could not print arguments due to exception\"); writeOut(ssout.call,e.toString); ssout(\"\\n\");}));\n";
+    res~=indent~"    sout.call(collectAppender(delegate void(void delegate(char[])s){ s(\"could not print arguments due to exception\"); writeOut(sout.call,e.toString); sout(\"\\n\");}));\n";
     res~=indent~"}\n";
     return res;
 }
@@ -165,7 +165,7 @@ class TextController: TestControllerI{
     OnFailure onFailure; /// what to do upon failure
     int testFactor; /// increase for a more throughly testing
     this(OnFailure onFailure=OnFailure.Throw,PrintLevel printLevel=PrintLevel.Skip,
-        CharSink progressLog=ssout.call,CharSink errorLog=ssout.call,int testFactor=1,
+        CharSink progressLog=sout.call,CharSink errorLog=sout.call,int testFactor=1,
         bool trace=false,Rand r=null){
         this._writeLock=new Mutex();
         this.progressLog=progressLog;
@@ -487,7 +487,7 @@ class SingleRTest{
         if (!testController.willRunTests(this)) return this;
         budgetLeft=testSize.budgetMax*testFactor;
         assert(r !is null,"null rng in test"); // setting it here might introduce non determinism
-        if (failureLog is null) failureLog=ssout.call; // use Stderr ?
+        if (failureLog is null) failureLog=sout.call; // use Stderr ?
         if (initialState !is null){
             r.fromString(rngState);
         }
@@ -544,7 +544,7 @@ class SingleRTest{
         this.testDlg=testDlg;
         this.testSize=testSize;
         this.failureLog=failureLog;
-        if (failureLog is null) this.failureLog=ssout.call; // use Stderr ?
+        if (failureLog is null) this.failureLog=sout.call; // use Stderr ?
         reset;
         this.baseDelegate=baseDelegate;
         this.testController=testController;
@@ -602,7 +602,7 @@ class TestCollection: SingleRTest, TestControllerI {
             SingleRTest rTmp=subT.findTest(name);
             if (rTmp !is null){
                 if (res !is null && res !is rTmp){
-                    ssout("WARNING findTest found several tests with the same name, returning first\n");
+                    sout("WARNING findTest found several tests with the same name, returning first\n");
                     return res;
                 }
                 res=rTmp;
@@ -622,7 +622,7 @@ class TestCollection: SingleRTest, TestControllerI {
             budgetLeft=testSize.budgetMax;
         }
         if (r is null) r=new Rand();
-        if (failureLog is null) failureLog=ssout.call; // use Stderr ?
+        if (failureLog is null) failureLog=sout.call; // use Stderr ?
         if (rngState !is null){
             r.fromString(rngState);
         }

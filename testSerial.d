@@ -252,28 +252,28 @@ void testJsonUnserial(T)(T a){
     jus(sOut);
     version(UnserializationTrace) {
         auto js2=new JsonSerializer!()(sout);
-        ssout("XXXXXX Unserialization end\n");
-        ssout("original:----\n");
+        sout("XXXXXX Unserialization end\n");
+        sout("original:----\n");
         js2(a);
-        ssout("unserialized:--\n");
+        sout("unserialized:--\n");
         js2(sOut);
-        ssout("in the buffer:-----\n");
+        sout("in the buffer:-----\n");
         buf.seek(0,IOStream.Anchor.Begin);
-        ssout(cast(char[])buf.slice)("\n");
-        ssout("-----\n");
+        sout(cast(char[])buf.slice)("\n");
+        sout("-----\n");
     }
     assert(a==sOut,"unserial error with "~T.stringof);
-    version(UnserializationTrace) ssout("passed test of unserialization of "~T.stringof~"\n");
+    version(UnserializationTrace) sout("passed test of unserialization of "~T.stringof~"\n");
 }
 /// unserialization test
 void testBinUnserial(T)(T a){
-    version(UnserializationTrace) ssout("testing unserialization of "~T.stringof~"\n");
+    version(UnserializationTrace) sout("testing unserialization of "~T.stringof~"\n");
     auto buf=new Array(1000,1000);
     auto js=new SBinSerializer(binaryDumper(buf));
     js(a);
     version(UnserializationTrace) {
         auto js2=new JsonSerializer!()(sout);
-        ssout("in the buffer:-----\n");
+        sout("in the buffer:-----\n");
         buf.seek(0,IOStream.Anchor.Begin);
         char[128] buf2;
         scope arr=new GrowableArray!(char)(buf2,0);
@@ -282,28 +282,28 @@ void testBinUnserial(T)(T a){
             arr(" ");
             if (i%10==9) {
                 arr("\n");
-                ssout(arr.data);
+                sout(arr.data);
                 arr.clearData;
             }
         }
         arr("\n");
-        ssout(arr.data);
+        sout(arr.data);
         buf.seek(0,IOStream.Anchor.Begin);
-        ssout("original:----\n");
+        sout("original:----\n");
         js2(a);
-        ssout("XXXXXX Unserialization start\n");
+        sout("XXXXXX Unserialization start\n");
     }
     auto jus=new SBinUnserializer(buf);
     T sOut;
     jus(sOut);
     version(UnserializationTrace){
-        ssout("XXXXXX Unserialization end\n");
-        ssout("unserialized:--\n");
+        sout("XXXXXX Unserialization end\n");
+        sout("unserialized:--\n");
         js2(sOut);
-        ssout("-----\n");
+        sout("-----\n");
     }
     assert(a==sOut,"unserial error with "~T.stringof);
-    version(UnserializationTrace) ssout("passed test of unserialization of "~T.stringof~"\n");
+    version(UnserializationTrace) sout("passed test of unserialization of "~T.stringof~"\n");
 }
 
 void testUnserial2(T,U)(void delegate(void function(T,U)) testF){
@@ -313,32 +313,32 @@ void testUnserial2(T,U)(void delegate(void function(T,U)) testF){
 
 /// unserialization test2 Json
 void testJsonUnserial2(T,U)(T a,ref U sOut){
-    version(UnserializationTrace) ssout("testing json unserialization of "~T.stringof~"\n");
+    version(UnserializationTrace) sout("testing json unserialization of "~T.stringof~"\n");
     auto buf=new Array(1000,1000);
     auto js=new JsonSerializer!()(strDumper(buf));
     js(a);
     auto jus=new JsonUnserializer!()(buf);
-    version(UnserializationTrace) ssout("XXXXXX Unserialization start\n");
+    version(UnserializationTrace) sout("XXXXXX Unserialization start\n");
     jus(sOut);
     version(UnserializationTrace) {
         auto js2=new JsonSerializer!()(sout);
-        ssout("XXXXXX Unserialization end\n");
-        ssout("in the buffer:-----\n");
+        sout("XXXXXX Unserialization end\n");
+        sout("in the buffer:-----\n");
         buf.seek(0,IOStream.Anchor.Begin);
-        ssout(cast(char[])buf.slice);
-        ssout("\n-----\n");
+        sout(cast(char[])buf.slice);
+        sout("\n-----\n");
     }
-    version(UnserializationTrace) ssout("json unserialization of "~T.stringof~"\n");
+    version(UnserializationTrace) sout("json unserialization of "~T.stringof~"\n");
 }
 /// unserialization test2 Bin
 void testBinUnserial2(T,U)(T a,ref U b){
-    version(UnserializationTrace) ssout("testing binary unserialization of "~T.stringof~"\n");
+    version(UnserializationTrace) sout("testing binary unserialization of "~T.stringof~"\n");
     auto buf=new Array(1000,1000);
     auto js=new SBinSerializer(binaryDumper(buf));
     js(a);
     version(UnserializationTrace) {
         auto js2=new JsonSerializer!()(sout);
-        ssout("in the buffer:-----\n");
+        sout("in the buffer:-----\n");
         buf.seek(0,IOStream.Anchor.Begin);
         char[128] buf2;
         scope arr=new GrowableArray!(char)(buf2,0);
@@ -347,34 +347,34 @@ void testBinUnserial2(T,U)(T a,ref U b){
             arr(" ");
             if (i%10==9) {
                 arr("\n");
-                ssout(arr.data);
+                sout(arr.data);
                 arr.clearData;
             }
         }
         arr("\n");
-        ssout(arr.data);
+        sout(arr.data);
         buf.seek(0,IOStream.Anchor.Begin);
-        ssout("----\n");
-        ssout("XXXXXX Unserialization start\n");
+        sout("----\n");
+        sout("XXXXXX Unserialization start\n");
     }
     auto jus=new SBinUnserializer(buf);
     jus(b);
     version(UnserializationTrace){
-        ssout("XXXXXX Unserialization end\n");
+        sout("XXXXXX Unserialization end\n");
     }
-    version(UnserializationTrace) ssout("binary test of unserialization of "~T.stringof~"\n");
+    version(UnserializationTrace) sout("binary test of unserialization of "~T.stringof~"\n");
 }
 
 void main(){
     CoreHandlers ch;
-    auto fh=new FormattedWriteHandlers!(char)(ssout.call);
+    auto fh=new FormattedWriteHandlers!(char)(sout.call);
     auto i=4;
     fh.handle(i);
     auto s="abc".dup;
     fh.handle(s);
-    ssout("\n");
+    sout("\n");
     
-    auto js=new JsonSerializer!()(ssout);
+    auto js=new JsonSerializer!()(sout);
     auto r=new Rand();
     A a;
     simpleRandom(r,a);
@@ -391,7 +391,7 @@ void main(){
         auto arrayOut=LazyArray!(int)(delegate void(int i){
                 auto val=fExp2.next();
                 if (i!=val) {
-                    ssout(collectAppender(delegate void(CharSink s){
+                    sout(collectAppender(delegate void(CharSink s){
                         s("ERROR: read "); writeOut(s,i); s(" vs "); writeOut(s,val); s("\n");
                     }));
                     throw new Exception("unexpected value",__FILE__,__LINE__);
@@ -409,7 +409,7 @@ void main(){
                 auto kR=fExp2.next();
                 auto vR=fExp2.i;
                 if (k!=kR || v!=vR) {
-                    ssout(collectAppender(delegate void(CharSink s){
+                    sout(collectAppender(delegate void(CharSink s){
                         s("keys:"); writeOut(s,k); s(" vs "); writeOut(s,kR);
                         s(" vals:"); writeOut(s,v); s(" vs "); writeOut(s,vR); s("\n");
                     }));
@@ -448,7 +448,7 @@ void main(){
     testUnserial(b);
     testUnserial(c);
     testUnserial(ts);
-    ssout("passed identity tests\n");
+    sout("passed identity tests\n");
 
     version(noComplex){ }
     else {
@@ -505,15 +505,15 @@ void main(){
     `);
     auto jus=new JsonUnserializer!()(buf);
     B b1,b2;
-    version(UnserializationTrace) ssout("XX unserial reference\n");
+    version(UnserializationTrace) sout("XX unserial reference\n");
     jus(b1);
-    version(UnserializationTrace) ssout("XX unserial reordered+comment+missing\n");
+    version(UnserializationTrace) sout("XX unserial reordered+comment+missing\n");
     jus(b2);
-    version(UnserializationTrace) ssout("XX unserialization finished\n");
+    version(UnserializationTrace) sout("XX unserialization finished\n");
     b2.l=b1.l;
     assert(b1==b2,"reordering+comments+missing failed");
     }
     
-    ssout("passed tests\n");
+    sout("passed tests\n");
 }
 

@@ -47,5 +47,5 @@ void main(){
     p(s)(ds);
     assert(s=="a string with space");
     assert(ds==`escapedString"`d);
-    ssout("did tests!\n");
+    sout("did tests!\n");
 }

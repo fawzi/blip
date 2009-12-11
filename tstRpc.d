@@ -49,13 +49,13 @@ void main(){
     A.globalA=new A();
     A.Proxy o=new A.Proxy();
     o.b(4.3);
-    ssout("\n");
+    sout("\n");
     auto a=X!(int,3).Pippo.classinfo;
     auto b=X!(int,4).Pippo.classinfo;
-    writeOut(ssout,a); ssout("\n");
-    writeOut(ssout,b); ssout("\n");
-    writeOut(ssout,cast(void*)ClassInfo.find(a.toString())); ssout("\n");
-    writeOut(ssout,cast(void*)ClassInfo.find(b.toString())); ssout("\n");
-    writeOut(ssout,cast(void*)a); ssout("\n");
-    writeOut(ssout,cast(void*)b); ssout("\n");
+    writeOut(sout,a); sout("\n");
+    writeOut(sout,b); sout("\n");
+    writeOut(sout,cast(void*)ClassInfo.find(a.toString())); sout("\n");
+    writeOut(sout,cast(void*)ClassInfo.find(b.toString())); sout("\n");
+    writeOut(sout,cast(void*)a); sout("\n");
+    writeOut(sout,cast(void*)b); sout("\n");
 }
