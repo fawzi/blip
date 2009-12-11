@@ -1,25 +1,25 @@
 module PriQueueTest;
 import blip.parallel.smp.BasicTasks;
 import blip.parallel.smp.PriQueue;
-import tango.io.Stdout;
+import blip.io.Console;
 
 void main(){
     PriQueue!(Task) queue=new PriQueue!(Task)();
-    queue.insert(10,new Task("bla1", delegate(){Stdout("task1").newline;}));
-    queue.desc(Stdout("xx1")).newline;
+    queue.insert(10,new Task("bla1", delegate(){ sout("task1\n");}));
+    writeOut(sout("xx1").call,queue); sout("\n");
     auto t=queue.popNext();
-    queue.desc(Stdout("xx2")).newline;
-    queue.insert(12,new Task("bla2", delegate(){Stdout("task2").newline;}));
-    queue.desc(Stdout("xx3")).newline;
+    writeOut(sout("xx2").call,queue); sout("\n");
+    queue.insert(12,new Task("bla2", delegate(){ sout("task2\n");}));
+    writeOut(sout("xx3").call,queue); sout("\n");
     queue.insert(10,t);
-    queue.desc(Stdout("xx4")).newline;
+    writeOut(sout("xx4").call,queue); sout("\n");
     queue.insert(12,t);
-    queue.desc(Stdout("xx5")).newline;
+    writeOut(sout("xx5").call,queue); sout("\n");
     auto t2=queue.popNext();
-    queue.desc(Stdout("xx5.1")).newline;
+    writeOut(sout("xx5.1").call,queue); sout("\n");
     queue.insert(20,t);    
-    queue.desc(Stdout("xx6")).newline;
+    writeOut(sout("xx6").call,queue); sout("\n");
     queue.insert(0,t);    
-    queue.desc(Stdout("xx7")).newline;
-    Stdout("done").newline;
+    writeOut(sout("xx7").call,queue); sout("\n");
+    sout("done\n");
 }

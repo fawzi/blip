@@ -13,16 +13,13 @@ protected import tango.io.device.Conduit : InputFilter, InputBuffer, InputStream
 import Utf=tango.text.convert.Utf;
 import tango.text.json.JsonEscape: unescape,escape;
 import tango.core.Traits: RealTypeOf, ImaginaryTypeOf, ElementTypeOfArray;
-import tango.io.Stdout;
 import tango.math.Math;
 import tango.io.model.IConduit;
-import blip.t.io.stream.Format;
 import tango.text.Regex;
-import blip.text.Stringify;
+import blip.io.BasicIO;
+import blip.container.GrowableArray;
 import blip.text.UtfUtils;
-
-/// extent of a slice of a buffer
-enum SliceExtent{ Partial, Maximal, ToEnd }
+import blip.BasicModels;
 
 /// a class that does a stream parser, for things in which white space amount
 /// is not relevant (it is just a separator)
@@ -55,20 +52,14 @@ class TextParser(T) : InputFilter
     }
     
     /// position of the parsed token
-    FormatOutput!(T) parserPos(FormatOutput!(T)s){
-        s(cast(T[])"line:")(oldLine)(cast(T[])" col:")(oldCol)(cast(T[])" token:\"")(escape(slice))(cast(T[])"\"").newline;
-        s(cast(T[])"context:<<")(cast(T[])source.slice)(">>").newline;
-        return s;
-    }
-    /// ditto
-    T[] parserPos(){
-        scope s=new StringIO!(T)();
-        return getString(parserPos(s));
+    void parserPos(void delegate(char[]) s){
+        dumper(s)("line:")(oldLine)(" col:")(oldCol)(" token:\"")(convertToString!(char)(escape(slice)))("\"\n");
+        dumper(s)("context:<<")(convertToString!(char)(cast(T[])source.slice))(">>\n");
     }
     /// exception during parsing (adds parser position info)
     static class ParsingException:Exception{
         this(TextParser p,char[]desc,char[]filename,long line){
-            super(desc~" parsing "~convertToString!()(p.parserPos()),filename,line);
+            super(collectAppender(delegate void(CharSink s){ s(desc); s(" parsing "); p.parserPos(s); }),filename,line);
         }
     }
     /// exception for when the cached part is too small
@@ -365,7 +356,6 @@ class TextParser(T) : InputFilter
                                 return t.length;
                             }
                             if (shouldThrow) {
-                                Stdout("nlines:")(nlines)(" i:")(i);
                                 throw new EofException(this,"unexpected EOF",__FILE__,__LINE__);
                             }
                             return t.length;

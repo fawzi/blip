@@ -1,6 +1,8 @@
 /// a growable array that knows its capacity
 module blip.container.GrowableArray;
 import blip.util.Grow;
+import blip.io.Console;
+import blip.io.BasicIO;
 
 enum GASharing{
     Local, /// local, don't free
@@ -45,11 +47,11 @@ final class GrowableArray(T){
     void growTo(size_t c){
         if (capacity<c){
             if(sharing==GASharing.Global){ // try to grow in place, destroy old data when reallocated
-                auto newData=dataPtr[0..dataLen];
+                auto newData=dataPtr[0..capacity];
                 newData.length=growLength(c,T.sizeof);
                 if (newData.ptr!is dataPtr){
                     // actively destroy old data, it is an error to use it
-                    delete (dataPtr[0..capacity]);
+                    //delete (dataPtr[0..capacity]);
                 }
                 dataPtr=newData.ptr;
                 capacity=newData.length;
@@ -61,7 +63,14 @@ final class GrowableArray(T){
                 sharing=GASharing.Global;
             }
         }
+        assert(capacity>=c);
         dataLen=c;
+    }
+    
+    void desc(void delegate(char[])sink){
+        auto s=dumper(sink);
+        s("<GrowableArray@")(cast(void*)this.dataPtr)(" len:")(this.dataLen);
+        s(" capacity:")(capacity)(" sharing:")(cast(int)sharing)(">")("\n");
     }
     /// appends to the array
     GrowableArray opCall(V)(V v){
@@ -75,7 +84,8 @@ final class GrowableArray(T){
                 dataPtr[(dataLen-t.length)..dataLen]=cast(ubyte[])t;
             }
         }
-        alias appendVoid opCatAssign;
+        //alias appendVoid opCatAssign;
+        void opCatAssign(void[]t){ appendVoid(t); }
     }
     void appendEl(T t){
         growTo(dataLen+1);
@@ -97,9 +107,11 @@ final class GrowableArray(T){
         this.sharing=sharing;
     }
     /// appends an element
-    alias appendEl opCatAssign;
+    //alias appendEl opCatAssign;
+    void opCatAssign(T t){ appendEl(t); }
     /// appends a slice
-    alias appendArr opCatAssign;
+    //alias appendArr opCatAssign;
+    void opCatAssign(T[] t){ appendArr(t); }
     /// appends what the appender delegate sends
     void opCatAssign(void delegate(void delegate(T)) appender){
         appender(&this.appendEl);

@@ -1,12 +1,10 @@
-/// a serializer to Stdout
-/// author: fawzi
+/// serializer to Stdout
 module blip.serialization.Sout;
 import blip.serialization.JsonSerialization;
 import blip.serialization.SerializationBase;
-import tango.io.Stdout;
+import blip.io.Console;
 
-/// the serializer to Stdout
 Serializer Sout;
 static this(){
-    Sout=new JsonSerializer!()(Stdout);
+    Sout=new JsonSerializer!()(sout);
 }

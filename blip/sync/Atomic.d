@@ -318,15 +318,16 @@ version(LDC){
 /// atomic compare & exchange (can be used to implement everything else)
 /// stores newval into val if val==equalTo in one atomic operation
 /// barriers are not implied, just atomicity!
+/// returns the old value (i.e. an exchange was performed if result==equalTo)
 version(LDC){
-    bool atomicCAS( T )( ref T val, T newval, T equalTo )
+    T atomicCAS( T )( ref T val, T newval, T equalTo )
     {
         T oldval = void;
         static if (isPointerType!(T))
         {
             oldval = cast(T)llvm_atomic_cmp_swap!(size_t)(cast(size_t*)&val, cast(size_t)equalTo, cast(size_t)newval);
         }
-        else static if (is(T == bool))
+        else static if (is(T == bool)) // correct also if bol has different size?
         {
             oldval = llvm_atomic_cmp_swap!(ubyte)(cast(ubyte*)&val, equalTo?1:0, newval?1:0)?0:1;
         }
@@ -334,10 +335,10 @@ version(LDC){
         {
             oldval = llvm_atomic_cmp_swap!(T)(&val, equalTo, newval);
         }
-        return oldval == equalTo;
+        return oldval;
     }
 } else version(D_InlineAsm_X86) {
-    bool atomicCAS( T )( inout T val, T newval, T equalTo )
+    T atomicCAS( T )( inout T val, T newval, T equalTo )
     in {
         // NOTE: 32 bit x86 systems support 8 byte CAS, which only requires
         //       4 byte alignment, so use size_t as the align type here.
@@ -354,7 +355,6 @@ version(LDC){
                 mov ECX, posVal;
                 lock; // lock always needed to make this op atomic
                 cmpxchg [ECX], DL;
-                setz AL;
             }
         }
         else static if( T.sizeof == short.sizeof ) {
@@ -364,7 +364,6 @@ version(LDC){
                 mov ECX, posVal;
                 lock; // lock always needed to make this op atomic
                 cmpxchg [ECX], DX;
-                setz AL;
             }
         }
         else static if( T.sizeof == int.sizeof ) {
@@ -374,14 +373,21 @@ version(LDC){
                 mov ECX, posVal;
                 lock; // lock always needed to make this op atomic
                 cmpxchg [ECX], EDX;
-                setz AL;
             }
         }
         else static if( T.sizeof == long.sizeof ) {
             // 8 Byte StoreIf on 32-Bit Processor
             version(darwin){
-                return OSAtomicCompareAndSwap64(cast(long)equalTo, cast(long)newval,  cast(long*)&val);
+                while(1){
+                    if(OSAtomicCompareAndSwap64(cast(long)equalTo, cast(long)newval,  cast(long*)&val)){
+                        return equalTo;
+                    } else {
+                        volatile T res=val;
+                        if (res!=equalTo) return res;
+                    }
+                }
             } else {
+                T res;
                 volatile asm
                 {
                     push EDI;
@@ -395,10 +401,13 @@ version(LDC){
                     mov EDI, val;
                     lock; // lock always needed to make this op atomic
                     cmpxch8b [EDI];
-                    setz AL;
+                    lea EDI, res;
+                    mov [EDI], EAX;
+                    mov 4[EDI], EDX;
                     pop EBX;
                     pop EDI;
                 }
+                return res;
             }
         }
         else
@@ -407,7 +416,7 @@ version(LDC){
         }
     }
 } else version (D_InlineAsm_X86_64){
-    bool atomicCAS( T )( inout T val, T newval, T equalTo )
+    T atomicCAS( T )( inout T val, T newval, T equalTo )
     in {
         assert( atomicValueIsProperlyAligned!(T)( cast(size_t) &val ) );
     } body {
@@ -419,7 +428,6 @@ version(LDC){
                 mov RCX, posVal;
                 lock; // lock always needed to make this op atomic
                 cmpxchg [RCX], DL;
-                setz AL;
             }
         }
         else static if( T.sizeof == short.sizeof ) {
@@ -429,7 +437,6 @@ version(LDC){
                 mov RCX, posVal;
                 lock; // lock always needed to make this op atomic
                 cmpxchg [RCX], DX;
-                setz AL;
             }
         }
         else static if( T.sizeof == int.sizeof ) {
@@ -439,7 +446,6 @@ version(LDC){
                 mov RCX, posVal;
                 lock; // lock always needed to make this op atomic
                 cmpxchg [RCX], EDX;
-                setz AL;
             }
         }
         else static if( T.sizeof == long.sizeof ) {
@@ -449,7 +455,6 @@ version(LDC){
                 mov RCX, posVal;
                 lock; // lock always needed to make this op atomic
                 cmpxchg [RCX], RDX;
-                setz AL;
             }
         }
         else
@@ -458,20 +463,24 @@ version(LDC){
         }
     }
 } else {
-    bool atomicCAS( T )( inout T val, T newval, T equalTo )
+    T atomicCAS( T )( inout T val, T newval, T equalTo )
     in {
             assert( atomicValueIsProperlyAligned!(T)( cast(size_t) &val ) );
     } body {
+        T oldval;
         synchronized(typeid(T)){
-            if(val==equalTo) {
+            oldval=val;
+            if(oldval==equalTo) {
                 val=newval;
-                return true;
             }
         }
-        return false;
+        return oldval;
     }
 }
 
+bool atomicCASB(T)( ref T val, T newval, T equalTo ){
+    return (equalTo==atomicCAS(val,newval,equalTo));
+}
 
 /// loads a value from memory
 ///
@@ -614,11 +623,13 @@ version(LDC){
         T atomicAdd(T)(ref T val, T incV){
             static assert( isIntegerType!(T)||isPointerType!(T),"invalid type: "~T.stringof );
             synchronized(typeid(T)){
-                T oldV,newVal;
+                T oldV,newVal,nextVal;
+                volatile nextVal=val;
                 do{
-                    volatile oldV=val;
+                    oldV=nextVal;
                     newV=oldV+incV;
-                } while(!atomicCAS!(T)(val,newV,oldV))
+                    auto nextVal=atomicCAS!(T)(val,newV,oldV);
+                } while(nextVal!=oldV)
                 return oldV;
             }
         }
@@ -632,19 +643,19 @@ version(LDC){
 /// the others (i.e. do not use this in case of high contention)
 T atomicOp(T)(ref T val, T delegate(T) f){
     static assert( isIntegerType!(T) || isPointerType!(T));
-    T oldV,newV;
+    T oldV,newV,nextV;
     int i=0;
-    bool success;
+    volatile nextV=val;
     do{
-        volatile oldV=val;
+        oldV=nextV;
         newV=f(oldV);
-        success=atomicCAS!(T)(val,newV,oldV);
-    } while((!success) && ++i<200)
-    while (!success){
+        nextV=atomicCAS!(T)(val,newV,oldV);
+    } while((nextV!=oldV) && ++i<200)
+    while (nextV!=oldV){
         thread_yield();
         volatile oldV=val;
         newV=f(oldV);
-        success=atomicCAS!(T)(val,newV,oldV);
+        nextV=atomicCAS!(T)(val,newV,oldV);
     }
     return oldV;
 }

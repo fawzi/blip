@@ -50,7 +50,7 @@
     {{{
         SingleRTest.defaultTestController=new TextController(
             TextController.OnFailure.StopTest,
-            TextController.PrintLevel.AllShort,Stdout);
+            TextController.PrintLevel.AllShort,sout.call);
     }}}
     and it should write out something like
     {{{
@@ -145,12 +145,10 @@ public import blip.rtest.RTestFramework;
 import tango.util.Convert;
 import tango.util.ArgParser;
 import tango.text.Util;
-import tango.io.Stdout;
+import blip.io.Console;
+import blip.io.BasicIO;
 import tango.stdc.stdlib: exit;
 import blip.parallel.smp.WorkManager;
-
-import blip.NullStream;
-import blip.t.io.stream.Format:FormatOut;
 
 mixin testInit!() autoInitTst; 
 
@@ -158,7 +156,7 @@ int[] parseIArray(char[] str){
     uint start=locate(str,'[');
     uint end=locate(str,']');
     if (start==str.length || end==str.length || start>=end){
-        Stdout("'")(str)("'")(start)(" ")(end).newline;
+        sout("'")(str)("'"); writeOut(sout.call,start); sout(" ")(end)("\n");
         throw new Exception("IArray parsing failed");
     }
     char[] core=str[start+1..end];
@@ -206,8 +204,8 @@ int mainTestFun(char[][] argStr,SingleRTest testSuite){
             case "Throw","throw": onFailure=TextController.OnFailure.Throw; break;
             default:
                 // use Stderr?
-                Stdout("ERROR invalid options for on-failure: '")(arg)("'").newline;
-                Stdout(helpStr).newline;
+                sout("ERROR invalid options for on-failure: '")(arg)("'\n");
+                sout(helpStr)("\n");
                 exit(-1);
         }
     });
@@ -220,8 +218,8 @@ int mainTestFun(char[][] argStr,SingleRTest testSuite){
             case "AllVerbose","allverbose","all","all-verbose","verbose":
                 printLevel=TextController.PrintLevel.AllVerbose; break;
             default:
-                Stderr("ERROR invalid options for print-level: '")(arg)("'").newline;
-                Stdout(helpStr).newline;
+                serr("ERROR invalid options for print-level: '")(arg)("'\n");
+                sout(helpStr)("\n");
                 exit(-2);
         }
     });
@@ -229,19 +227,19 @@ int mainTestFun(char[][] argStr,SingleRTest testSuite){
     args.parse(argStr[1..$]);
     
     if (help){
-        Stdout(helpStr).newline;
+        sout(helpStr)("\n");
         return 0;
     }
     
     SingleRTest.defaultTestController=new TextController(
-        onFailure, printLevel,Stdout,Stdout,1,trace);
+        onFailure, printLevel,ssout.call,ssout.call,1,trace);
     if (test.length==0){
         // testSuite.runTests(runs,seed,counter);
         testSuite.runTestsTask(runs,seed,counter).autorelease.submit(defaultTask).wait();
     } else{
         auto tst=testSuite.findTest(test);
         if (tst is null){
-            Stdout("ERROR test '")(test)("' not found!").newline;
+            sout("ERROR test '")(test)("' not found!\n");
             return -3;
         }
         //tst.runTests(runs,seed,counter);
@@ -261,8 +259,8 @@ debug(UnitTest){
     arg1=specialNrs[arg1_i]; arg1_nEl=specialNrs.length;`) combNrTst; // combinatorial cases
 
     unittest{
-        FormatOut nullPrt=new FormatOut(nullStream());
-        // nullPrt=Stdout;
+        CharSink nullPrt=delegate void(char[]){};
+        // nullPrt=ssout;
         SingleRTest.defaultTestController=new TextController(TextController.OnFailure.StopTest,
             TextController.PrintLevel.AllShort,nullPrt,nullPrt);
         TestCollection failTests=new TestCollection("failTests",__LINE__,__FILE__);

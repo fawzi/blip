@@ -1,9 +1,9 @@
 module blip.parallel.smp.PriQueue;
-import blip.t.io.stream.Format:FormatOut;
+import blip.io.BasicIO;
 import tango.core.sync.Mutex;
 import tango.core.sync.Semaphore;
 import tango.math.Math;
-import blip.text.Stringify;
+import blip.container.GrowableArray;
 import blip.BasicModels;
 
 /// a simple priority queue optimized for adding high priority tasks
@@ -55,21 +55,21 @@ class PriQueue(T){
         }
         /// description (for debugging)
         char[] toString(){
-            return getString(desc(new Stringify()).newline);
+            return collectAppender(cast(OutWriter)&desc);
         }
         /// description (for debugging)
-        FormatOut desc(FormatOut s){
-            s.format("<PriQLevel@{} level={} entries=[",cast(void*)this,level);
+        void desc(void delegate(char[]) s){
+            s("<PriQLevel@"); writeOut(s,cast(void*)this); s(" level=");
+            writeOut(s,level); s(" entries=[");
             if (nEl>entries.length){
-                s("*ERROR* nEl=")(nEl);
+                s("*ERROR* nEl="); writeOut(s,nEl);
             } else {
                 for (int i=0;i<nEl;++i){
                     if (i!=0) s(", ");
-                    writeDesc(s,entries[(start+i)%entries.length]);
+                    writeOut(s,entries[(start+i)%entries.length]);
                 }
             }
-            s("] capacity=")(entries.length)(" >").newline;
-            return s;
+            s("] capacity="); writeOut(s,entries.length); s(" >");
         }
     }
     /// pool to recycle PriQLevels
@@ -95,23 +95,22 @@ class PriQueue(T){
         }
         /// description (for debugging)
         char[] toString(){
-            return getString(desc(new Stringify()).newline);
+            return collectAppender(cast(OutWriter)&desc);
         }
         /// description (for debugging)
-        FormatOut desc(FormatOut s){
+        void desc(void delegate(char[]) s){
             if (this is null){
-                s("<PriQPool *NULL*>").newline;
+                s("<PriQPool *NULL*>");
             } else {
-                s.format("<PriQPool@{} entries=[",cast(void*)this);
+                s("<PriQPool@"); writeOut(s,cast(void*)this); s(" entries=[");
                 PriQLevel el=lastE;
                 while(el !is null){
                     if (el !is lastE) s(", ");
-                    s.format("<PriQLevel@{}",cast(void *)el);
+                    s("<PriQLevel@"); writeOut(s,cast(void *)el);
                     el=el.subLevel;
                 }
-                s("] >").newline;
+                s("] >\n");
             }
-            return s;
         }
     }
     /// level pool
@@ -150,7 +149,7 @@ class PriQueue(T){
     }
     /// adds the given task to the queue with the given level (threadsafe)
     void insert(int tLevel,T t){
-        // desc(Stdout("queue pre insert:")).newline;
+        // desc(sout("queue pre insert:").call); sout("\n");
         synchronized(queueLock){
             PriQLevel oldL=queue,lAtt=queue;
             while (lAtt !is null && lAtt.level>tLevel) {
@@ -169,8 +168,8 @@ class PriQueue(T){
                 }
             }
             ++nEntries;
-            //Stdout("XXX pushed ")(t.taskName)(nEntries).newline;
-            // desc(Stdout("queue post insert:")).newline;
+            // sout("XXX pushed ")(t.taskName)(nEntries)("\n");
+            // sout("queue post insert:"); writeOut(sout,&desc);
             if (nEntries==1) zeroSem.notify;
         }
     }
@@ -194,7 +193,6 @@ class PriQueue(T){
                         queue=nT;
                     }
                     --nEntries;
-                    //Stdout("XXX popping ")(res.taskName)(nEntries).newline;
                     return res;
                 } else {
                     shouldLockZero=true;
@@ -220,29 +218,30 @@ class PriQueue(T){
     /// description (for debugging)
     /// non threadsafe
     char[] toString(){
-        return getString(desc(new Stringify()).newline);
+        return collectAppender(cast(OutWriter)&desc);
     }
     /// description (for debugging)
     /// (might not be a snapshot if other thread modify it while printing)
     /// non threadsafe
-    FormatOut desc(FormatOut s){
+    void desc(void delegate(char[]) s){
         if (this is null){
-            s("<PriQueue *NULL*>").newline;
+            s("<PriQueue *NULL*>\n");
         } else {
-            s.format("<PriQueue@{} nEntries={},",cast(void*)this,nEntries).newline;
-            writeDesc(s("  lPool="),lPool)(",").newline;
+            s("<PriQueue@"); writeOut(s,cast(void*)this); s(" nEntries=");
+            writeOut(s,nEntries); s(",\n");
+            s("  lPool="); writeOut(s,lPool); s(",\n");
             if (queue is null) {
-                s("  queue=*NULL*,").newline;
+                s("  queue=*NULL*,\n");
             } else {
                 auto lAtt=queue;
                 s("  queue=[");
                 while(lAtt !is null){
-                    writeDesc(s("   "),lAtt)(",").newline;
+                    s("   "); writeOut(s,lAtt); s(",\n");
                     lAtt=lAtt.subLevel;
                 }
-                s(" ],").newline;
+                s(" ],\n");
             }
-            s("  shouldStop=")(shouldStop);
+            s("  shouldStop="); writeOut(s,shouldStop);
             bool qL=queueLock.tryLock();
             if (qL) queueLock.unlock();
             s(" queueLock:");
@@ -251,7 +250,7 @@ class PriQueue(T){
             } else {
                 s("locked by others");
             }
-            s(",").newline;
+            s(",\n");
             bool zL=zeroSem.tryWait();
             if (zL) zeroSem.notify();
             s(" zeroSem:");
@@ -260,10 +259,9 @@ class PriQueue(T){
             } else {
                 s("==0");
             }
-            s.newline;
-            s(" >").newline;
+            s("\n");
+            s(" >");
         }
-        return s;
     }
 }
 

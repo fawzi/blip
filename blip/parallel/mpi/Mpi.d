@@ -281,10 +281,11 @@ version(mpi)
             }
         }
     
-        FormatOut desc(FormatOut s){
-            s("{<MPIChannel@")(cast(void*)this)(">").newline;
-            s("  otherRank:")(otherRank)(",").newline;
-            s("  comm:MpiLinearComm@")(cast(void*)comm)(">").newline;
+        void desc(void delegate(char[]) sink){
+            auto s=dumper(sink);
+            s("{<MPIChannel@")(cast(void*)this)(">\n");
+            s("  otherRank:")(otherRank)(",\n");
+            s("  comm:MpiLinearComm@")(cast(void*)comm)(">\n");
             s("}");
         }
     }
@@ -360,12 +361,10 @@ version(mpi)
                         handler(status.tag,comm[status.source]);
                     }
                 } catch (Exception e){
-                    synchronized(Stderr){
-                        Stderr("Error in mpi handler for comm ")(comm.name)(" tag:")(tag).newline;
-                        e.desc(delegate void(char[]c){
-                            Stderr(c);
-                        } );
-                    }
+                    serr(collectAppender(delegate void(CharSink s){
+                        dumper(s)("Error in mpi handler for comm ")(comm.name)(" tag:")(tag)("\n");
+                        e.desc(s);
+                    }));
                 }
             }
         }

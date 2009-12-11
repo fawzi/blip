@@ -3,12 +3,11 @@
 module blip.serialization.SBinSerialization;
 import blip.serialization.SerializationBase;
 import blip.serialization.Handlers;
-import tango.io.Stdout : Stdout;
-import blip.t.io.stream.Format:FormatOut;
-import tango.io.model.IConduit;
 import tango.core.Variant;
 import blip.BasicModels;
 import blip.text.TextParser;
+import blip.container.GrowableArray;
+import blip.io.BasicIO;
 
 class SBinSerializer : Serializer {
     uint[void*] writtenMetaInfo;
@@ -56,10 +55,6 @@ class SBinSerializer : Serializer {
     }
     this(void delegate(void[]) s){
         this(new BinaryWriteHandlers!()(s));
-    }
-    this(OutputStream s){
-        auto stream=new StreamWriter(s);
-        this(new BinaryWriteHandlers!()(&stream.writeExact));
     }
     void writeField(FieldMetaInfo *field){ }
     /// writes something that has a custom write operation
@@ -249,7 +244,7 @@ class SBinUnserializer: Unserializer {
         FieldMetaInfo *mismatchedField;
         char[] actualField;
         this(FieldMetaInfo *mismatchedField,char[] actualField,char[]desc,char[]filename,long line){
-            super(desc~" at "~reader.parserPos(),filename,line);
+            super(collectAppender(delegate void(CharSink s){ s(desc); s(" at "); reader.parserPos(s); }),filename,line);
             this.actualField=actualField;
             this.mismatchedField=mismatchedField;
         }
@@ -278,7 +273,6 @@ class SBinUnserializer: Unserializer {
         if (lSize==ulong.max){
             size=ulong.max;
         } else if (lSize>=size_t.max){
-            Stdout.format("lSize:{:x}",lSize).newline;
             serializationError("trying to decode an array too large for 32 bit representation",__FILE__,__LINE__);
         } else {
             size=lSize;
@@ -403,7 +397,7 @@ class SBinUnserializer: Unserializer {
     /// override this to give more info on parser position,...
     /// this method *has* to throw
     override void serializationError(char[]msg,char[]filename,long line){
-        throw new SerializationException(msg,reader.parserPos(),filename,line);
+        throw new SerializationException(msg,collectAppender(&reader.parserPos),filename,line);
     }
     /// returns true if this is the SBIN protocol, otherwise throws
     override bool readProtocolVersion(){

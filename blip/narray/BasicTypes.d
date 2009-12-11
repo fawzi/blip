@@ -42,15 +42,14 @@ import tango.core.Array: sort;
 import tango.stdc.string: memset,memcpy,memcmp;
 import blip.TemplateFu;
 import tango.core.Traits;
-import blip.t.io.stream.Format:FormatOut;
 import tango.math.Math: abs;
 import blip.rtest.RTest;
 import blip.BasicModels;
 import blip.serialization.Serialization;
-import blip.text.Stringify;
+import blip.container.GrowableArray;
 import blip.sync.Atomic;
 import blip.parallel.smp.WorkManager;
-//import tango.io.Stdout;
+import blip.io.BasicIO;
 
 /// flags for fast checking of 
 enum ArrayFlags {
@@ -812,18 +811,32 @@ else {
                     }
                     return 0;
                 }
-                FormatOut desc(FormatOut s){
+                void desc(void delegate(char[]) s){
                     if (this is null){
-                        return s("<SubView *null*>").newline;
+                        s("<SubView *null*>");
+                        return;
                     }
-                    s("<SubView!(")(V.stringof)(",")(rank)(")").newline;
+                    s("<SubView!(");
+                    s(V.stringof);
+                    s(",");
+                    writeOut(s,rank);
+                    s(")\n");
                     s("baseArray:");
-                    baseArray.desc(s)(",").newline;
-                    view.desc(s("view:"))(",").newline;
-                    s("idxAtt:")(idxAtt)(",").newline;
-                    s("iPos:")(iPos)(", ")("iDim:")(iDim)(", ")("stride :")(stride).newline;
-                    s(">").newline;
-                    return s;
+                    baseArray.desc(s);
+                    s(",\n");
+                    s("view:");
+                    view.desc(s);
+                    s(",\n");
+                    s("idxAtt:");
+                    writeOut(s,idxAtt);
+                    s(",\n");
+                    s("iPos:");
+                    writeOut(s,iPos);
+                    s(", iDim:");
+                    writeOut(s,iDim);
+                    s(", stride :");
+                    writeOut(s,stride);
+                    s("\n>\n");
                 }
             }
         }
@@ -955,16 +968,17 @@ else {
                 }
                 return 0;
             }
-            FormatOut desc(FormatOut s){
+            void desc(void delegate(char[]) sink){
+                auto s=dumper(sink);
                 if (this is null){
-                    return s("<FlatIterator *null*>").newline;
+                    s("<FlatIterator *null*>");
+                    return;
                 }
-                s("<FlatIterator rank:")(rank)(", p:")(this.p)(",").newline;
-                s("left:")(this.left)(",").newline;
-                s("adds:")(this.adds).newline;
-                this.baseArray.desc(s("baseArray:"))(",").newline;
-                s(">").newline;
-                return s;
+                s("<FlatIterator rank:")(rank)(", p:")(cast(void*)this.p)(",\n");
+                s("left:")(this.left)(",\n");
+                s("adds:")(this.adds)(",\n");
+                s("baseArray:")(this.baseArray)(",\n");
+                s(">");
             }
         }
         
@@ -1400,24 +1414,24 @@ else {
         }
 
         char[] toString(){
-            return getString(this.printData(new Stringify()));
+            return collectAppender(delegate void(CharSink s){ this.printData(s); });
         }
         
-        FormatOut printData(FormatOut s,char[] formatEl="{,10}", index_type elPerLine=10,
+        void printData(CharSink s,char[] formatEl=",10", index_type elPerLine=10,
             char[] indent=""){
             s("[");
             static if(rank==1) {
                 index_type lastI=this.shape[0]-1;
                 foreach(index_type i,V v;SubView(this)){
-                    static if (isComplexType!(V)){
-                        s.format(formatEl,v.re)("+1i*").format(formatEl,v.im);
+                    if (formatEl.length>0){
+                        writeOut(s,v,formatEl);
                     } else {
-                        s.format(formatEl,v);
+                        writeOut(s,v);
                     }
                     if (i!=lastI){
                         s(",");
                         if (i%elPerLine==elPerLine-1){
-                            s("\n")(indent)(" ");
+                            s("\n"); s(indent); s(" ");
                         }
                     }
                 }
@@ -1426,22 +1440,23 @@ else {
                 foreach(i,v;this){
                     v.printData(s,formatEl,elPerLine,indent~" ");
                     if (i!=lastI){
-                        s(",\n")(indent)(" ");
+                        s(",\n"); s(indent); s(" ");
                     }
                 }
             }
             s("]");
-            return s;
         }
             
         /// description of the NArray wrapper, not of the contents, for debugging purposes...
-        FormatOut desc(FormatOut s){
+        void desc(void delegate(char[]) sink){
+            auto s=dumper(sink);
             if (this is null){
-                return s("<NArray *null*>").newline;
+                s("<NArray *null*>");
+                return;
             }
-            s("<NArray @:")(&this)(",").newline;
-            s("  bStrides:")(bStrides)(",").newline;
-            s("  shape:")(this.shape)(",").newline;
+            s("<NArray @:")(cast(void*)this)(",\n");
+            s("  bStrides:")(bStrides)(",\n");
+            s("  shape:")(this.shape)(",\n");
             s("  flags:")(flags)("=None");
             if (flags&Flags.Contiguous) s("|Contiguos");
             if (flags&Flags.Fortran) s("|Fortran");
@@ -1450,11 +1465,10 @@ else {
             if (flags&Flags.Small) s("|Small");
             if (flags&Flags.Large) s("|Large");
             if (flags&Flags.ReadOnly) s("|ReadOnly");
-            s(",").newline;
-            s("  data: <array<")(V.stringof)("> @:")(startPtrArray)(", #:")(nElArray)(",").newline;
-            s("  base:")(mBase).newline;
+            s(",\n");
+            s("  data: <array<")(V.stringof)("> @:")(cast(void*)startPtrArray)(", #:")(nElArray)(",\n");
+            s("  base:")(cast(void*)mBase)("\n");
             s(">");
-            return s;
         }
         
         /// returns the base for an array that is a view of the current array

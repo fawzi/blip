@@ -5,11 +5,10 @@ import tango.core.Thread;
 import tango.core.Variant:Variant;
 import tango.core.sync.Mutex;
 import tango.math.Math;
-import tango.io.Stdout;
 import blip.t.util.log.Log;
 import tango.util.container.LinkedList;
-import blip.t.io.stream.Format:FormatOut;
-import blip.text.Stringify;
+import blip.io.BasicIO;
+import blip.container.GrowableArray;
 import blip.TemplateFu:ctfe_i2a;
 import blip.parallel.smp.PriQueue;
 import blip.parallel.smp.SmpModels;
@@ -122,7 +121,7 @@ class PriQTaskScheduler:TaskSchedulerI {
     /// description (for debugging)
     /// non threadsafe
     char[] toString(){
-        return getString(desc(new Stringify()).newline);
+        return collectAppender(cast(OutWriter)&desc);
     }
     /// locks the scheduler (to perform task reorganization)
     /// if you call this then toString is threadsafe
@@ -186,48 +185,46 @@ class PriQTaskScheduler:TaskSchedulerI {
         return _executer;
     }
     /// description (for debugging)
-    FormatOut desc(FormatOut s){ return desc(s,false); }
+    void desc(void delegate(char[]) s){ return desc(s,false); }
     /// description (for debugging)
     /// (might not be a snapshot if other threads modify it while printing)
     /// non threadsafe
-    FormatOut desc(FormatOut s,bool shortVersion){
-        if (this is null){
-            s("<PriQTaskScheduler *NULL*>").newline;
-        } else {
-            s.format("<PriQTaskScheduler@{}",cast(void*)this);
-            if (shortVersion) {
-                s(" >");
-                return s;
-            }
-            s.newline;
-            s("  name:")(name)(",").newline;
-            s("  runLevel:")(runLevel)(",").newline;
-            s("  queue:")(queue)(",").newline;
-            s("  log:")(log)(",").newline;
-            s("  activeTasks:[").newline;
-            s("    ");
-            bool nonFirst=false;
-            foreach (t,r;activeTasks){
-                if (nonFirst) { s(",").newline; nonFirst=true; }
-                writeDesc(s("    ")(r),t,true);
-            }
-            s.newline;
-            s("  ],").newline;
-            writeDesc(s("  rootTask:"),rootTask).newline;
-            s(" >").newline;
+    void desc(void delegate(char[]) sink,bool shortVersion){
+        auto s=dumper(sink);
+        s("<PriQTaskScheduler@"); writeOut(sink,cast(void*)this);
+        if (shortVersion) {
+            s(" >");
+            return;
         }
-        return s;
+        s("\n");
+        s("  name:")(name)(",\n");
+        s("  runLevel:")(runLevel)(",\n");
+        s("  queue:")(queue)(",\n");
+        s("  log:")(log)(",\n");
+        s("  activeTasks:[\n");
+        s("    ");
+        bool nonFirst=false;
+        foreach (t,r;activeTasks){
+            if (nonFirst) { s(",\n"); nonFirst=true; }
+            s("    ")(r);
+            writeOut(sink,t,true);
+        }
+        s("\n");
+        s("  ],\n");
+        s("  rootTask:"); writeOut(sink,rootTask);
+        s("\n >");
     }
     /// changes the current run level of the scheduler
     /// the level can be only raised and the highest run level is "stopped"
     void raiseRunlevel(SchedulerRunLevel level){
         synchronized(this){
             assert(cast(int)runLevel <= cast(int)level,"runLevel can be only increased");
-            if (runLevel < cast(int)level)
+            if (runLevel < cast(int)level){
                 runLevel=level;
                 if (runLevel==SchedulerRunLevel.Stopped){
                     queue.stop();
                 }
+            }
         }
     }
     /// scheduler logger

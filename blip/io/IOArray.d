@@ -699,7 +699,7 @@ class IOArray : Conduit, InputBuffer, OutputBuffer, Conduit.Seek
 
 debug (IOArray)
 {
-        import tango.io.Stdout;
+        import blip.io.Console;
 
         void main()
         {       
@@ -707,11 +707,10 @@ debug (IOArray)
                 b.seek (0);
                 b.write ("fubar");
 
-                Stdout.formatln ("extent {}, pos {}, read {}, bufsize {}", 
-                                  b.limit, b.position, cast(char[]) b.slice, b.bufferSize);
-
+                sout("extent ")(b.limit)(", pos ")(b.position);
+                sout(", read ")(cast(char[]) b.slice)(", bufsize ")(b.bufferSize)("\n");
                 b.write ("fubar");
-                Stdout.formatln ("extent {}, pos {}, read {}, bufsize {}", 
-                                  b.limit, b.position, cast(char[]) b.slice, b.bufferSize);
+                sout("extent ")(b.limit)(", pos ")(b.position);
+                sout(", read ")(cast(char[]) b.slice)(", bufsize ")(b.bufferSize)("\n");
         }
 }

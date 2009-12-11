@@ -1,6 +1,6 @@
 module blip.serialization.Handlers;
 import tango.core.Tuple;
-import blip.t.io.stream.Format:FormatOut;
+import blip.io.BasicIO;
 import tango.io.model.IConduit;
 import tango.text.json.JsonEscape: escape;
 import tango.io.encode.Base64: encode,decode,allocateEncodeSize;
@@ -110,9 +110,15 @@ class CoreHandlers{
 }
 
 /// handlers for writing
-class WriteHandlers: CoreHandlers{
-    this(){}
+class WriteHandlers: CoreHandlers,OutStreamI{
+    void delegate() flusher;
     
+    this(void delegate() f){ flusher=f; }
+    
+    /// flushes the underlying stream if possible
+    void flush(){
+        if (flusher !is null) flusher();
+    }
     /// nicer way to write out
     WriteHandlers opCall(T)(T t){
         static assert(isCoreType!(T),T.stringof~" is not a core type");
@@ -131,11 +137,23 @@ class WriteHandlers: CoreHandlers{
     void rawWriteStr(char[]data){
         assert(0,"unimplemented");
     }
+    void rawWriteStr(wchar[]data){
+        assert(0,"unimplemented");
+    }
+    void rawWriteStr(dchar[]data){
+        assert(0,"unimplemented");
+    }
     override void handleOutWriter(OutWriter w){
         w(&rawWriteStr);
     }
     override void handleBinWriter(BinWriter w){
         w(&rawWrite);
+    }
+    CharSink charSink(){
+        return cast(void delegate(char[]))&this.rawWriteStr;
+    }
+    BinSink binSink(){
+        return &this.rawWrite;
     }
 }
 
@@ -183,8 +201,7 @@ class ReadHandlers: CoreHandlers{
         return true;
     }
     /// current read position (only informative)
-    char[] parserPos(){
-        return "";
+    void parserPos(void delegate(char[]) s){
     }
     void handleOutReader(OutReader r){
         throw new Exception("unimplemented",__FILE__,__LINE__);
@@ -200,77 +217,16 @@ version (BigEndian){
     enum:bool{ isSmallEndian=true }
 }
 
-class StreamWriter{
-    OutputStream writer;
-    this(OutputStream s){
-        writer=s;
-    }
-    final void writeExact(void[] src){
-        auto written=writer.write(src);
-        if (written!=src.length){
-            if (written==OutputStream.Eof){
-                throw new Exception("unexpected Eof",__FILE__,__LINE__);
-            }
-            uint countEmpty=0;
-            while (1){
-                auto writtenNow=writer.write(src[written..$]);
-                if (writtenNow==OutputStream.Eof){
-                    throw new Exception("unexpected Eof",__FILE__,__LINE__);
-                } else if (writtenNow==0){
-                    if (countEmpty==100)
-                        throw new Exception("unexpected suspension",__FILE__,__LINE__);
-                    else
-                        ++countEmpty;
-                } else {
-                    countEmpty=0;
-                }
-                written+=writtenNow;
-                if (written>=src.length) break;
-            }
-        }
-    }
-}
-
-class StreamStrWriter(T){
-    OutputStream writer;
-    this(OutputStream s){
-        writer=s;
-    }
-    final void writeExactStr(T[] src){
-        auto written=writer.write(src);
-        if (written!=src.length*T.sizeof){
-            if (written==OutputStream.Eof){
-                throw new Exception("unexpected Eof",__FILE__,__LINE__);
-            }
-            uint countEmpty=0;
-            while (1){
-                auto writtenNow=writer.write(src[written..$]);
-                if (writtenNow==OutputStream.Eof){
-                    throw new Exception("unexpected Eof",__FILE__,__LINE__);
-                } else if (writtenNow==0){
-                    if (countEmpty==100)
-                        throw new Exception("unexpected suspension",__FILE__,__LINE__);
-                    else
-                        ++countEmpty;
-                } else {
-                    countEmpty=0;
-                }
-                written+=writtenNow;
-                if (written>=src.length*T.sizeof) break;
-            }
-        }
-    }
-}
-
 /// binary write handlers
 /// build it on the top of OutputBuffer? would spare a buffer and its copy if SwapBytes is true
 final class BinaryWriteHandlers(bool SwapBytes=isSmallEndian):WriteHandlers{
     void delegate(void[]) writer;
     
-    this (void delegate(void[]) writer)
+    this (void delegate(void[]) writer, void delegate() flusher=null)
     {
-        super();
+        super(flusher);
         this.writer=writer;
+        this.flusher=flusher;
         setCoreHandlersFrom_basicWrite();
     }
     
@@ -360,9 +316,24 @@ final class BinaryWriteHandlers(bool SwapBytes=isSmallEndian):WriteHandlers{
     void rawWrite(void[] data){
         basicWrite(data);
     }
+    final void rawWriteStrD(char[]data){
+        writer(data);
+    }
     /// writes a raw string
     void rawWriteStr(char[]data){
-        basicWrite(data);
+        writer(data);
+    }
+    void rawWriteStr(wchar[]data){
+        writer(data);
+    }
+    void rawWriteStr(dchar[]data){
+        writer(data);
+    }
+    CharSink charSink(){
+        return &this.rawWriteStrD;
+    }
+    BinSink binSink(){
+        return writer;
     }
 }
 
@@ -472,22 +443,22 @@ final class BinaryReadHandlers(bool SwapBytes=isSmallEndian):ReadHandlers{
         return data;
     }
     /// the current position (for information purposes)
-    char[] parserPos(){
+    void parserPos(void delegate(char[]) s){
         long pos=0;
         try {
             pos=reader.seek(0,reader.Anchor.Current);
         } catch (IOException e){
             pos=-1;
         }
-        return (cast(Object)reader).toString()~"@"~ctfe_i2a(pos);
+        writeOut(s,(cast(Object)reader)); s("@"); writeOut(s,pos);
     }
 }
 
 /// formatted write handlers written on the top of a simple sink
 final class FormattedWriteHandlers(U=char): WriteHandlers{
     void delegate(U[]) writer;
-    this(void delegate(U[]) writer){
-        super();
+    this(void delegate(U[]) writer,void delegate() flusher=null){
+        super(flusher);
         this.writer=writer;
         setCoreHandlersFrom_basicWrite();
     }
@@ -525,8 +496,40 @@ final class FormattedWriteHandlers(U=char): WriteHandlers{
         basicWrite(data); // should encode it in base 64 or something like it
     }
     /// writes a raw string
-    void rawWriteStr(char[]data){
-        writer(data);
+    void writeStr(T)(T[]data){
+        static if (is(T==U)){
+            writer(data);
+        } else static if (is(T==char)||is(T==wchar)||is(T==dchar)){
+            U[] s;
+            if (data.length<240){
+                U[256] buf;
+                s=convertToString!(U)(data,buf);
+            } else {
+                s=convertToString!(U)(data);
+            }
+            writer(s);
+        } else {
+            assert(0,"unsupported type "~T.stringof);
+        }
+    }
+    override void rawWriteStr(char[]s){
+        writeStr(s);
+    }
+    override void rawWriteStr(wchar[]s){
+        writeStr(s);
+    }
+    override void rawWriteStr(dchar[]s){
+        writeStr(s);
+    }
+    CharSink charSink(){
+        static if (is(U==char)){
+            return writer;
+        } else {
+            return &this.writeStr!(char);
+        }
+    }
+    BinSink binSink(){
+        return &this.rawWrite;
     }
 }
 

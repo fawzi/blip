@@ -6,15 +6,16 @@
 /// or via xpose
 module blip.serialization.SerializationBase;
 import blip.serialization.Handlers;
-import tango.io.Stdout : Stdout;
 import tango.core.Tuple;
-import blip.t.io.stream.Format:FormatOut;
 import tango.core.Variant;
+import blip.io.Console;
+import blip.io.BasicIO;
 import blip.BasicModels;
 import tango.util.container.HashSet;
 import tango.text.Util;
 import blip.TemplateFu;
 import tango.text.Regex;
+import blip.container.GrowableArray;
 public import tango.core.Traits;
 
 version(SerializationTrace){
@@ -72,12 +73,11 @@ struct FieldMetaInfo {
         return res;
     }
     /// describes a field meta info
-    FormatOut desc(FormatOut s){
-        s("<FieldMetaInfo name:'")(name)("',");
-        s("level:")(serializationLevel)(",");
-        s("metaInfo:")((metaInfo is null) ? "*NULL*" : metaInfo.className)(">");
-        s("metaInfo:")((metaInfo is null) ? "*NULL*" : metaInfo.className)(">");
-        return s;
+    void desc(void delegate(char[]) s){
+        s("<FieldMetaInfo name:'"); s(name); s("',");
+        s("level:"); writeOut(s,serializationLevel); s(",");
+        s("metaInfo:"); s((metaInfo is null) ? "*NULL*"[] : metaInfo.className); s(">");
+        s("metaInfo:"); s((metaInfo is null) ? "*NULL*"[] : metaInfo.className); s(">");
     }
     char[][]citationKeys(){
         char[][] res=[];
@@ -234,20 +234,20 @@ class ClassMetaInfo {
         return fields.length;
     }
     /// description (for debugging purposes)
-    FormatOut desc(FormatOut s){
-        s("<ClassMetaInfo@")(cast(void*)this).newline;
-        s(" className:'")(className)("',").newline;
-        s(" kind:")(kind)(",").newline;
-        s(" superMeta:")(superMeta is null ? "*NULL*" : superMeta.className).newline;
-        s(" ti:")(ti is null ? "*NULL*" : ti.toString)("@")(cast(void*)ti).newline;
-        s(" ci:")(ci is null ? "*NULL*" : ci.toString)("@")(cast(void*)ci).newline;
-        s(" allocEl:")(allocEl is null ? "*NULL*" : "*ASSOCIATED*")("@")(cast(void*)allocEl).newline;
+    void desc(void delegate(char[]) sink){
+        auto s=dumper(sink);
+        s("<ClassMetaInfo@"); writeOut(sink,cast(void*)this); s("\n");
+        s(" className:'")(className)("',\n");
+        s(" kind:")(kind)(",\n");
+        s(" superMeta:")(superMeta is null ? "*NULL*" : superMeta.className)("\n");
+        s(" ti:")(ti is null ? "*NULL*" : ti.toString)("@")(cast(void*)ti)("\n");
+        s(" ci:")(ci is null ? "*NULL*" : ci.toString)("@")(cast(void*)ci)("\n");
+        s(" allocEl:")(allocEl is null ? "*NULL*" : "*ASSOCIATED*")("@")(cast(void*)allocEl)("\n");
         foreach(field;fields){
-            writeDesc(s,field);
-            s.newline;
+            writeOut(sink,field);
+            sink("\n");
         }
-        s(">").newline;
-        return s;
+        s(">\n");
     }
     int opApply(int delegate(ref FieldMetaInfo *) loopBody){
         if (superMeta){
@@ -432,7 +432,12 @@ class SerializationRegistry {
     
     void register(T)(ClassMetaInfo metaInfo) {
         assert(metaInfo!is null,"attempt to register null metaInfo");
-        version(STrace) Stdout.formatln("Registering {} in the serialization factory {} ({})", metaInfo.className,keyOf!(T).toString,T.stringof);
+        version(STrace) {
+            ssout(collectAppender(delegate(CharSink s){
+                s("Registering "); s(metaInfo.className);
+                s(" in the serialization factory "~keyOf!(T).toString~" ("~T.stringof~")");
+            }));
+        }
         Object key = keyOf!(T);
         synchronized(this){
             name2metaInfos[metaInfo.className]=metaInfo;
@@ -537,6 +542,10 @@ class Serializer {
             serializerCloseCallback(this);
         }
     }
+    /// flushes the underlying stream
+    void flush(){
+        handlers.flush();
+    }
     /// writes the given root object
     /// you should only use the field method to write in the serialization methods
     typeof(this) opCall(T)(T o) {
@@ -577,8 +586,14 @@ class Serializer {
     /// writes out a custom field
     final void customField(FieldMetaInfo *fieldMeta, void delegate() realWrite){
         version(SerializationTrace) {
-            Stdout("X customField(")(fieldMeta is null?"*NULL*":fieldMeta.name)(") starting").newline;
-            scope(exit) Stdout("X customField(")(fieldMeta is null?"*NULL*":fieldMeta.name)(") finished").newline;
+            ssout(collectAppender(delegate(CharSink s){
+                s("X customField("); s(fieldMeta is null?"*NULL*":fieldMeta.name); s(") starting\n");
+            }));
+            scope(exit) {
+                ssout(collectAppender(delegate(CharSink s){
+                    s("X customField("); s(fieldMeta is null?"*NULL*":fieldMeta.name); s(") finished\n");
+                }));
+            }
         }
         if (fieldMeta !is null && fieldMeta.serializationLevel>serializationLevel) return;
         writeCustomField(fieldMeta,realWrite);
@@ -586,15 +601,25 @@ class Serializer {
     /// writes out a field of type t
     void field(T)(FieldMetaInfo *fieldMeta, ref T t) {
         version(SerializationTrace) {
-            Stdout("X field!("~T.stringof~")(")(fieldMeta is null?"*NULL*":fieldMeta.name)(",")(cast(void*)&t)(") starting").newline;
-            scope(exit) Stdout("X field!("~T.stringof~")(")(fieldMeta is null?"*NULL*":fieldMeta.name)(",")(cast(void*)&t)(") finished").newline;
+            ssout(collectAppender(delegate void(CharSink s){
+                s("X field!("~T.stringof~")(");
+                s(fieldMeta is null?"*NULL*":fieldMeta.name);
+                s(","); writeOut(s,cast(void*)&t); s(") starting\n");
+            }));
+            scope(exit) {
+                ssout(collectAppender(delegate void(CharSink s){
+                    s("X field!("~T.stringof~")(");
+                    s(fieldMeta is null?"*NULL*":fieldMeta.name);
+                    s(","); writeOut(s,cast(void*)&t); s(") finished\n");
+                }));
+            }
         }
         if (fieldMeta !is null && fieldMeta.serializationLevel>serializationLevel) return;
         static if (isCoreType!(T)){
-            version(SerializationTrace) Stdout("X coreType").newline;
+            version(SerializationTrace) ssout("X coreType\n");
             writeCoreType(fieldMeta, { handlers.handle(t); },&t);
         } else static if (is(T == interface) && !is(T==Serializable)) {
-            version(SerializationTrace) Stdout("X interface->Serializable").newline;
+            version(SerializationTrace) ssout("X interface->Serializable\n");
             auto o=cast(Serializable)t;
             if (o is null){
                 serializationError("serializing an interface non derived from Serializable",
@@ -603,7 +628,7 @@ class Serializer {
             field!(Serializable)(fieldMeta,o);
         } else {
             static if(is(T==class)||is(T==Serializable)||(isPointerType!(T) && is(typeof(*T.init)==struct))){
-                version(SerializationTrace) Stdout("X check if already serialized").newline;
+                version(SerializationTrace) ssout("X check if already serialized\n");
                 // check for cycles
                 static if(is(T==class)||is(T==Serializable)) {
                     void* ptr=cast(void *)cast(Object)t;
@@ -630,10 +655,10 @@ class Serializer {
                 } else {
                     ++lastObjectId;
                 }
-                version(SerializationTrace) Stdout("X non serialized object").newline;
+                version(SerializationTrace) ssout("X non serialized object\n");
             }
             static if (is(T == class) || is(T==Serializable)) {
-                version(SerializationTrace) Stdout("X serializing class").newline;
+                version(SerializationTrace) ssout("X serializing class\n");
                 assert(SerializationRegistry().getMetaInfo(t.classinfo)!is null, 
                     "No class metaInfo registered for type '"
                     ~t.classinfo.name~"'("~T.stringof~")");
@@ -648,12 +673,20 @@ class Serializer {
                 // so this is disallowed
                 Serializable sObj=cast(Serializable)t;
                 if (sObj!is null){
-                    version(SerializationTrace) Stdout("X using serializable interface").newline;
+                    version(SerializationTrace) ssout("X using serializable interface\n");
                     metaInfo=sObj.getSerializationMetaInfo();
                     if (metaInfo.ci != t.classinfo){
                         version(SerializationTrace) {
-                            writeDesc(Stdout("X metaInfo:"),metaInfo).newline;
-                            Stdout("t.classinfo:")(t.classinfo.name)("@")(cast(void*)t.classinfo).newline;
+                            ssout(collectAppender(delegate void(CharSink s){
+                                s("X metaInfo:");
+                                writeOut(s,metaInfo);
+                                s("\n");
+                            }));
+                            ssout(collectAppender(delegate void(CharSink s){
+                                s("t.classinfo:"); s(t.classinfo.name); s("@");
+                                writeOut(s,cast(void*)t.classinfo);
+                                s("\n");
+                            }));
                         }
                         assert(0,"No subclass metaInfo defined for type '"
                             ~t.classinfo.name~"'("~T.stringof~")");
@@ -664,7 +697,7 @@ class Serializer {
                         sObj.serialize(this);
                     }
                     if (metaInfo.kind==TypeKind.CustomK){
-                        version(SerializationTrace) Stdout("X serializing as custom field").newline;
+                        version(SerializationTrace) ssout("X serializing as custom field\n");
                         assert(T.classinfo is t.classinfo,"subclasses not supported for custom writers");
                         writeCustomField(fieldMeta,&realWrite1);
                     } else {
@@ -682,7 +715,7 @@ class Serializer {
                         assert(metaInfo);
                     }
                     if (metaInfo.externalHandlers){
-                        version(SerializationTrace) Stdout("X using external handlers").newline;
+                        version(SerializationTrace) ssout("X using external handlers\n");
                         ExternalSerializationHandlers *h=metaInfo.externalHandlers;
                         void realWrite2(){
                             if (h.preSerialize){
@@ -697,7 +730,7 @@ class Serializer {
                             h.serialize(this,metaInfo,cast(void*)t);
                         }
                         if (metaInfo.kind==TypeKind.CustomK){
-                            version(SerializationTrace) Stdout("X serializing as custom field").newline;
+                            version(SerializationTrace) ssout("X serializing as custom field\n");
                             assert(T.classinfo is t.classinfo,"subclasses not supported for custom writers");
                             writeCustomField(fieldMeta,&realWrite2);
                         } else {
@@ -710,7 +743,7 @@ class Serializer {
                             }
                         }
                     } else {
-                        version(SerializationTrace) Stdout("X using serialize methods").newline;
+                        version(SerializationTrace) ssout("X using serialize methods\n");
                         static if(is(typeof(T.init.serialize(this)))){
                             void realWrite3(){
                                 static if(is(typeof(T.init.preSerialize(this)))){
@@ -724,7 +757,7 @@ class Serializer {
                                 t.serialize(this);
                             }
                             if (metaInfo.kind==TypeKind.CustomK){
-                                version(SerializationTrace) Stdout("X serializing as custom field").newline;
+                                version(SerializationTrace) ssout("X serializing as custom field\n");
                                 assert(T.classinfo is t.classinfo,"subclasses not supported for custom writers");
                                 writeCustomField(fieldMeta,&realWrite3);
                             } else {
@@ -744,10 +777,10 @@ class Serializer {
                 }
             }
             else static if (is(T == struct)) {
-                version(SerializationTrace) Stdout("X serializing struct").newline;
+                version(SerializationTrace) ssout("X serializing struct\n");
                 objectId objId=cast(objectId)0;
                 if (structHasId){
-                    version(SerializationTrace) Stdout("struct has id").newline;
+                    version(SerializationTrace) ssout("struct has id\n");
                     objId=lastObjectId;
                     structHasId=false;
                 }
@@ -762,7 +795,7 @@ class Serializer {
                     "No metaInfo registered for struct '"
                     ~typeid(T).toString~"'("~T.stringof~")");
                 if (metaInfo.externalHandlers){
-                    version(SerializationTrace) Stdout("X using external handlers").newline;
+                    version(SerializationTrace) ssout("X using external handlers\n");
                     ExternalSerializationHandlers *h=metaInfo.externalHandlers;
                     void realWrite4(){
                         if (metaInfo.externalHandlers.preSerialize){
@@ -775,14 +808,14 @@ class Serializer {
                         }
                     }
                     if (metaInfo.kind==TypeKind.CustomK){
-                        version(SerializationTrace) Stdout("X serializing as custom field").newline;
+                        version(SerializationTrace) ssout("X serializing as custom field\n");
                         writeCustomField(fieldMeta,&realWrite4);
                     } else {
                         writeStruct(fieldMeta,metaInfo,objId,
                             &realWrite4, &t);
                     }
                 } else {
-                    version(SerializationTrace) Stdout("X using serialize methods").newline;
+                    version(SerializationTrace) ssout("X using serialize methods\n");
                     static if(is(typeof(t.serialize(this)))){
                         void realWrite5(){
                             static if(is(typeof(t.preSerialize(this)))){
@@ -794,7 +827,7 @@ class Serializer {
                             }
                         }
                         if (metaInfo.kind==TypeKind.CustomK){
-                            version(SerializationTrace) Stdout("X serializing as custom field").newline;
+                            version(SerializationTrace) ssout("X serializing as custom field\n");
                             writeCustomField(fieldMeta,&realWrite5);
                         } else {
                             writeStruct(fieldMeta,metaInfo,objId,
@@ -807,7 +840,7 @@ class Serializer {
                 }
             }
             else static if (isArrayType!(T)) {
-                version(SerializationTrace) Stdout.formatln("X serializing array").newline;
+                version(SerializationTrace) ssout("X serializing array\n");
                 FieldMetaInfo *elMetaInfoP=null;
                 version(PseudoFieldMetaInfo){
                     FieldMetaInfo elMetaInfo=FieldMetaInfo("el","",
@@ -817,13 +850,13 @@ class Serializer {
                 }
                 auto ac=writeArrayStart(fieldMeta,t.length);
                 foreach (ref x; t) {
-                    version(SerializationTrace) Stdout.formatln("X serializing array element").newline;
+                    version(SerializationTrace) ssout("X serializing array element\n");
                     writeArrayEl(ac,{ this.field(elMetaInfoP, x); } );
                 }
                 writeArrayEnd(ac);
             }
             else static if (isAssocArrayType!(T)) {
-                version(SerializationTrace) Stdout.formatln("X serializing associative array").newline;
+                version(SerializationTrace) ssout("X serializing associative array\n");
                 alias KeyTypeOfAA!(T) K;
                 alias ValTypeOfAA!(T) V;
                 version(PseudoFieldMetaInfo){
@@ -835,7 +868,7 @@ class Serializer {
                 auto ac=writeDictStart(fieldMeta,t.length,
                     is(K==char[])||is(K==wchar[])||is(K==dchar[]));
                 foreach (key, inout value; t) {
-                    version(SerializationTrace) Stdout.formatln("X serializing associative array entry").newline;
+                    version(SerializationTrace) ssout("X serializing associative array entry\n");
                     version(PseudoFieldMetaInfo){
                         writeEntry(ac,{ this.field!(K)(&keyMetaInfo, key); },
                             { this.field(&valMetaInfo, value); });
@@ -846,7 +879,7 @@ class Serializer {
                 }
                 writeDictEnd(ac);
             } else static if (isPointerType!(T)) {
-                version(SerializationTrace) Stdout("X serializing pointer").newline;
+                version(SerializationTrace) ssout("X serializing pointer\n");
                 if (t is null){
                     writeNull(fieldMeta);
                     return;
@@ -856,10 +889,10 @@ class Serializer {
                 } else {
                     if (recursePtr){
                         // it is not guaranteed that reading in will recover the same situation that was dumped...
-                        Stdout("X recursing pointer").newline;
+                        ssout("X recursing pointer\n");
                         this.field!(typeof(*t))(fieldMeta, *t);
                     } else {
-                        Stdout("X debug pointer").newline;
+                        ssout("X debug pointer\n");
                         writeDebugPtr(fieldMeta,cast(void*)t);
                     }
                 }
@@ -873,7 +906,7 @@ class Serializer {
                 if (metaInfo is null || metaInfo.externalHandlers is null){
                     serializationError("Error: no meta info and external handlers for field of type "~T.stringof,__FILE__,__LINE__);
                 } else {
-                    version(SerializationTrace) Stdout("X using external handlers").newline;
+                    version(SerializationTrace) ssout("X using external handlers\n");
                     ExternalSerializationHandlers *h=metaInfo.externalHandlers;
                     void realWrite6(){
                         if (h.preSerialize){
@@ -886,7 +919,7 @@ class Serializer {
                         }
                     }
                     if (metaInfo.kind==TypeKind.CustomK){
-                        version(SerializationTrace) Stdout("X serializing as custom field").newline;
+                        version(SerializationTrace) ssout("X serializing as custom field\n");
                         writeCustomField(fieldMeta,&realWrite6);
                     } else {
                         writeStruct(fieldMeta,metaInfo,cast(objectId)0,
@@ -1083,12 +1116,18 @@ class Unserializer {
     /// reads a custom field
     final void customField(FieldMetaInfo *fieldMeta, void delegate() readOp){
         version(SerializationTrace) {
-            Stdout("Y customField(")(fieldMeta is null?"*NULL*":fieldMeta.name)(") starting").newline;
-            scope(exit) Stdout("> customField(")(fieldMeta is null?"*NULL*":fieldMeta.name)(") finished").newline;
+            ssout(collectAppender(delegate void(CharSink s){
+                s("Y customField("); s(fieldMeta is null?"*NULL*"[]:fieldMeta.name); s(") starting\n");
+            }));
+            scope(exit) {
+                ssout(collectAppender(delegate void(CharSink s){
+                    s("> customField("); s(fieldMeta is null?"*NULL*":fieldMeta.name); s(") finished\n");
+                }));
+            }
         }
         if (fieldMeta !is null) {
             if (fieldMeta.serializationLevel>serializationLevel) {
-                version(UnserializationTrace) Stdout("Y skip (above serialization level)").newline;
+                version(UnserializationTrace) ssout("Y skip (above serialization level)\n");
                 return;
             }
             if (nStack>0){
@@ -1096,10 +1135,10 @@ class Unserializer {
                 auto lab=stackTop.labelToRead;
                 if (lab.length>0 && (!fieldMeta.pseudo)){
                     if (lab!=fieldMeta.name) {
-                        version(UnserializationTrace) Stdout("Y skip field (non selected)").newline;
+                        version(UnserializationTrace) ssout("Y skip field (non selected)\n");
                         return;
                     } else {
-                        version(UnserializationTrace) Stdout("Y selected field").newline;
+                        version(UnserializationTrace) ssout("Y selected field\n");
                     }
                 }
                 ++stackTop.iFieldRead;
@@ -1112,12 +1151,20 @@ class Unserializer {
     /// this method cannot be overridden, but call all other methods that can be
     void field(T)(FieldMetaInfo *fieldMeta, ref T t) {
         version(UnserializationTrace) {
-            Stdout("Y field!("~T.stringof~")(")(fieldMeta is null ? "*NULL*" : fieldMeta.name)(",")(cast(void*)&t)(") starting unserialization").newline;
-            scope(exit) Stdout("Y field!("~T.stringof~")(")(fieldMeta is null ? "*NULL*" : fieldMeta.name)(",")(cast(void*)&t)(") finished unserialization").newline;
+            ssout(collectAppender(delegate void(CharSink s){
+                s("Y field!("~T.stringof~")("); s(fieldMeta is null ? "*NULL*"[] : fieldMeta.name);
+                s(","); writeOut(s,cast(void*)&t); s(") starting unserialization\n");
+            }));
+            scope(exit) {
+                ssout(collectAppender(delegate void(CharSink s){
+                    s("Y field!("~T.stringof~")("); s(fieldMeta is null ? "*NULL*"[] : fieldMeta.name);
+                    s(","); writeOut(s,cast(void*)&t); s(") finished unserialization\n");
+                }));
+            }
         }
         if (fieldMeta !is null) {
             if (fieldMeta.serializationLevel>serializationLevel) {
-                version(UnserializationTrace) Stdout("Y skip (above serialization level)").newline;
+                version(UnserializationTrace) ssout("Y skip (above serialization level)\n");
                 return;
             }
             if (nStack>0){
@@ -1125,10 +1172,10 @@ class Unserializer {
                 auto lab=stackTop.labelToRead;
                 if ( lab.length>0 && (!fieldMeta.pseudo)){
                     if (lab!=fieldMeta.name) {
-                        version(UnserializationTrace) Stdout("Y skip field (non selected)").newline;
+                        version(UnserializationTrace) ssout("Y skip field (non selected)\n");
                         return;
                     } else {
-                        version(UnserializationTrace) Stdout("Y selected field").newline;
+                        version(UnserializationTrace) ssout("Y selected field\n");
                     }
                 }
                 ++stackTop.iFieldRead;
@@ -1136,7 +1183,11 @@ class Unserializer {
         }
         static if (isCoreType!(T)){
             readCoreType(fieldMeta, { handlers.handle(t); });
-            version(UnserializationTrace) Stdout("Y readValue:")(t).newline;
+            version(UnserializationTrace) {
+                ssout(collectAppender(delegate void(CharSink s){
+                    s("Y readValue:"); writeOut(s,t); s("\n");
+                }));
+            }
         } else static if (is(T == interface) && !is(T==Serializable)) {
             auto o=cast(Serializable)t;
             if (o is null){
@@ -1144,7 +1195,7 @@ class Unserializer {
                     __FILE__,__LINE__);
             }
             field!(Serializable)(fieldMeta,o);
-            version(UnserializationTrace) Stdout("Y readInterfaceObject").newline;
+            version(UnserializationTrace) ssout("Y readInterfaceObject\n");
         } else {
             ClassMetaInfo metaInfo;
             objectId oid;
@@ -1159,11 +1210,11 @@ class Unserializer {
                         } else {
                             t=cast(T)v;
                         }
-                        version(UnserializationTrace) Stdout("Y read proxy").newline;
+                        version(UnserializationTrace) ssout("Y read proxy\n");
                         return;
                     }
                     readStructProxy=is(typeof(*T.init)==struct);
-                    version(UnserializationTrace) Stdout("Y read no proxy").newline;
+                    version(UnserializationTrace) ssout("Y read no proxy\n");
                 }
             }
             static if (is(T == class) || is(T==Serializable)) {
@@ -1183,7 +1234,12 @@ class Unserializer {
                     t=cast(T)instantiateClass(metaInfo);
                 } else {
                     t=cast(T)readAndInstantiateClass(fieldMeta,metaInfo,oid,cast(Object)t);
-                    version(UnserializationTrace) Stdout("Y instantiated object of class ")(metaInfo.className)(" ("~T.stringof~") at ")(cast(void*)t).newline;
+                    version(UnserializationTrace) {
+                        ssout(collectAppender(delegate void(CharSink s){
+                            s("Y instantiated object of class "); s(metaInfo.className);
+                            s(" ("~T.stringof~") at "); writeOut(s,cast(void*)t); s("\n");
+                        }));
+                    }
                     assert(metaInfo!is null,
                         "metaInfo not set by readAndInstantiateClass ("~T.stringof~")");
                     assert(t!is null," object not allocated by readAndInstantiateClass ("
@@ -1201,20 +1257,32 @@ class Unserializer {
                 // so this is disallowed
                 Serializable sObj=cast(Serializable)t;
                 if (sObj!is null){
-                    version(UnserializationTrace) Stdout("Y using Serializable interface").newline;
+                    version(UnserializationTrace) ssout("Y using Serializable interface\n");
                     sObj=sObj.preUnserialize(this);
                     top().value=Variant(cast(Object)sObj);
-                    version(UnserializationTrace) Stdout("Y after preUnserialize obj is at ")(cast(void*)cast(Object)sObj).newline;
+                    version(UnserializationTrace) {
+                        ssout(collectAppender(delegate void(CharSink s){
+                            s("Y after preUnserialize obj is at ");
+                            writeOut(s,cast(void*)cast(Object)sObj);
+                            s("\n");
+                        }));
+                    }
                     scope(exit) {
                         sObj=sObj.postUnserialize(this);
                         t=cast(T)sObj;
-                        version(UnserializationTrace) Stdout("Y after postUnserialize obj is at ")(cast(void*)cast(Object)sObj).newline;
+                        version(UnserializationTrace) {
+                            ssout(collectAppender(delegate void(CharSink s){
+                                s("Y after postUnserialize obj is at ");
+                                writeOut(s,cast(void*)cast(Object)sObj);
+                                s("\n");
+                            }));
+                        }
                     }
                     void realRead1(){
                         sObj.unserialize(this);
                     }
                     if (metaInfo.kind==TypeKind.CustomK){
-                        version(UnserializationTrace) Stdout("Y as customField").newline;
+                        version(UnserializationTrace) ssout("Y as customField\n");
                         readCustomField(fieldMeta,&realRead1);
                     } else {
                         readObject(fieldMeta,metaInfo,
@@ -1222,7 +1290,7 @@ class Unserializer {
                     }
                 } else {
                     if (metaInfo.externalHandlers){
-                        version(UnserializationTrace) Stdout("Y using externalHandlers").newline;
+                        version(UnserializationTrace) ssout("Y using externalHandlers\n");
                         ExternalSerializationHandlers *h=metaInfo.externalHandlers;
                         assert(h.unserialize!is null,"externalHandlers with null unserialize");
                         if (h.preUnserialize){
@@ -1238,13 +1306,13 @@ class Unserializer {
                             h.unserialize(this,metaInfo,cast(void*)t);
                         }
                         if (metaInfo.kind==TypeKind.CustomK){
-                            version(UnserializationTrace) Stdout("Y as customField").newline;
+                            version(UnserializationTrace) ssout("Y as customField\n");
                             readCustomField(fieldMeta,&realRead2);
                         } else {
                             readObject(fieldMeta,metaInfo,&realRead2, cast(Object)t);
                         }
                     } else {
-                        version(UnserializationTrace) Stdout("Y using unserialize methods").newline;
+                        version(UnserializationTrace) ssout("Y using unserialize methods\n");
                         static if(is(typeof(T.init.preUnserialize(this)))){
                             t=cast(T)cast(Object)t.preUnserialize(this);
                             top().value=Variant(t);
@@ -1260,7 +1328,7 @@ class Unserializer {
                         }
                         static if(is(typeof(T.init.unserialize(this)))){
                             if (metaInfo.kind==TypeKind.CustomK){
-                                version(UnserializationTrace) Stdout("Y as customField").newline;
+                                version(UnserializationTrace) ssout("Y as customField\n");
                                 readCustomField(fieldMeta,&realRead3);
                             } else {
                                 readObject(fieldMeta,metaInfo,&realRead3,cast(Object)t);
@@ -1269,15 +1337,23 @@ class Unserializer {
                             assert(0,"no unserialization function for "
                                 ~t.classinfo.name~"'("~T.stringof~")");
                         }
-                        version(UnserializationTrace) Stdout("Y did read object now at ")
-                            (cast(void*)t).newline;
+                        version(UnserializationTrace) {
+                            ssout(collectAppender(delegate void(CharSink s){
+                                s("Y did read object now at ");
+                                writeOut(s,cast(void*)t); s("\n");
+                            }));
+                        }
                     }
                 }
-                version(UnserializationTrace) Stdout("Y did read object now at ")
-                    (cast(void*)t).newline;
+                version(UnserializationTrace) {
+                    ssout(collectAppender(delegate void(CharSink s){
+                        s("Y did read object now at ");
+                        writeOut(s,cast(void*)t); s("\n");
+                    }));
+                }
             }
             else static if (is(T == struct)) {
-                version(UnserializationTrace) Stdout("Y reading struct").newline;
+                version(UnserializationTrace) ssout("Y reading struct\n");
                 if (metaInfo is null){
                     if (fieldMeta) {
                         metaInfo=fieldMeta.metaInfo;
@@ -1292,12 +1368,12 @@ class Unserializer {
                 }
                 if ((!readStructProxy) && metaInfo.kind!=TypeKind.CustomK){
                     void *v;
-                    version(UnserializationTrace) Stdout("Y will try proxy").newline;
+                    version(UnserializationTrace) ssout("Y will try proxy\n");
                     if (maybeReadProxy(fieldMeta,metaInfo,oid,v)){
                         serializationError("read proxy for non pointer struct",__FILE__,__LINE__);
                         // simply copy it if non null?
                     }
-                    version(UnserializationTrace) Stdout("Y tried proxy").newline;
+                    version(UnserializationTrace) ssout("Y tried proxy\n");
                 }
                 if (metaInfo is null){
                     if (fieldMeta) {
@@ -1313,7 +1389,7 @@ class Unserializer {
                     "No metaInfo registered for struct '"
                     ~typeid(T).toString~"'("~T.stringof~")");
                 if (metaInfo.externalHandlers){
-                    version(UnserializationTrace) Stdout("Y using external handlers").newline;
+                    version(UnserializationTrace) ssout("Y using external handlers\n");
                     ExternalSerializationHandlers *h=metaInfo.externalHandlers;
                     assert(h.unserialize!is null,"externalHandlers without valid unserialize");
                     if (h.preUnserialize){
@@ -1328,13 +1404,13 @@ class Unserializer {
                         h.unserialize(this,metaInfo,cast(void*)&t);
                     }
                     if (metaInfo.kind==TypeKind.CustomK){
-                        version(UnserializationTrace) Stdout("Y as customField").newline;
+                        version(UnserializationTrace) ssout("Y as customField\n");
                         readCustomField(fieldMeta,&realRead4);
                     } else {
                         readStruct(fieldMeta,metaInfo,&realRead4, &t);
                     }
                 } else {
-                    version(UnserializationTrace) Stdout("Y using serialization methods").newline;
+                    version(UnserializationTrace) ssout("Y using serialization methods\n");
                     static if(is(typeof(T.init.preUnserialize(this)))){
                         t.preUnserialize(this);
                     }
@@ -1348,7 +1424,7 @@ class Unserializer {
                     }
                     static if (is(typeof(T.init.unserialize(this)))){
                         if (metaInfo.kind==TypeKind.CustomK){
-                            version(UnserializationTrace) Stdout("Y as customField").newline;
+                            version(UnserializationTrace) ssout("Y as customField\n");
                             readCustomField(fieldMeta,&realRead5);
                         } else {
                             readStruct(fieldMeta,metaInfo,&realRead5,&t);
@@ -1360,7 +1436,12 @@ class Unserializer {
                 }
             }
             else static if (isArrayType!(T)) {
-                version(UnserializationTrace) Stdout.formatln("Y unserializing array: {} {}", (fieldMeta?fieldMeta.name:"*NULL*"), typeid(T)).newline;
+                version(UnserializationTrace) {
+                    ssout(collectAppender(delegate void(CharSink s){
+                        s("Y unserializing array: "); s(fieldMeta?fieldMeta.name:"*NULL*");
+                        writeOut(s,typeid(T)); s("\n");
+                    }));
+                }
                 FieldMetaInfo elMetaInfo=FieldMetaInfo("el","",
                     getSerializationInfoForType!(ElementTypeOfArray!(T))());
                 elMetaInfo.pseudo=true;
@@ -1384,7 +1465,7 @@ class Unserializer {
                 t.length=pos;
             }
             else static if (isAssocArrayType!(T)) {
-                version(UnserializationTrace) Stdout("Y unserializing associative array").newline;
+                version(UnserializationTrace) ssout("Y unserializing associative array\n");
                 alias KeyTypeOfAA!(T) K;
                 alias ValTypeOfAA!(T) V;
                 FieldMetaInfo keyMetaInfo=FieldMetaInfo("key","",getSerializationInfoForType!(K)());
@@ -1410,25 +1491,25 @@ class Unserializer {
                         }
                     })) { key=K.init; value=V.init; }
             } else static if (isPointerType!(T)) {
-                version(UnserializationTrace) Stdout("Y unserializing pointer").newline;
+                version(UnserializationTrace) ssout("Y unserializing pointer\n");
                 static if (is(typeof(*T.init)==struct)||is(isArrayType!(typeof(*T.init)))||is(typeof(*T.init)==class)){
                     static if(is(typeof(*T.init)==struct)){
                         if (t is null){
                             t=new typeof(*T.init);
                         }
                     }
-                    version(UnserializationTrace) Stdout("Y pointer to struct or class").newline;
+                    version(UnserializationTrace) ssout("Y pointer to struct or class\n");
                     this.field!(typeof(*t))(fieldMeta, *t);
                 } else {
                     if (recursePtr){
                         // it is not guaranteed that reading in will recover the same situation that was dumped...
-                        version(UnserializationTrace) Stdout("Y recursing pointer").newline;
+                        version(UnserializationTrace) ssout("Y recursing pointer\n");
                         if (t is null){
                             t=new typeof(*T.init);
                         }
                         this.field!(typeof(*t))(fieldMeta, *t);
                     } else {
-                        version(UnserializationTrace) Stdout("Y debug pointer").newline;
+                        version(UnserializationTrace) ssout("Y debug pointer\n");
                         readDebugPtr(fieldMeta,cast(void*)&t);
                     }
                 }
@@ -1442,7 +1523,7 @@ class Unserializer {
                 if (metaInfo is null || metaInfo.externalHandlers is null){
                     serializationError("Error: no meta info and external handlers for field of type "~T.stringof,__FILE__,__LINE__);
                 } else {
-                    version(UnserializationTrace) Stdout("Y using external handlers").newline;
+                    version(UnserializationTrace) ssout("Y using external handlers\n");
                     ExternalSerializationHandlers *h=metaInfo.externalHandlers;
                     assert(h.unserialize!is null,"externalHandlers without valid unserialize");
                     if (h.preUnserialize){
@@ -1457,7 +1538,7 @@ class Unserializer {
                         h.unserialize(this,metaInfo,cast(void*)&t);
                     }
                     if (metaInfo.kind==TypeKind.CustomK){
-                        version(UnserializationTrace) Stdout("Y as customField").newline;
+                        version(UnserializationTrace) ssout("Y as customField\n");
                         readCustomField(fieldMeta,&realRead6);
                     } else {
                         readStruct(fieldMeta,metaInfo,&realRead6, &t);
@@ -1567,6 +1648,6 @@ class Unserializer {
     /// override this to give more info on parser position,...
     /// this method *has* to throw
     void serializationError(char[]msg,char[]filename,long line){
-        throw new SerializationException(msg,handlers.parserPos(),filename,line);
+        throw new SerializationException(msg,collectAppender(&handlers.parserPos),filename,line);
     }
 }

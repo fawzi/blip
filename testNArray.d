@@ -8,7 +8,7 @@
 *******************************************************************************/
 module testNArray;
 import blip.narray.BasicTypes;
-import tango.io.Stdout;
+import blip.io.Console;
 import blip.rtest.RTest;
 import blip.narray.NArray;
 import blip.narray.TestSupport;
@@ -17,15 +17,16 @@ import blip.narray.Convolve;
 import blip.TemplateFu;
 import blip.parallel.smp.WorkManager;
 import tango.util.log.Config;
-import blip.text.Stringify;
+import blip.container.GrowableArray;
 import tango.math.Math: abs,min,max,sqrt;
 import tango.math.IEEE: feqrel;
 import blip.serialization.Serialization;
 import tango.io.device.Array;
-import blip.t.io.stream.Format:FormatOut;
 import blip.BasicModels;
 import tango.core.Traits;
 import tango.core.stacktrace.TraceExceptions;
+import blip.io.BasicIO;
+import blip.io.StreamConverters;
 
 /// returns a NArray indexed with the variables of a pLoopIdx or sLoopGenIdx
 char[] NArrayInLoop(char[] arrName,int rank,char[] ivarStr){
@@ -170,13 +171,19 @@ bool checkResDot(U,int rank3)(NArray!(U,rank3)refVal,NArray!(U,rank3)v,int tol=8
     static if(is(typeof(feqrel2(U.init,U.init)))&& is(typeof(U.mant_dig))){
         auto err=minFeqrel2(refVal,v);
         res=(err>=2*U.mant_dig/3-tol);
-        if (!res) Stdout("error:")(err)("/")(U.mant_dig).newline;
+        if (!res) {
+            ssout(collectAppender(delegate void(CharSink s){
+                s("error:"); writeOut(s,err); s("/"); writeOut(s,U.mant_dig); s("\n");
+            }));
+        }
     } else {
         res=(refVal==v);
     }
     if (!res){
-        Stdout("v=")(v).newline;
-        Stdout("refVal=")(refVal).newline;
+        ssout(collectAppender(delegate void(CharSink s){
+            s("v="); writeOut(s,v); s("\n");
+            s("refVal="); writeOut(s,refVal); s("\n");
+        }));
     }
     return res;
 }
@@ -186,8 +193,8 @@ bool checkResStr(U,int rank3)(NArray!(U,rank3)refVal,NArray!(U,rank3)v,int tol=8
     bool res=true;
     void checkSame(U a,U b){
         if (res && !eqStr(a,b)) {
-            writeDesc!(U)(Stdout("'"),a);
-            writeDesc!(U)(Stdout("'!='"),b)("'").newline;
+            writeOut(sout("'").call,a);
+            writeOut(sout("'!='").call,b); sout("'\n");
             res=false;
         }
     }
@@ -205,8 +212,10 @@ void testSumAll(T,int rank)(NArray!(T,rank) a){
     }
     int err=feqrel2(refVal,dVal);
     if (err<2*real.mant_dig/3-6){
-        Stdout("refVal:")(refVal).newline;
-        Stdout("dVal:")(dVal).newline;
+        ssout(collectAppender(delegate void(CharSink s){
+            s("refVal:"); writeOut(s,refVal); s("\n");
+            s("dVal:"); writeOut(s,dVal); s("\n");
+        }));
         assert(false,"sumAll error too large");
     }
 }
@@ -227,8 +236,10 @@ void testSumAxis(T,int rank)(NArray!(T,rank) a, Rand r){
     static if (rank==1){
         int err=feqrel2(refVal,dVal);
         if (err<2*real.mant_dig/3-6){
-            Stdout("refVal:")(refVal).newline;
-            Stdout("dVal:")(dVal).newline;
+            ssout(collectAppender(delegate void(CharSink s){
+                s("refVal:"); writeOut(s,refVal); s("\n");
+                s("dVal:"); writeOut(s,dVal); s("\n");
+            }));
             assert(false,"sumAxis error too large");
         }
     } else {
@@ -246,8 +257,10 @@ void testMultAll(T,int rank)(NArray!(T,rank) a){
     }
     int err=feqrel2(refVal,dVal);
     if (err<2*real.mant_dig/3-6){
-        Stdout("refVal:")(refVal).newline;
-        Stdout("dVal:")(dVal).newline;
+        ssout(collectAppender(delegate void(CharSink s){
+            s("refVal:"); writeOut(s,refVal); s("\n");
+            s("dVal:"); writeOut(s,dVal); s("\n");
+        }));
         assert(false,"sumAll error too large");
     }
 }
@@ -268,8 +281,10 @@ void testMultAxis(T,int rank)(NArray!(T,rank) a, Rand r){
     static if (rank==1){
         int err=feqrel2(refVal,dVal);
         if (err<2*real.mant_dig/3-6){
-            Stdout("refVal:")(refVal).newline;
-            Stdout("dVal:")(dVal).newline;
+            ssout(collectAppender(delegate void(CharSink s){
+                s("refVal:"); writeOut(s,refVal); s("\n");
+                s("dVal:"); writeOut(s,dVal); s("\n");
+            }));
             assert(false,"sumAxis error too large");
         }
     } else {
@@ -302,12 +317,12 @@ void testAxisFilter(T,int rank)(NArray!(T,rank) a, NArray!(index_type,1)indexes)
     assert(c.shape==a.shape);
     foreach (el;indexes){
         if (!(a[el]==c[el])){
-            b.desc(Stdout("b:")).newline;
-            b.printData(Stdout).newline;
-            c.desc(Stdout("c:")).newline;
-            c.printData(Stdout).newline;
-            d.desc(Stdout("d:")).newline;
-            d.printData(Stdout).newline;
+            writeOut(sout("b:").call,b); sout("\n");
+            if (b) { b.printData(sout.call); sout("\n"); }
+            writeOut(sout("c:").call,c); sout("\n");
+            if (c) { c.printData(sout.call); sout("\n"); }
+            writeOut(sout("d:").call,d); sout("\n");
+            if (d) { d.printData(sout.call); sout("\n"); }
             assert(false,"axisFilter failed");
         }
     }
@@ -326,11 +341,11 @@ void testDot1x1(T,S)(Dottable!(T,1,S,1,true,true) d){
     static if(is(typeof(feqrel2(U.init,U.init)))&& is(typeof(U.mant_dig))){
         auto err=feqrel2(refVal,v);
         if (err<2*U.mant_dig/3-tol){
-            d.a.desc(Stdout("a:")).newline;
-            d.b.desc(Stdout("b:")).newline;
-            Stdout("v=")(v).newline;
-            Stdout("refVal=")(refVal).newline;
-            Stdout("error:")(err)("/")(U.mant_dig).newline;
+            sout("a:"); writeOut(sout.call,d.a); sout("\n");
+            sout("b:"); writeOut(sout,d.b); sout("\n");
+            sout("v=")(v)("\n");
+            sout("refVal=")(refVal)("\n");
+            sout("error:")(err)("/")(U.mant_dig)("\n");
         }
         assert(err>=2*U.mant_dig/3-tol,"error too large");
     } else {
@@ -471,21 +486,28 @@ else {
         assert(norm2!(ComplexTypeOf!(T),2,real)(rightEVect)>0.5,"rightEVect too small");
         assert(norm2!(ComplexTypeOf!(T),2,real)(leftEVect)>0.5,"leftEVect too small");
         if (err1<T.mant_dig*2/3-tol){
-            ev2.printData(Stdout("ev:"),"{:F8,10}").newline;
-            leftEVect.printData(Stdout("leftEVect:"),"{:F8,10}").newline;
-            rightEVect.printData(Stdout("rightEVect:"),"{:F8,10}").newline;
-            Stdout("error")(err1)("/")(T.mant_dig).newline;
+            ssout("ev:");
+            ev2.printData(ssout.call,"F8,10"); ssout("\n");
+            ssout("leftEVect:");  leftEVect.printData(ssout.call,"F8,10"); ssout("\n");
+            ssout("rightEVect:"); rightEVect.printData(ssout.call,"F8,10"); ssout("\n");
+            ssout(collectAppender(delegate void(CharSink s){
+                s("error"); writeOut(s,err1); s("/"); writeOut(s,T.mant_dig); s("\n");
+            }));
             assert(false,"rightEVect error too large");
         }
         if (err2<T.mant_dig*2/3-tol){
-            Stdout("error")(err2)("/")(T.mant_dig).newline;
+            ssout(collectAppender(delegate void(CharSink s){
+                s("error"); writeOut(s,err2); s("/"); writeOut(s,T.mant_dig); s("\n");
+            }));
             assert(false,"leftEVect error too large");
         }
         auto ev3=eig(d.a);
         auto diff3=norm2!(ComplexTypeOf!(T),1,real)(ev2-ev3)/sqrt(cast(real)n);
         auto err3=feqrel(diff3+1.0L,1.0L);
         if (err3<T.mant_dig*2/3-tol){
-            Stdout("error")(err2)("/")(T.mant_dig).newline;
+            ssout(collectAppender(delegate void(CharSink s){
+                s("error"); writeOut(s,err3); s("/"); writeOut(s,T.mant_dig); s("\n");
+            }));
             assert(false,"eigenvalues changed too much (from eval+evect)");
         }
     }
@@ -517,26 +539,34 @@ else {
         auto err2=feqrel(diff2+1.0L,1.0L);
         auto err3=feqrel(diff3+1.0L,1.0L);
         if (err1<T.mant_dig*2/3-tol){
-            d.a.printData(Stdout("a:"),"{:F8}").newline;
-            u.printData(Stdout("u:"),"{:F8}").newline;
-            s.printData(Stdout("s:"),"{:F8}").newline;
-            vt.printData(Stdout("vt:"),"{:F8}").newline;
-            Stdout("error1 ")(err1)("/")(T.mant_dig).newline;
+            d.a.printData(ssout("a:").call,"F8"); ssout("\n");
+            u.printData(ssout("u:").call,"F8"); ssout("\n");
+            s.printData(ssout("s:").call,"F8"); ssout("\n");
+            vt.printData(ssout("vt:").call,"F8"); ssout("\n");
+            ssout(collectAppender(delegate void(CharSink s){
+                s("error1"); writeOut(s,err1); s("/"); writeOut(s,T.mant_dig); s("\n");
+            }));
             assert(false,"svd does not recover a");
         }
         if (err2<T.mant_dig*2/3-tol){
-            Stdout("error2 ")(err2)("/")(T.mant_dig).newline;
+            ssout(collectAppender(delegate void(CharSink s){
+                s("error2"); writeOut(s,err2); s("/"); writeOut(s,T.mant_dig); s("\n");
+            }));
             assert(false,"u non orthogonal");
         }
         if (err3<T.mant_dig*2/3-tol){
-            Stdout("error3 ")(err2)("/")(T.mant_dig).newline;
+            ssout(collectAppender(delegate void(CharSink s){
+                s("error3"); writeOut(s,err3); s("/"); writeOut(s,T.mant_dig); s("\n");
+            }));
             assert(false,"vt non orthogonal");
         }
         auto s3=svd(d.a);
         auto diff4=norm2!(RealTypeOf!(T),1,real)(s2-s3)/sqrt(cast(real)n);
         auto err4=feqrel(diff4+1.0L,1.0L);
         if (err3<T.mant_dig*2/3-tol){
-            Stdout("error4 ")(err2)("/")(T.mant_dig).newline;
+            ssout(collectAppender(delegate void(CharSink s){
+                s("error4"); writeOut(s,err4); s("/"); writeOut(s,T.mant_dig); s("\n");
+            }));
             assert(false,"singular values changed too much (from svd(u,s,vt))");
         }
     }
@@ -560,21 +590,27 @@ else {
         auto err1=feqrel(diff1+1.0L,1.0L);
         auto err2=feqrel(diff2+1.0L,1.0L);
         if (err1<T.mant_dig*2/3-tol){
-            d.a.printData(Stdout("a:"),"{:F8}").newline;
-            ev.printData(Stdout("ev:"),"{:F8}").newline;
-            eVect.printData(Stdout("eVect:"),"{:F8}").newline;
-            Stdout("error1 ")(err1)("/")(T.mant_dig).newline;
+            d.a.printData(ssout("a:").call,"F8"); ssout("\n");
+            ev.printData(ssout("ev:").call,"F8"); ssout("\n");
+            eVect.printData(ssout("eVect:").call,"F8"); ssout("\n");
+            ssout(collectAppender(delegate void(CharSink s){
+                s("error1"); writeOut(s,err1); s("/"); writeOut(s,T.mant_dig); s("\n");
+            }));
             assert(false,"diagonalization error too large");
         }
         if (err2<T.mant_dig*2/3-tol){
-            Stdout("error2 ")(err2)("/")(T.mant_dig).newline;
+            ssout(collectAppender(delegate void(CharSink s){
+                s("error2"); writeOut(s,err2); s("/"); writeOut(s,T.mant_dig); s("\n");
+            }));
             assert(false,"non orto eVect error too large");
         }
         auto ev3=eigh(d.a);
         auto diff3=norm2!(RealTypeOf!(T),1,real)(ev2-ev3)/sqrt(cast(real)n);
         auto err3=feqrel(diff3+1.0L,1.0L);
         if (err3<T.mant_dig*2/3-tol){
-            Stdout("error")(err2)("/")(T.mant_dig).newline;
+            ssout(collectAppender(delegate void(CharSink s){
+                s("error"); writeOut(s,err3); s("/"); writeOut(s,T.mant_dig); s("\n");
+            }));
             assert(false,"hermitian eigenvalues changed too much (from eval+evect)");
         }
     }
@@ -591,15 +627,15 @@ void testConvolveNN(T,int rank,Border border)(NArray!(T,rank)inA,NArray!(T,rank)
 
 void testSerial(T,int rank)(NArray!(T,rank)a){
     auto buf=new Array(1000,1000);
-    auto s=new JsonSerializer!(char)(new FormatOut(buf));
+    auto s=new JsonSerializer!(char)(strDumper(buf));
     auto u=new JsonUnserializer!(char)(buf);
     s(a);
     NArray!(T,rank) b;
     u(b);
     if (!checkResStr(a,b)){
         buf.seek(0,buf.Anchor.Begin);
-        writeDesc(Stdout("b:"),b).newline;
-        Stdout("buf:<<")(cast(char[])buf.slice)(">>").newline;
+        sout("b:"); writeOut(sout.call,b); ssout("\n");
+        sout("buf:<<")(cast(char[])buf.slice)(">>\n");
         throw new Exception("different string values",__FILE__,__LINE__);
     }
 }
@@ -685,7 +721,7 @@ TestCollection rtestNArray(){
     TestCollection coll=new TestCollection("NArray",__LINE__,__FILE__);
     version(Windows){
         pragma(msg,"WARNING on windows due to limitations on the number of symbols per module only a subset of the tests is performed "~__FILE__~":"~ctfe_i2a(__LINE__));
-        Stdout("WARNING\non windows due to limitations on the number of symbols per module only a subset of the tests is performed ")(__FILE__)(":")(__LINE__).newline;
+        ssout("WARNING\non windows due to limitations on the number of symbols per module only a subset of the tests is performed ")(__FILE__)(":")(__LINE__)("\n");
         narrayRTst1!(float,1)(coll);
         narrayRTst1!(float,2)(coll);
     } else {
@@ -733,14 +769,13 @@ void doNArrayFixTests(){
     checkeq(a3[1],[1,0,2,0,3,0]);
     checkeq(a3[2],[0,0,0,0,0,0]);
     checkeq(a4[0,Range(1,3),Range(1,4,2)],[5,7,9,11]);
-    //Stdout("`")(getString(a4.printData((new Stringify)("a4:"),"{,6}",10,"   ").newline))("`").newline;
-    assert(getString(a4.printData((new Stringify)("a4:"),"{,6}",10,"   ").newline)==
-`a4:[[[     0,     1,     2,     3],
-     [     4,     5,     6,     7],
-     [     8,     9,    10,    11]],
-    [[    12,    13,    14,    15],
-     [    16,    17,    18,    19],
-     [    20,    21,    22,    23]]]
+    assert(collectAppender(delegate void(CharSink s){ s("a4:"); a4.printData(s,",6",10,"   "); s("\n");})==
+`a4:[[[0     ,1     ,2     ,3     ],
+     [4     ,5     ,6     ,7     ],
+     [8     ,9     ,10    ,11    ]],
+    [[12    ,13    ,14    ,15    ],
+     [16    ,17    ,18    ,19    ],
+     [20    ,21    ,22    ,23    ]]]
 `,"NArray.printData wrote unexpected value");
     arangeTests;
     test_iter;
@@ -790,7 +825,7 @@ version(UnitTest){
 }
 
 void main(char[][] args){
-    Stdout(rand.toString()).newline;
+    ssout(rand.toString()); ssout("\n");
     doNArrayFixTests();
     mainTestFun(args,rtestNArray());
 }

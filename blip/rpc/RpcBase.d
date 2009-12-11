@@ -11,6 +11,7 @@ import blip.t.util.Convert;
 import blip.container.GrowableArray;
 import blip.BasicModels;
 import blip.t.core.sync.Mutex;
+import blip.io.BasicIO;
 
 alias void delegate(ubyte[] reqId,void delegate(Serializer) sRes) SendResHandler;
 
@@ -218,7 +219,7 @@ ubyte[] urlDecode(char[]str,bool query=false){
 
 /// an objects that can be published (typically publishes another object)
 interface ObjVendorI{
-    char[] proxyDesc();
+    void proxyDesc(void delegate(char[]));
     char[] proxyName();
     char[] objName();
     void objName(char[] newVal);
@@ -236,8 +237,8 @@ class BasicVendor:ObjVendorI{
     Publisher _publisher;
     TaskI _objTask;
     
-    char[] proxyDesc(){
-        return "char[] proxyDesc()\nchar[] proxyName()\nchar[]proxyObjUrl()\n";
+    void proxyDesc(void delegate(char[])s){
+        s("char[] proxyDesc()\nchar[] proxyName()\nchar[]proxyObjUrl()\n");
     }
     char[] proxyName(){
         return _proxyName;
@@ -268,7 +269,7 @@ class BasicVendor:ObjVendorI{
     {
         switch(fName){
         case "proxyDesc":
-            simpleReply(sendRes,reqId,proxyDesc());
+            simpleReply(sendRes,reqId,&proxyDesc);
             break;
         case "proxyName":
             simpleReply(sendRes,reqId,proxyName());
@@ -279,8 +280,9 @@ class BasicVendor:ObjVendorI{
         default:
             char[256] buf;
             scope appender=new GrowableArray!(char)(buf,0,GASharing.Local);
-            exceptionReply(sendRes,reqId,
-                appender("unknown function ")(fName)(" ")(__FILE__)(" ")(outWriter(__LINE__)).takeData(true));
+            appender("unknown function ")(fName)(" ")(__FILE__)(" ");
+            writeOut(&appender.appendArr,__LINE__);
+            exceptionReply(sendRes,reqId,appender.takeData(true));
         }
     }
     

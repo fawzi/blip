@@ -3,6 +3,7 @@
 /// from arrays and associative arrays
 module blip.serialization.SimpleWrappers;
 import blip.serialization.SerializationBase;
+version(SerializationTrace) import blip.io.Console;
 
 // wrapper to write out an array
 struct LazyArray(T) {
@@ -134,7 +135,7 @@ struct LazyAA(K,V) {
         auto ac=s.writeDictStart(null,size,
             is(K==char[])||is(K==wchar[])||is(K==dchar[]));
         loopOp(delegate int(ref K key, ref V value){
-            version(SerializationTrace) Stdout.formatln("X serializing associative array entry").newline;
+            version(SerializationTrace) ssout("X serializing associative array entry\n");
             version(PseudoFieldMetaInfo){
                 s.writeEntry(ac,{ s.field!(K)(&keyMetaInfo, key); },
                     { s.field(&valMetaInfo, value); });

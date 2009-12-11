@@ -1,13 +1,14 @@
 /// quick test file
 module testRTest;
-import tango.io.Stdout;
+import blip.io.Console;
 import blip.rtest.RTest;
 import blip.NullStream;
-import blip.t.io.stream.Format:FormatOut;
 import blip.TemplateFu;
 import blip.parallel.smp.WorkManager;
 import tango.util.log.Config;
 import blip.t.util.log.Log;
+import blip.io.BasicIO;
+import blip.io.Console;
 
 private int[4] specialNrs=[0,2,5,8];
 
@@ -19,12 +20,12 @@ private mixin testInit!("",`arg0=specialNrs[arg0_i]; arg0_nEl=specialNrs.length;
 arg1=specialNrs[arg1_i]; arg1_nEl=specialNrs.length;`) combNrTst; // combinatorial cases
 
 void main(char[][]argv){
-    Stdout("blip.parallel.smp:")(Log.lookup("blip.parallel.smp").level).newline;
+    sout("blip.parallel.smp:")(Log.lookup("blip.parallel.smp").level)("\n");
     Log.lookup("blip.parallel.smp").info("pippo");
-    Stdout("blip.parallel.smp.queue:")(Log.lookup("blip.parallel.smp.queue").level).newline;
+    sout("blip.parallel.smp.queue:")(Log.lookup("blip.parallel.smp.queue").level)("\n");
     Log.lookup("blip.parallel.smp.queue").info("pippo");
-    FormatOut nullPrt=new FormatOut(nullStream());
-    nullPrt=Stdout;
+    CharSink nullPrt=delegate void(char[]s){};
+    nullPrt=ssout.call;
     SingleRTest.defaultTestController=new TextController(TextController.OnFailure.StopTest,
         TextController.PrintLevel.AllShort,nullPrt,nullPrt,1,false);
     TestCollection failTests=new TestCollection("failTests",__LINE__,__FILE__);
@@ -83,11 +84,12 @@ void main(char[][]argv){
     failTests.runTestsTask().autorelease.submit(defaultTask).wait();
     foreach (i,t;tests){
         t.runTestsTask().submit(sequentialTask);
-        if(t.stat.failedTests!=expectedFailures[i])
+        if(t.stat.failedTests!=expectedFailures[i]){
             throw new Exception("test `"~t.testName~"` had "~ctfe_i2a(t.stat.failedTests)~" failures, expected "~ctfe_i2a(expectedFailures[i]));
+        }
     }
-    Stdout("\n=============================================================\n").newline;
+    ssout("\n=============================================================\n\n");
     mainTestFun(argv,failTests);
-    Stdout("test finished!").newline;
+    ssout("test finished!\n");
 }
 

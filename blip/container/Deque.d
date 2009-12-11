@@ -4,7 +4,7 @@ import tango.stdc.string:memmove;
 import blip.BasicModels:CopiableObjectI;
 import tango.core.Memory;
 import tango.math.Math;
-import blip.t.io.stream.Format:FormatOut;
+import blip.io.BasicIO;
 
 class Deque(T):CopiableObjectI{
     T[] baseArr;
@@ -168,9 +168,12 @@ class Deque(T):CopiableObjectI{
     
         mixin printOut!();
     } else {
-        FormatOut desc(FormatOut s){
-            s("{<Deque!(")(T.stringof)(") nEl=")(nEl)("}")();
-            return s;
+        void desc(void delegate(char[]) s){
+            s("{<Deque!(");
+            s(T.stringof);
+            s(") nEl=");
+            writeOut(s,nEl);
+            s("}");
         }
     }
     

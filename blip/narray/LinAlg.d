@@ -19,7 +19,6 @@
     author:         Fawzi Mohamed
 *******************************************************************************/
 module blip.narray.LinAlg;
-//import tango.io.Stdout;
 import blip.narray.BasicTypes;
 import blip.narray.BasicOps;
 import tango.math.Math:min,max,round,sqrt,ceil,abs;
@@ -785,9 +784,9 @@ else {
                     iwork.startPtrArray, liwork, info);
             }
         } else {
-            /+writeDesc(Stdout("a:"),a);Stdout.newline;// pippo
-            writeDesc(Stdout("eVect:"),eVect);Stdout.newline;// pippo
-            writeDesc(Stdout("supportEVect:"),supportEVect); Stdout.newline;// pippo+/
+            /+writeOut(sout("a:").call,a);sout("\n");// pippo
+            writeOut(sout("eVect:").call,eVect);sout("\n");// pippo
+            writeOut(sout("supportEVect:").call,supportEVect);sout("\n");// pippo+/
             assert(false,"buggy!");
             Trace.formatln("DLapack.syevr({},{},{},{},{},{},{},{},{},{},\n{},{},{},{},{},{},{},{},{},{}, {});",(eVectPtr is null)?'N':'V', range.kind, (storage==MStorage.up)?'U':'L',
                 cast(f_int) n, a.startPtrArray,

@@ -10,11 +10,11 @@ module blip.narray.TestSupport;
 import blip.narray.NArray;
 import blip.narray.Convolve;
 import blip.TemplateFu;
-import tango.io.Stdout;
-import blip.text.Stringify;
+import blip.container.GrowableArray;
 import tango.math.Math: abs,min,max;
 import blip.rtest.RTest;
 import blip.parallel.smp.WorkManager;
+import blip.io.BasicIO;
 
 /// creates arrays that can be dotted with each other along the given axis
 /// useful mainly for random tests
@@ -93,20 +93,26 @@ class Dottable(T,int rank1,S,int rank2,bool scanAxis=false, bool randomLayout=fa
         return new Dottable(a,b,axis1,axis2);
     }
     char[] toString(){
-        return getString(printData(new Stringify()));
+        return collectAppender(delegate void(void delegate(char[])s){ this.printData(s); });
     }
-    FormatOut printData(FormatOut s,char[] formatEl="{,10}", index_type elPerLine=10,
+    void printData(void delegate(char[]) sink,char[] formatEl="{,10}", index_type elPerLine=10,
         char[] indent=""){
-        s(indent)("Dottable{").newline;
-        s(indent)("axis1=")(axis1).newline;
-        s(indent)("axis2=")(axis2).newline;
-        s(indent)("k    =")(k).newline;
-        a.desc(s(indent)("a:")).newline;
-        a.printData(s,formatEl,elPerLine,indent~"  ").newline;
-        b.desc(s(indent)("b:")).newline;
-        b.printData(s,formatEl,elPerLine,indent~"  ").newline;
-        s(indent)("}").newline;
-        return s;
+        auto s=dumper(sink);
+        s(indent)("Dottable{\n");
+        s(indent)("axis1=")(this.axis1)("\n");
+        s(indent)("axis2=")(this.axis2)("\n");
+        s(indent)("k    =")(this.k)("\n");
+        s(indent)("a:")(this.a)("\n");
+        if (this.a!is null){
+            this.a.printData(sink,formatEl,elPerLine,indent~"  ");
+            s("\n");
+        }
+        s(indent)("b:")(this.b)("\n");
+        if (this.a!is null){
+            this.b.printData(sink,formatEl,elPerLine,indent~"  ");
+            s("\n");
+        }
+        s(indent)("}\n");
     }
 }
 

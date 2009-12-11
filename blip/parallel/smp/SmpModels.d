@@ -2,7 +2,7 @@
 module blip.parallel.smp.SmpModels;
 import blip.t.util.log.Log;
 import blip.BasicModels;
-import blip.t.io.stream.Format:FormatOut;
+import blip.io.BasicIO;
 import blip.container.FiberPool;
 
 enum TaskStatus:int{
@@ -52,8 +52,10 @@ interface TaskSchedulerI:BasicObjectI {
     void maybeYield();
     /// root task, the easy way to add tasks to this scheduler
     TaskI rootTask();
+    /// description
+    void desc(void delegate(char[]) s);
     /// possibly short description
-    FormatOut desc(FormatOut s,bool shortVersion);
+    void desc(void delegate(char[]) s,bool shortVersion);
     /// if there are many queued tasks (and one should try not to queue too many of them)
     bool manyQueued();
     /// number of simple tasks wanted
@@ -85,8 +87,10 @@ interface TaskI:SubtaskNotificationsI,SubmittingI{
     TaskSchedulerI scheduler();
     /// name of the task
     char[] taskName();
+    /// description
+    void desc(void delegate(char[]) s);
     /// possibly short description
-    FormatOut desc(FormatOut s,bool shortVersion);
+    void desc(void delegate(char[]) s,bool shortVersion);
     /// if this task might spawn
     bool mightSpawn();
     /// if this task might Yield

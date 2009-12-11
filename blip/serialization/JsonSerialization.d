@@ -2,46 +2,62 @@
 module blip.serialization.JsonSerialization;
 import blip.serialization.SerializationBase;
 import blip.serialization.Handlers;
-import tango.io.Stdout : Stdout;
-import blip.t.io.stream.Format;
+import blip.io.Console;
 import tango.io.model.IConduit:IOStream;
 import tango.core.Variant;
 import blip.BasicModels;
 import blip.text.TextParser;
 import blip.text.UtfUtils;
+import blip.container.GrowableArray;
+import blip.io.BasicIO;
 
 class JsonSerializer(T=char) : Serializer {
     int depth;
     long writeCount,lineCount;
     bool atStart;
     bool compact; // skips class, id when possible
-    FormatOutput!(T) writer;
-    void dumpStr(char[] s){ writer(s); }
-    this(FormatOutput!(T)w){
-        auto stream=new StreamStrWriter!(char)(w);
-        super(new FormattedWriteHandlers!()(&stream.writeExactStr));
-        writer=w;
+    const T[1] nline=[cast(T)'\n'];
+    Dumper!(void delegate(char[])) s; // quick dump of strings
+    /// writes a newline
+    void newline(){
+        handlers.rawWriteStr(nline);
+    }
+
+    /// constructor using a wispered sink delegate
+    this(Dumper!(void delegate(T[])) sink){
+        this(sink.call);
+    }
+    /// constructor usin a sink delegate
+    this(void delegate(T[])sink){
+        super(new FormattedWriteHandlers!()(sink));
+        s=dumper(handlers.charSink());
         writeCount=0;
         atStart=true;
         compact=true;
     }
     /// indents the output
     void indent(int amount){
-        for (int i=0;i<amount;++i)
-            writer.stream.write(cast(T[])"  ");
+        T[20] str;
+        str[]=' ';
+        amount=2*amount;
+        while(amount>0){
+            auto toAdd=((amount>20)?20:amount);
+            handlers.rawWriteStr(str[0..toAdd]);
+            amount-=toAdd;
+        }
     }
     void writeField(FieldMetaInfo *field){
         ++writeCount;
         if (field !is null && (!field.pseudo)){
             if (!atStart) {
-                writer(cast(T[])",");
+                handlers.rawWriteStr([cast(T)',']);
                 atStart=false;
             }
-            writer.newline;
+            newline;
             ++lineCount;
             indent(depth);
-            writer(cast(T[])field.name);
-            writer(cast(T[])":");
+            s(field.name);
+            handlers.rawWriteStr([cast(T)':']);
         }
     }
     /// writes something that has a custom write operation
@@ -57,16 +73,16 @@ class JsonSerializer(T=char) : Serializer {
     /// null object
     override void writeNull(FieldMetaInfo *field) {
         writeField(field);
-        writer(cast(T[])"null");
+        s("null");
     }
     /// writes the start of an array of the given size
     override PosCounter writeArrayStart(FieldMetaInfo *field,ulong size){
         atStart=true;
         writeField(field);
-        writer(cast(T[])`[`);
+        handlers.rawWriteStr([cast(T)'[']);
         ++depth;
         if (size>6){
-            writer.newline;
+            newline;
             indent(depth);
         }
         return PosCounter(size);
@@ -83,9 +99,9 @@ class JsonSerializer(T=char) : Serializer {
             ac.data=Variant(cast(int)newlineEach);
         }
         if (ac.pos>0){
-            writer(cast(T[])", ");
+            handlers.rawWriteStr([cast(T)',',' ']);
             if (ac.pos % ac.data.get!(int) ==0) {  /// wrap lines
-                writer.newline;
+                newline;
                 indent(depth);
             }
         }
@@ -97,20 +113,20 @@ class JsonSerializer(T=char) : Serializer {
     /// writes the end of the array
     override void writeArrayEnd(ref PosCounter ac) {
         ac.end();
-        writer(cast(T[])"]");
+        handlers.rawWriteStr([cast(T)']']);
         --depth;
     }
     /// start of a dictionary
     override PosCounter writeDictStart(FieldMetaInfo *field,ulong l, bool stringKeys=false) {
         writeField(field);
         if (compact){
-            writer(cast(T[])`{`);
+            handlers.rawWriteStr([cast(T)'{']);
             atStart=true;
         } else {
             if (stringKeys)
-                writer(cast(T[])`{ class:"dict"`);
+                s(`{ class:"dict"`);
             else
-                writer(cast(T[])`{ class:"associativeArray"`);
+                s(`{ class:"associativeArray"`);
             atStart=false;
         }
         auto res=PosCounter(l);
@@ -120,23 +136,23 @@ class JsonSerializer(T=char) : Serializer {
     }
     /// writes an entry of the dictionary
     override void writeEntry(ref PosCounter ac, void delegate() writeKey,void delegate() writeVal) {
-        if (!atStart) writer(cast(T[])",");
-        writer.newline;
+        if (!atStart) handlers.rawWriteStr([cast(T)',']);
+        newline;
         ac.next();
         indent(depth);
         ++depth;
         if (ac.data.get!(bool)){
             writeKey();
-            writer(cast(T[])":");
+            handlers.rawWriteStr([cast(T)':']);
             writeVal();
         } else {
-            writer(cast(T[])`{ key:`);
+            s(`{ key:`);
             writeKey();
-            writer(cast(T[])",\n");
+            s(",\n");
             indent(depth-1);
-            writer(cast(T[])`  val:`);
+            s(`  val:`);
             writeVal();
-            writer(cast(T[])`}`);
+            handlers.rawWriteStr([cast(T)'}']);
         }
         --depth;
         ++writeCount;
@@ -147,41 +163,42 @@ class JsonSerializer(T=char) : Serializer {
         ac.end();
         --depth;
         if (ac.pos>0) {
-            writer.newline;
+            newline;
             indent(depth);
         }
-        writer(cast(T[])`}`);
+        handlers.rawWriteStr([cast(T)'}']);
     }
     /// writes an Object
     override void writeObject(FieldMetaInfo *field, ClassMetaInfo metaInfo, objectId objId,
-        bool isSubclass,void delegate() realWrite, Object o){
+        bool isSubclass,void delegate() realWrite, Object o)
+    {
         writeField(field);
         assert(metaInfo!is null);
         if (compact && !isSubclass){
-            writer(cast(T[])"{");
+            handlers.rawWriteStr([cast(T)'{']);
             if (objId!=cast(objectId)0){
-                writer(" id:")(objId);
+                s(" id:")(cast(long)objId);
                 atStart=false;
             } else {
                 atStart=true;
             }
         } else {
-            writer(cast(T[])`{ class:"`)(metaInfo.className)(`"`);
-            writer(cast(T[])`, id:`)(objId);
+            s(`{ class:"`)(metaInfo.className)("\"");
+            s(`, id:`)(cast(long)objId);
             atStart=false;
         }
         ++depth;
         realWrite();
         --depth;
-        writer.newline;
+        newline;
         indent(depth);
-        writer(cast(T[])`}`);
+        s("}");
     }
     /// write ObjectProxy
     override void writeProxy(FieldMetaInfo *field, objectId objId){
         writeField(field);
-        writer(cast(T[])`{ class:"proxy"`);
-        writer(cast(T[])`, id:`)(objId)("}");
+        s(`{ class:"proxy"`);
+        s(`, id:`)(cast(long)objId)("}");
     }
     /// write Struct
     override void writeStruct(FieldMetaInfo *field, ClassMetaInfo metaInfo, objectId objId,
@@ -189,24 +206,24 @@ class JsonSerializer(T=char) : Serializer {
         writeField(field);
         assert(metaInfo!is null);
         if (compact) {
-            writer(cast(T[])`{`);
+            handlers.rawWriteStr(cast(T[])`{`);
             if (objId!=cast(objectId)0) {
-                writer(cast(T[])` "id":`)(objId);
+                s(` "id":`)(cast(long)objId);
                 atStart=false;
             } else {
                 atStart=true;
             }
         } else {
-            writer(cast(T[])`{ class:"`)(metaInfo.className)(`"`);
-            if (objId!=cast(objectId)0) writer(cast(T[])`, "id":`)(objId);
+            s(`{ class:"`)(metaInfo.className)(`"`);
+            if (objId!=cast(objectId)0) s(`, "id":`)(cast(long)objId);
             atStart=false;
         }
         ++depth;
         realWrite();
         --depth;
-        writer.newline;
+        newline;
         indent(depth);
-        writer(cast(T[])"}");
+        s("}");
     }
     /// writes a core type
     override void writeCoreType(FieldMetaInfo *field, void delegate() realWrite,void *t){
@@ -215,11 +232,11 @@ class JsonSerializer(T=char) : Serializer {
     }
 
     override void writeEndRoot() {
-        writer.newline;
+        newline;
     }
     
     override void writeProtocolVersion(){
-        writer("BLIP_JSON_1.0").newline;
+        s("BLIP_JSON_1.0\n");
     }
 }
 
@@ -243,7 +260,7 @@ class JsonUnserializer(T=char) : Unserializer {
         FieldMetaInfo *mismatchedField;
         char[] actualField;
         this(FieldMetaInfo *mismatchedField,char[] actualField,char[]desc,char[]filename,long line){
-            super(desc~" at "~convertToString!()(reader.parserPos()),filename,line);
+            super(collectAppender(delegate void(CharSink s){ s(desc); s(" at "); reader.parserPos(s); }),filename,line);
             this.actualField=actualField;
             this.mismatchedField=mismatchedField;
         }
@@ -452,10 +469,10 @@ class JsonUnserializer(T=char) : Unserializer {
             reader.skipString(cast(S)"}");
         } catch (FieldMismatchException e) {
             version(UnserializationTrace) {
-                Stdout("field mismatch, trying recovery by reading field "~
-                    e.actualField).newline;
+                ssout("field mismatch, trying recovery by reading field "~
+                    e.actualField~"\n");
                 scope(exit){
-                    Stdout("field mismatch, finished recovery").newline;
+                    ssout("field mismatch, finished recovery\n");
                 }
             }
             auto stackTop=top;

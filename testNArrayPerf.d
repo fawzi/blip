@@ -1,10 +1,12 @@
 /// performace tests of NArray
 module testNArrayPerf;
-import tango.io.Stdout;
+import blip.io.Console;
+import blip.io.BasicIO;
 import tango.core.Exception;
 import tango.time.StopWatch;
 import tango.math.Math;
 import blip.narray.NArray;
+import blip.container.GrowableArray;
 
 version(multiarray){
     import murray.multiarray: ndarray,ones,zeros;
@@ -107,7 +109,11 @@ void tst()
     auto t1=timer.stop();
     
     foreach(i,t;res)
-        if (!(abs(t-res2[i])<1.e-12)) Stdout.format("error1 {} {} {}",i,t,res2[i]).newline;
+        if (!(abs(t-res2[i])<1.e-12)) {
+            ssout(collectAppender(delegate void(CharSink s){
+                s("error1"); writeOut(s,i); s(" "); writeOut(s,t); s(" "); writeOut(s,res2[i]); s("\n");
+            }));
+        }
         
     res[]=0.0L;
     timer.start();
@@ -120,7 +126,11 @@ void tst()
     }
     auto t2=timer.stop();
     foreach(i,t;res)
-        if (!(abs(t-res2[i])<1.e-12)) Stdout.format("error2 {} {} {}",i,t,res2[i]).newline;
+        if (!(abs(t-res2[i])<1.e-12)) {
+            ssout(collectAppender(delegate void(CharSink s){
+                s("error2"); writeOut(s,i); s(" "); writeOut(s,t); s(" "); writeOut(s,res2[i]); s("\n");
+            }));
+        }
 
     version(multiarray){
         array c1=ones!(double)([ndim,ndim,ndim]);
@@ -136,7 +146,11 @@ void tst()
         }
         auto t3=timer.stop();
         foreach(i,t;res)
-            if (!(abs(t-res2[i])<1.e-12)) Stdout.format("error3 {} {} {}",i,t,res2[i]).newline;
+            if (!(abs(t-res2[i])<1.e-12)) {
+                ssout(collectAppender(delegate void(CharSink s){
+                    s("error3"); writeOut(s,i); s(" "); writeOut(s,t); s(" "); writeOut(s,res2[i]); s("\n");
+                }));
+            }
     
         res[]=0.0L;
         timer.start();
@@ -150,7 +164,11 @@ void tst()
         }
         auto t4=timer.stop();
         foreach(i,t;res)
-            if (!(abs(t-res2[i])<1.e-12)) Stdout.format("error4 {} {} {}",i,t,res2[i]).newline;
+            if (!(abs(t-res2[i])<1.e-12)) {
+                ssout(collectAppender(delegate void(CharSink s){
+                    s("error4"); writeOut(s,i); s(" "); writeOut(s,t); s(" "); writeOut(s,res2[i]); s("\n");
+                }));
+            }
     
         res[]=0.0L;
         timer.start();
@@ -166,7 +184,11 @@ void tst()
         }
         auto t5=timer.stop();
         foreach(i,t;res)
-            if (!(abs(t-res2[i])<1.e-12)) Stdout.format("error5 {} {} {}",i,t,res2[i]).newline;
+            if (!(abs(t-res2[i])<1.e-12)) {
+                ssout(collectAppender(delegate void(CharSink s){
+                    s("error5"); writeOut(s,i); s(" "); writeOut(s,t); s(" "); writeOut(s,res2[i]); s("\n");
+                }));
+            }
     } else {
         double t3=0.0,t4=0.0,t5=0.0;
     }
@@ -187,7 +209,11 @@ void tst()
     }
     auto t6=timer.stop();
     foreach(i,t;res)
-        if (!(abs(t-res2[i])<1.e-12)) Stdout.format("error6 {} {} {}",i,t,res2[i]).newline;
+        if (!(abs(t-res2[i])<1.e-12)) {
+            ssout(collectAppender(delegate void(CharSink s){
+                s("error6"); writeOut(s,i); s(" "); writeOut(s,t); s(" "); writeOut(s,res2[i]); s("\n");
+            }));
+        }
     
     res[]=0.0L;
     timer.start();
@@ -205,7 +231,11 @@ void tst()
     }
     auto t7=timer.stop();
     foreach(i,t;res)
-        if (!(abs(t-res2[i])<1.e-12)) Stdout.format("error7 {} {} {}",i,t,res2[i]).newline;
+        if (!(abs(t-res2[i])<1.e-12)) {
+            ssout(collectAppender(delegate void(CharSink s){
+                s("error7"); writeOut(s,i); s(" "); writeOut(s,t); s(" "); writeOut(s,res2[i]); s("\n");
+            }));
+        }
 
     // check removal of multiplication by compiler
     res[]=0.0L;
@@ -231,7 +261,11 @@ void tst()
     }
     auto t8=timer.stop();
     foreach(i,t;res)
-        if (!(abs(t-res2[i])<1.e-12)) Stdout.format("error8 {} {} {}",i,t,res2[i]).newline;
+        if (!(abs(t-res2[i])<1.e-12)) {
+            ssout(collectAppender(delegate void(CharSink s){
+                s("error8"); writeOut(s,i); s(" "); writeOut(s,t); s(" "); writeOut(s,res2[i]); s("\n");
+            }));
+        }
     
     res[]=0.0L;
     alias NArray!(double,3) NArr;
@@ -247,7 +281,11 @@ void tst()
     }
     auto t9=timer.stop();
     foreach(i,t;res)
-        if (!(abs(t-res2[i])<1.e-12)) Stdout.format("error9 {} {} {}",i,t,res2[i]).newline;
+        if (!(abs(t-res2[i])<1.e-12)) {
+            ssout(collectAppender(delegate void(CharSink s){
+                s("error9"); writeOut(s,i); s(" "); writeOut(s,t); s(" "); writeOut(s,res2[i]); s("\n");
+            }));
+        }
     
     res[]=0.0L;
     timer.start();
@@ -261,7 +299,11 @@ void tst()
     }
     auto t10=timer.stop();
     foreach(i,t;res)
-        if (!(abs(t-res2[i])<1.e-12)) Stdout.format("error10 {} {} {}",i,t,res2[i]).newline;
+        if (!(abs(t-res2[i])<1.e-12)) {
+            ssout(collectAppender(delegate void(CharSink s){
+                s("error10"); writeOut(s,i); s(" "); writeOut(s,t); s(" "); writeOut(s,res2[i]); s("\n");
+            }));
+        }
     
     res[]=0.0L;
     timer.start();
@@ -277,7 +319,11 @@ void tst()
     }
     auto t11=timer.stop();
     foreach(i,t;res)
-        if (!(abs(t-res2[i])<1.e-12)) Stdout.format("error11 {} {} {}",i,t,res2[i]).newline;
+        if (!(abs(t-res2[i])<1.e-12)) {
+            ssout(collectAppender(delegate void(CharSink s){
+                s("error11"); writeOut(s,i); s(" "); writeOut(s,t); s(" "); writeOut(s,res2[i]); s("\n");
+            }));
+        }
     
     res[]=0.0L;
     timer.start();
@@ -293,7 +339,11 @@ void tst()
     }
     auto t12=timer.stop();
     foreach(i,t;res)
-        if (!(abs(t-res2[i])<1.e-12)) Stdout.format("error11 {} {} {}",i,t,res2[i]).newline;
+        if (!(abs(t-res2[i])<1.e-12)) {
+            ssout(collectAppender(delegate void(CharSink s){
+                s("error12"); writeOut(s,i); s(" "); writeOut(s,t); s(" "); writeOut(s,res2[i]); s("\n");
+            }));
+        }
 
 
     // check removal of multiplication by compiler, ptr + fast striding
@@ -328,7 +378,11 @@ void tst()
     }
     auto t13=timer.stop();
     foreach(i,t;res)
-        if (!(abs(t-res2[i])<1.e-12)) Stdout.format("error13 {} {} {}",i,t,res2[i]).newline;
+        if (!(abs(t-res2[i])<1.e-12)) {
+            ssout(collectAppender(delegate void(CharSink s){
+                s("error13"); writeOut(s,i); s(" "); writeOut(s,t); s(" "); writeOut(s,res2[i]); s("\n");
+            }));
+        }
 
     res[]=0.0L;
     timer.start();
@@ -361,27 +415,34 @@ void tst()
     }
     auto t14=timer.stop();
     foreach(i,t;res)
-        if (!(abs(t-res2[i])<1.e-12)) Stdout.format("error14 {} {} {}",i,t,res2[i]).newline;
+        if (!(abs(t-res2[i])<1.e-12)) {
+            ssout(collectAppender(delegate void(CharSink s){
+                s("error14"); writeOut(s,i); s(" "); writeOut(s,t); s(" "); writeOut(s,res2[i]); s("\n");
+            }));
+        }
 
-    Stdout.format("tref: {} t1:{} t2:{} t3:{} t4:{} t5:{} t6:{} t7:{} t8:{} t9:{} t10:{}, t11:{} t12:{} t13:{} t14:{}",tref,t1,t2,t3,t4,t5,t6,t7,t8,t9,t10,t11,t12,t13,t14).newline;
-    Stdout.format("tref: {} t1:{} t2:{} t3:{} t4:{} t5:{} t6:{} t7:{} t8:{} t9:{} t10:{}, t11:{}, t12:{} t13:{} t14:{}",tref/tref,t1/tref,t2/tref,t3/tref,t4/tref,t5/tref,t6/tref,t7/tref,t8/tref,
-    t9/tref,t10/tref,t11/tref,t12/tref,t13/tref,t14/tref).newline;
+    sout("tref:")(tref)(" t1:")(t1)(" t2:")(t2)(" t3:")(t3)(" t4:")(t4)(" t5:")(t5)(" t6:")(t6)
+        (" t7:")(t7)(" t8:")(t8)(" t9:")(t9)(" t10:")(t10)(" t11:")(t11)(" t12:")(t12)
+        (" t13:")(t13)(" t14:")(t14)("\n");
+    sout("tref:")(tref/tref)(" t1:")(t1/tref)(" t2:")(t2/tref)(" t3:")(t3/tref)(" t4:")(t4/tref)(" t5:")(t5/tref)(" t6:")(t6/tref)
+        (" t7:")(t7/tref)(" t8:")(t8/tref)(" t9:")(t9/tref)(" t10:")(t10/tref)(" t11:")(t11/tref)(" t12:")(t12/tref)
+        (" t13:")(t13/tref)(" t14:")(t14/tref)("\n");
 }
-Stdout("tref: contiguous pointer loop").newline;
-Stdout("t1: index loop on struct").newline;
-Stdout("t2: index loop on class (const strides)").newline;
-Stdout("t3: Multiarray index loop").newline;
-Stdout("t4: Multiarray flat iter").newline;
-Stdout("t5: Multiarray foreach + flat iter").newline;
-Stdout("t6: index op floated to outer loops on struct (smart compiler)").newline;
-Stdout("t7: index op floated to outer loops on class (smart compiler)").newline;
-Stdout("t8: index op floated to outer loops and removal of multiplication on struct (smart compiler)").newline;
-Stdout("t9: index loop on NArray").newline;
-Stdout("t10: loop+binaryOp on NArray").newline;
-Stdout("t11: loop+mixin pLoopPtr on NArray").newline;
-Stdout("t12: loop+mixin pLoopIdx on NArray").newline;
-Stdout("t13: index op floated to outer loops and removal of multiplication on struct without *T.sizeof(smart compiler)").newline;
-Stdout("t14: index op floated to outer loops and removal of multiplication on struct with (no native,w var )").newline;
+ssout("tref: contiguous pointer loop\n");
+ssout("t1: index loop on struct\n");
+ssout("t2: index loop on class (const strides)\n");
+ssout("t3: Multiarray index loop\n");
+ssout("t4: Multiarray flat iter\n");
+ssout("t5: Multiarray foreach + flat iter\n");
+ssout("t6: index op floated to outer loops on struct (smart compiler)\n");
+ssout("t7: index op floated to outer loops on class (smart compiler)\n");
+ssout("t8: index op floated to outer loops and removal of multiplication on struct (smart compiler)\n");
+ssout("t9: index loop on NArray\n");
+ssout("t10: loop+binaryOp on NArray\n");
+ssout("t11: loop+mixin pLoopPtr on NArray\n");
+ssout("t12: loop+mixin pLoopIdx on NArray\n");
+ssout("t13: index op floated to outer loops and removal of multiplication on struct without *T.sizeof(smart compiler)\n");
+ssout("t14: index op floated to outer loops and removal of multiplication on struct with (no native,w var )\n");
 
 } 
 

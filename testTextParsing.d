@@ -2,11 +2,11 @@ module testTextParsing;
 import blip.text.TextParser;
 import tango.io.device.Array;
 import tango.io.stream.Lines;
-import tango.io.Stdout;
 import tango.math.Math;
 import blip.rtest.BasicGenerators;
 import blip.text.UtfUtils;
 import tango.core.stacktrace.TraceExceptions;
+import blip.io.Console;
 
 void main(){
     assert(nCodePoints("abc")==3);
@@ -47,5 +47,5 @@ void main(){
     p(s)(ds);
     assert(s=="a string with space");
     assert(ds==`escapedString"`d);
-    Stdout("did tests!").newline;
+    ssout("did tests!\n");
 }

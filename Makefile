@@ -42,7 +42,7 @@
 
 BLIP_HOME=$(PWD)
 TANGO_HOME=$(HOME)/tango
-TOOLDIR=$(TANGO_HOME)/build/tools
+TOOLDIR=$(BLIP_HOME)/build/tools
 VERSION=opt
 DC=$(shell $(TOOLDIR)/guessCompiler.sh --path)
 DC_SHORT=$(shell $(TOOLDIR)/guessCompiler.sh $(DC))
@@ -52,7 +52,7 @@ SRCDIR=$(BLIP_HOME)
 TESTS_DIR=$(BLIP_HOME)/tests
 OBJDIRBASE=$(BLIP_HOME)
 OBJDIR=$(OBJDIRBASE)/blipBuild/objs-$(IDENT)
-ARCHDIR=$(TANGO_HOME)/build/arch
+ARCHDIR=$(BLIP_HOME)/build/arch
 EXCLUDEPAT_ALL=$(EXCLUDEPAT_OS) *objs-*
 ARCHFILE=$(ARCHDIR)/$(IDENT).mak
 MAKEFILE=$(BLIP_HOME)/Makefile

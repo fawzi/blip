@@ -113,7 +113,7 @@ struct NumaNode{
         serial(s);
     }
     char[] toString(){
-        return serializeToString(this);
+        return serializeToArray(this);
     }
 }
 
@@ -456,7 +456,7 @@ version(noHwloc){} else {
             int depth;
             bool partition;
             char[] toString(){
-                return serializeToString(this);
+                return serializeToArray(this);
             }
             mixin(serializeSome("",`depth|partition`));
         }

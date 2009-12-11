@@ -2,10 +2,10 @@
 module blip.parallel.smp.BasicExecuters;
 import tango.core.Thread;
 import tango.math.Math;
-import tango.io.Stdout;
+import blip.io.Console;
 import blip.t.util.log.Log;
-import blip.t.io.stream.Format:FormatOut;
-import blip.text.Stringify;
+import blip.io.BasicIO;
+import blip.container.GrowableArray;
 import blip.TemplateFu:ctfe_i2a;
 import blip.parallel.smp.SmpModels;
 import blip.parallel.smp.BasicSchedulers;
@@ -48,23 +48,25 @@ class ImmediateExecuter:ExecuterI,TaskSchedulerI{
     /// description (for debugging)
     /// non threadsafe
     char[] toString(){
-        return getString(desc(new Stringify()).newline);
+        return collectAppender(cast(OutWriter)&desc);
     }
     /// description (for debugging)
-    FormatOut desc(FormatOut s){ return desc(s,false); }
+    void desc(void delegate(char[]) s){ desc(s,false); }
     /// description (for debugging)
     /// (might not be a snapshot if other threads modify it while printing)
     /// non threadsafe
-    FormatOut desc(FormatOut s,bool shortVersion){
-        s.format("<ImmediateExecuter@{} ",cast(void*)this)(name);
+    void desc(void delegate(char[]) s,bool shortVersion){
+        s("<ImmediateExecuter@");
+        writeOut(s,cast(void*)this);
+        s(" ");
+        s(name);
         if (shortVersion) {
             s(" >");
-            return s;
+            return;
         }
-        s.newline;
-        s("  log:")(log)(",").newline;
-        s(" >").newline;
-        return s;
+        s("\n");
+        s("  log:"); writeOut(s, log); s(",\n");
+        s(" >\n");
     }
     /// changes the current run level of the scheduler (the level can be only raised)
     void raiseRunlevel(SchedulerRunLevel level){
@@ -88,8 +90,8 @@ class ImmediateExecuter:ExecuterI,TaskSchedulerI{
             }
             catch(Exception e) {
                 log.error("exception in main thread ");
-                e.writeOut(delegate void(char[]s){ Stdout(s); });
-                Stdout.flush();
+                e.writeOut(sout.call);
+                soutStream.flush();
                 runLevel=SchedulerRunLevel.Stopped;
             }
         }
@@ -184,8 +186,8 @@ class PExecuter:ExecuterI{
             }
             catch(Exception e) {
                 log.error("exception in working thread ");
-                e.writeOut(delegate void(char[]s){ Stdout(s); });
-                Stdout.flush();
+                e.writeOut(sout.call);
+                soutStream.flush();
                 scheduler.raiseRunlevel(SchedulerRunLevel.Stopped);
             }
         }
@@ -194,26 +196,25 @@ class PExecuter:ExecuterI{
     /// description (for debugging)
     /// non threadsafe
     char[] toString(){
-        return getString(desc(new Stringify()).newline);
+        return collectAppender(cast(OutWriter)&desc);
     }
     /// description (for debugging)
-    FormatOut desc(FormatOut s){ return desc(s,false); }
+    void desc(CharSink s){ desc(s,false); }
     /// description (for debugging)
     /// (might not be a snapshot if other threads modify it while printing)
     /// non threadsafe
-    FormatOut desc(FormatOut s,bool shortVersion){
-        s.format("<PExecuter@{}",cast(void*)this);
+    void desc(CharSink s,bool shortVersion){
+        s("<PExecuter@");writeOut(s,cast(void*)this);
         if (shortVersion) {
             s(" >");
-            return s;
+            return;
         }
-        s.newline;
-        s("  nproc:")(nproc)(",").newline;
-        s("  workers:")(workers)(",").newline;
-        writeDesc(s("  scheduler:"),scheduler)(",").newline;
-        s("  log:")(log)(",").newline;
-        s(" >").newline;
-        return s;
+        s("\n");
+        s("  nproc:"); writeOut(s,nproc); s(",\n");
+        s("  workers:"); writeOut(s,workers); s(",\n");
+        s("  scheduler:"); writeOut(s,scheduler); s(",\n");
+        s("  log:"); writeOut(s,log); s(",\n");
+        s(" >\n");
     }
     /// number of simple tasks wanted
     int nSimpleTasksWanted(){
@@ -261,8 +262,8 @@ class TWorker{
             }
             catch(Exception e) {
                 log.error("exception in working thread ");
-                e.writeOut(delegate void(char[]s){ Stdout(s); });
-                Stdout.flush();
+                e.writeOut(sout.call);
+                soutStream.flush();
                 scheduler.raiseRunlevel(SchedulerRunLevel.Stopped);
             }
         }
@@ -329,26 +330,25 @@ class TExecuter:ExecuterI{
     /// description (for debugging)
     /// non threadsafe
     char[] toString(){
-        return getString(desc(new Stringify()).newline);
+        return collectAppender(cast(OutWriter)&desc);
     }
     /// description (for debugging)
-    FormatOut desc(FormatOut s){ return desc(s,false); }
+    void desc(void delegate(char[]) s){ desc(s,false); }
     /// description (for debugging)
     /// (might not be a snapshot if other threads modify it while printing)
     /// non threadsafe
-    FormatOut desc(FormatOut s,bool shortVersion){
-        s.format("<TExecuter@{}",cast(void*)this);
+    void desc(void delegate(char[]) s,bool shortVersion){
+        s("<TExecuter@"); writeOut(s,cast(void*)this);
         if (shortVersion) {
             s(" >");
-            return s;
+            return;
         }
-        s.newline;
-        s("  nproc:")(nproc)(",").newline;
-        s("  workers:")(workers)(",").newline;
-        writeDesc(s("  scheduler:"),scheduler)(",").newline;
-        s("  log:")(log)(",").newline;
-        s(" >").newline;
-        return s;
+        s("\n");
+        s("  nproc:"); writeOut(s,nproc); s(",\n");
+        s("  workers:"); writeOut(s,workers); s(",\n");
+        s("  scheduler:"); writeOut(s,scheduler); s(",\n");
+        s("  log:"); writeOut(s,log); s(",\n");
+        s(" >\n");
     }
     /// number of simple tasks wanted
     int nSimpleTasksWanted(){

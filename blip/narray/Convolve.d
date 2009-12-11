@@ -11,9 +11,8 @@ import blip.narray.BasicTypes;
 import blip.narray.BasicOps;
 import blip.TemplateFu;
 import tango.core.Traits;
-import tango.io.Stdout;
 import tango.math.Math:min;
-debug(ConvolveCheckAccess) import blip.text.Stringify;
+debug(ConvolveCheckAccess) import blip.container.GrowableArray;
 /+ --------- convolution --------- +/
 // convolution base in 2d: 3 streams (minus,zero,plus), kernel[imin..imax,jmin..jmax] in aij
 // i setup is: (vertical bar read, horizontal write, columns are the three streams)
@@ -339,19 +338,21 @@ char[] preConvolveIJSetup(char[]indent,char[]inAName,char[]outAName,Border borde
         res~=indent~"T[] outBaseSlice="~outAName~".data;\n";
         res~=indent~"void safeOut(T* ptr,long lineNr){\n";
         res~=indent~"    if (ptr<outBaseSlice.ptr || ptr>=(outBaseSlice.ptr+outBaseSlice.length)){\n";
-        res~=indent~"        char[] msg=getString((new Stringify())(\"ERROR convolve kernel invalid write\").newline()\n";
-        res~=indent~"            (\" invalid access of out array in convolution kernel, T=\")\n";
+        res~=indent~"        char[] msg=collectAppender(void delegate(CharSink sink){\n";
+        res~=indent~"            sink(\"ERROR convolve kernel invalid write\\n\");\n";
+        res~=indent~"            dumper(sink)(\" invalid access of out array in convolution kernel, T=\")\n";
         res~=indent~"            (T.stringof)(\",rank=\")(rank)(\",switchTag=\")(switchTag)(\", line=\")\n";
-        res~=indent~"            (lineNr-convolveStartLine).newline());\n";
+        res~=indent~"            (lineNr-convolveStartLine)(\"\\n\")));\n";
         res~=indent~"        throw new Exception(msg);\n";
         res~=indent~"    }\n";
         res~=indent~"}\n";
         res~=indent~"void safeIn(T* ptr,long lineNr){\n";
         res~=indent~"    if (ptr<inBaseSlice.ptr || ptr>=(inBaseSlice.ptr+inBaseSlice.length)){\n";
-        res~=indent~"        char[] msg=getString((new Stringify())(\"ERROR convolve kernel invalid read\").newline()\n";
+        res~=indent~"        char[] msg=collectAppender(void delegate(CharSink sink){\n";
+        res~=indent~"            dumper(s)(\"ERROR convolve kernel invalid read\\n\")\n";
         res~=indent~"            (\" invalid access of in array in convolution kernel, T=\")\n";
         res~=indent~"            (T.stringof)(\",rank=\")(rank)(\",switchTag=\")(switchTag)(\", line=\")\n";
-        res~=indent~"            (lineNr-convolveStartLine).newline());\n";
+        res~=indent~"            (lineNr-convolveStartLine)(\"\\n\"));\n";
         res~=indent~"        throw new Exception(msg);\n";
         res~=indent~"    }\n";
         res~=indent~"}\n";
@@ -367,7 +368,6 @@ char[] preConvolveIJSetup(char[]indent,char[]inAName,char[]outAName,Border borde
 /// the variables of preConvolveIJSetup and T*pOutAPtr0,pInAPtr0 have to be defined
 char[] convolveIJ(char[] indent,Border border){
     char[] res="".dup;
-    //res~=indent~"Stdout(\"switchTag:\")(switchTag).newline;\n";
     res~=indent~"switch (switchTag){\n";
     char[] indent2=indent~"    ";
     foreach (ires;[-1,0]){
@@ -392,7 +392,6 @@ char[] convolveIJ(char[] indent,Border border){
 /// the variables of preConvolveIJSetup and T*pOutAPtr0,pInAPtr0 have to be defined
 char[] convolveJOnly(char[] indent,Border border){
     char[] res="".dup;
-    // res~=indent~"Stdout(\"switchTag:\")(switchTag).newline;\n";
     res~=indent~"T* resPtr0I=pOutAPtr0;\n";
     res~=indent~"T* aPtr0I=pInAPtr0;\n";
     res~=indent~"switch (switchTag){\n";

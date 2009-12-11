@@ -10,6 +10,7 @@ import blip.t.util.log.Log;
 import blip.sync.UniqueNumber;
 import blip.io.IOArray;
 import blip.parallel.smp.WorkManager;
+import blip.io.BasicIO;
 
 /// handles vending (and possibly also receiving the results if using one channel for both)
 class MpiProtocolHandler: ProtocolHandler{
@@ -39,7 +40,7 @@ class MpiProtocolHandler: ProtocolHandler{
     /// registers a mpi communicator handler
     static void registerMpiProtocolHandler(MpiProtocolHandler pH){
         scope arr=new GrowableArray!(char)();
-        arr(pH.comm.name)("-")(outWriter(pH.tag));
+        arr(pH.comm.name)("-"); writeOut(&arr.appendArr,pH.tag);
         char[] commName=arr.takeData();
         synchronized(MpiProtocolHandler.classinfo){
             if ((commName in mpiProtocolHandlers)is null)
@@ -68,7 +69,8 @@ class MpiProtocolHandler: ProtocolHandler{
         this.tag=tag;
         char[128] buf;
         scope arr=new GrowableArray!(char)(buf,0,GASharing.Local);
-        _handlerUrl=arr("mpi-sbin://")(outWriter(comm.myRank))(":")(comm.name)("-")(outWriter(tag)).takeData(true);
+        dumper(arr)("mpi-sbin://")(comm.myRank)(":")(comm.name)("-")(tag);
+        _handlerUrl=arr.takeData(true);
         newRequestId=UniqueNumber!(size_t)(10);
     }
     

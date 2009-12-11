@@ -15,6 +15,7 @@ import blip.serialization.Handlers;
 import tango.math.random.Random;
 import tango.core.Variant;
 import blip.container.GrowableArray;
+import blip.io.BasicIO;
 
 // duplication of serializer/unserilizer with blip.parallel.Mpi ugly, should probably be abstracted away
 struct SNMessage{
@@ -329,24 +330,25 @@ class SNChannel:Channel,BasicObjectI{
     alias sr2.sendrecv sendrecv;
     alias sr3.sendrecv sendrecv;
 
-    FormatOut desc(FormatOut s){
-        s("{<SNChannel@")(cast(void*)this)(">").newline;
-        data.desc(s("  queue:"))(",").newline;
+    void desc(void delegate(char[]) s){
+        s("{<SNChannel@"); writeOut(s,cast(void*)this); s(">\n");
+        s("  queue:"); writeOut(s,data); s(",\n");
         s("  handlers:{");
         foreach(k,v;handlers){
-            s("    ")(k)(":")(cast(void*)v.funcptr)(" ")(cast(void*)v.ptr)(",").newline;
+            s("    "); writeOut(s,k); s(":"); writeOut(s,cast(void*)v.funcptr);
+            s(" "); writeOut(s,cast(void*)v.ptr); s(",\n");
         }
-        s("  },").newline;
+        s("  },\n");
         s("  permanent:{");
         foreach(k,v;handlers){
-            s("    ")(k)(":")(v)(",").newline;
+            s("    "); writeOut(s,k); s(":"); writeOut(s,cast(void*)v.funcptr); s(",\n");
         }
-        s("  },").newline;
+        s("  },\n");
         
-        s("  gHandler")(cast(void*)gHandler.funcptr)(" ")(cast(void*)gHandler.ptr)(",").newline;
-        s("  recevingChannel:")(cast(void*)recevingChannel).newline;
-        s("}").newline;
-        return s;
+        s("  gHandler"); writeOut(s,cast(void*)gHandler.funcptr);
+        s(" "); writeOut(s,cast(void*)gHandler.ptr); s(",\n");
+        s("  recevingChannel:"); writeOut(s,cast(void*)recevingChannel); s("\n");
+        s("}");
     }
 }
 
@@ -582,9 +584,8 @@ class SNLinearComm:LinearComm,BasicObjectI{
         (cast(SNChannel)(this[0])).registerHandler(handler,tag);
     }
     
-    FormatOut desc(FormatOut s){
-        s("{<SNLinearComm> name:")(name)("}")();
-        return s;
+    void desc(void delegate(char[]) s){
+        s("{<SNLinearComm> name:"); s(name); s("}");
     }
 }
 

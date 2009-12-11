@@ -291,8 +291,8 @@ char[] rpcVendorMixin(char[] name, char[][] functionsComments){
     
         Closure *freeList;
     
-        override char[] proxyDesc(){
-            char[] res=super.proxyDesc();`;
+        override void proxyDesc(void delegate(char[])s){
+            super.proxyDesc(s);`;
     for (int ifield=0;ifield<functionsComments.length/2;++ifield){
         auto functionName=functionsComments[2*ifield];
         auto comment=functionsComments[2*ifield+1];
@@ -308,17 +308,16 @@ char[] rpcVendorMixin(char[] name, char[][] functionsComments){
             static if (is(typeof(`~name~`ProxiedType.`~functionName~`) `~functionName~`Args=function)){
                     static if (is(typeof(`~name~`ProxiedType.`~functionName~`) `~functionName~`Return=return)){
                     if (oneway){
-                        res~="oneway ";
+                        s("oneway ");
                     }
-                    res~=`~functionName~`Return.stringof;
-                    res~="`~functionName~`";
-                    res~=`~functionName~`Args.stringof;
-                    res~="\n";
+                    s(`~functionName~`Return.stringof);
+                    s("`~functionName~`");
+                    s(`~functionName~`Args.stringof);
+                    s("\n");
                 } else { static assert(0,"could not extract function return for `~functionName~`"); }
             } else { static assert(0,"could not extract function arguments for `~functionName~`"); }`;
     }
     res~=`
-            return res;
         }`;
     for (int ifield=0;ifield<functionsComments.length/2;++ifield){
         auto functionName=functionsComments[2*ifield];

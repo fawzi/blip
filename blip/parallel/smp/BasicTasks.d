@@ -4,13 +4,12 @@ import tango.core.Thread;
 import tango.core.Variant:Variant;
 import tango.core.sync.Mutex;
 import tango.math.Math;
-import tango.io.Stdout;
 import blip.t.util.log.Log;
 import tango.util.Convert;
 import tango.stdc.string;
 import tango.util.container.LinkedList;
-import blip.t.io.stream.Format:FormatOut;
-import blip.text.Stringify;
+import blip.io.BasicIO;
+import blip.container.GrowableArray;
 import tango.core.sync.Semaphore;
 import blip.TemplateFu:ctfe_i2a;
 import blip.parallel.smp.SmpModels;
@@ -389,7 +388,7 @@ class Task:TaskI{
                 version(NoTaskLock){
                     volatile auto flagsAtt=flags;
                     while (flagsAtt & TaskFlags.Delaying){
-                        if (atomicCAS(flags,(flagsAtt & ~TaskFlags.Delaying)|TaskFlags.Delayed,flagsAtt)){
+                        if (atomicCASB(flags,(flagsAtt & ~TaskFlags.Delaying)|TaskFlags.Delayed,flagsAtt)){
                             assert((flagsAtt & TaskFlags.Delayed)==0);
                             resub=false;
                             break;
@@ -420,7 +419,7 @@ class Task:TaskI{
         bool callOnFinish=false;
         version(NoTaskLock){
             if (0==flagGet(spawnTasks)){
-                if (atomicCAS(status,TaskStatus.PostExec,TaskStatus.WaitingEnd)){
+                if (atomicCASB(status,TaskStatus.PostExec,TaskStatus.WaitingEnd)){
                     callOnFinish=true;
                 }
             }
@@ -484,13 +483,13 @@ class Task:TaskI{
         version(NoTaskLock){ // mmh suspicious, I should recheck this... especially barriers wrt. to the rest
             volatile auto oldTasks=flagAdd(spawnTasks,-1);
             if (oldTasks==1){
-                if (atomicCAS(statusAtt,TaskStatus.PostExec,TaskStatus.WaitingEnd)){
+                if (atomicCASB(statusAtt,TaskStatus.PostExec,TaskStatus.WaitingEnd)){
                     callOnFinish=true;
                     assert(flags & (TaskFlags.WaitingSubtasks|TaskFlags.Delayed|TaskFlags.Delaying)==0);
                 } else {
                     volatile memoryBarrier!(true,false,false,true)();
                      while ((flagsAtt & TaskFlags.WaitingSubtasks)!=0){
-                        if (atomicCAS(flags,flagsAtt & (~TaskFlags.WaitingSubtasks),flagsAtt)){
+                        if (atomicCASB(flags,flagsAtt & (~TaskFlags.WaitingSubtasks),flagsAtt)){
                             callOnFinish=true;
                         }
                         volatile flagsAtt=flags;
@@ -527,12 +526,12 @@ class Task:TaskI{
             volatile auto flagsAtt=flags;
             while ((flagsAtt & (TaskFlags.Delaying | TaskFlags.Delayed))!=0){
                 if (flagsAtt & TaskFlags.Delaying){
-                    if (atomicCAS(flags,flagsAtt & (~TaskFlags.Delaying),flagsAtt)){
+                    if (atomicCASB(flags,flagsAtt & (~TaskFlags.Delaying),flagsAtt)){
                         assert((flagsAtt& TaskFlags.Delayed)==0);
                         return;
                     }
                 } else { // (flags & TaskFlags.Delayed)!=0
-                    if (atomicCAS(flags,flagsAtt & (~TaskFlags.Delayed),flagsAtt)){
+                    if (atomicCASB(flags,flagsAtt & (~TaskFlags.Delayed),flagsAtt)){
                         assert((flagsAtt& TaskFlags.Delaying)==0);
                         scheduler.addTask(this);
                         return;
@@ -825,7 +824,7 @@ class Task:TaskI{
                 if (0==flagGet(spawnTasks)){
                     volatile auto flagsAtt=flags;
                     while ((flagsAtt & TaskFlags.WaitingSubtasks)!=0){
-                        if (atomicCAS(flags,flagsAtt & (~(TaskFlags.Delaying|TaskFlags.WaitingSubtasks)),flagsAtt)){
+                        if (atomicCASB(flags,flagsAtt & (~(TaskFlags.Delaying|TaskFlags.WaitingSubtasks)),flagsAtt)){
                             return;
                         }
                     }
@@ -859,52 +858,54 @@ class Task:TaskI{
     /// description (for debugging)
     /// non threadsafe
     char[] toString(){
-        return getString(desc(new Stringify()).newline);
+        return collectAppender(cast(OutWriter)&desc);
     }
     /// description (for debugging)
-    FormatOut desc(FormatOut s){
-        return desc(s,false);
+    void desc(void delegate(char[]) s){
+        return desc(s,true);
     }
     /// description (for debugging)
     /// (might not be a snapshot if other threads modify it while printing)
     /// non threadsafe
-    FormatOut desc(FormatOut s,bool shortVersion){
+    void desc(void delegate(char[]) s,bool shortVersion){
         if (this is null){
-            s("<Task *NULL*>").newline;
+            s("<Task *NULL*>");
         } else {
-            s("<")(this.classinfo.name).format("@{} '{}' status:",cast(void*)this,taskName);
+            s("<"); s(this.classinfo.name); s("@"); writeOut(s,cast(void*)this);
+            s(" '"); s(taskName); s("' ");
             s(status.stringof);
             if (shortVersion) {
                 s(" >");
-                return s;
+                return;
             }
-            s.newline;
+            s("\n");
             fieldsDesc(s);
-            s(" >").newline;
+            s(" >");
         }
         return s;
     }
     /// prints the fields (superclasses can override this an call it through super)
-    FormatOut fieldsDesc(FormatOut s){
-        s("  level=")(level)(",").newline;
+    void fieldsDesc(void delegate(char[]) sink){
+        auto s=dumper(sink);
+        s("  level=")(level)(",\n");
         s("  taskOp:");
         if (taskOp is null)
             s("*NULL*");
         else
             s("associated");
-        s(",").newline;
+        s(",\n");
         s("  fiber:");
         if (fiber is null)
             s("*NULL*");
         else
             s("associated");
-        s(",").newline;
+        s(",\n");
         s("  generator:");
         if (generator is null)
             s("*NULL*");
         else
             s("associated");
-        s(",").newline;
+        s(",\n");
         s("  onFinish:[");
         bool atStart=true;
         foreach (t;onFinish){
@@ -915,13 +916,15 @@ class Task:TaskI{
             else
                 s("associated");
         }
-        s("],").newline;
-        writeDesc(s("  superTask="),superTask,true)(",").newline;
-        s("  resubmit:")(resubmit)(",").newline;
-        s("  holdSubtasks:")(holdSubtasks)(",").newline;
-        s("  holdedSubtasks:")(holdedSubtasks)(",").newline;
-        s("  spawnTasks:")(spawnTasks)(",").newline;
-        writeDesc(s("  scheduler:"),scheduler,true)(",").newline;
+        s("],\n");
+        s("  superTask=");
+        writeOut(s,superTask,true);
+        s(",\n");
+        s("  resubmit:")(resubmit)(",\n");
+        s("  holdSubtasks:")(holdSubtasks)(",\n");
+        s("  holdedSubtasks:")(holdedSubtasks)(",\n");
+        s("  spawnTasks:")(spawnTasks)(",\n");
+        s("  scheduler:"); writeOut(sink,scheduler,true); s(",\n");
         version(NoTaskLock){} else {
             bool lokD=taskLock.tryLock();
             if (lokD) taskLock.unlock();
@@ -930,10 +933,9 @@ class Task:TaskI{
                 s("locked by others");
             else
                 s("unlocked by others");
-            s(",").newline;
+            s(",\n");
         }
         s("  mightSpawn:")(mightSpawn);
-        return s;
     }
     /// waits for the task to finish
     void wait(){
@@ -944,7 +946,7 @@ class Task:TaskI{
                     if (statusAtt!=TaskStatus.Finished){
                         if (waitSem is null){
                             auto waitSemNew=new Semaphore();
-                            if (!atomicCAS(waitSem,waitSemNew,null)){
+                            if (!atomicCASB(waitSem,waitSemNew,null)){
                                 delete waitSemNew;
                             }
                         }
@@ -1041,7 +1043,7 @@ class SequentialTask:RootTask{
         TaskI toExe;
         synchronized(queue){
             flagAdd(spawnTasks,1);
-            if (atomicCAS(nExecuting,1,0)){
+            if (atomicCASB(nExecuting,1,0)){
                 if (queue.length>0){
                     toExe=queue.popFront();
                     queue.append(t);
@@ -1097,7 +1099,7 @@ class SequentialTask:RootTask{
                     TaskI toExe;
                     synchronized(queue){
                         flagAdd(spawnTasks,1);
-                        if (atomicCAS(nExecuting,1,0)){
+                        if (atomicCASB(nExecuting,1,0)){
                             if (queue.length==0){
                                 toExe=queue.popFront();
                                 queue.append(task);
