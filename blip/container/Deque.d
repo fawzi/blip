@@ -2,9 +2,9 @@
 module blip.container.Deque;
 import tango.stdc.string:memmove;
 import blip.BasicModels:CopiableObjectI;
-import tango.core.Memory;
 import tango.math.Math;
 import blip.io.BasicIO;
+import blip.util.Grow:growLength;
 
 class Deque(T):CopiableObjectI{
     T[] baseArr;
@@ -20,7 +20,7 @@ class Deque(T):CopiableObjectI{
     }
     private void growLen(){
         assert(nEl==baseArr.length,"growLen should be called only when the array is full");
-        baseArr.length=GC.growLength(nEl,T.sizeof,60)/T.sizeof;
+        baseArr.length=growLength(nEl,T.sizeof,60);
         size_t to1=min(start,baseArr.length-nEl);
         baseArr[nEl..$]=baseArr[0..to1];
         if (to1<start){
@@ -42,7 +42,8 @@ class Deque(T):CopiableObjectI{
                 --start;
         }
     }
-    /// returns the element at the beginning of the array and drops it
+    /// returns the element at the beginning of the array into el and drops it
+    /// if the array is empty returns false
     bool popFront(ref T el){
         synchronized(this){
             if (nEl==0) return false;
@@ -53,6 +54,54 @@ class Deque(T):CopiableObjectI{
             el=res;
         }
         return true;
+    }
+    /// returns the first element that matches the given filter
+    bool popFront(ref T el,bool delegate(T) filter){
+        bool retRes(){
+            baseArr[start]=T.init;
+            start=(start+1)%baseArr.length;
+            --nEl;
+            return true;
+        }
+        synchronized(this){
+            if (nEl==0) return false;
+            T res=baseArr[start];
+            auto pAtt=start;
+            if(filter(baseArr[pAtt])){
+                el=baseArr[start];
+                return retRes();
+            } else {
+                size_t to1=start+nEl;
+                if (to1>baseArr.length){
+                    auto to2=baseArr.length-start;
+                    for (size_t i=1;i<to2;++i){
+                        if (filter(baseArr[start+i])){
+                            el=baseArr[start+i];
+                            memmove(baseArr.ptr+start+1,baseArr.ptr+start,i);
+                            return retRes();
+                        }
+                    }
+                    for (size_t i=0;i<nEl-to2;++i){
+                        if (filter(baseArr[i])){
+                            el=baseArr[i];
+                            memmove(baseArr.ptr+i,baseArr.ptr+i+1,nEl-to2-i-1);
+                            baseArr[nEl-to2-1]=T.init;
+                            --nEl;
+                            return true;
+                        }
+                    }
+                } else {
+                    for (size_t i=1;i<nEl;++i){
+                        if (filter(baseArr[start+i])){
+                            el=baseArr[start+i];
+                            memmove(baseArr.ptr+start+1,baseArr.ptr+start,i);
+                            return retRes();
+                        }
+                    }
+                }
+            }
+        }
+        return false;
     }
     /// returns the element at the beginning of the array and drops it
     T popFront(){
@@ -74,12 +123,50 @@ class Deque(T):CopiableObjectI{
     bool popBack(ref T el){
         synchronized(this){
             if (nEl==0) return false;
-            T res=baseArr[(start+nEl-1)%baseArr.length];
+            el=baseArr[(start+nEl-1)%baseArr.length];
             baseArr[(start+nEl-1)%baseArr.length]=T.init;
             --nEl;
-            el=res;
         }
         return true;
+    }
+    /// returns the last element that matches the given filter
+    bool popBack(ref T el,bool delegate(T) filter){
+        synchronized(this){
+            if (nEl==0) return false;
+            if (filter(baseArr[(start+nEl-1)%baseArr.length])){
+                el=baseArr[(start+nEl-1)%baseArr.length];
+                baseArr[(start+nEl-1)%baseArr.length]=T.init;
+                --nEl;
+                return true;
+            }
+            size_t i=start+nEl;
+            if (i>=baseArr.length){
+                size_t ii=i-baseArr.length+1;
+                while(ii!=0){
+                    --ii;
+                    if (filter(baseArr[ii])){
+                        el=baseArr[ii];
+                        memmove(baseArr.ptr+ii,baseArr.ptr+ii+1,i-baseArr.length-ii);
+                        baseArr[(start+nEl-1)-baseArr.length]=T.init;
+                        --nEl;
+                        return true;
+                    }
+                }
+                i=baseArr.length;
+            }
+            while(i!=start){
+                --i;
+                if (filter(baseArr[i])){
+                    el=baseArr[i];
+                    memmove(baseArr.ptr+start+1,baseArr.ptr+start,i-start);
+                    baseArr[start]=T.init;
+                    --nEl;
+                    ++start;
+                    return true;
+                }
+            }
+        }
+        return false;
     }
     /// returns the last element of the array and drops it
     T popBack(){

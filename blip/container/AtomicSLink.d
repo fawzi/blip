@@ -7,11 +7,16 @@
 /// author: fawzi
 /// license: apache 2.0
 module blip.container.AtomicSLink;
-import blip.sync.Atomic: atomicOp;
+import blip.sync.Atomic: atomicOp,memoryBarrier;
+import blip.io.Console;
 
 /// inserts newHead before head, and returns the value at head when the insertion took place
 T insertAt(T)(ref T head,T newHead){
-    return atomicOp(head,delegate T(T val){ newHead.next=val; return newHead; });
+    return atomicOp(head,delegate T(T val){
+        newHead.next=val;
+        memoryBarrier!(false,false,false,true)();
+        return newHead;
+    });
 }
 
 /// removes one element from the top of list

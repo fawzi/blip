@@ -38,14 +38,17 @@ interface ForeachableI(T){
     }
 }
 
-/// forward iterator interface, and foreach support.
-/// the two things cannot be mixed (begin to iterate,
-/// then continue with foreach is not allowed)
-interface FIteratorI(T): ForeachableI!(T){
+/// simple iterator
+interface SimpleIteratorI(T): ForeachableI!(T){
     /// goes to the next element
-    T next();
-    /// true if the iterator is at the end
-    bool atEnd();
+    bool next(ref T);
+}
+
+/// forward iterator interface, and (parallel)foreach support.
+/// the two things cannot be mixed (begin to iterate,
+/// then continue with opApply/foreach is not allowed 
+/// unless specifically noted)
+interface FIteratorI(T): SimpleIteratorI!(T){
     /// might make opApply parallel (if the work amount is larger than
     /// optimalChunkSize, tries to subdivide it in chunks of that size)
     ForeachableI!(T) parallelLoop(size_t optimalChunkSize);
@@ -53,3 +56,103 @@ interface FIteratorI(T): ForeachableI!(T){
     ForeachableI!(T) parallelLoop();
 }
 
+/// template to mixin opApply based on a next operation
+template opApplyFromNext(T){
+    static if(is(T U:U*)){
+        /// loop without index
+        int opApply(int delegate(ref U x) loopBody){
+            T el;
+            while(next(el)){
+                if (auto res=loopBody(*el)) return res;
+            }
+            return 0;
+        }
+        /// loop with index
+        int opApply(int delegate(ref size_t i,ref U x) dlg){
+            T el;
+            size_t counter=0;
+            while(next(el)){
+                if (auto res=loopBody(counter,*el)) return res;
+                ++counter;
+            }
+            return 0;
+        }
+    } else {
+        /// loop without index
+        int opApply(int delegate(ref T x) loopBody){
+            T el;
+            while(next(el)){
+                if (auto res=loopBody(el)) return res;
+            }
+            return 0;
+        }
+        /// loop with index
+        int opApply(int delegate(ref size_t i,ref T x) loopBody){
+            T el;
+            size_t counter=0;
+            while(next(el)){
+                if (auto res=loopBody(counter,el)) return res;
+                ++counter;
+            }
+            return 0;
+        }
+    }
+}
+
+/+ 
+// overloading not working with all compilers yet
+
+/// template to mixin opApply based on a next operation
+template opApplyCounterFromNext(T){
+    static if(is(T U:U*)){
+        /// loop with index
+        int opApply(int delegate(ref size_t i,ref U x) dlg){
+            T el;
+            size_t counter=0;
+            while(next(el)){
+                if (auto res=loopBody(counter,*el)) return res;
+                ++counter;
+            }
+            return 0;
+        }
+    } else {
+        /// loop with index
+        int opApply(int delegate(ref size_t i,ref T x) dlg){
+            T el;
+            size_t counter=0;
+            while(next(el)){
+                if (auto res=loopBody(counter,el)) return res;
+                ++counter;
+            }
+            return 0;
+        }
+    }
+}
+
+/// template to mixin opApply based on a next operation
+template opApplyCounterFromOpApply(T){
+    static if(is(T U:U*)){
+        /// loop with index
+        int opApply(int delegate(ref size_t i,ref U x) dlg){
+            size_t counter=0;
+            auto inBody=delegate int(ref U x){
+                if (auto res=loopBody(counter,*x)) return res;
+                ++counter;
+                return 0;
+            }
+            return opApply(inBody);
+        }
+    } else {
+        /// loop with index
+        int opApply(int delegate(ref size_t i,ref T x) dlg){
+            size_t counter=0;
+            auto inBody=delegate int(ref T x){
+                if (auto res=loopBody(counter,x)) return res;
+                ++counter;
+                return 0;
+            }
+            return opApply(inBody);
+        }
+    }
+}
++/

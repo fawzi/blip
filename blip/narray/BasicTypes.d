@@ -690,6 +690,16 @@ else {
                         return false;
                     }
                 }
+                bool next(ref V el){
+                    auto res=this.next();
+                    if (res) el=value();
+                    return res;
+                }
+                bool next(ref V* el){
+                    auto res=this.next();
+                    if (res) el=cast(V*)(cast(size_t)this.baseArray.startPtrArray+this.iIdx);
+                    return res;
+                }
                 V value()
                 in { assert(this.iPos<this.iDim); }
                 body {
@@ -782,6 +792,11 @@ else {
                         iPos=iDim;
                         return false;
                     }
+                }
+                bool next(ref NArray!(V,rank-1) el){
+                    auto res=next();
+                    el=view;
+                    return res;
                 }
                 NArray!(V,rank-1) value(){
                     return view;
@@ -906,6 +921,18 @@ else {
                         return false;
                     }
                 }
+            }
+            bool next(ref V el){
+                auto res=next();
+                if (res)
+                    el=*this.p;
+                return res;
+            }
+            bool next(ref V* el){
+                auto res=next();
+                if (res)
+                    el=this.p;
+                return res;
             }
             /// Advance to the next item.  Return false if there is no next item.
             bool opAddAssign(int i) {
@@ -1104,12 +1131,11 @@ else {
                 this.parallel=false;
                 this.optimalChunkSize=defaultOptimalChunkSize;
             }
-            V *next(){
-                this.it.next();
-                return this.it.p;
+            bool next(ref V *el){
+                return it.next(el);
             }
-            bool atEnd() {
-                return this.it.end();
+            bool next(ref V el){
+                return it.next(el);
             }
             int opApply(int delegate(ref V x) loop_body){
                 NArray a=this.it.baseArray;

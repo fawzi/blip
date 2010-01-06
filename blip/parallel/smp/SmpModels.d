@@ -4,6 +4,7 @@ import blip.t.util.log.Log;
 import blip.BasicModels;
 import blip.io.BasicIO;
 import blip.container.FiberPool;
+import blip.container.Cache;
 
 enum TaskStatus:int{
     Building=-1,
@@ -31,8 +32,10 @@ interface TaskSchedulerI:BasicObjectI {
     /// changes the current run level of the scheduler
     /// the level can be only raised and the highest run level is "stopped"
     void raiseRunlevel(SchedulerRunLevel level);
-    /// adds a task to the scheduler queue
+    /// adds a task to the scheduler queue (might redirect the task)
     void addTask(TaskI t);
+    /// adds a task to the scheduler queue (will not redirect the task)
+    void addTask0(TaskI t);
     /// returns the next task, blocks unless the scheduler is stopped
     TaskI nextTask();
     /// subtask has started execution (automatically called by nextTask)
@@ -60,9 +63,11 @@ interface TaskSchedulerI:BasicObjectI {
     bool manyQueued();
     /// number of simple tasks wanted
     int nSimpleTasksWanted();
+    /// a cache local to the current numa node (useful for memory pools)
+    Cache nnCache();
 }
 
-// the following subtivisions are more to structure the methods of a task
+// the following subdivisions are more to structure the methods of a task
 // and are not really used alone
 
 /// methods needed in a queued task
@@ -77,6 +82,10 @@ interface TaskI:SubtaskNotificationsI,SubmittingI{
     int level();
     /// sets the level of the task
     void level(int level);
+    /// returns the steal level of the task (how much it can be stolen)
+    int stealLevel();
+    /// sets the steal level of the task
+    void stealLevel(int level);
     /// sets the super task of this task (the one that spawned this)
     void superTask(TaskI task);
     /// sets the scheduler of this task

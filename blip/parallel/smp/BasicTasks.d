@@ -98,11 +98,9 @@ class SchedulerPools{
         }
     }
 }
-SchedulerPools __schedulerPools; // to remove
 ThreadLocal!(SchedulerPools) _schedulerPools;
 
 static this(){
-    __schedulerPools=new SchedulerPools(); // to remove
     _schedulerPools=new ThreadLocal!(SchedulerPools)(null);
 }
 
@@ -164,7 +162,7 @@ static this(){
 
 class Task:TaskI{
     int _level; /// priority level of the task, the higher the better
-    int optAffinityLevel; /// optimal affinity level of the task (0 thread, 1 core, 2 numa node/socket)
+    int _stealLevel; /// maximum steal level of the task (0 thread, 1 core, 2 numa node/socket), default fully stealable
     TaskStatus _status; /// execution status of the task
     
     void delegate() taskOp; /// task to execute
@@ -212,6 +210,7 @@ class Task:TaskI{
         assert(_status==TaskStatus.Finished || _status==TaskStatus.Building || 
             _status==TaskStatus.NonStarted,"invalid status for clear");
         _level=0;
+        _stealLevel=int.max;
         _status=TaskStatus.Finished;
         taskOp=null; generator=null; generator2=null;
         if (fiber!is null && fPool!is null){
@@ -241,6 +240,10 @@ class Task:TaskI{
     int level(){ return _level; }
     /// sets the level of the task
     void level(int l){ assert(status==TaskStatus.Building); _level=l; }
+    /// returns the steal level of the task
+    int stealLevel(){ return _stealLevel; }
+    /// sets the steal level of the task
+    void stealLevel(int l){ assert(status==TaskStatus.Building); _stealLevel=l; }
     /// return the superTask of this task
     TaskI superTask(){ return _superTask; }
     /// sets the superTask of this task
@@ -325,6 +328,7 @@ class Task:TaskI{
         assert(taskOp !is null);
         this._status=TaskStatus.Building;
         this.level=0;
+        this._stealLevel=int.max;
         this._taskName=name;
         this.taskOp=taskOp;
         this.fiber=fiber;
@@ -563,6 +567,7 @@ class Task:TaskI{
     /// opStart is executed after the task has been flagged as delayed, but before
     /// stopping the current execution. Use it to start the operation that will resume
     /// the task (so that it is not possible to resume before the delay is effective)
+    /// a similar thing could be done using a "delay count" but I find this cleaner and safer
     void delay(void delegate() opStart=null){
         auto tAtt=taskAtt.val;
         if (tAtt !is this){

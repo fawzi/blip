@@ -30,6 +30,9 @@ import tango.math.random.Random;
 import tango.stdc.stringz;
 import blip.parallel.hwloc.hwloc;
 import blip.serialization.StringSerialize;
+import blip.BasicModels;
+import blip.util.Grow:growLength;
+import blip.io.BasicIO;
 
 version(Windows){
     
@@ -115,24 +118,27 @@ struct NumaNode{
     char[] toString(){
         return serializeToArray(this);
     }
+    mixin printOut!();
 }
 
-struct Cache{
+struct CacheInfo{
     NumaNode attachedTo;
     ulong size_kB;
     ulong sharingLevel;
     ulong depth; // useful?
     mixin(serializeSome("",`attachedTo|size_kB|sharingLevel|depth`));
+    mixin printOut!();
 }
 
-struct Memory{
+struct MemoryInfo{
     NumaNode attachedTo;
     ulong memory_kB;          /**< \brief Size of memory node */
     ulong huge_page_free;     /**< \brief Number of available huge pages */
     mixin(serializeSome("",`attachedTo|memory_kB|huge_page_free`));
+    mixin printOut!();
 }
 
-struct Machine{
+struct MachineInfo{
     NumaNode attachedTo;
     char[]dmi_board_vendor;       /**< \brief DMI board vendor name */
     char[]dmi_board_name;         /**< \brief DMI board model name */
@@ -141,34 +147,26 @@ struct Machine{
     ulong huge_page_size_kB;      /**< \brief Size of huge pages */
     mixin(serializeSome("",`attachedTo|dmi_board_vendor|dmi_board_name|memory_kB
         huge_page_free|huge_page_size_kB`));
+    mixin printOut!();
 }
 
-struct Socket{
+struct SocketInfo{
     NumaNode attachedTo;
     mixin(serializeSome("",`attachedTo`));
-}
-
-/// simple iterator
-interface SimpleIterator(T){
-    /// goes to the next element
-    T next();
-    /// true if the iterator is at the end
-    bool atEnd();
-    /// loop without index, has to be implemented
-    int opApply(int delegate(ref T x) dlg);
+    mixin printOut!();
 }
 
 /// returns the id of the current CPU
 proc_id_t currentCpuId() { throw new Exception("unimplemented",__FILE__,__LINE__); }
 /// loops on the available nodes (at one ot the levels 0,1 or 2)
-SimpleIterator!(NumaNode) nodesAvailable() {
+SimpleIteratorI!(NumaNode) nodesAvailable() {
     throw new Exception("unimplemented",__FILE__,__LINE__); // do not implement at all, so that presence can be statically checked?
 }
 
 /// describes the topology of a machine in a simplified hierarchical way
 /// starting with leaf nodes each super level adds nodes that are further away
 /// there are methods to loop on subnodes or on the added nodes
-interface Topology(NodeType){
+interface Topology(NodeType):BasicObjectI{
     /// maximum (whole system) level
     int maxLevel();
     /// maximum number of nodes at the given level (actual nodes might be less)
@@ -177,14 +175,87 @@ interface Topology(NodeType){
     /// if false it might still be a partition, or not
     bool isPartition(int level);
     /// loops on the nodes at the given level
-    SimpleIterator!(NodeType) nodes(int level);
+    SimpleIteratorI!(NodeType) nodes(int level);
     /// super node of the given node
     NodeType superNode(NumaNode node);
     /// loops on the subnodes (level of subnodes is uniform, but might be lower than node.lower-1)
-    SimpleIterator!(NodeType) subNodes(NodeType node);
+    SimpleIteratorI!(NodeType) subNodes(NodeType node);
     /// loops on the subnodes in a random order (load balancing), if possible skipping the 
     // subnodes of the skip subnode
-    SimpleIterator!(NodeType) subNodesRandom(NodeType node,NodeType skipSubnode=NodeType(-1,0));
+    SimpleIteratorI!(NodeType) subNodesRandom(NodeType node,NodeType skipSubnode=NodeType.init);
+}
+
+struct SubnodesWithLevel(NodeType,bool isRandom) /+:SimpleIteratorI!(NodeType)+/{
+    Topology!(NodeType) topo;
+    SimpleIteratorI!(NodeType)[] stack;
+    size_t lastStack;
+    int level;
+    NodeType skipSubnode;
+    
+    static SubnodesWithLevel opCall(int level, Topology!(NodeType) topo,
+        NodeType rootNode,NodeType skipSubnode=NodeType(-1,0))
+    {
+        SubnodesWithLevel res;
+        res.topo=topo;
+        res.lastStack=0;
+        res.stack.length=topo.maxLevel()+1;
+        res.skipSubnode=skipSubnode;
+        static if (isRandom){
+            res.stack[res.lastStack]=topo.subNodesRandom(rootNode,res.skipSubnode);
+        } else {
+            res.stack[res.lastStack]=topo.subNodes(rootNode);
+        }
+        return res;
+    }
+    /// goes to the next element
+    bool next(ref NodeType el){
+        NodeType nodeAtt;
+        bool readVal=false;
+        readVal=stack[lastStack].next(nodeAtt);
+        while (true){
+            if (!readVal){
+                if (lastStack!=0){
+                    --lastStack;
+                } else {
+                    return false;
+                }
+            } else {
+                if (nodeAtt!=skipSubnode){
+                    if (nodeAtt.level<level) {
+                        ++lastStack;
+                        if (stack.length<=lastStack){
+                            stack.length=growLength(lastStack+1);
+                        }
+                        static if (isRandom){
+                            stack[lastStack]=topo.subNodesRandom(nodeAtt,skipSubnode);
+                        } else {
+                            stack[lastStack]=topo.subNodes(nodeAtt);
+                        }
+                    } else if (nodeAtt.level==level){
+                        el=nodeAtt;
+                        return true;
+                    } // else ignore too deep nodes
+                }
+            }
+            readVal=stack[lastStack].next(nodeAtt);
+        }
+        return false;
+    }
+    mixin opApplyFromNext!(NodeType);
+}
+/// subnodes of the root subnode that have the given level
+SubnodesWithLevel!(NodeType,false) subnodesWithLevel(NodeType)(int level,
+    Topology!(NodeType) topo,NodeType rootNode,NodeType skipNode=NodeType.init)
+{
+    return SubnodesWithLevel!(NodeType,false)(level,topo,rootNode,skipNode);
+}
+
+/// subnodes of the root subnode that have the given level in a random order
+/// (potentially different for each call)
+SubnodesWithLevel!(NodeType,true) randomSubnodesWithLevel(NodeType)(int level,
+    Topology!(NodeType) topo,NodeType rootNode,NodeType skipNode=NodeType.init)
+{
+    return SubnodesWithLevel!(NodeType,true)(level,topo,rootNode,skipNode);
 }
 
 /// level 0 are the single logical cores (threads)
@@ -215,17 +286,50 @@ interface NumaTopology: Topology!(NumaNode){
     /// withing the ones of the node
     bool bindToNode(NumaNode n,bool singlify=false);
     /// returns the next cache, if attachedTo.level=-1 the result is bogus (no cache found)
-    Cache nextCache(NumaNode);
+    CacheInfo nextCache(NumaNode);
     /// returns the next memory, if attachedTo.level=-1 the result is bogus (no memory found)
-    Memory nextMemory(NumaNode);
+    MemoryInfo nextMemory(NumaNode);
     /// returns the next machine, if attachedTo.level=-1 the result is bogus (no machine found)
-    Machine nextMachine(NumaNode);
+    MachineInfo nextMachine(NumaNode);
     /// returns the next socket, if attachedTo.level=-1 the result is bogus (no socket found)
-    Socket nextSocket(NumaNode);
+    SocketInfo nextSocket(NumaNode);
+}
+
+void writeOutTopo(NodeType)(void delegate(char[]) sink,Topology!(NodeType) topo){
+    auto s=dumper(sink);
+    for (int ilevel=topo.maxLevel;ilevel!=0;++ilevel){
+        s("level(")(ilevel)("){");
+        if (topo.isPartition(ilevel)){
+            s("*partition*");
+        }
+        s("\n");
+        foreach(i,n;topo.nodes(ilevel)){
+            if (i!=0) s(",\n");
+            s("  ")(n)("[");
+            foreach(j,subN;topo.subNodes(n)){
+                if (j!=0) s(",");
+                s(subN);
+            }
+            s("]");
+        }
+        s("\n}\n");
+    }
+    if (topo.maxLevel>=0){
+        s("level(0){");
+        if (topo.isPartition(0)){
+            s("*partition*");
+        }
+        s("\n  ");
+        foreach(i,n;topo.nodes(0)){
+            if (i!=0) s(", ");
+            s(n);
+        }
+        s("\n}\n");
+    }
 }
 
 class ExplicitTopology(NodeType): Topology!(NodeType){
-    final class ArrayIterator(T):SimpleIterator!(T){
+    final class ArrayIterator(T):SimpleIteratorI!(T){
         T[] array;
         size_t pos;
         size_t left;
@@ -234,18 +338,28 @@ class ExplicitTopology(NodeType): Topology!(NodeType){
             pos=startIdx;
             left=array.length;
         }
-        T next(){
-            if (left==0) throw new Exception("iterate past end",__FILE__,__LINE__);
+        bool next(ref T el){
+            if (left==0) return false;
             size_t posAtt=pos;
             ++pos;
             --left;
             if (pos==array.length) pos=0;
-            return array[posAtt];
+            el=array[posAtt];
+            return true;
         }
-        bool atEnd(){ return left==0; }
         int opApply(int delegate(ref T el) loopBody){
             while (left!=0){
                 if (auto res=loopBody(array[pos])){
+                    return res;
+                }
+                ++pos;--left;
+                if (pos==array.length) pos=0;
+            }
+            return 0;
+        }
+        int opApply(int delegate(ref size_t i,ref T el) loopBody){
+            while (left!=0){
+                if (auto res=loopBody(pos,array[pos])){
                     return res;
                 }
                 ++pos;--left;
@@ -318,7 +432,7 @@ class ExplicitTopology(NodeType): Topology!(NodeType){
         return levels[level].partition;
     }
     /// loops on the nodes at the given level
-    SimpleIterator!(NodeType) nodes(int level){
+    SimpleIteratorI!(NodeType) nodes(int level){
         return new ArrayIterator!(NodeType)(levels[level].nodes);
     }
     /// super node of the given node
@@ -327,14 +441,14 @@ class ExplicitTopology(NodeType): Topology!(NodeType){
         return levels[node.level].superNodes[node.pos];
     }
     /// loops on the subnodes (level of subnodes is uniform, but might be 2 rather than node.level-1)
-    SimpleIterator!(NodeType) subNodes(NodeType node){
+    SimpleIteratorI!(NodeType) subNodes(NodeType node){
         assert(node.level!=0,"no subnode of the last level"); // return an empty iterator?
         return new ArrayIterator!(NodeType)(levels[node.level].subNodes[node.pos]);
     }
     /// loops on the subnodes, but perform at least a random
     /// rotation on them and tries to avoid the subnodes of skip
     /// (thus can be used for load balancing purposes)
-    SimpleIterator!(NodeType) subNodesRandom(NodeType node,NodeType skipSubnode=NodeType(-1,0)){
+    SimpleIteratorI!(NodeType) subNodesRandom(NodeType node,NodeType skipSubnode=NodeType(-1,0)){
         assert(node.level!=0,"no subNodes at level 0"); // return an empty iterator?
         int start=0;
         auto subNs=levels[node.level].subNodes[node.pos];
@@ -365,6 +479,9 @@ class ExplicitTopology(NodeType): Topology!(NodeType){
     void unserialize(Unserializer s){
         s.field(metaI[0],levels);
     }
+    void desc(CharSink sink){
+        writeOutTopo(sink,cast(Topology!(NumaNode))this);
+    }
 }
 
 class ExplicitNumaTopology: ExplicitTopology!(NumaNode), NumaTopology {
@@ -378,10 +495,10 @@ class ExplicitNumaTopology: ExplicitTopology!(NumaNode), NumaTopology {
         super(levels);
     }
 
-    Cache nextCache(NumaNode){ Cache res; return res; }
-    Memory nextMemory(NumaNode){ Memory res; return res; }
-    Machine nextMachine(NumaNode){ Machine res; return res; }
-    Socket nextSocket(NumaNode){ Socket res; return res; }
+    CacheInfo nextCache(NumaNode){ CacheInfo res; return res; }
+    MemoryInfo nextMemory(NumaNode){ MemoryInfo res; return res; }
+    MachineInfo nextMachine(NumaNode){ MachineInfo res; return res; }
+    SocketInfo nextSocket(NumaNode){ SocketInfo res; return res; }
     bool bindToNode(NumaNode n,bool singlify=false){ return false; }
     
     static ClassMetaInfo metaI;
@@ -463,7 +580,7 @@ version(noHwloc){} else {
         LevelMap[] levelMapping;
         int backMapping[];
     
-        class CousinIterator:SimpleIterator!(NumaNode){
+        class CousinIterator:SimpleIteratorI!(NumaNode){
             HwlocTopology topo;
             hwloc_obj_t pos;
         
@@ -472,17 +589,13 @@ version(noHwloc){} else {
                 this.pos=pos;
             }
         
-            NumaNode next(){
-                NumaNode res;
+            bool next(ref NumaNode res){
                 if (pos!is null){
                     res=NumaNode(backMapping[pos.depth],pos.logical_index);
                     pos=pos.next_cousin;
+                    return true;
                 }
-                return res;
-            }
-        
-            bool atEnd(){
-                return pos is null;
+                return false;
             }
         
             int opApply(int delegate(ref NumaNode x) dlg){
@@ -492,6 +605,18 @@ version(noHwloc){} else {
                     auto n=NumaNode(backMapping[pos.depth],i);
                     auto res=dlg(n);
                     if (res) return res;
+                }
+                return 0;
+            }
+            int opApply(int delegate(ref size_t i,ref NumaNode x) dlg){
+                if (pos is null) return 0;
+                int nEl=hwloc_get_nbobjs_by_depth(topo.topology,pos.depth);
+                size_t ii=0;
+                for (int i=pos.logical_index;i<nEl;++i){
+                    auto n=NumaNode(backMapping[pos.depth],i);
+                    auto res=dlg(ii,n);
+                    if (res) return res;
+                    ++ii;
                 }
                 return 0;
             }
@@ -510,7 +635,7 @@ version(noHwloc){} else {
             }
         }
 
-        class RandomChildernIterator:SimpleIterator!(NumaNode){
+        class RandomChildernIterator:SimpleIteratorI!(NumaNode){
             HwlocTopology topo;
             hwloc_obj_t[] childrens;
             int end;
@@ -537,8 +662,7 @@ version(noHwloc){} else {
                 }
             }
         
-            NumaNode next(){
-                NumaNode res;
+            bool next(ref NumaNode res){
                 if (objPos!is null){
                     while(objPos.depth<depth2){
                         assert(objPos.arity>0);
@@ -565,12 +689,9 @@ version(noHwloc){} else {
                             }
                         }
                     }
+                    return true;
                 }
-                return res;
-            }
-        
-            bool atEnd(){
-                return objPos==null;
+                return false;
             }
         
             int opApply(int delegate(ref NumaNode x) dlg){
@@ -583,6 +704,42 @@ version(noHwloc){} else {
                     assert(objPos.depth==depth2);
                     auto n=NumaNode(level,objPos.logical_index);
                     auto res=dlg(n);
+                    if (res!=0) return res;
+                    // try advance objPos
+                    if (objPos.next_sibling!is null){
+                        objPos=objPos.next_sibling;
+                    } else {
+                        while (objPos.depth>depth1 && objPos.next_sibling is null){
+                            objPos=objPos.father;
+                        }
+                        if (objPos.next_sibling!is null){
+                            objPos=objPos.next_sibling;
+                        } else {
+                            ++pos;
+                            if (pos!=end) {
+                                pos=pos%childrens.length;
+                                objPos=childrens[pos];
+                            } else {
+                                break;
+                            }
+                        }
+                    }
+                }
+                return 0;
+            }
+
+            int opApply(int delegate(ref size_t,ref NumaNode) dlg){
+                if (objPos is null) return 0;
+                size_t ii=0;
+                while (1){
+                    while(objPos.depth<depth2){
+                        assert(objPos.arity>0);
+                        objPos=objPos.first_child;
+                    }
+                    assert(objPos.depth==depth2);
+                    auto n=NumaNode(level,objPos.logical_index);
+                    auto res=dlg(ii,n);
+                    ++ii;
                     if (res!=0) return res;
                     // try advance objPos
                     if (objPos.next_sibling!is null){
@@ -728,7 +885,7 @@ version(noHwloc){} else {
             return hwloc_get_obj_by_depth(topology,levelMapping[n.level].depth,n.pos);
         }
         /// loops on the nodes at the given level
-        SimpleIterator!(NumaNode) nodes(int level){
+        SimpleIteratorI!(NumaNode) nodes(int level){
             return new CousinIterator(this,
                 hwloc_get_obj_by_depth(topology,levelMapping[level].depth,0));
         }
@@ -746,7 +903,7 @@ version(noHwloc){} else {
             return NumaNode(node.level+1,obj.logical_index);
         }
         /// loops on the subnodes (level of subnodes is uniform, but might be 2 rather than node.level-1)
-        SimpleIterator!(NumaNode) subNodes(NumaNode node){
+        SimpleIteratorI!(NumaNode) subNodes(NumaNode node){
             assert(node.level!=0,"no subnode of the last level"); // return an empty iterator?
             auto obj=hwlocObjForNumaNode(node);
             auto nextDepth=levelMapping[node.level-1].depth;
@@ -760,7 +917,7 @@ version(noHwloc){} else {
         /// rotation on them and tries to avoid the subnodes of skip
         /// (thus can be used for load balancing purposes)
         /// could be better (really skip all subnodes of skip)
-        SimpleIterator!(NumaNode) subNodesRandom(NumaNode node,NumaNode skipSubnode=NumaNode(-1,0)){
+        SimpleIteratorI!(NumaNode) subNodesRandom(NumaNode node,NumaNode skipSubnode=NumaNode(-1,0)){
             assert(node.level!=0,"no subNodes at level 0"); // return an empty iterator?
             auto obj=hwlocObjForNumaNode(node);
             auto nextDepth=levelMapping[node.level-1].depth;
@@ -799,7 +956,7 @@ version(noHwloc){} else {
             s.field(metaI[0],levels);
         }+/
     
-        Cache nextCache(NumaNode n){
+        CacheInfo nextCache(NumaNode n){
             int countLeafs(hwloc_obj_t obj){
                 if (obj is null) return 0;
                 if (obj.first_child is null) return 1;
@@ -810,7 +967,7 @@ version(noHwloc){} else {
                 return res;
             }
         
-            Cache res;
+            CacheInfo res;
             auto obj=hwlocObjForNumaNode(n);
             while(obj!=null){
                 if (obj.type==HWLOC_OBJ.CACHE) break;
@@ -832,8 +989,8 @@ version(noHwloc){} else {
             return res;
         }
     
-        Memory nextMemory(NumaNode n){
-            Memory res;
+        MemoryInfo nextMemory(NumaNode n){
+            MemoryInfo res;
             auto obj=hwlocObjForNumaNode(n);
             while(obj!=null){
                 if (obj.type==HWLOC_OBJ.NODE || obj.type==HWLOC_OBJ.MACHINE ||
@@ -868,8 +1025,8 @@ version(noHwloc){} else {
             }
             return res;
         }
-        Machine nextMachine(NumaNode n){
-            Machine res;
+        MachineInfo nextMachine(NumaNode n){
+            MachineInfo res;
             auto obj=hwlocObjForNumaNode(n);
             while(obj!=null){
                 if (obj.type==HWLOC_OBJ.MACHINE || obj.type==HWLOC_OBJ.SYSTEM) break;
@@ -905,8 +1062,8 @@ version(noHwloc){} else {
             }
             return res;
         }
-        Socket nextSocket(NumaNode n){
-            Socket res;
+        SocketInfo nextSocket(NumaNode n){
+            SocketInfo res;
             auto obj=hwlocObjForNumaNode(n);
             while(obj!=null){
                 if (obj.type==HWLOC_OBJ.SOCKET) break;
@@ -940,6 +1097,9 @@ version(noHwloc){} else {
                 return false;
             }
             return true;
+        }
+        void desc(CharSink sink){
+            writeOutTopo(sink,cast(Topology!(NumaNode))this);
         }
     }
 }

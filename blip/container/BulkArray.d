@@ -207,12 +207,13 @@ struct BulkArray(T){
         return n;
     }
     // iterator/sequential loop done directly on BulkArray
-    T* next(){
-        if (ptr==ptrEnd) return null;
-        return ++ptr;
-    }
-    bool atEnd(){
-        return ptr==ptrEnd;
+    bool next(ref T* el){
+        if (ptr==ptrEnd) {
+            el=null;
+            return false;
+        }
+        el=++ptr;
+        return true;
     }
     int opApply(int delegate(ref DynamicArrayType!(T) v) loopBody){
         for (T*aPtr=ptr;aPtr!=ptrEnd;++aPtr){
@@ -388,11 +389,8 @@ struct BulkArray(T){
             parallel=false;
             optimalChunkSize=defaultOptimalBlockSize;
         }
-        DynamicArrayType!(T)* next(){
-            return cast(DynamicArrayType!(T)*)(it.next());
-        }
-        bool atEnd(){
-            return it.atEnd();
+        bool next(ref DynamicArrayType!(T)* el){
+            return it.next(el);
         }
         int opApply(int delegate(ref DynamicArrayType!(T) v) loopBody){
             if (parallel){

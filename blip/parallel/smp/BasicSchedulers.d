@@ -15,6 +15,7 @@ import blip.parallel.smp.SmpModels;
 import blip.parallel.smp.BasicTasks;
 import blip.BasicModels;
 import tango.math.random.Random;
+import blip.container.Cache;
 
 /// task scheduler that tries to perform a depth first reduction of the task
 /// using the maximum parallelization available.
@@ -22,9 +23,6 @@ import tango.math.random.Random;
 /// tasks, it can be seen as a parallelization of eager evaluation.
 /// Just as eager evaulation it has the great advantage of being relatively easy
 /// to understand and to have good performance.
-/// This is closely related to work stealing, and you can implement
-/// a work stealing approach based on this (I am thinking about it)
-/// this would have more tasks, but a better cpu affinity, so it might be better
 ///
 /// integrate PriQueue in this? it would be slighly more efficient, and already now
 /// depends on its implementation details, or they should be better separated
@@ -47,24 +45,21 @@ class PriQTaskScheduler:TaskSchedulerI {
     int level;
     /// executer
     ExecuterI _executer;
+    Cache _nnCache;
+    Cache nnCache(){
+        return _nnCache;
+    }
     /// returns the root task
     TaskI rootTask(){ return _rootTask; }
-    /// super scheduler, only subclasses of this are accepted
-    PriQTaskScheduler superScheduler;
     /// creates a new PriQTaskScheduler
-    this(char[] name,char[] loggerPath="blip.parallel.smp.queue",int level=0,
-        PriQTaskScheduler superScheduler=null){
+    this(char[] name,char[] loggerPath="blip.parallel.smp.queue",int level=0){
         this.name=name;
-        if (superScheduler){
-            this.superScheduler=superScheduler;
-            queue=new PriQueue!(TaskI)(superScheduler.queue);
-        } else {
-            queue=new PriQueue!(TaskI)();
-        }
+        queue=new PriQueue!(TaskI)();
         this.rand=new RandomSync();
         log=Log.lookup(loggerPath);
         _rootTask=new RootTask(this,0,name~"RootTask");
         runLevel=SchedulerRunLevel.Running;
+        _nnCache=new Cache();
     }
     /// adds a task to be executed
     void addTask(TaskI t){
@@ -74,6 +69,10 @@ class PriQTaskScheduler:TaskSchedulerI {
         if (shouldAddTask(t)){
             queue.insert(t.level,t);
         }
+    }
+    // alias addTask addTask0;
+    void addTask0(TaskI t){
+        addTask(t);
     }
     /// returns nextTask if available, null if it should wait
     TaskI nextTaskImmediate(int stealLevel){

@@ -7,6 +7,7 @@ import blip.text.UtfUtils: convertToString;
 
 /// extent of a slice of a buffer
 enum SliceExtent{ Partial, Maximal, ToEnd }
+enum :size_t{Eof=size_t.max}
 
 alias void delegate(void delegate(char[]))  OutWriter;
 alias void delegate(void delegate(void[]))  BinWriter;
@@ -14,6 +15,8 @@ alias size_t delegate(char[], SliceExtent slice,out bool iterate)  OutReader;
 alias size_t delegate(ubyte[], SliceExtent slice,out bool iterate) BinReader;
 alias void delegate(char[]) CharSink;
 alias void delegate(void[]) BinSink;
+alias size_t delegate(char[])  CharRead;
+alias size_t delegate(void[]) BinRead;
 
 interface OutStreamI{
     void rawWriteStr(char[]);
@@ -289,7 +292,7 @@ struct Dumper(T){
         } else static if (is(typeof(writeOut(call,u)))){ 
             writeOut(call,u);
         } else {
-            static assert(0,"Dumper!("~T.stingof~") cannot handle "~U.stringof);
+            static assert(0,"Dumper!("~T.stringof~") cannot handle "~U.stringof);
         }
         return *this;
     }

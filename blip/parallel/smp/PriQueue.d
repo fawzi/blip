@@ -3,8 +3,11 @@ import blip.io.BasicIO;
 import tango.core.sync.Mutex;
 import tango.core.sync.Semaphore;
 import tango.math.Math;
-import blip.container.GrowableArray;
+import blip.container.GrowableArray:collectAppender;
 import blip.BasicModels;
+import blip.util.Grow:growLength;
+import blip.container.Deque;
+import blip.container.AtomicSLink;
 
 /// a simple priority queue optimized for adding high priority tasks
 /// the public interface consists of
@@ -16,42 +19,14 @@ import blip.BasicModels;
 /// this means that task reorganizations are ok
 class PriQueue(T){
     /// stores all the elements with a given level
-    class PriQLevel{
+    static class PriQLevel{
         int level;
-        int start,nEl;
-        T[] entries;
-        PriQLevel subLevel;
-        this(int level,PriQLevel subLevel=null,int capacity=10){
+        Deque!(T) entries;
+        PriQLevel next;
+        this(int level,PriQLevel next=null,int capacity=10){
             this.level=level;
-            this.entries=new T[max(1,capacity)];
-            this.start=0;
-            this.nEl=0;
-            this.subLevel=subLevel;
-        }
-        /// adds a new element at the end of the level
-        void append(T e){
-            if (nEl==entries.length){
-                int oldSize=entries.length;
-                entries.length=3*entries.length/2+1;
-                for (int i=0;i!=start;i++){
-                    entries[oldSize]=entries[i];
-                    entries[i]=null;
-                    ++oldSize;
-                    if (oldSize==entries.length) oldSize=0;
-                }
-            }
-            entries[(start+nEl)%entries.length]=e;
-            ++nEl;
-        }
-        /// peek the next element in the level
-        T peek(){ if (nEl<1) return null; return entries[start]; }
-        /// return the next element and removes it
-        T pop(){
-            if (nEl<1) return null;
-            T res=entries[start]; entries[start]=null;
-            ++start; --nEl;
-            if (start==entries.length) start=0;
-            return res;
+            this.entries=new Deque!(T)(max(1,capacity));
+            this.next=next;
         }
         /// description (for debugging)
         char[] toString(){
@@ -60,34 +35,26 @@ class PriQueue(T){
         /// description (for debugging)
         void desc(void delegate(char[]) s){
             s("<PriQLevel@"); writeOut(s,cast(void*)this); s(" level=");
-            writeOut(s,level); s(" entries=[");
-            if (nEl>entries.length){
-                s("*ERROR* nEl="); writeOut(s,nEl);
-            } else {
-                for (int i=0;i<nEl;++i){
-                    if (i!=0) s(", ");
-                    writeOut(s,entries[(start+i)%entries.length]);
-                }
-            }
-            s("] capacity="); writeOut(s,entries.length); s(" >");
+            writeOut(s,level); s(" entries=");
+            writeOut(s,entries);
+            s(" >");
         }
     }
     /// pool to recycle PriQLevels
-    class PriQPool{
+    static class PriQPool{
         PriQLevel lastE;
         /// returns a PriQLevel to the pool for recycling
-        void giveBack(PriQLevel l){ assert(l); l.subLevel=lastE; lastE=l; }
+        void giveBack(PriQLevel l){ assert(l!is null); insertAt(lastE,l); }
         /// creates a PriQLevel, if possible recycling an old one.
         /// if recycled the capacity is ignored
-        PriQLevel create(int level,PriQLevel subLevel=null,int capacity=10){
-            if (lastE !is null){
-                PriQLevel res=lastE;
-                lastE=lastE.subLevel;
+        PriQLevel create(int level,PriQLevel next=null,int capacity=10){
+            PriQLevel res=popFrom(lastE);
+            if (res !is null){
                 res.level=level;
-                res.subLevel=subLevel;
+                res.next=next;
                 return res;
             }
-            return new PriQLevel(level,subLevel,capacity);
+            return new PriQLevel(level,next,capacity);
         }
         /// creates the pool
         this(){
@@ -107,7 +74,7 @@ class PriQueue(T){
                 while(el !is null){
                     if (el !is lastE) s(", ");
                     s("<PriQLevel@"); writeOut(s,cast(void *)el);
-                    el=el.subLevel;
+                    el=el.next;
                 }
                 s("] >\n");
             }
@@ -121,22 +88,29 @@ class PriQueue(T){
     int nEntries;
     /// if the queue should stop
     bool shouldStop;
-    /// a super queue (asked for tasks)
-    PriQueue superQueue;
     /// lock for queue modifications
     Mutex queueLock;
     /// to make the threads wait when no tasks are available
     /// use a Condition instead? (on mac I should test them, I strongly suspect they don't work);
     Semaphore zeroSem;
-    /// creates a new piriority queue
-    this(PriQueue superQueue=null){
-        this.superQueue=superQueue;
+    /// creates a new priority queue
+    this(PriQPool lPool=null){
         nEntries=0;
         queue=null;
         shouldStop=false;
         queueLock=new Mutex();
         zeroSem=new Semaphore();
-        lPool=new PriQPool();
+        if (lPool is null){
+            this.lPool=new PriQPool();
+        } else {
+            this.lPool=lPool;
+        }
+    }
+    /// resets a queue
+    void reset(){
+        nEntries=0;
+        queue=null;
+        shouldStop=false;
     }
     /// shuts down the priority queue
     void stop(){
@@ -154,17 +128,17 @@ class PriQueue(T){
             PriQLevel oldL=queue,lAtt=queue;
             while (lAtt !is null && lAtt.level>tLevel) {
                 oldL=lAtt;
-                lAtt=lAtt.subLevel;
+                lAtt=lAtt.next;
             }
             if (lAtt !is null && lAtt.level==tLevel){
-                lAtt.append(t);
+                lAtt.entries.append(t);
             } else {
                 PriQLevel newL=lPool.create(tLevel,lAtt);
-                newL.append(t);
+                newL.entries.append(t);
                 if (oldL is lAtt) {
                     queue=newL;
                 } else {
-                    oldL.subLevel=newL;
+                    oldL.next=newL;
                 }
             }
             ++nEntries;
@@ -185,10 +159,10 @@ class PriQueue(T){
                 if (nEntries>0){
                     if (shouldStop) return null;
                     assert(queue !is null);
-                    T res=queue.pop();
+                    T res=queue.entries.popFront();
                     assert(res!is null);
-                    if (queue.nEl==0){
-                        PriQLevel nT=queue.subLevel;
+                    if (queue.entries.length==0){
+                        PriQLevel nT=queue.next;
                         lPool.giveBack(queue);
                         queue=nT;
                     }
@@ -198,13 +172,9 @@ class PriQueue(T){
                     shouldLockZero=true;
                     assert(queue is null);
                 }
+                if (immediate && shouldLockZero) return null;
             }
             if (shouldLockZero) {
-                if (superQueue){
-                    T res=superQueue.popNext(true);
-                    if (res) return res;
-                }
-                if (immediate) return null;
                 zeroSem.wait();
                 synchronized(queueLock){
                     if (nEntries>0)
@@ -213,7 +183,36 @@ class PriQueue(T){
                 shouldLockZero=false;
             }
         }
-        return null;
+    }
+    /// returns the first element from the back that satifies the given filter function
+    bool popBack(ref T el,bool delegate(T) filter){
+        PriQLevel[128] levels;
+        size_t ilevel=0;
+        synchronized(queueLock){
+            PriQLevel lAtt=queue;
+            while (lAtt!is null){
+                levels[ilevel%levels.length]=lAtt;
+                lAtt=lAtt.next;
+                ++ilevel;
+            }
+            size_t iblock=levels.length;
+            while(ilevel!=0){
+                --ilevel;
+                --iblock;
+                if (iblock==0){
+                    lAtt=queue;
+                    for (size_t iilev=ilevel+1;iilev!=0;--iilev){
+                        levels[iilev%levels.length]=lAtt;
+                        lAtt=lAtt.next;
+                    }
+                    iblock=levels.length;
+                }
+                if (levels[ilevel%levels.length].entries.popBack(el,filter)){
+                    return true;
+                }
+            }
+        }
+        return false;
     }
     /// description (for debugging)
     /// non threadsafe
@@ -237,7 +236,7 @@ class PriQueue(T){
                 s("  queue=[");
                 while(lAtt !is null){
                     s("   "); writeOut(s,lAtt); s(",\n");
-                    lAtt=lAtt.subLevel;
+                    lAtt=lAtt.next;
                 }
                 s(" ],\n");
             }

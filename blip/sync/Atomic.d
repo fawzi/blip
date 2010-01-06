@@ -5,6 +5,7 @@
  * partly by the llvm atomic operations
  *
  * If no atomic ops are available an (inefficent) fallback solution is provided
+ * For classes atomic access means atomic access to their *address* not their content
  *
  * If you want unique counters or flags to communicate in multithreading settings
  * look at tango.core.sync.Counter that provides them in a better way and handles
@@ -15,6 +16,7 @@
  * Authors:   Fawzi Mohamed
  */
 module blip.sync.Atomic;
+import blip.io.Console;
 
 version( LDC )
 {
@@ -34,14 +36,14 @@ private {
     /**
      * Evaluates to true if T is a pointer type.
      */
-    template isPointerType(T)
+    template isPointerOrClass(T)
     {
-            const isPointerType = false;
+        const isPointerOrClass = is(T==class);
     }
 
-    template isPointerType(T : T*)
+    template isPointerOrClass(T : T*)
     {
-            const isPointerType = true;
+            const isPointerOrClass = true;
     }
     /**
      * Evaluates to true if T is a signed integer type.
@@ -65,6 +67,15 @@ private {
                                            is( T == ulong )/+||
                                            is( T == ucent  )+/;
     }
+    
+    /// substitutes classes with void* 
+    template ClassPtr(T){
+        static if (is(T==class)){
+            alias void* ClassPtr;
+        } else {
+            alias T ClassPtr;
+        }
+    }
 }
 
 extern(C) void thread_yield();
@@ -76,7 +87,7 @@ template atomicValueIsProperlyAligned( T )
 {
     bool atomicValueIsProperlyAligned( size_t addr )
     {
-        return addr % T.sizeof == 0;
+        return addr % ClassPtr!(T).sizeof == 0;
     }
 }
 
@@ -199,7 +210,7 @@ version(LDC){
     T atomicSwap( T )( ref T val, T newval )
     {
         T oldval = void;
-        static if (isPointerType!(T))
+        static if (isPointerOrClass!(T))
         {
             oldval = cast(T)llvm_atomic_swap!(size_t)(cast(size_t*)&val, cast(size_t)newval);
         }
@@ -323,7 +334,7 @@ version(LDC){
     T atomicCAS( T )( ref T val, T newval, T equalTo )
     {
         T oldval = void;
-        static if (isPointerType!(T))
+        static if (isPointerOrClass!(T))
         {
             oldval = cast(T)llvm_atomic_cmp_swap!(size_t)(cast(size_t*)&val, cast(size_t)equalTo, cast(size_t)newval);
         }
@@ -342,10 +353,10 @@ version(LDC){
     in {
         // NOTE: 32 bit x86 systems support 8 byte CAS, which only requires
         //       4 byte alignment, so use size_t as the align type here.
-        static if( T.sizeof > size_t.sizeof )
+        static if( ClassPtr!(T).sizeof > size_t.sizeof )
             assert( atomicValueIsProperlyAligned!(size_t)( cast(size_t) &val ) );
         else
-            assert( atomicValueIsProperlyAligned!(T)( cast(size_t) &val ) );
+            assert( atomicValueIsProperlyAligned!(ClassPtr!(T))( cast(size_t) &val ) );
     } body {
         T*posVal=&val;
         static if( T.sizeof == byte.sizeof ) {
@@ -366,7 +377,7 @@ version(LDC){
                 cmpxchg [ECX], DX;
             }
         }
-        else static if( T.sizeof == int.sizeof ) {
+        else static if( ClassPtr!(T).sizeof == int.sizeof ) {
             volatile asm {
                 mov EDX, newval;
                 mov EAX, equalTo;
@@ -379,7 +390,9 @@ version(LDC){
             // 8 Byte StoreIf on 32-Bit Processor
             version(darwin){
                 while(1){
-                    if(OSAtomicCompareAndSwap64(cast(long)equalTo, cast(long)newval,  cast(long*)&val)){
+                    if(OSAtomicCompareAndSwap64(cast(long)cast(ClassPtr!(T))equalTo,
+                        cast(long)cast(ClassPtr!(T))newval,  cast(long*)&val))
+                    {
                         return equalTo;
                     } else {
                         volatile T res=val;
@@ -439,7 +452,7 @@ version(LDC){
                 cmpxchg [RCX], DX;
             }
         }
-        else static if( T.sizeof == int.sizeof ) {
+        else static if( ClassPtr!(T).sizeof == int.sizeof ) {
             volatile asm {
                 mov EDX, newval;
                 mov EAX, equalTo;
@@ -448,7 +461,7 @@ version(LDC){
                 cmpxchg [RCX], EDX;
             }
         }
-        else static if( T.sizeof == long.sizeof ) {
+        else static if( ClassPtr!(T).sizeof == long.sizeof ) {
             volatile asm {
                 mov RDX, newval;
                 mov RAX, equalTo;
@@ -465,7 +478,7 @@ version(LDC){
 } else {
     T atomicCAS( T )( inout T val, T newval, T equalTo )
     in {
-            assert( atomicValueIsProperlyAligned!(T)( cast(size_t) &val ) );
+        assert( atomicValueIsProperlyAligned!(T)( cast(size_t) &val ) );
     } body {
         T oldval;
         synchronized(typeid(T)){
@@ -479,7 +492,7 @@ version(LDC){
 }
 
 bool atomicCASB(T)( ref T val, T newval, T equalTo ){
-    return (equalTo==atomicCAS(val,newval,equalTo));
+    return (equalTo is atomicCAS(val,newval,equalTo));
 }
 
 /// loads a value from memory
@@ -490,8 +503,8 @@ bool atomicCASB(T)( ref T val, T newval, T equalTo ){
 /// remove this? I know no actual architecture where this would be different
 T atomicLoad(T)(ref T val)
 in {
-        assert( atomicValueIsProperlyAligned!(T)( cast(size_t) &val ) );
-        static assert(T.sizeof<=size_t.sizeof,"invalid size for "~T.stringof);
+    assert( atomicValueIsProperlyAligned!(T)( cast(size_t) &val ) );
+    static assert(ClassPtr!(T).sizeof<=size_t.sizeof,"invalid size for "~T.stringof);
 } body {
     volatile res=val;
     return res;
@@ -506,7 +519,7 @@ in {
 T atomicStore(T)(ref T val, T newVal)
 in {
         assert( atomicValueIsProperlyAligned!(T)( cast(size_t) &val ), "invalid alignment" );
-        static assert(T.sizeof<=size_t.sizeof,"invalid size for "~T.stringof);
+        static assert(ClassPtr!(T).sizeof<=size_t.sizeof,"invalid size for "~T.stringof);
 } body {
     volatile newVal=val;
 }
@@ -518,7 +531,7 @@ in {
 /// no barriers implied, only atomicity!
 version(LDC){
     T atomicAdd(T)(ref T val, T inc){
-        static if (isPointerType!(T))
+        static if (isPointerOrClass!(T))
         {
             return cast(T)llvm_atomic_load_add!(size_t)(cast(size_t*)&val, inc);
         }
@@ -530,7 +543,7 @@ version(LDC){
     }
 } else version (D_InlineAsm_X86){
     T atomicAdd(T)(ref T val, T incV){
-        static assert( isIntegerType!(T)||isPointerType!(T),"invalid type: "~T.stringof );
+        static assert( isIntegerType!(T)||isPointerOrClass!(T),"invalid type: "~T.stringof );
         T* posVal=&val;
         T res;
         static if (T.sizeof==1){
@@ -567,7 +580,7 @@ version(LDC){
     }
 } else version (D_InlineAsm_X86_64){
     T atomicAdd(T)(ref T val, T incV){
-        static assert( isIntegerType!(T)||isPointerType!(T),"invalid type: "~T.stringof );
+        static assert( isIntegerType!(T)||isPointerOrClass!(T),"invalid type: "~T.stringof );
         T* posVal=&val;
         T res;
         static if (T.sizeof==1){
@@ -612,7 +625,7 @@ version(LDC){
 } else {
     static if (LockVersion){
         T atomicAdd(T)(ref T val, T incV){
-            static assert( isIntegerType!(T)||isPointerType!(T),"invalid type: "~T.stringof );
+            static assert( isIntegerType!(T)||isPointerOrClass!(T),"invalid type: "~T.stringof );
             synchronized(typeid(T)){
                 T oldV=val;
                 val+=incV;
@@ -621,7 +634,7 @@ version(LDC){
         }
     } else {
         T atomicAdd(T)(ref T val, T incV){
-            static assert( isIntegerType!(T)||isPointerType!(T),"invalid type: "~T.stringof );
+            static assert( isIntegerType!(T)||isPointerOrClass!(T),"invalid type: "~T.stringof );
             synchronized(typeid(T)){
                 T oldV,newVal,nextVal;
                 volatile nextVal=val;
@@ -642,7 +655,7 @@ version(LDC){
 /// and no "fair" share is applied between fast function (more likely to succeed) and
 /// the others (i.e. do not use this in case of high contention)
 T atomicOp(T)(ref T val, T delegate(T) f){
-    static assert( isIntegerType!(T) || isPointerType!(T));
+    static assert(isIntegerType!(T) || isPointerOrClass!(T),"invalid type "~T.stringof);
     T oldV,newV,nextV;
     int i=0;
     volatile nextV=val;
@@ -650,8 +663,8 @@ T atomicOp(T)(ref T val, T delegate(T) f){
         oldV=nextV;
         newV=f(oldV);
         nextV=atomicCAS!(T)(val,newV,oldV);
-    } while((nextV!=oldV) && ++i<200)
-    while (nextV!=oldV){
+    } while((nextV !is oldV) && ++i<200)
+    while (nextV !is oldV){
         thread_yield();
         volatile oldV=val;
         newV=f(oldV);
