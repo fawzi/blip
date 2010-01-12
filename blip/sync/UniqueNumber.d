@@ -7,7 +7,7 @@
  */
 module blip.sync.UniqueNumber;
 import blip.sync.Atomic;
-import tango.core.sync.Mutex;
+import blip.t.core.sync.Mutex;
 
 static if (LockVersion){
     /// fast unique number (that handles well the absence of atomic ops)

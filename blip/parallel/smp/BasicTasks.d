@@ -1,16 +1,16 @@
 module blip.parallel.smp.BasicTasks;
 import blip.parallel.smp.SmpModels;
-import tango.core.Thread;
-import tango.core.Variant:Variant;
-import tango.core.sync.Mutex;
-import tango.math.Math;
+import blip.t.core.Thread;
+import blip.t.core.Variant:Variant;
+import blip.t.core.sync.Mutex;
+import blip.t.math.Math;
 import blip.t.util.log.Log;
 import tango.util.Convert;
-import tango.stdc.string;
+import blip.t.stdc.string;
 import tango.util.container.LinkedList;
 import blip.io.BasicIO;
 import blip.container.GrowableArray;
-import tango.core.sync.Semaphore;
+import blip.t.core.sync.Semaphore;
 import blip.TemplateFu:ctfe_i2a;
 import blip.parallel.smp.SmpModels;
 import blip.BasicModels;
@@ -251,7 +251,7 @@ class Task:TaskI{
     /// return the scheduler of this task
     TaskSchedulerI scheduler(){ return _scheduler; }
     /// sets the scheduler of this task
-    void scheduler(TaskSchedulerI sched){ assert(status==TaskStatus.Building); _scheduler=sched; }
+    void scheduler(TaskSchedulerI sched){ _scheduler=sched; }
     /// it the task might spawn other tasks
     bool mightSpawn() { return !(flags & TaskFlags.NoSpawn); }
 
@@ -470,16 +470,26 @@ class Task:TaskI{
         if (superTask !is null){
             superTask.subtaskEnded(this);
         }
-        volatile auto refCountAtt=refCount;
-        if (refCountAtt==1){
-            if (this.classinfo == Task.classinfo){
-                auto tPool=defaultSchedulerPools().taskPool;
-                tPool.giveBack(this); // already returns the fiber
-            } else if (fiber !is null && fPool!is null){
-                fPool.giveBack(fiber);
-                fiber=null;
+        if (!tryReuse()){
+            release();
+        }
+    }
+    /// tries to give back the task for later reuse
+    bool tryReuse(){
+        version(NoReuse){ } else {
+            volatile auto refCountAtt=refCount;
+            if (refCountAtt==1){
+                if (this.classinfo == Task.classinfo){
+                    auto tPool=defaultSchedulerPools().taskPool;
+                    tPool.giveBack(this); // already returns the fiber
+                } else if (fiber !is null && fPool!is null){
+                    fPool.giveBack(fiber);
+                    fiber=null;
+                }
+                return true;
             }
         }
+        return false;
     }
     /// called when a subtasks has finished
     void subtaskEnded(TaskI st){
@@ -640,22 +650,14 @@ class Task:TaskI{
             this.spawnTask(task);
             if (!task.status==TaskStatus.Finished)
                 task.wait();
-            if (task.classinfo == Task.classinfo){
-                auto t=cast(Task)task;
-                if (t.refCount==1){
-                    auto tPool=defaultSchedulerPools().taskPool;
-                    tPool.giveBack(t); // already returns the fiber
-                } else if (t.fiber !is null && t.fPool!is null){
-                    fPool.giveBack(t.fiber);
-                    t.fiber=null;
-                }
-            } else{
+            if (!task.tryReuse()){
                 task.release();
             }
         } else {
-            onFinish.append(&tAtt.resubmitDelayed);
+            (cast(Task)task).appendOnFinish(&tAtt.resubmitDelayed);
             tAtt.delay({
                 if ((flags & TaskFlags.ImmediateSyncSubtasks)!=0){
+                    // add something like && rand.uniform!(bool)() to avoid excessive task length?
                     spawnTask(task,{ task.execute(); });
                 } else {
                     this.spawnTask(task);
@@ -766,7 +768,6 @@ class Task:TaskI{
             return defaultFiberPool(fPool);
     }
     /// executes this task synchroneously
-    /// could be improved to immediately execute in some cases, to do
     void executeNow(TaskI supertask=null){
         if (supertask !is null){
             assert(this.superTask is null || this.superTask is superTask,"superTask was already set");
@@ -887,7 +888,6 @@ class Task:TaskI{
             fieldsDesc(s);
             s(" >");
         }
-        return s;
     }
     /// prints the fields (superclasses can override this an call it through super)
     void fieldsDesc(void delegate(char[]) sink){
@@ -1034,8 +1034,12 @@ class SequentialTask:RootTask{
     this(char[] name,TaskSchedulerI scheduler, int level=0,bool canBeImmediate=true){
         super(scheduler,level,name,false);
         if (canBeImmediate){
-            flags|=TaskFlags.ImmediateSyncSubtasks;
+            version(NoReuse){ } else {
+                flags|=TaskFlags.ImmediateSyncSubtasks;
+            }
         }
+        queue=new Deque!(TaskI)();
+        nExecuting=0;
     }
     this(char[]name,TaskI t,bool canBeImmediate=true){
         if (t is null){
@@ -1049,8 +1053,7 @@ class SequentialTask:RootTask{
         synchronized(queue){
             flagAdd(spawnTasks,1);
             if (atomicCASB(nExecuting,1,0)){
-                if (queue.length>0){
-                    toExe=queue.popFront();
+                if (queue.popFront(toExe)){
                     queue.append(t);
                 } else {
                     toExe=t;
@@ -1072,20 +1075,11 @@ class SequentialTask:RootTask{
             this.spawnTask(task);
             if (!task.status==TaskStatus.Finished)
                 task.wait();
-            if (task.classinfo == Task.classinfo){
-                auto t=cast(Task)task;
-                if (t.refCount==1){
-                    auto tPool=defaultSchedulerPools().taskPool;
-                    tPool.giveBack(t); // already returns the fiber
-                } else if (t.fiber !is null && t.fPool!is null){
-                    t.fPool.giveBack(t.fiber);
-                    t.fiber=null;
-                }
-            } else{
+            if (!task.tryReuse()){
                 task.release();
             }
         } else {
-            onFinish.append(&tAtt.resubmitDelayed);
+            (cast(Task)task).appendOnFinish(&tAtt.resubmitDelayed);
             tAtt.delay({
                 if (tAtt.superTask is this){
                     synchronized(queue){
@@ -1095,18 +1089,18 @@ class SequentialTask:RootTask{
                                 __FILE__,__LINE__);// allow??
                         }
                     }
-                    log.warn("'"~this.taskName~"'.spawnTaskSync('"~task.taskName~"') called while executing '"~tAtt.taskName~"' which is sequential task of '"~this.taskName~"'");
+                    log.warn("'"~this.taskName~"'.spawnTaskSync('"~task.taskName~"') called while executing '"~tAtt.taskName~"' which is sequential task of '"~this.taskName~"'"); // remove?
                     if (atomicAdd(nExecuting,1)<1){
                         throw new ParaException("unexpected value of nExecuting",__FILE__,__LINE__);
                     }
                     super.spawnTask(task,{ task.execute(); });
                 } else if ((flags & TaskFlags.ImmediateSyncSubtasks)!=0){
+                    // add && scheduler.rand.uniform!(bool)() to avoid excessive task length
                     TaskI toExe;
                     synchronized(queue){
                         flagAdd(spawnTasks,1);
                         if (atomicCASB(nExecuting,1,0)){
-                            if (queue.length==0){
-                                toExe=queue.popFront();
+                            if (queue.popFront(toExe)){
                                 queue.append(task);
                             } else {
                                 toExe=task;
@@ -1119,7 +1113,7 @@ class SequentialTask:RootTask{
                         super.spawnTask(toExe,{ toExe.execute(); }); // could even loop until task is executed... but might give subtle priority problems
                     }
                 } else {
-                    super.spawnTask(task);
+                    spawnTask(task);
                 }
             });
         }
@@ -1140,13 +1134,11 @@ class SequentialTask:RootTask{
         TaskI toExe;
         super.subtaskEnded(st);
         synchronized(queue){
-            if (queue.length>0){
-                assert(nExecuting==1);
+            if (nExecuting==1 && queue.length>0){
+                // add && scheduler.rand.uniform!(bool)() ?
                 toExe=queue.popFront;
-            } else {
-                if (atomicAdd(nExecuting,-1)<1){
-                    throw new ParaException("unexpected value for nExecuting "~to!(char[])(nExecuting),__FILE__,__LINE__);
-                }
+            } else if (atomicAdd(nExecuting,-1)<1){
+                throw new ParaException("unexpected value for nExecuting "~to!(char[])(nExecuting),__FILE__,__LINE__);
             }
         }
         if (toExe){

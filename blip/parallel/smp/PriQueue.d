@@ -1,13 +1,14 @@
 module blip.parallel.smp.PriQueue;
 import blip.io.BasicIO;
-import tango.core.sync.Mutex;
-import tango.core.sync.Semaphore;
-import tango.math.Math;
+import blip.t.core.sync.Mutex;
+import blip.t.core.sync.Semaphore;
+import blip.t.math.Math;
 import blip.container.GrowableArray:collectAppender;
 import blip.BasicModels;
 import blip.util.Grow:growLength;
 import blip.container.Deque;
 import blip.container.AtomicSLink;
+import blip.io.Console;//pippo
 
 /// a simple priority queue optimized for adding high priority tasks
 /// the public interface consists of
@@ -107,10 +108,22 @@ class PriQueue(T){
         }
     }
     /// resets a queue
-    void reset(){
+    bool reset(){
+        bool res=true;
+        shouldStop=true;
+        while(!zeroSem.tryWait()){ // unsafe, make it an error???
+            zeroSem.notify();
+            res=false;
+        }
+        if (!res) return false;
         nEntries=0;
-        queue=null;
+        while(queue !is null){
+            PriQLevel pNext=queue.next;
+            lPool.giveBack(queue);
+            queue=pNext;
+        }
         shouldStop=false;
+        return true;
     }
     /// shuts down the priority queue
     void stop(){
@@ -159,7 +172,11 @@ class PriQueue(T){
                 if (nEntries>0){
                     if (shouldStop) return null;
                     assert(queue !is null);
-                    T res=queue.entries.popFront();
+                    T res;
+                    if(!queue.entries.popFront(res)){
+                        sout("Error: expected queue to have entries\n");
+                        desc(sout.call);
+                    }
                     assert(res!is null);
                     if (queue.entries.length==0){
                         PriQLevel nT=queue.next;
@@ -208,6 +225,7 @@ class PriQueue(T){
                     iblock=levels.length;
                 }
                 if (levels[ilevel%levels.length].entries.popBack(el,filter)){
+                    --nEntries;
                     return true;
                 }
             }

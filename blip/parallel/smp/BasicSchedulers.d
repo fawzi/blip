@@ -1,10 +1,8 @@
 module blip.parallel.smp.BasicSchedulers;
-import tango.io.protocol.model.IWriter;
-import tango.io.protocol.model.IReader;
-import tango.core.Thread;
-import tango.core.Variant:Variant;
-import tango.core.sync.Mutex;
-import tango.math.Math;
+import blip.t.core.Thread;
+import blip.t.core.Variant:Variant;
+import blip.t.core.sync.Mutex;
+import blip.t.math.Math;
 import blip.t.util.log.Log;
 import tango.util.container.LinkedList;
 import blip.io.BasicIO;
@@ -14,7 +12,7 @@ import blip.parallel.smp.PriQueue;
 import blip.parallel.smp.SmpModels;
 import blip.parallel.smp.BasicTasks;
 import blip.BasicModels;
-import tango.math.random.Random;
+import blip.t.math.random.Random;
 import blip.container.Cache;
 
 /// task scheduler that tries to perform a depth first reduction of the task
@@ -27,8 +25,6 @@ import blip.container.Cache;
 /// integrate PriQueue in this? it would be slighly more efficient, and already now
 /// depends on its implementation details, or they should be better separated
 class PriQTaskScheduler:TaskSchedulerI {
-    /// random source for scheduling
-    RandomSync rand;
     /// queue for tasks to execute
     PriQueue!(TaskI) queue;
     /// logger for problems/info
@@ -46,6 +42,9 @@ class PriQTaskScheduler:TaskSchedulerI {
     /// executer
     ExecuterI _executer;
     Cache _nnCache;
+    RandomSync _rand;
+    /// returns a random source for scheduling
+    final RandomSync rand(){ return _rand; }
     Cache nnCache(){
         return _nnCache;
     }
@@ -55,8 +54,9 @@ class PriQTaskScheduler:TaskSchedulerI {
     this(char[] name,char[] loggerPath="blip.parallel.smp.queue",int level=0){
         this.name=name;
         queue=new PriQueue!(TaskI)();
-        this.rand=new RandomSync();
+        this._rand=new RandomSync();
         log=Log.lookup(loggerPath);
+        _rand=new RandomSync();
         _rootTask=new RootTask(this,0,name~"RootTask");
         runLevel=SchedulerRunLevel.Running;
         _nnCache=new Cache();

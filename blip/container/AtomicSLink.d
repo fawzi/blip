@@ -8,10 +8,12 @@
 /// license: apache 2.0
 module blip.container.AtomicSLink;
 import blip.sync.Atomic: atomicOp,memoryBarrier;
-import blip.io.Console;
 
 /// inserts newHead before head, and returns the value at head when the insertion took place
 T insertAt(T)(ref T head,T newHead){
+    static if(is(typeof(newHead is null))){
+        assert(!(newHead is null),"cannot add a null head");
+    }
     return atomicOp(head,delegate T(T val){
         newHead.next=val;
         memoryBarrier!(false,false,false,true)();

@@ -7,7 +7,7 @@
 module blip.serialization.SerializationBase;
 import blip.serialization.Handlers;
 import tango.core.Tuple;
-import tango.core.Variant;
+import blip.t.core.Variant;
 import blip.io.Console;
 import blip.io.BasicIO;
 import blip.BasicModels;
@@ -16,7 +16,7 @@ import tango.text.Util;
 import blip.TemplateFu;
 import tango.text.Regex;
 import blip.container.GrowableArray;
-public import tango.core.Traits;
+public import blip.t.core.Traits;
 
 version(SerializationTrace){
     version=STrace;
@@ -207,16 +207,14 @@ class ClassMetaInfo {
         if (name.length==0){
             name=T.mangleof;
         }
-        static if (is(typeof(function RefType!(T)(){ return new UnrefType!(T); }))) {
-            static if (is(T==class)) { // do for all types? increases size...
+        static if (is(T==class)) { // do for all types? increases size...
+            static if (is(typeof(new T()))){
                 if (allocEl is null) {
                     allocEl=function void*(ClassMetaInfo mI){
-                        return cast(void*)(new UnrefType!(T));
+                        return cast(void*)(new T);
                     };
                 }
-            }
-        } else {
-            static if(is(T==class)){
+            } else {
                 assert(allocEl !is null,"cannot allocate automatically, and no allocator given for "~T.stringof~" name:"~name);
             }
         }
@@ -334,23 +332,6 @@ ClassMetaInfo getSerializationInfoForVar(T)(T t){
     } else {
         // return SerializationRegistry().getMetaInfo(typeid(T));
         static assert(0,"unsupported type "~T.stringof); 
-    }
-}
-
-template RefType(T) {
-    static if (is(T == class)) {
-        alias T RefType;
-    } else {
-        alias T* RefType;
-    }
-}
-
-
-template UnrefType(T) {
-    static if (is(T == class)) {
-        alias T UnrefType;
-    } else {
-        alias typeof(*T) UnrefType;
     }
 }
 
@@ -553,7 +534,11 @@ class Serializer {
             rootObjStartCallback(this);
         }
         writeStartRoot();
-        field!(T)(cast(FieldMetaInfo *)null,o);
+        static if(is(typeof(*o))){
+            field!(typeof(*o))(cast(FieldMetaInfo *)null,*o);
+        } else {
+            field!(T)(cast(FieldMetaInfo *)null,o);
+        }
         writeEndRoot();
         if (rootObjEndCallback){
             rootObjEndCallback(this);

@@ -7,7 +7,7 @@
         author:         Fawzi Mohamed
 *******************************************************************************/
 module blip.TemplateFu;
-import tango.core.Traits;
+import blip.t.core.Traits;
 
 /// returns the number of arguments in the tuple (its length)
 template nArgs(){

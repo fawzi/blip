@@ -1,8 +1,9 @@
 /// condition variables, try avoid their use
+/// DataFlowVar are safe, use that when possible
 module blip.parallel.smp.Condition;
 import blip.parallel.smp.SmpModels;
 import blip.parallel.smp.BasicTasks;
-import tango.core.Thread;
+import blip.t.core.Thread;
 
 /// waits for an OS lock
 /// WARNING this might deadlock if alwaysLock and the task that aquires the lock might

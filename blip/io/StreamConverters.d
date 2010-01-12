@@ -1,4 +1,4 @@
-/// helpters to convert basic tango streams to stream usable in blip
+/// helpers to convert basic tango streams to stream usable in blip
 module blip.io.StreamConverters;
 import tango.io.model.IConduit: OutputStream;
 import tango.core.Array: find;

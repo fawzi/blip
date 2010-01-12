@@ -7,6 +7,7 @@ compiler=
 silent="-s"
 tests=1
 build_dir=
+noopt=
 
 die() {
     echo "$1"
@@ -36,7 +37,8 @@ do
             echo "  --verbose       verbose building"
             echo "  --d-home x      uses x as d home (default $D_HOME )"
             echo "  --tango-home x  uses x as tango home"
-            echo "  --no-tests      does not compile "
+            echo "  --no-tests      does not compile the tests"
+            echo "  --no-opt      does not compile the opt version"
             echo "  --build-dir X   uses X as build dir (you *really* want to use a local"
             echo "                  filesystem like /tmp/$USER/build for building if possible)"
             echo ""
@@ -72,6 +74,9 @@ do
             ;;
         --no-tests)
             tests=0
+            ;;
+        --no-opt)
+            noopt=1
             ;;
         *)
             die "unexpected argument $1"
@@ -130,14 +135,16 @@ case $version in
     ;;
     *)
     echo "unknown version, guessing extra_libs"
-    extra_libs="${linkFlag}-ltango-user-${compShort}-${version} $extra_libs_os $extra_libs_comp"
+    extra_libs="${linkFlag}-L${D_HOME}/lib ${linkFlag}-ltango-user-${compShort}-${version} $extra_libs_os $extra_libs_comp"
 esac
 makeFlags="$silent TANGO_HOME=$TANGO_HOME $build_dir"
 if [ -n "$clean" ]; then
     $make $makeFlags distclean
 fi
 rm libblip-*
-$make $makeFlags EXTRA_LIBS="$extra_libs_opt" VERSION=opt lib || die "error building the opt version"
+if [ -z "$noopt" ]; then
+    $make $makeFlags EXTRA_LIBS="$extra_libs_opt" VERSION=opt lib || die "error building the opt version"
+fi
 $make $makeFlags EXTRA_LIBS="$extra_libs_dbg" VERSION=dbg lib || die "error building the dbg version"
 if [ -n "$tests" ] ; then
     $make $makeFlags EXTRA_LIBS="$extra_libs" VERSION=$version || die "error building the tests"

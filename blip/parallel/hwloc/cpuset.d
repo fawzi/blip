@@ -6,8 +6,8 @@
  */
 module blip.parallel.hwloc.cpuset;
 version(noHwloc){} else {
-import tango.stdc.config;
-import tango.stdc.stringz;
+import blip.t.stdc.config;
+import blip.t.stdc.stringz;
 /** \defgroup hwlocality_cpuset The Cpuset API
  *
  * For use in hwloc itself, a hwloc_cpuset_t represents a set of logical

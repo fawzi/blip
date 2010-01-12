@@ -10,7 +10,7 @@
         authors:        Kris
 
 *******************************************************************************/
-
+// to do remove and complete transition to new io system
 module blip.io.IOArray;
 
 private import tango.core.Exception;

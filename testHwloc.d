@@ -37,6 +37,27 @@ int main()
          */
         uint topo_depth=hwloc_topology_get_depth(topology);
 
+// pippo
+    void prObj(hwloc_obj_t obj){
+        char[128] string;
+        hwloc_obj_snprintf(string.ptr,string.length, topology, obj, "#", 0);
+        printf("%*s%s\n", 4, "               ".ptr, string.ptr);
+    }
+    auto mObj=hwloc_get_obj_by_depth(topology,1,0);
+    printf("mObj:");
+    prObj(mObj);
+    printf("childrens:");
+    for (int ichild=0;ichild<mObj.arity;++ichild){
+        printf("<ichild %d\n",ichild);
+        prObj(mObj.children[ichild]);
+        for (int jchild=0;jchild<mObj.children[ichild].arity;++jchild){
+            printf("jchild %d\n",jchild);
+            prObj(mObj.children[ichild].children[jchild]);
+        }
+        printf(">\n");
+    }
+    printf("\ndone\n");
+// pippo
 
         /* Walk the topology with an array style, from level 0 (always the
          * system level) to the lowest level (always the proc level). */

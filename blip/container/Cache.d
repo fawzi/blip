@@ -40,6 +40,23 @@ class Cache{
             }
         }
     }
+    // internal, should be called from a synchronized method
+    void updateAccess(CacheEntry* el){
+        assert(el !is null);
+        synchronized(this){
+            if (el !is last){
+                auto p1=el.prev;
+                auto p2=el.next;
+                p1.next=p2;
+                p2.prev=p1;
+                el.next=last;
+                el.prev=last.prev;
+                last.prev=el;
+                last=el;
+            }
+            el.lastUsed=Clock.now;
+        }
+    }
     /// returns a cache entry if stored
     bool getIfCached(char[]name,ref CacheEntry el){
         synchronized(this){
@@ -48,17 +65,7 @@ class Cache{
             el= **e;
             el.next=null;
             el.prev=null;
-            if (el.name != last.name){
-                auto p1=(*e).prev;
-                auto p2=(*e).next;
-                p1.next=p2;
-                p2.prev=p1;
-                (*e).next=last;
-                (*e).prev=last.prev;
-                last.prev=(*e);
-                last=(*e);
-            }
-            (*e).lastUsed=Clock.now;
+            updateAccess(*e);
         }
         return true;
     }
@@ -84,32 +91,34 @@ class Cache{
         return true;
     }
     
-    /// performs an operation on a cache entry 
+    /// performs an operation on a cache entry (creating it if needed)
     void cacheOp(char[] name, Variant delegate()create,EntryFlags flags,char[] kind,void delegate(ref CacheEntry) op){
         CacheEntry c;
         synchronized(this){
-            if (getIfCached(name,c)){
-                op(c);
-                return;
-            }
-            CacheEntry *newE=new CacheEntry;
-            newE.entry=create();
-            newE.name=name;
-            newE.kind=kind;
-            newE.flags=flags;
-            newE.lastUsed=Clock.now;
-            if (last is null){
-                newE.next=newE;
-                newE.prev=newE;
-                last=newE;
+            auto e=name in entries;
+            if (e !is null) {
+                updateAccess(*e);
+                op(**e);
             } else {
-                newE.prev=last.prev;
-                newE.next=last;
-                last.prev=newE;
-                last=newE;
+                CacheEntry *newE=new CacheEntry;
+                newE.entry=create();
+                newE.name=name;
+                newE.kind=kind;
+                newE.flags=flags;
+                newE.lastUsed=Clock.now;
+                if (last is null){
+                    newE.next=newE;
+                    newE.prev=newE;
+                    last=newE;
+                } else {
+                    newE.prev=last.prev;
+                    newE.next=last;
+                    last.prev=newE;
+                    last=newE;
+                }
+                entries[name]=newE;
+                op(*newE);
             }
-            entries[name]=newE;
-            return op(*newE);
         }
     }
     /// gets a value (if possible from the cache)
@@ -206,7 +215,11 @@ class Cached(T){
         Cache.EntryFlags flags=Cache.EntryFlags.Purge,
         T delegate()c=null){
         if (name.length==0){
-            this.name=collectAppender(outWriter(cacheId.next()));
+            this.name=collectAppender(delegate void(CharSink sink){
+                sink(T.stringof);
+                sink("_");
+                writeOut(sink,cacheId.next());
+            });
         } else if (name[$-1]=='_') {
             this.name=collectAppender(delegate void(CharSink s){
                 s(name);
@@ -225,8 +238,17 @@ class Cached(T){
         this(T.init,kind,name,flags,createOp);
     }
     Variant create(){
-        if (createOp !is null) return Variant(createOp());
-        return Variant(val0);
+        static if (is(T==Variant)){
+            if (createOp !is null) {
+                return createOp();
+            }
+            return val0;
+        } else {
+            if (createOp !is null) {
+                return Variant(createOp());
+            }
+            return Variant(val0);
+        }
     }
     final T getFromCache(Cache cache){
         return cache.get!(T)(name,&create,flags,kind);

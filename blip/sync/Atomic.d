@@ -16,7 +16,6 @@
  * Authors:   Fawzi Mohamed
  */
 module blip.sync.Atomic;
-import blip.io.Console;
 
 version( LDC )
 {
@@ -336,7 +335,7 @@ version(LDC){
         T oldval = void;
         static if (isPointerOrClass!(T))
         {
-            oldval = cast(T)llvm_atomic_cmp_swap!(size_t)(cast(size_t*)&val, cast(size_t)equalTo, cast(size_t)newval);
+            oldval = cast(T)cast(void*)llvm_atomic_cmp_swap!(size_t)(cast(size_t*)cast(void*)&val, cast(size_t)cast(void*)equalTo, cast(size_t)cast(void*)newval);
         }
         else static if (is(T == bool)) // correct also if bol has different size?
         {

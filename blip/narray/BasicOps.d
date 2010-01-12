@@ -9,8 +9,8 @@
 module blip.narray.BasicOps;
 import blip.narray.BasicTypes;
 import blip.TemplateFu;
-import tango.core.Traits;
-import tango.math.Math: round,sqrt,min,ceil;
+import blip.t.core.Traits;
+import blip.t.math.Math: round,sqrt,min,ceil;
 import tango.math.IEEE: feqrel;
 import tango.core.Memory:GC;
 

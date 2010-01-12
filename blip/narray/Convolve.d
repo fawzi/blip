@@ -10,8 +10,8 @@ module blip.narray.Convolve;
 import blip.narray.BasicTypes;
 import blip.narray.BasicOps;
 import blip.TemplateFu;
-import tango.core.Traits;
-import tango.math.Math:min;
+import blip.t.core.Traits;
+import blip.t.math.Math:min;
 debug(ConvolveCheckAccess) import blip.container.GrowableArray;
 /+ --------- convolution --------- +/
 // convolution base in 2d: 3 streams (minus,zero,plus), kernel[imin..imax,jmin..jmax] in aij

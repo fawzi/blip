@@ -5,6 +5,7 @@ import blip.BasicModels;
 import blip.io.BasicIO;
 import blip.container.FiberPool;
 import blip.container.Cache;
+import blip.t.math.random.Random;
 
 enum TaskStatus:int{
     Building=-1,
@@ -29,6 +30,8 @@ enum SchedulerRunLevel:int{
 }
 
 interface TaskSchedulerI:BasicObjectI {
+    /// random source (for scheduling)
+    RandomSync rand();
     /// changes the current run level of the scheduler
     /// the level can be only raised and the highest run level is "stopped"
     void raiseRunlevel(SchedulerRunLevel level);
@@ -117,6 +120,8 @@ interface TaskI:SubtaskNotificationsI,SubmittingI{
     TaskI setFiberPool(FiberPool fPool);
     /// returns the fiber pool used
     FiberPool fiberPool(bool canBeNull=false);
+    /// gives back the task for later reuse (makes the task invalid)
+    bool tryReuse();
 }
 
 /// notifications called by direct subtasks

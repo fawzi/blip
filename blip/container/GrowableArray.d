@@ -1,7 +1,6 @@
 /// a growable array that knows its capacity
 module blip.container.GrowableArray;
 import blip.util.Grow;
-import blip.io.Console;
 import blip.io.BasicIO;
 
 enum GASharing{

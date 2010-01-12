@@ -53,7 +53,7 @@ struct OutW(S...){
 OutWriter outWriter(T,S...)(T v,S args){
     return OutW!(T,S).closure(v,args);
 }
-
+/// parses an integer
 private size_t parseInt(char[]s,ref int i){
     size_t res=0;
     if (s.length>0 && s[0]>='0' && s[0]<='9'){
@@ -68,6 +68,18 @@ private size_t parseInt(char[]s,ref int i){
         }
     }
     return res;
+}
+/// writes out the given amount of space
+void writeSpace(S)(S s,int amount){
+    char[] tt="                ";
+    int l=cast(int)tt.length;
+    while(amount>l){
+        s(tt);
+        amount-=l;
+    }
+    if (amount>0){
+        s(tt[0..amount]);
+    }
 }
 // this is to write out a value (for debugging and similar purposes)
 void writeOut(V,T,S...)(V sink1,T v,S args){
@@ -95,12 +107,7 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
             };
         }
         scope(exit){
-            auto spce="        ";
-            while(width>0){
-                auto toAdd=((spce.length<width)?spce.length:cast(size_t)width);
-                sink1(spce[0..toAdd]);
-                width-=toAdd;
-            }
+            writeSpace(sink1,width);
         }
     } else {
         alias sink1 sink;
@@ -393,4 +400,3 @@ class BasicStrStream(T=char): OutStreamI{
         return &this.rawWrite;
     }
 }
-

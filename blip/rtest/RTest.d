@@ -147,7 +147,7 @@ import tango.util.ArgParser;
 import tango.text.Util;
 import blip.io.Console;
 import blip.io.BasicIO;
-import tango.stdc.stdlib: exit;
+import blip.t.stdc.stdlib: exit;
 import blip.parallel.smp.WorkManager;
 
 mixin testInit!() autoInitTst; 

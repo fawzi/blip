@@ -1,7 +1,8 @@
 /// executers (sequential and parallel)
 module blip.parallel.smp.BasicExecuters;
-import tango.core.Thread;
-import tango.math.Math;
+import blip.t.core.Thread;
+import blip.t.math.Math;
+import blip.t.math.random.Random;
 import blip.io.Console;
 import blip.t.util.log.Log;
 import blip.io.BasicIO;
@@ -16,7 +17,7 @@ import blip.parallel.smp.Numa;
 import blip.container.Cache;
 
 static this(){
-    Log.lookup("blip.parallel.smp.exec").level(Logger.Level.Warn,true);
+    Log.lookup("blip.parallel.smp.exec").level(Logger.Level.Info,true);
 }
 
 /// executes the task immediately in the current context
@@ -32,6 +33,9 @@ class ImmediateExecuter:ExecuterI,TaskSchedulerI{
     /// name of the executer
     char[] _name;
     Cache _nnCache;
+    RandomSync _rand;
+    /// returns a random source for scheduling
+    final RandomSync rand(){ return _rand; }
     /// name accessor
     char[] name(){
         return _name;
@@ -56,6 +60,7 @@ class ImmediateExecuter:ExecuterI,TaskSchedulerI{
         this._name=name;
         log=Log.lookup(loggerPath);
         runLevel=SchedulerRunLevel.Running;
+        _rand=new RandomSync();
         _rootTask=new RootTask(this,0,name~"DefaultTask",false);
     }
     /// returns the scheduler (itself in this case)
@@ -195,6 +200,9 @@ class PExecuter:ExecuterI{
     /// the job of the worker threads
     void workThreadJob(){
         log.info("Work thread "~Thread.getThis().name~" started");
+        scope(exit){
+            log.info("Work thread ".dup~Thread.getThis().name~" stopped");
+        }
         while(1){
             try{
                 TaskI t=scheduler.nextTask();
@@ -212,7 +220,6 @@ class PExecuter:ExecuterI{
                 scheduler.raiseRunlevel(SchedulerRunLevel.Stopped);
             }
         }
-        log.info("Work thread ".dup~Thread.getThis().name~" stopped");
     }
     /// description (for debugging)
     /// non threadsafe

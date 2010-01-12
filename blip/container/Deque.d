@@ -1,8 +1,8 @@
 /// a double ended queue
 module blip.container.Deque;
-import tango.stdc.string:memmove;
+import blip.t.stdc.string:memmove;
 import blip.BasicModels:CopiableObjectI;
-import tango.math.Math;
+import blip.t.math.Math;
 import blip.io.BasicIO;
 import blip.util.Grow:growLength;
 
@@ -22,7 +22,7 @@ class Deque(T):CopiableObjectI{
         assert(nEl==baseArr.length,"growLen should be called only when the array is full");
         baseArr.length=growLength(nEl,T.sizeof,60);
         size_t to1=min(start,baseArr.length-nEl);
-        baseArr[nEl..$]=baseArr[0..to1];
+        baseArr[nEl..nEl+to1]=baseArr[0..to1];
         if (to1<start){
             memmove(baseArr.ptr,baseArr.ptr+to1,start-to1);
         }
@@ -64,7 +64,24 @@ class Deque(T):CopiableObjectI{
             return true;
         }
         synchronized(this){
-            if (nEl==0) return false;
+            size_t i=0;
+            bool res=false;
+            while (i<length){
+                if (filter(opIndex(i))){
+                    el=opIndex(i);
+                    res=true;
+                    break;
+                }
+                ++i;
+            }
+            ++i;
+            while (i<length){
+                opIndexAssign(opIndex(i-1),i);
+                ++i;
+            }
+            if (res) popBack();
+            return res;
+/+            if (nEl==0) return false;
             T res=baseArr[start];
             auto pAtt=start;
             if(filter(baseArr[pAtt])){
@@ -99,7 +116,7 @@ class Deque(T):CopiableObjectI{
                         }
                     }
                 }
-            }
+            }+/
         }
         return false;
     }
@@ -132,6 +149,22 @@ class Deque(T):CopiableObjectI{
     /// returns the last element that matches the given filter
     bool popBack(ref T el,bool delegate(T) filter){
         synchronized(this){
+            bool res;
+            size_t pos=nEl;
+            while (pos!=0){
+                --pos;
+                if (filter(opIndex(pos))){
+                    el=opIndex(pos);
+                    res=true;
+                    break;
+                }
+            }
+            while (pos!=0){
+                --pos;
+                opIndexAssign(opIndex(pos+1),pos);
+            }
+            return res;
+            /+
             if (nEl==0) return false;
             if (filter(baseArr[(start+nEl-1)%baseArr.length])){
                 el=baseArr[(start+nEl-1)%baseArr.length];
@@ -164,7 +197,7 @@ class Deque(T):CopiableObjectI{
                     ++start;
                     return true;
                 }
-            }
+            }+/
         }
         return false;
     }

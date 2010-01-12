@@ -3,9 +3,9 @@
         license:        Apache 2.0
         author:         Fawzi Mohamed
 *******************************************************************************/
-module blip.containter.Pool;
-import tango.core.Traits:ctfe_i2a;
-import tango.math.Math: max;
+module blip.container.Pool;
+import blip.t.core.Traits:ctfe_i2a;
+import blip.t.math.Math: max;
 
 /// calls the allocator for the given type
 T allocT(T,A...)(A args) {

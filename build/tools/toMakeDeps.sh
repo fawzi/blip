@@ -15,6 +15,7 @@ do
         exit 0
         ;;
     --target)
+        shift
         target=$1
         ;;
     *)

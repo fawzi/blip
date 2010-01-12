@@ -5,7 +5,7 @@
  * Copyright: Copyright (C) 2005-2006 Digital Mars, www.digitalmars.com.
  *            All rights reserved.
  * License:   BSD style: $(LICENSE)
- * Authors:   Walter Bright, Sean Kelly
+ * Authors:   Walter Bright, Sean Kelly, modified by fawzi (minor changes to better match BitVector)
  */
 module blip.container.BitArray;
 private import tango.core.BitManip;

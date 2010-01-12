@@ -4,7 +4,7 @@
 ///
 /// author: Fawzi
 module blip.serialization.SerializationMixins;
-import tango.core.Traits: ctfe_i2a;
+public import blip.t.core.Traits: ctfe_i2a,isStaticArrayType,DynamicArrayType;
 
 char[][] extractFieldsAndDocs(char[] fieldsDoc){
     int i=0;
@@ -75,15 +75,26 @@ char[] serializeSome(char[] typeName1,char[]fieldsDoc){
     res~="void serial(Ser)(Ser s){\n";
     for (int ifield=0;ifield<fieldsDocArray.length/2;++ifield){
         auto field=fieldsDocArray[2*ifield];
-        res~="    static if(isStaticArrayType!(typeof(this."~field~"))){\n";
-        res~="        auto this_"~field~"=this."~field~"[];\n";
-        res~="        s.field(metaI["~ctfe_i2a(ifield)~"],this_"~field~");\n";
-        res~="        assert(this."~field~".length==this_"~field~".length);\n";
-        res~="        if (this."~field~".ptr !is this_"~field~".ptr)\n";
-        res~="            this."~field~"[]=this_"~field~";\n";
-        res~="    } else {\n";
-        res~="        s.field(metaI["~ctfe_i2a(ifield)~"],this."~field~");\n";
-        res~="    }\n";
+        res~=`
+        {
+            static if (is(typeof(this.`~field~`()))){
+                alias typeof(this.`~field~`()) FieldType;
+                    FieldType thisField=this.`~field~`;
+                    s.field(metaI[`~ctfe_i2a(ifield)~`],thisField);
+                    this.`~field~`=thisField;
+            } else {
+                alias typeof(this.`~field~`) FieldType;
+                static if(isStaticArrayType!(FieldType)){
+                    auto thisField=this.`~field~`[];
+                    s.field(metaI[`~ctfe_i2a(ifield)~`],thisField);
+                    assert(this.`~field~`.length==thisField.length);
+                    if (this.`~field~`.ptr !is thisField.ptr)
+                        this.`~field~`[]=thisField;
+                } else {
+                    s.field(metaI[`~ctfe_i2a(ifield)~`],this.`~field~`);
+                }
+            }
+        }`;
     }
     res~="    }\n";
     res~=`
@@ -126,3 +137,110 @@ char[] serializeSome(char[] typeName1,char[]fieldsDoc){
 `;
     return res;
 }
+
+/// serializes some fields
+/// basic version, does not work for subclasses serialized with external structs
+/// (should take the logic from the Xpose version)
+char[] createView(char[] viewName,char[]fieldsDoc,char[] baseType=""){
+    char[] res="";
+    bool inContext=false;
+    if (viewName[0]<'A' && viewName[0]>'Z') {
+        assert(0,"first letter of viewName should be an uppercase letter");
+    }
+    if (baseType.length==0){
+        inContext=true;
+        res~=`
+        alias typeof(this) `~viewName~`InnerType;`;
+        baseType=viewName~`InnerType`;
+    }
+    res~=`
+    struct `~viewName~`{
+        `~baseType~` el;`;
+    
+    res~=`
+        static ClassMetaInfo metaI;
+        static this(){
+            metaI=ClassMetaInfo.createForType!(typeof(*this))(typeof(*this).mangleof);`;
+    auto fieldsDocArray=extractFieldsAndDocs(fieldsDoc);
+    for (int ifield=0;ifield<fieldsDocArray.length/2;++ifield){
+        auto field=fieldsDocArray[2*ifield];
+        auto doc=fieldsDocArray[2*ifield+1];
+        res~=`
+            {
+                static if (is(typeof(this.`~field~`()))){
+                    alias typeof(this.`~field~`()) FieldType;
+                } else {
+                    alias typeof(this.`~field~`) FieldType;
+                }
+                metaI.addFieldOfType!(FieldType)("`~field~"\",`"~doc~"`"~`);
+            }`;
+    }
+    res~=`
+        }
+        static `~viewName~` opCall(`~baseType~` a){
+            `~viewName~` res;
+            res.el=a;
+            return res;
+        }
+        ClassMetaInfo getSerializationMetaInfo(){
+            return metaI;
+        }
+        void serial(Ser)(Ser s){`;
+    for (int ifield=0;ifield<fieldsDocArray.length/2;++ifield){
+        auto field=fieldsDocArray[2*ifield];
+        res~=`
+            {
+                static if (is(typeof(el.`~field~`()))){
+                    alias typeof(el.`~field~`()) FieldType;
+                        FieldType thisField=el.`~field~`;
+                        s.field(metaI[`~ctfe_i2a(ifield)~`],thisField);
+                        el.`~field~`=thisField;
+                } else {
+                    alias typeof(el.`~field~`) FieldType;
+                    static if(isStaticArrayType!(FieldType)){
+                        auto thisField=el.`~field~`[];
+                        s.field(metaI[`~ctfe_i2a(ifield)~`],thisField);
+                        assert(el.`~field~`.length==thisField.length);
+                        if (el.`~field~`.ptr !is thisField.ptr)
+                            el.`~field~`[]=thisField;
+                    } else {
+                        s.field(metaI[`~ctfe_i2a(ifield)~`],el.`~field~`);
+                    }
+                }
+            }`;
+    }
+    res~=`
+        }
+        void serialize(Serializer s){
+            serial(s);
+        }
+        void unserialize(Unserializer s){
+            serial(s);
+        }
+        void preSerialize(Serializer s){
+            static if (is(typeof(el is null))){
+                if (el is null){
+                    if (is(typeof(*el))){
+                        el=new typeof(*el);
+                    } else {
+                        el=new typeof(el);
+                    }
+                }
+            }
+        }
+    }
+    `;
+    if (inContext){
+        char viewLow=cast(char)(viewName[0]-'A'+'a');
+        res~=`
+    `~viewName~` `~[viewLow]~viewName[1..$]~`(){
+        `~viewName~` res;
+        res.el=this;
+        return res;
+    }
+    `;
+    }
+    return res;
+}
+    
+

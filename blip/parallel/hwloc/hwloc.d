@@ -6,8 +6,8 @@
  */
 module blip.parallel.hwloc.hwloc;
 version(noHwloc){} else {
-import tango.stdc.config;
-import tango.stdc.stdlib:abort;
+import blip.t.stdc.config;
+import blip.t.stdc.stdlib:abort;
 import blip.parallel.hwloc.cpuset;
 public import blip.parallel.hwloc.cpuset: hwloc_cpuset_t;
 

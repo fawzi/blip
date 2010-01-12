@@ -34,21 +34,21 @@ struct WaitListPtr{
             memoryBarrier!(false,false,false,true)();
             atomicCAS(_ptr,w,cast(WaitList)null);
             p=_ptr;
-            assert(p!is null,"unexpected null");
-            synchronized(p){
-                if (p==_ptr){
-                    op(p);
-                    return true;
-                } else {
-                    do {
-                        volatile p=_ptr;
-                        Thread.yield();
-                    } while(((cast(size_t)cast(void*)p)&3)==3);
-                    volatile assert(((cast(size_t)cast(void*)_ptr)&1)==1,"no val when expected one");
-                }
-            }
-            return false;
         }
+        assert(p!is null,"unexpected null");
+        synchronized(p){
+            if (p==_ptr){
+                op(p);
+                return true;
+            } else {
+                do {
+                    volatile p=_ptr;
+                    Thread.yield();
+                } while(((cast(size_t)cast(void*)p)&3)==3);
+                volatile assert(((cast(size_t)cast(void*)_ptr)&1)==1,"no val when expected one");
+            }
+        }
+        return false;
     }
     /// returns true if the value has been set (useful for the fast path)
     bool hasVal(){

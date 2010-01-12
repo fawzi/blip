@@ -120,6 +120,7 @@ struct BitVector(size_t len){
                     val= val &(~(1<<bitPos));
                 }
                 ii+=internal_t.sizeof*8;
+                ++p;
             }
             return 0;
         }
@@ -448,27 +449,23 @@ struct BitVector(size_t len){
     }
     
     /// assign a pattern to the whole array
-    void opSliceAssign( internal_t v, size_t pos )
-    in
-    {
-        assert( pos < len );
-    }
-    body
-    {
-        internal_t* p1 = this.ptr;
-        size_t n = len / internal_t.sizeof;
-        size_t i;
-        for( i = 0; i < n; ++i )
-        {
-            p1[i]=v;
-        }
+    void opSliceAssign( internal_t v){
+        data[]=v;
         int rest=cast(int)(len & cast(size_t) (internal_t.sizeof*8-1));
         if (rest>0) {
-            uint mask=~((~0u)<<rest);
-            p1[i] = v & mask;
+            internal_t mask=~((~(cast(size_t)0))<<rest);
+            data[$-1] = v & mask;
         }
     }
 
+    /// copy op (for completness and compatibility with BitArray, normal assign also works)
+    BitVector opSliceAssign( BitVector rhs )
+    body
+    {
+        auto dim = this.dim();
+        data[]=rhs.data;
+        return *this;
+    }
 
     /**
      * Updates the contents of this array with the result of a bitwise and
@@ -781,7 +778,7 @@ debug( UnitTest )
   {
     BitVector!(6) a = [1,0,1,0,1,0];
     int[] idx=[0,2,4];
-    ii=0;
+    size_t ii=0;
     foreach(i;a.loopTrue){
         assert(i==idx[ii]);
         ++ii;

@@ -6,8 +6,8 @@
 module blip.container.BulkArray;
 import tango.core.Memory;
 import blip.BasicModels;
-import tango.stdc.string;
-import tango.core.Traits;
+import blip.t.stdc.string;
+import blip.t.core.Traits;
 import blip.serialization.Serialization;
 import blip.serialization.SerializationMixins;
 import blip.container.AtomicSLink;

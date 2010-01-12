@@ -76,12 +76,11 @@ vpath %di $(SRCDIR)
 
 MODULES=$(MOD_BLIP) $(MOD_GOBO) $(MOD_OMG)
 
-EXCLUDE_DEP_ALL=$(EXCLUDE_DEP_COMP) ^tango.*
+EXCLUDE_DEP_ALL=$(EXCLUDE_DEP_COMP) object.di ^tango.*
 
 OBJS=$(MODULES:%=%.$(OBJ_EXT))
 
-TESTS=testTextParsing testRTest testSerial testNArray testNArrayPerf testNuma testHwloc
-
+TESTS=testTextParsing testRTest testSerial testNArrayPerf testNuma testHwloc testNArray
 .PHONY: _genDeps newFiles build clean distclean _tests tests lib $(TESTS)
 
 lib: $(OBJDIR)/MODULES.inc $(OBJDIR)/intermediate.rule

@@ -12,8 +12,8 @@ import blip.container.Deque;
 import blip.sync.UniqueNumber;
 import blip.io.IOArray;
 import blip.serialization.Handlers;
-import tango.math.random.Random;
-import tango.core.Variant;
+import blip.t.math.random.Random;
+import blip.t.core.Variant;
 import blip.container.GrowableArray;
 import blip.io.BasicIO;
 

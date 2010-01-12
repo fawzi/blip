@@ -7,7 +7,7 @@
 /// license: Apache 2.0
 module blip.util.NotificationCenter;
 import blip.sync.Atomic;
-import tango.core.Variant;
+import blip.t.core.Variant;
 import blip.container.AtomicSLink;
 
 struct Callback{

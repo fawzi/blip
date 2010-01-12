@@ -4,7 +4,7 @@ import blip.serialization.SerializationBase;
 import blip.serialization.Handlers;
 import blip.io.Console;
 import tango.io.model.IConduit:IOStream;
-import tango.core.Variant;
+import blip.t.core.Variant;
 import blip.BasicModels;
 import blip.text.TextParser;
 import blip.text.UtfUtils;

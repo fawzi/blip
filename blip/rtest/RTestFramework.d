@@ -6,16 +6,16 @@
         author:         Fawzi Mohamed
 *******************************************************************************/
 module blip.rtest.RTestFramework;
-import tango.math.random.Random: Random;
+import blip.t.math.random.Random: Random;
 public import blip.TemplateFu: nArgs,ctfe_i2a,ctfe_hasToken, ctfe_replaceToken;
-public import tango.core.Traits:isStaticArrayType;
+public import blip.t.core.Traits:isStaticArrayType;
 import blip.io.BasicIO;
 public import blip.io.Console;
-public import tango.core.Variant:Variant;
-import tango.core.Array: find,remove;
-import tango.core.sync.Mutex: Mutex;
+public import blip.t.core.Variant:Variant;
+import blip.t.core.Array: find,remove;
+import blip.t.core.sync.Mutex: Mutex;
 import blip.parallel.smp.WorkManager;
-import tango.core.Thread;
+import blip.t.core.Thread;
 public import blip.container.GrowableArray;
 
 /// exception that causes a test to skip

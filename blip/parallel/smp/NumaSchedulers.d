@@ -1,10 +1,12 @@
-module blip.parallel.smp.NewSchedulers;
+/// schedulers that take advantage of numa topology
+module blip.parallel.smp.NumaSchedulers;
 import blip.t.core.Thread;
 import blip.t.core.Variant:Variant;
 import blip.t.core.sync.Mutex;
 import blip.t.core.sync.Semaphore;
 import blip.t.math.Math;
 import blip.t.util.log.Log;
+import blip.t.math.random.Random;
 import blip.io.BasicIO;
 import blip.container.GrowableArray;
 import blip.TemplateFu:ctfe_i2a;
@@ -13,12 +15,24 @@ import blip.parallel.smp.SmpModels;
 import blip.parallel.smp.BasicTasks;
 import blip.parallel.smp.Numa;
 import blip.BasicModels;
-import tango.math.random.Random;
 import blip.container.Deque;
 import blip.container.Cache;
 import blip.container.BitVector;
 import blip.container.AtomicSLink;
 import blip.io.Console;
+import blip.sync.Atomic;
+
+// locking order, be careful to change that to avoid deadlocks
+// especially addSched and redirectedTask are sensible
+//
+// PriQSched(this): never lock anything else
+// PriQSched(queue.lock): never lock anything else
+// 
+// MultiSched(this): never lock anything else
+// MultiSched(queue): lock PriQSched(queue.lock), *(this)
+// 
+// StarvationManager(this): never lock anything else
+
 
 /// task scheduler that tries to perform a depth first reduction of the task
 /// using the maximum parallelization available.
@@ -32,11 +46,14 @@ import blip.io.Console;
 class PriQScheduler:TaskSchedulerI {
     static Cached!(PriQueue!(TaskI).PriQPool) pQLevelPool;
     static this(){
-        pQLevelPool=new Cached!(PriQueue!(TaskI).PriQPool)(delegate PriQueue!(TaskI).PriQPool(){ return new PriQueue!(TaskI).PriQPool(); });
+        pQLevelPool=new Cached!(PriQueue!(TaskI).PriQPool)(delegate PriQueue!(TaskI).PriQPool(){
+            auto res=new PriQueue!(TaskI).PriQPool();
+            return res;
+        });
     }
     
     /// random source for scheduling
-    RandomSync rand;
+    RandomSync _rand;
     /// queue for tasks to execute
     PriQueue!(TaskI) queue;
     /// logger for problems/info
@@ -68,13 +85,20 @@ class PriQScheduler:TaskSchedulerI {
     Cache nnCache(){
         return _nnCache;
     }
+    /// returns a random source for scheduling
+    final RandomSync rand(){ return _rand; }
     /// creates a new PriQScheduler
     this(char[] name,MultiSched superScheduler,char[] loggerPath="blip.parallel.smp.queue",int level=0){
         this.name=name;
+        assert(superScheduler!is null);
         this.superScheduler=superScheduler;
         this._nnCache=superScheduler.nnCache();
-        queue=new PriQueue!(TaskI)(pQLevelPool(_nnCache));
-        this.rand=new RandomSync();
+        version(NoReuse){
+            queue=new PriQueue!(TaskI)();
+        } else {
+            queue=new PriQueue!(TaskI)(pQLevelPool(_nnCache));
+        }
+        this._rand=new RandomSync();
         this.inSuperSched=0;
         log=Log.lookup(loggerPath);
         _rootTask=new RootTask(this,0,name~"RootTask");
@@ -83,9 +107,13 @@ class PriQScheduler:TaskSchedulerI {
     }
     void reset(char[] name,MultiSched superScheduler){
         this.name=name;
+        assert(superScheduler!is null);
         this.superScheduler=superScheduler;
         this._nnCache=superScheduler.nnCache();
-        queue.reset();
+        if (!queue.reset()){
+            throw new Exception("someone waiting on queue, this should neve happen (wait are only on MultiSched)",
+                __FILE__,__LINE__);
+        }
         stealLevel=int.max;
         inSuperSched=0;
         runLevel=SchedulerRunLevel.Running;
@@ -94,22 +122,38 @@ class PriQScheduler:TaskSchedulerI {
     void addTask0(TaskI t){
         assert(t.status==TaskStatus.NonStarted ||
             t.status==TaskStatus.Started,"initial");
-        log.info("task "~t.taskName~" will be added to queue "~name);
-        if (shouldAddTask(t)){
-            synchronized(queue.queueLock){
-                queue.insert(t.level,t);
-                if (inSuperSched==0) {
-                    inSuperSched=1;
-                    if (superScheduler) superScheduler.addSched(this);
-                }
+        version(TrackQueues){
+            log.info(collectAppender(delegate void(CharSink s){
+                s("pre PriQScheduler "); s(name); s(".addTask0:");writeStatus(s,4);
+            }));
+            log.info("task "~t.taskName~" will be added to queue "~name);
+            scope(exit){
+                log.info(collectAppender(delegate void(CharSink s){
+                    s("post PriQScheduler "); s(name); s(".addTask0:");writeStatus(s,4);
+                }));
             }
         }
+        if (t.scheduler!is this){
+            assert(t.scheduler is cast(TaskSchedulerI)superScheduler ||
+                t.scheduler is cast(TaskSchedulerI)superScheduler.starvationManager,
+                "wrong scheduler in task");
+            t.scheduler=this;
+        }
+        bool addToSuperSched=false;
+        synchronized(queue.queueLock){
+            queue.insert(t.level,t);
+            if (inSuperSched==0) {
+                inSuperSched=1;
+                addToSuperSched=true;
+            }
+        }
+        if (addToSuperSched) superScheduler.addSched(this);
     }
     /// adds a task to be executed
     void addTask(TaskI t){
         assert(t.status==TaskStatus.NonStarted ||
             t.status==TaskStatus.Started,"initial");
-        log.info("task "~t.taskName~" might be added to queue "~name);
+        version(TrackQueues) log.info("task "~t.taskName~" might be added to queue "~name);
         if (shouldAddTask(t)){
             addTask0(t);
         }
@@ -120,13 +164,11 @@ class PriQScheduler:TaskSchedulerI {
         TaskI t;
         if (runLevel>=SchedulerRunLevel.StopNoTasks){
             if (queue.nEntries==0){
-                synchronized(this){
-                    if (runLevel==SchedulerRunLevel.StopNoQueuedTasks){
-                        raiseRunlevel(SchedulerRunLevel.Stopped);
-                    } else if (runLevel==SchedulerRunLevel.StopNoTasks &&
-                        queue.nEntries==0 && activeTasks.length==0){
-                        raiseRunlevel(SchedulerRunLevel.Stopped);
-                    }
+                if (runLevel==SchedulerRunLevel.StopNoQueuedTasks){
+                    raiseRunlevel(SchedulerRunLevel.Stopped);
+                } else if (runLevel==SchedulerRunLevel.StopNoTasks &&
+                    queue.nEntries==0 && activeTasks.length==0){
+                    raiseRunlevel(SchedulerRunLevel.Stopped);
                 }
             }
             if (runLevel==SchedulerRunLevel.Stopped){
@@ -145,9 +187,7 @@ class PriQScheduler:TaskSchedulerI {
             }
         }
         if (t !is null){
-            if (superScheduler){
-                superScheduler.addSched(this);
-            }
+            superScheduler.addSched(this);
             subtaskActivated(t);
         }
         return t;
@@ -161,9 +201,7 @@ class PriQScheduler:TaskSchedulerI {
                 t=queue.popNext(false);
             }
             if (t !is null){
-                if (superScheduler){
-                    superScheduler.addSched(this);
-                }
+                superScheduler.addSched(this);
                 subtaskActivated(t);
             } else {
                 assert(runLevel==SchedulerRunLevel.Stopped);
@@ -178,33 +216,32 @@ class PriQScheduler:TaskSchedulerI {
         TaskI t;
         if (runLevel>=SchedulerRunLevel.StopNoTasks){
             if (queue.nEntries==0){
-                synchronized(this){
-                    if (runLevel==SchedulerRunLevel.StopNoQueuedTasks){
-                        raiseRunlevel(SchedulerRunLevel.Stopped);
-                    } else if (runLevel==SchedulerRunLevel.StopNoTasks &&
-                        queue.nEntries==0 && activeTasks.length==0){
-                        raiseRunlevel(SchedulerRunLevel.Stopped);
-                    }
+                if (runLevel==SchedulerRunLevel.StopNoQueuedTasks){
+                    raiseRunlevel(SchedulerRunLevel.Stopped);
+                } else if (runLevel==SchedulerRunLevel.StopNoTasks &&
+                    queue.nEntries==0 && activeTasks.length==0){
+                    raiseRunlevel(SchedulerRunLevel.Stopped);
                 }
             }
             if (runLevel==SchedulerRunLevel.Stopped){
                 return false;
             }
         }
-        synchronized(queue.queueLock){
-            if (queue.popBack(t,delegate bool(TaskI task){ return task.stealLevel>=stealLevel; })){
-                t.scheduler=targetScheduler;
-                targetScheduler.addTask0(t);
-                while (queue.nEntries>0 && rand.uniform!(bool)()){
-                    TaskI t2;
-                    if (queue.popBack(t2,delegate bool(TaskI task){ return task.stealLevel>=stealLevel; })){
-                        t2.scheduler=t.scheduler;
-                        t.scheduler.addTask0(t2);
-                    }
-                }
+        if (!queue.popBack(t,delegate bool(TaskI task){ return task.stealLevel>=stealLevel; })){
+            return false;
+        }
+        t.scheduler=targetScheduler;
+        targetScheduler.addTask0(t);
+        auto scheduler2=t.scheduler;
+        if(scheduler2 is null) scheduler2=targetScheduler;
+        while (true){
+            if(rand.uniform!(bool)()) return true;
+            TaskI t2;
+            if (!queue.popBack(t2,delegate bool(TaskI task){ return task.stealLevel>=stealLevel; })){
                 return true;
             }
-            return false;
+            t2.scheduler=scheduler2;
+            scheduler2.addTask0(t2);
         }
     }
     /// description (for debugging)
@@ -234,28 +271,29 @@ class PriQScheduler:TaskSchedulerI {
     /// subtask has stopped execution (but is not necessarily finished)
     /// this has to be called by the executer
     void subtaskDeactivated(TaskI st){
+        bool checkRunLevel=false;
         synchronized(this){
             if (activeTasks[st]>1){
                 activeTasks[st]-=1;
             } else {
                 activeTasks.remove(st);
                 if (runLevel>=SchedulerRunLevel.StopNoTasks && queue.nEntries==0){
-                    if (runLevel==SchedulerRunLevel.StopNoQueuedTasks){
-                        raiseRunlevel(SchedulerRunLevel.Stopped);
-                    } else if (runLevel==SchedulerRunLevel.StopNoTasks &&
-                        activeTasks.length==0){
-                        raiseRunlevel(SchedulerRunLevel.Stopped);
-                    }
+                    checkRunLevel=true;
                 }
+            }
+        }
+        if (checkRunLevel){
+            if (runLevel==SchedulerRunLevel.StopNoQueuedTasks){
+                raiseRunlevel(SchedulerRunLevel.Stopped);
+            } else if (runLevel==SchedulerRunLevel.StopNoTasks &&
+                activeTasks.length==0){
+                raiseRunlevel(SchedulerRunLevel.Stopped);
             }
         }
     }
     /// returns wether the current task should be added
     bool shouldAddTask(TaskI t){
-        if (superScheduler !is null){
-            return superScheduler.starvationManager.redirectedTask(t,this);
-        }
-        return true;
+        return !superScheduler.starvationManager.redirectedTask(t,this);
     }
     /// yields the current task if the scheduler is not sequential
     void yield(){
@@ -307,24 +345,52 @@ class PriQScheduler:TaskSchedulerI {
         s("  rootTask:"); writeOut(sink,rootTask);
         s("\n >");
     }
+    /// writes the status of the queue in a compact and 
+    void writeStatus(CharSink s,int intentL){
+        synchronized(queue.queueLock){
+            s("{ \"sched@\":"); writeOut(s,cast(void*)this); s(", q:[");
+            auto lAtt=queue.queue;
+            while(lAtt !is null){
+                s("\n");
+                if (lAtt !is queue) writeSpace(s,intentL+1);
+                s("{ level:"); writeOut(s,lAtt.level); s(", q:[");
+                foreach(i,e;lAtt.entries){
+                    if (i!=0) {
+                        s("\", \"");
+                    } else {
+                        s("\"");
+                    }
+                    s(e.taskName);
+                    s("@");
+                    writeOut(s,cast(void*)e);
+                }
+                if (lAtt.entries.length>0) s("\"");
+                s("] }\n");
+                lAtt=lAtt.next;
+            }
+            s("]}");
+        }
+    }
     /// changes the current run level of the scheduler
     /// the level can be only raised and the highest run level is "stopped"
     void raiseRunlevel(SchedulerRunLevel level){
+        bool callOnStop=false;
         synchronized(this){
             if (runLevel < cast(int)level){
                 runLevel=level;
                 if (runLevel==SchedulerRunLevel.Stopped){
-                    queue.stop();
-                    onStop();
+                    callOnStop=true;
                 }
             }
+        }
+        if (callOnStop){
+            queue.stop();
+            onStop();
         }
     }
     /// called when the queue stops
     void onStop(){
-        if (superScheduler !is null){
-            superScheduler.queueStopped(this);
-        }
+        superScheduler.queueStopped(this);
     }
     /// scheduler logger
     Logger logger(){ return log; }
@@ -339,20 +405,17 @@ class MultiSched:TaskSchedulerI {
     static this(){
         pQSchedPool=new Cached!(PriQScheduler*)(delegate PriQScheduler*(){
             auto res=cast(PriQScheduler*)cast(void*)new size_t;
-            res=null;
             return res;
         });
     }
     /// random source for scheduling
-    RandomSync rand;
+    RandomSync _rand;
     /// queue for tasks to execute
     Deque!(PriQScheduler) queue;
-    /// queueLock
-    Mutex queueLock;
     /// semaphore for non busy waiting
     Semaphore zeroSem;
-    /// if someome is waiting on the semaphore... (not all semaphores give that info)
-    bool zeroLock;
+    /// how many are waiting on the semaphore... (not all semaphores give that info)
+    int zeroLock;
     /// numa not this schedule is connected to
     NumaNode numaNode;
     /// logger for problems/info
@@ -383,18 +446,22 @@ class MultiSched:TaskSchedulerI {
     Cache nnCache(){
         return _nnCache;
     }
+    /// returns a random source for scheduling
+    final RandomSync rand(){ return _rand; }
     /// creates a new PriQScheduler
     this(char[] name,NumaNode numaNode,
         StarvationManager starvationManager,
         char[] loggerPath="blip.parallel.smp.queue")
     {
-        this.name=name;
+        this.name=collectAppender(delegate void(CharSink s){
+            s(name); s("_"); writeOut(s,numaNode.level); s("_"); writeOut(s,numaNode.pos);
+        });
         this.starvationManager=starvationManager;
         this.numaNode=numaNode;
         assert(starvationManager!is null,"starvationManager must be valid");
         _nnCache=starvationManager.nnCacheForNode(numaNode);
         queue=new Deque!(PriQScheduler)();
-        this.rand=new RandomSync();
+        this._rand=new RandomSync();
         log=Log.lookup(loggerPath);
         _rootTask=new RootTask(this,0,name~"RootTask");
         stealLevel=int.max;
@@ -407,12 +474,26 @@ class MultiSched:TaskSchedulerI {
     void addTask0(TaskI t){
         assert(t.status==TaskStatus.NonStarted ||
             t.status==TaskStatus.Started,"initial");
-        log.info("task "~t.taskName~" will be added to a newly created queue in "~name);
-        auto newS=popFrom(*pQSchedPool(_nnCache));
-        if (newS is null){
-            newS=new PriQScheduler(t.taskName,this);
+        version(TrackQueues){
+            log.info(collectAppender(delegate void(CharSink s){
+                s("pre MultiSched ");s(name);s(".addTask0:");writeStatus(s,4);
+            }));
+            scope(exit){
+                log.info(collectAppender(delegate void(CharSink s){
+                    s("post MultiSched ");s(name);s(".addTask0:");writeStatus(s,4);
+                }));
+            }
+            log.info("task "~t.taskName~" will be added to a newly created queue in "~name);
+        }
+        version(NoReuse){
+            auto newS=new PriQScheduler(t.taskName,this);
         } else {
-            newS.reset(t.taskName,this);
+            auto newS=popFrom(*pQSchedPool(_nnCache));
+            if (newS is null){
+                newS=new PriQScheduler(t.taskName,this);
+            } else {
+                newS.reset(t.taskName,this);
+            }
         }
         if (t.scheduler is null || t.scheduler is this){
             t.scheduler=newS;
@@ -423,7 +504,7 @@ class MultiSched:TaskSchedulerI {
     void addTask(TaskI t){
         assert(t.status==TaskStatus.NonStarted ||
             t.status==TaskStatus.Started,"initial");
-        log.info("task "~t.taskName~" might be added to a newly created queue in "~name);
+        version(TrackQueues) log.info("task "~t.taskName~" might be added to a newly created queue in "~name);
         if (shouldAddTask(t)){
             addTask0(t);
         }
@@ -432,12 +513,10 @@ class MultiSched:TaskSchedulerI {
     TaskI nextTaskImmediate(){
         TaskI t;
         PriQScheduler sched;
-        synchronized(queueLock){
-            while (queue.length>0 && t is null){
-                if (runLevel==SchedulerRunLevel.Stopped) return null;
-                sched=queue.popFront();
-                t=sched.nextTaskImmediate();
-            }
+        while (t is null){
+            if (runLevel==SchedulerRunLevel.Stopped) return null;
+            if (!queue.popFront(sched)) break;
+            t=sched.nextTaskImmediate();
         }
         if (t !is null){
             subtaskActivated(t);
@@ -449,13 +528,11 @@ class MultiSched:TaskSchedulerI {
         if (stealLevel>this.stealLevel) return false;
         if (runLevel>=SchedulerRunLevel.StopNoTasks){
             if (queue.length==0){
-                synchronized(this){
-                    if (runLevel==SchedulerRunLevel.StopNoQueuedTasks){
-                        raiseRunlevel(SchedulerRunLevel.Stopped);
-                    } else if (runLevel==SchedulerRunLevel.StopNoTasks &&
-                        queue.length==0 && activeTasks.length==0){
-                        raiseRunlevel(SchedulerRunLevel.Stopped);
-                    }
+                if (runLevel==SchedulerRunLevel.StopNoQueuedTasks){
+                    raiseRunlevel(SchedulerRunLevel.Stopped);
+                } else if (runLevel==SchedulerRunLevel.StopNoTasks &&
+                    queue.length==0 && activeTasks.length==0){
+                    raiseRunlevel(SchedulerRunLevel.Stopped);
                 }
             }
             if (runLevel==SchedulerRunLevel.Stopped){
@@ -463,8 +540,9 @@ class MultiSched:TaskSchedulerI {
             }
         }
         size_t didSteal=0;
-        synchronized(queueLock){
+        synchronized(queue){
             foreach (sched;queue){
+                assert(sched.inSuperSched!=0,"unexpected inSuperSched value");
                 if (sched.stealLevel>=stealLevel){
                     if (sched.stealTask(stealLevel,targetScheduler)){
                         ++didSteal;
@@ -481,20 +559,30 @@ class MultiSched:TaskSchedulerI {
         if (t is null && stealLevel>this.numaNode.level){
             t=starvationManager.trySteal(this,stealLevel);
         }
-        if (t !is null){
-            subtaskActivated(t);
-        }
         return t;
     }
     /// queue stop
     void queueStopped(PriQScheduler q){
-        insertAt(*pQSchedPool(_nnCache),q);
+        version(TrackQueues){
+            log.info(collectAppender(delegate void(CharSink s){
+                s("scheduler "); s(q.name); s(" finished");
+            }));
+        }
+        version(NoReuse){} else{
+            insertAt(*pQSchedPool(_nnCache),q);
+        }
     }
     void addSched(PriQScheduler sched){
-        synchronized(queueLock){
+        synchronized(queue){
             queue.append(sched);
-            if (queue.length>0 && zeroLock){
-                zeroLock=false;
+            starvationManager.rmStarvingSched(this);
+            version(TrackQueues) {
+                log.info(collectAppender(delegate void(CharSink s){
+                    s("MultiSched "); s(name); s(" added sched@"); writeOut(s,cast(void*)sched);
+                }));
+            }
+            if (zeroLock>0){
+                atomicAdd(zeroLock,-1);
                 zeroSem.notify();
             }
         }
@@ -505,21 +593,17 @@ class MultiSched:TaskSchedulerI {
         while(t is null){
             if (runLevel>=SchedulerRunLevel.StopNoTasks){
                 if (queue.length==0){
-                    synchronized(this){
-                        if (runLevel==SchedulerRunLevel.StopNoQueuedTasks){
-                            raiseRunlevel(SchedulerRunLevel.Stopped);
-                        } else if (runLevel==SchedulerRunLevel.StopNoTasks &&
-                            queue.length==0 && activeTasks.length==0){
-                            raiseRunlevel(SchedulerRunLevel.Stopped);
-                        }
+                    if (runLevel==SchedulerRunLevel.StopNoQueuedTasks){
+                        raiseRunlevel(SchedulerRunLevel.Stopped);
+                    } else if (runLevel==SchedulerRunLevel.StopNoTasks &&
+                        queue.length==0 && activeTasks.length==0){
+                        raiseRunlevel(SchedulerRunLevel.Stopped);
                     }
                 }
-                synchronized(queueLock){
-                    if (queue.length>0){
-                        auto sched=queue.popFront();
-                        t=sched.nextTaskImmediate();
-                        if (t is null) continue;
-                    }
+                PriQScheduler sched;
+                if (queue.popFront(sched)){
+                    t=sched.nextTaskImmediate();
+                    if (t is null) continue;
                 }
                 if (acceptLevel>numaNode.level && t is null){
                     t=starvationManager.trySteal(this,acceptLevel);
@@ -530,17 +614,17 @@ class MultiSched:TaskSchedulerI {
             if (t is null) {
                 starvationManager.addStarvingSched(this);
                 // better close the gap in which added tasks are not redirected...
-                // remove the trySteal? imperfect redirection just leads to inefficency, not errors
-                // and the trySteal just
+                // remove this? imperfect redirection just leads to inefficency, not errors
                 t=starvationManager.trySteal(this,acceptLevel);
             }
             if (t is null) {
-                zeroLock=true;
+                atomicAdd(zeroLock,1);
                 zeroSem.wait();
-                // starvationManager.rmStarvingSched(this);
-                synchronized(queueLock){
-                    if (queue.length>0 || runLevel==SchedulerRunLevel.Stopped)
+                synchronized(queue){
+                    if (zeroLock>0 && (queue.length>0 || runLevel==SchedulerRunLevel.Stopped)){
+                        atomicAdd(zeroLock,-1);
                         zeroSem.notify();
+                    }
                 }
             }
         }
@@ -552,15 +636,6 @@ class MultiSched:TaskSchedulerI {
     char[] toString(){
         return collectAppender(cast(OutWriter)&desc);
     }
-    /// locks the scheduler (to perform task reorganization)
-    /// if you call this then toString is threadsafe
-    void lockSched(){
-        queueLock.lock();
-    }
-    /// unlocks the scheduler
-    void unlockSched(){
-        queueLock.unlock();
-    }
     /// subtask has started execution (automatically called by nextTask)
     void subtaskActivated(TaskI st){
         synchronized(this){
@@ -570,6 +645,7 @@ class MultiSched:TaskSchedulerI {
                 activeTasks[st]=1;
             }
         }
+        st.retain();
     }
     /// subtask has stopped execution (but is not necessarily finished)
     /// this has to be called by the executer
@@ -579,18 +655,14 @@ class MultiSched:TaskSchedulerI {
                 activeTasks[st]-=1;
             } else {
                 activeTasks.remove(st);
-                if (runLevel>=SchedulerRunLevel.StopNoTasks && queue.length==0){
-                    if (runLevel==SchedulerRunLevel.StopNoQueuedTasks){
-                        raiseRunlevel(SchedulerRunLevel.Stopped);
-                    } else if (runLevel==SchedulerRunLevel.StopNoTasks &&
-                        activeTasks.length==0){
-                        raiseRunlevel(SchedulerRunLevel.Stopped);
-                    }
-                }
             }
-            if (!(st.scheduler is this)){
-                st.scheduler.subtaskDeactivated(st);
-            }
+        }
+        if (!(st.scheduler is this)){
+            assert(st.scheduler!is null,"task without scheduler...");
+            st.scheduler.subtaskDeactivated(st);
+        }
+        if (!st.tryReuse()){
+            st.release();
         }
     }
     /// returns wether the current task should be added (check for starvation)
@@ -649,22 +721,30 @@ class MultiSched:TaskSchedulerI {
     /// changes the current run level of the scheduler
     /// the level can be only raised and the highest run level is "stopped"
     void raiseRunlevel(SchedulerRunLevel level){
+        bool callOnStop=false;
         synchronized(this){
             assert(cast(int)runLevel <= cast(int)level,"runLevel can be only increased");
             if (runLevel < cast(int)level){
                 runLevel=level;
                 if (runLevel==SchedulerRunLevel.Stopped){
-                    if (zeroLock){
-                        zeroLock=false;
-                        zeroSem.notify();
-                    }
-                    onStop();
+                    callOnStop=true;
                 }
             }
+        }
+        if (callOnStop){
+            if (atomicOp(zeroLock,delegate typeof(zeroLock)(typeof(zeroLock) x){ if (x>0) return x-1; return x; })>0){
+                zeroSem.notify();
+            }
+            onStop();
         }
     }
     /// actions executed on stop (tells the starvationManager)
     void onStop(){
+        version(TrackQueues){
+            log.info(collectAppender(delegate void(CharSink s){
+                s("MultiSched "); s(name); s(" stopped");
+            }));
+        }
         starvationManager.schedulerStopped(this);
     }
     /// scheduler logger
@@ -673,6 +753,21 @@ class MultiSched:TaskSchedulerI {
     bool manyQueued() { return queue.length>15; }
     /// number of simple tasks wanted
     int nSimpleTasksWanted(){ return 4; }
+    /// writes just the scheduling status in a way that looks good
+    void writeStatus(CharSink sink,int indentL){
+        auto s=dumper(sink);
+        synchronized(queue){
+            s("{ class:MultiSched, name:\"")(name)("\", scheds:\n");
+            foreach(i,sched;queue){
+                if (i!=0) s(",\n");
+                writeSpace(sink,indentL+4);
+                sched.writeStatus(sink,indentL+4);
+            }
+            s("\n");
+            writeSpace(sink,indentL);
+            s("}");
+        }
+    }
 }
 
 /// starvation manager helps distribution the tasks when some scheduler have no tasks
@@ -686,7 +781,7 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
     TaskI _rootTask; /// root task
     int schedLevel;  /// numa level of the schedulers (normally 1 or 0)
     int exeLevel;    /// numa level of the executer threads (normally 0 or 1)
-    RandomSync rand; /// random source for scheduling
+    RandomSync _rand; /// random source for scheduling
     BitVector!(MaxScheds)[] starved; /// which schedulers are starved (or from which schedulers starved schedulers would accept tasks)
     SchedulerRunLevel runLevel; /// run level of the main queue
     int nRunningScheds; /// number of running schedulers
@@ -703,7 +798,45 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
     Logger execLogger(){
         return _execLogger;
     }
+    /// returns a random source for scheduling
+    final RandomSync rand(){ return _rand; }
     
+    void writeStatus(CharSink sink,int indentL){
+        void ind(int l){
+            writeSpace(sink,indentL+l);
+        }
+        auto s=dumper(sink);
+        auto maxScheds=topo.nNodes(schedLevel);
+        auto schedsN=scheds;
+        synchronized(this){
+            s("{ class:StarvationManager, runLevel:")(runLevel)(",\n");
+            ind(2); s("starved:[\n");
+            foreach(i,st;starved){
+                if (i!=0) {
+                    s("\",\n");
+                }
+                ind(4);
+                s("\"");
+                foreach(ibit,b;st){
+                    if (ibit>=maxScheds) break;
+                    if (b){
+                        s("+");
+                    } else {
+                        s("-");
+                    }
+                }
+            }
+            s("\"],\n");
+            ind(2);
+            volatile schedsN=scheds;
+        }
+        s("q:[ ");
+        foreach(i,sched;schedsN){
+            if (i!=0) { s(",\n"); ind(4); }
+            sched.writeStatus(sink,indentL+6);
+        }
+        s("]}");
+    }
     this(char[] name,NumaTopology topo,int schedLevel=1,int exeLevel=0,
         char[] loggerPath="blip.parallel.smp.queue",
         char[]exeLoggerPath="blip.parallel.smp.exec"){
@@ -714,7 +847,7 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
         this.exeLevel=exeLevel;
         this.nRunningScheds=0;
         this.pinLevel=int.max;
-        this.rand=new RandomSync();
+        this._rand=new RandomSync();
         starved=new BitVector!(MaxScheds)[](topo.maxLevel+1);
         runLevel=SchedulerRunLevel.Configuring;
         log=Log.lookup(loggerPath);
@@ -782,27 +915,33 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
     }
     /// adds the given scheduler to the list of starving ones
     void addStarvingSched(MultiSched sched){
-        assert(numa2pos(sched.numaNode)>0 && numa2pos(sched.numaNode)<scheds.length,"pos out of range");
+        assert(numa2pos(sched.numaNode)>=0 && numa2pos(sched.numaNode)<scheds.length,"pos out of range");
         assert(scheds[numa2pos(sched.numaNode)] is sched,"mismatched sched.pos");
         addStarvingSched(sched.numaNode);
     }
     /// removes a scheduler, regeneration of starved masks could be more efficient
     void rmStarvingSched(MultiSched sched){
-        assert(numa2pos(sched.numaNode)>0 && numa2pos(sched.numaNode)<scheds.length,"pos out of range");
         auto pos=numa2pos(sched.numaNode);
+        assert(pos>=0 && pos<topo.nNodes(schedLevel),"pos out of range");
         assert(scheds[pos] is sched,"mismatched sched.pos");
-        synchronized(this){
-            if (starved[schedLevel][pos]){
-                starved[schedLevel][pos]=false;
-                foreach(indx; starved[schedLevel].loopTrue){
-                    NumaNode posAtt;
-                    posAtt.level=1;
-                    posAtt.pos=indx;
-                    for (size_t i=schedLevel+1;i<starved.length;++i){
-                        posAtt=topo.superNode(posAtt);
-                        foreach(subN;subnodesWithLevel(1,cast(Topology!(NumaNode))topo,posAtt)){
-                            starved[i][subN.pos]=true;
+        if (starved[schedLevel][pos]){ // might be wrong... but is much faster, if wrong it is just less efficient
+            synchronized(this){
+                if (starved[schedLevel][pos]){
+                    starved[schedLevel][pos]=false;
+                    for (size_t ilevel=schedLevel+1;ilevel<starved.length;++ilevel){
+                        BitVector!(MaxScheds) lAttBit;
+                        foreach(indx; starved[schedLevel].loopTrue){
+                            NumaNode posAtt;
+                            posAtt.level=schedLevel;
+                            posAtt.pos=indx;
+                            for(int i=schedLevel;i<ilevel;++i){
+                                posAtt=topo.superNode(posAtt);
+                            }
+                            foreach(subN;subnodesWithLevel(1,cast(Topology!(NumaNode))topo,posAtt)){
+                                lAttBit[subN.pos]=true;
+                            }
                         }
+                        starved[ilevel]=lAttBit;
                     }
                 }
             }
@@ -810,14 +949,24 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
     }
     /// tries to steal a task, might redistribute the tasks
     TaskI trySteal(MultiSched el,int stealLevel){
+        version(TrackQueues){
+            log.info(collectAppender(delegate void(CharSink s){
+                s("pre trySteal in "); s(name); s(":");writeStatus(s,4);
+            }));
+            scope(exit){
+                log.info(collectAppender(delegate void(CharSink s){
+                    s("post trySteal in "); s(name); s(":");writeStatus(s,4);
+                }));
+            }
+        }
         auto superN=el.numaNode;
         NumaNode oldSuper=superN;
-        auto maxLevel=max(stealLevel,topo.maxLevel);
+        auto maxLevel=min(stealLevel,min(el.acceptLevel,topo.maxLevel));
         while (superN.level<maxLevel){
             superN=topo.superNode(superN);
             foreach(subN;randomSubnodesWithLevel(1,cast(Topology!(NumaNode))topo,superN,oldSuper)){
                 auto subP=numa2pos(subN);
-                if (scheds[subP].stealTask(superN.level,el)){
+                if (subP<scheds.length && scheds[subP].stealTask(superN.level,el)){
                     auto t=el.nextTaskImmediate();
                     if (t !is null) return t;
                 }
@@ -831,26 +980,25 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
         auto sLevel=min(min(sched.stealLevel,t.stealLevel),cast(int)starved.length-1);
         auto pos=numa2pos(sched.numaNode);
         if (starved[sLevel][pos]){
-            synchronized(this){
-                if (starved[sLevel][pos]){
-                    if (starved[0][pos]){
-                        rmStarvingSched(sched);
-                        return false;
-                    }
-                    auto superN=sched.numaNode;
-                    NumaNode oldSuper=superN;
-                    while (superN.level<sLevel){
-                        superN=topo.superNode(superN);
-                        foreach(subN;randomSubnodesWithLevel(schedLevel,cast(Topology!(NumaNode))topo,superN,oldSuper)){
-                            auto pos2=numa2pos(subN);
-                            if (starved[schedLevel][pos2]){
-                                addIfNonExistent(pos2);
-                                t.scheduler=scheds[pos2];
-                                rmStarvingSched(scheds[pos2]);
-                                scheds[pos2].addTask0(t);
-                                return true;
+            auto superN=sched.numaNode;
+            NumaNode oldSuper=superN;
+            while (superN.level<sLevel){
+                superN=topo.superNode(superN);
+                foreach(subN;randomSubnodesWithLevel(schedLevel,
+                    cast(Topology!(NumaNode))topo,superN,oldSuper))
+                {
+                    auto pos2=numa2pos(subN);
+                    if (starved[schedLevel][pos2]){
+                        synchronized(this){
+                            if (!starved[sLevel][pos] || starved[schedLevel][pos]){
+                                return false;
                             }
+                            if (!starved[schedLevel][pos2]) continue;
                         }
+                        addIfNonExistent(pos2);
+                        t.scheduler=scheds[pos2];
+                        scheds[pos2].addTask0(t);
+                        return true;
                     }
                 }
             }
@@ -899,7 +1047,6 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
                 addIfNonExistent(p);
                 t.scheduler=scheds[p];
                 scheds[p].addTask0(t);
-                rmStarvingSched(scheds[p]);
                 return;
             }
             size_t i=this.rand.uniformR(scheds.length);
@@ -995,15 +1142,18 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
     /// changes the current run level of the scheduler
     /// the level can be only raised and the highest run level is "stopped"
     void raiseRunlevel(SchedulerRunLevel level){
+        bool callOnStop=false;
         synchronized(this){
-            assert(cast(int)runLevel <= cast(int)level,"runLevel can be only increased");
             if (runLevel < cast(int)level){
                 runLevel=level;
                 foreach(sched;scheds){
                     sched.raiseRunlevel(runLevel);
                 }
-                if (runLevel==SchedulerRunLevel.Stopped) onStop();
+                if (runLevel==SchedulerRunLevel.Stopped) callOnStop=true;
             }
+        }
+        if (callOnStop){
+            onStop();
         }
     }
     /// called when the scheduler stops
@@ -1037,16 +1187,27 @@ class MExecuter:ExecuterI{
     this(char[] name,NumaNode exeNode, MultiSched scheduler){
         this._name=name;
         this._scheduler=scheduler;
+        this.exeNode=exeNode;
         log=_scheduler.starvationManager.execLogger;
         worker=new Thread(&(this.workThreadJob),16*8192);
         worker.isDaemon=true;
-        worker.name=name;
+        worker.name=collectAppender(delegate void(CharSink s){
+            s(name); s("_"); writeOut(s,exeNode.level); s("_"); writeOut(s,exeNode.pos);
+        });
         worker.start();
     }
     /// the job of the worker threads
     void workThreadJob(){
         log.info("Work thread "~Thread.getThis().name~" started");
-        pin(_scheduler.starvationManager.pinLevel);
+        scope(exit){
+            log.info("Work thread "~Thread.getThis().name~" stopped");
+        }
+        try{
+            pin(_scheduler.starvationManager.pinLevel);
+        } catch(Exception e){
+            log.error("pinning failed, continuing...");
+            log.error(collectAppender(&e.writeOut));
+        }
         while(1){
             try{
                 TaskI t=scheduler.nextTask();
@@ -1059,12 +1220,11 @@ class MExecuter:ExecuterI{
             }
             catch(Exception e) {
                 log.error("exception in working thread ");
-                e.writeOut(sout.call);
+                log.error(collectAppender(&e.writeOut));
                 soutStream.flush();
                 scheduler.raiseRunlevel(SchedulerRunLevel.Stopped);
             }
         }
-        log.info("Work thread "~Thread.getThis().name~" stopped");
     }
     /// description (for debugging)
     /// non threadsafe
@@ -1103,7 +1263,7 @@ class MExecuter:ExecuterI{
                 n=topo.superNode(n);
             }
             char[128] buf;
-            scope s=new GrowableArray!(char)(buf);
+            scope s=new GrowableArray!(char)(buf,0);
             s("Work thread ")(Thread.getThis().name)(" pinned to");
             writeOut(&s.appendArr,exeNode);
             log.info(s.data);

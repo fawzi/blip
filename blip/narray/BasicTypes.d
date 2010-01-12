@@ -38,11 +38,11 @@
 *******************************************************************************/
 module blip.narray.BasicTypes;
 import tango.core.Memory: GC;
-import tango.core.Array: sort;
-import tango.stdc.string: memset,memcpy,memcmp;
+import blip.t.core.Array: sort;
+import blip.t.stdc.string: memset,memcpy,memcmp;
 import blip.TemplateFu;
-import tango.core.Traits;
-import tango.math.Math: abs;
+import blip.t.core.Traits;
+import blip.t.math.Math: abs;
 import blip.rtest.RTest;
 import blip.BasicModels;
 import blip.serialization.Serialization;
@@ -692,7 +692,7 @@ else {
                 }
                 bool next(ref V el){
                     auto res=this.next();
-                    if (res) el=value();
+                    if (res) el=this.value();
                     return res;
                 }
                 bool next(ref V* el){
@@ -923,13 +923,13 @@ else {
                 }
             }
             bool next(ref V el){
-                auto res=next();
+                auto res=this.next();
                 if (res)
                     el=*this.p;
                 return res;
             }
             bool next(ref V* el){
-                auto res=next();
+                auto res=this.next();
                 if (res)
                     el=this.p;
                 return res;
@@ -1132,10 +1132,10 @@ else {
                 this.optimalChunkSize=defaultOptimalChunkSize;
             }
             bool next(ref V *el){
-                return it.next(el);
+                return this.it.next(el);
             }
             bool next(ref V el){
-                return it.next(el);
+                return this.it.next(el);
             }
             int opApply(int delegate(ref V x) loop_body){
                 NArray a=this.it.baseArray;
@@ -1429,7 +1429,8 @@ else {
             if (this.flags & o.flags & Flags.Compact1){
                 return !memcmp(this.startPtrArray,o.startPtrArray,this.nElArray*cast(index_type)V.sizeof);
             }
-            mixin(sLoopPtr(rank,["","o"],"if (*Ptr0 != *oPtr0) return false;","i"));
+            NArray a=this;
+            mixin(sLoopPtr(rank,["a","o"],"if (*aPtr0 != *oPtr0) return false;","i"));
             return true; 
         }
 
@@ -1481,30 +1482,30 @@ else {
                 return;
             }
             s("<NArray @:")(cast(void*)this)(",\n");
-            s("  bStrides:")(bStrides)(",\n");
+            s("  bStrides:")(this.bStrides)(",\n");
             s("  shape:")(this.shape)(",\n");
-            s("  flags:")(flags)("=None");
-            if (flags&Flags.Contiguous) s("|Contiguos");
-            if (flags&Flags.Fortran) s("|Fortran");
-            if (flags&Flags.Compact1) s("|Compact1");
-            if (flags&Flags.Compact2) s("|Compact2");
-            if (flags&Flags.Small) s("|Small");
-            if (flags&Flags.Large) s("|Large");
-            if (flags&Flags.ReadOnly) s("|ReadOnly");
+            s("  flags:")(this.flags)("=None");
+            if (this.flags&Flags.Contiguous) s("|Contiguos");
+            if (this.flags&Flags.Fortran) s("|Fortran");
+            if (this.flags&Flags.Compact1) s("|Compact1");
+            if (this.flags&Flags.Compact2) s("|Compact2");
+            if (this.flags&Flags.Small) s("|Small");
+            if (this.flags&Flags.Large) s("|Large");
+            if (this.flags&Flags.ReadOnly) s("|ReadOnly");
             s(",\n");
-            s("  data: <array<")(V.stringof)("> @:")(cast(void*)startPtrArray)(", #:")(nElArray)(",\n");
-            s("  base:")(cast(void*)mBase)("\n");
+            s("  data: <array<")(V.stringof)("> @:")(cast(void*)this.startPtrArray)(", #:")(this.nElArray)(",\n");
+            s("  base:")(cast(void*)this.mBase)("\n");
             s(">");
         }
         
         /// returns the base for an array that is a view of the current array
         Guard newBase(){
-            return mBase;
+            return this.mBase;
         }
         
         /// returns the flags for an array derived from the current one
         uint newFlags(){
-            return flags; // &Flags.ExtFlags ???
+            return this.flags; // &Flags.ExtFlags ???
         }
         
         /// increments a static index array, return true if it did wrap
@@ -1533,9 +1534,9 @@ else {
                 newshape[i]=this.shape[rank-1-i];
             }
             for (int i=0;i<rank;++i){
-                newstrides[i]=bStrides[rank-1-i];
+                newstrides[i]=this.bStrides[rank-1-i];
             }
-            return NArray(newstrides,newshape,startPtrArray,newFlags,newBase);
+            return NArray(newstrides,newshape,this.startPtrArray,this.newFlags,this.newBase);
         }
         
         static if(isComplexType!(V)){

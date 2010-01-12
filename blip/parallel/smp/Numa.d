@@ -12,7 +12,7 @@
 ///   a nice library that I use to get affinity & more working on linux distribtion without libnuma
 /// - OSX 10.5 thread affinity
 ///      http://developer.apple.com/releasenotes/Performance/RN-AffinityAPI/
-///   a good atarting point for these issues on macosX 10.5
+///   a good starting point for these issues on macosX 10.5
 /// - Windows numa resources:
 ///      http://www.microsoft.com/whdc/archive/numa_isv.mspx
 ///   an intoductive article about it
@@ -24,16 +24,18 @@
 ///
 ///  author: Fawzi Mohamed
 module blip.parallel.smp.Numa;
-import tango.core.Thread;
+import blip.t.core.Thread;
 import blip.serialization.Serialization;
-import tango.math.random.Random;
-import tango.stdc.stringz;
+import blip.t.math.random.Random;
+import blip.t.stdc.stringz;
 import blip.parallel.hwloc.hwloc;
 import blip.serialization.StringSerialize;
 import blip.BasicModels;
 import blip.util.Grow:growLength;
 import blip.io.BasicIO;
-
+import blip.io.Console;//pippo
+import blip.t.stdc.stdlib:abort;
+import blip.container.GrowableArray:collectAppender;
 version(Windows){
     
 } else {
@@ -90,7 +92,12 @@ struct NumaNode{
     equals_t opEquals(NumaNode n){
         return level==n.level && pos==n.pos;
     }
-
+    static NumaNode opCall(int level,int pos){
+        NumaNode res;
+        res.level=level;
+        res.pos=pos;
+        return res;
+    }
     int opCmp(NumaNode n){
         auto v=level-n.level; // we assume less than 2**31 levels and pos
         return
@@ -198,8 +205,9 @@ struct SubnodesWithLevel(NodeType,bool isRandom) /+:SimpleIteratorI!(NodeType)+/
         SubnodesWithLevel res;
         res.topo=topo;
         res.lastStack=0;
-        res.stack.length=topo.maxLevel()+1;
+        res.stack.length=rootNode.level;
         res.skipSubnode=skipSubnode;
+        res.level=level;
         static if (isRandom){
             res.stack[res.lastStack]=topo.subNodesRandom(rootNode,res.skipSubnode);
         } else {
@@ -221,11 +229,8 @@ struct SubnodesWithLevel(NodeType,bool isRandom) /+:SimpleIteratorI!(NodeType)+/
                 }
             } else {
                 if (nodeAtt!=skipSubnode){
-                    if (nodeAtt.level<level) {
+                    if (nodeAtt.level>level) {
                         ++lastStack;
-                        if (stack.length<=lastStack){
-                            stack.length=growLength(lastStack+1);
-                        }
                         static if (isRandom){
                             stack[lastStack]=topo.subNodesRandom(nodeAtt,skipSubnode);
                         } else {
@@ -239,7 +244,6 @@ struct SubnodesWithLevel(NodeType,bool isRandom) /+:SimpleIteratorI!(NodeType)+/
             }
             readVal=stack[lastStack].next(nodeAtt);
         }
-        return false;
     }
     mixin opApplyFromNext!(NodeType);
 }
@@ -297,7 +301,7 @@ interface NumaTopology: Topology!(NumaNode){
 
 void writeOutTopo(NodeType)(void delegate(char[]) sink,Topology!(NodeType) topo){
     auto s=dumper(sink);
-    for (int ilevel=topo.maxLevel;ilevel!=0;++ilevel){
+    for (int ilevel=topo.maxLevel;ilevel!=0;--ilevel){
         s("level(")(ilevel)("){");
         if (topo.isPartition(ilevel)){
             s("*partition*");
@@ -570,15 +574,13 @@ version(noHwloc){} else {
         hwloc_topology_t topology;
     
         struct LevelMap{
-            int depth;
-            bool partition;
-            char[] toString(){
-                return serializeToArray(this);
-            }
+            int depth; /// hwloc depth
+            bool partition; /// if it is a partition
             mixin(serializeSome("",`depth|partition`));
+            mixin printOut!();
         }
-        LevelMap[] levelMapping;
-        int backMapping[];
+        LevelMap[] levelMapping; /// mapping numa level -> hwloc depth
+        int backMapping[]; /// mapping hwloc depth -> numa level
     
         class CousinIterator:SimpleIteratorI!(NumaNode){
             HwlocTopology topo;
@@ -637,163 +639,105 @@ version(noHwloc){} else {
 
         class RandomChildernIterator:SimpleIteratorI!(NumaNode){
             HwlocTopology topo;
-            hwloc_obj_t[] childrens;
-            int end;
-            int pos;
-            int level,depth1,depth2;
-            hwloc_obj_t objPos;
+            hwloc_obj_t[][] childrens;
+            int[] pos;
+            int[] left;
+            int lastStack;
+            int level; /// the minimum level of the childrens
+            int depth2,maxDepth;
         
             this(HwlocTopology topo,hwloc_obj_t[] childrens,int start,int level){
                 this.topo=topo;
-                this.pos=start;
-                this.childrens=childrens;
-                if (start==0) {
-                    this.end=childrens.length;
-                } else {
-                    this.end=start-1;
-                }
                 this.level=level;
-                if (childrens.length>0){
-                    depth1=childrens[0].depth;
-                    depth2=levelMapping[level-1].depth;
-                    objPos=childrens[start];
+                
+                if (childrens.length>0 && level>=0){
+                    depth2=levelMapping[level].depth;
+                    maxDepth=hwloc_topology_get_depth(topology);
+                    this.childrens.length=maxDepth-levelMapping[level+1].depth+1;
+                    this.childrens[0]=childrens;
+                    lastStack=0;
+                    pos.length =this.childrens.length;
+                    left.length=this.childrens.length;
+                    pos[0]=start%(childrens.length);
+                    left[0]=childrens.length;
                 } else {
-                    objPos=null;
+                    this.childrens=[[]];
+                    lastStack=0;
+                    pos=[0];
+                    left=[0];
                 }
             }
         
-            bool next(ref NumaNode res){
-                if (objPos!is null){
-                    while(objPos.depth<depth2){
-                        assert(objPos.arity>0);
-                        objPos=objPos.first_child;
+            bool next(ref NumaNode res,ref hwloc_obj_t obj){
+                while(true){
+                    while (left[lastStack]<=0){
+                        if (lastStack==0) return false;
+                        --lastStack;
                     }
-                    assert(objPos.depth==depth2);
-                    res=NumaNode(level,objPos.logical_index);
-                    // try advance objPos
-                    if (objPos.next_sibling!is null){
-                        objPos=objPos.next_sibling;
+                    auto cAtt=childrens[lastStack][pos[lastStack]];
+                    ++(pos[lastStack]);
+                    if (pos[lastStack]==childrens[lastStack].length) {
+                        pos[lastStack]=0;
+                    }
+                    --(left[lastStack]);
+                    if(cAtt.depth<depth2){
+                        ++lastStack;
+                        pos[lastStack]=0;
+                        left[lastStack]=cAtt.arity;
+                        childrens[lastStack]=cAtt.children[0..cAtt.arity];
+                    } else if (cAtt.depth==depth2){
+                        res=NumaNode(level,cAtt.logical_index);
+                        obj=cAtt;
+                        return true;
                     } else {
-                        while (objPos.depth>depth1 && objPos.next_sibling is null){
-                            objPos=objPos.father;
-                        }
-                        if (objPos.next_sibling!is null){
-                            objPos=objPos.next_sibling;
-                        } else {
-                            ++pos;
-                            if (pos!=end) {
-                                pos=pos%childrens.length;
-                                objPos=childrens[pos];
-                            } else {
-                                objPos=null;
+                        for (int ilevel=level;ilevel>=0;--ilevel){
+                            if (cAtt.depth==levelMapping[ilevel].depth){
+                                res=NumaNode(ilevel,cAtt.logical_index);
+                                obj=cAtt;
+                                return true;
                             }
                         }
+                        if (cAtt.depth<maxDepth){
+                            ++lastStack;
+                            pos[lastStack]=0;
+                            left[lastStack]=cAtt.arity;
+                            childrens[lastStack]=cAtt.children[0..cAtt.arity];
+                        }
                     }
-                    return true;
                 }
-                return false;
+            }
+            
+            bool next(ref NumaNode res){
+                hwloc_obj_t o;
+                return next(res,o);
             }
         
             int opApply(int delegate(ref NumaNode x) dlg){
-                if (objPos is null) return 0;
-                while (1){
-                    while(objPos.depth<depth2){
-                        assert(objPos.arity>0);
-                        objPos=objPos.first_child;
-                    }
-                    assert(objPos.depth==depth2);
-                    auto n=NumaNode(level,objPos.logical_index);
+                NumaNode n;
+                while (next(n)){
                     auto res=dlg(n);
                     if (res!=0) return res;
-                    // try advance objPos
-                    if (objPos.next_sibling!is null){
-                        objPos=objPos.next_sibling;
-                    } else {
-                        while (objPos.depth>depth1 && objPos.next_sibling is null){
-                            objPos=objPos.father;
-                        }
-                        if (objPos.next_sibling!is null){
-                            objPos=objPos.next_sibling;
-                        } else {
-                            ++pos;
-                            if (pos!=end) {
-                                pos=pos%childrens.length;
-                                objPos=childrens[pos];
-                            } else {
-                                break;
-                            }
-                        }
-                    }
                 }
                 return 0;
             }
 
             int opApply(int delegate(ref size_t,ref NumaNode) dlg){
-                if (objPos is null) return 0;
                 size_t ii=0;
-                while (1){
-                    while(objPos.depth<depth2){
-                        assert(objPos.arity>0);
-                        objPos=objPos.first_child;
-                    }
-                    assert(objPos.depth==depth2);
-                    auto n=NumaNode(level,objPos.logical_index);
+                NumaNode n;
+                while (next(n)){
                     auto res=dlg(ii,n);
-                    ++ii;
                     if (res!=0) return res;
-                    // try advance objPos
-                    if (objPos.next_sibling!is null){
-                        objPos=objPos.next_sibling;
-                    } else {
-                        while (objPos.depth>depth1 && objPos.next_sibling is null){
-                            objPos=objPos.father;
-                        }
-                        if (objPos.next_sibling!is null){
-                            objPos=objPos.next_sibling;
-                        } else {
-                            ++pos;
-                            if (pos!=end) {
-                                pos=pos%childrens.length;
-                                objPos=childrens[pos];
-                            } else {
-                                break;
-                            }
-                        }
-                    }
+                    ++ii;
                 }
                 return 0;
             }
         
             int opApply(int delegate(ref NumaNode x,ref hwloc_obj_t obj) dlg){
-                if (objPos is null) return 0;
-                while (1){
-                    while(objPos.depth<depth2){
-                        assert(objPos.arity>0);
-                        objPos=objPos.first_child;
-                    }
-                    assert(objPos.depth==depth2);
-                    auto n=NumaNode(level,objPos.logical_index);
-                    auto res=dlg(n,objPos);
+                NumaNode n;
+                hwloc_obj_t obj;
+                while (next(n,obj)){
+                    auto res=dlg(n,obj);
                     if (res!=0) return res;
-                    // try advance objPos
-                    if (objPos.next_sibling!is null){
-                        objPos=objPos.next_sibling;
-                    } else {
-                        while (objPos.depth>depth1 && objPos.next_sibling is null){
-                            objPos=objPos.father;
-                        }
-                        if (objPos.next_sibling!is null){
-                            objPos=objPos.next_sibling;
-                        } else {
-                            ++pos;
-                            if (pos!=end) {
-                                pos=pos%childrens.length;
-                                objPos=childrens[pos];
-                            } else {
-                                break;
-                            }
-                        }
-                    }
                 }
                 return 0;
             }
@@ -862,6 +806,8 @@ version(noHwloc){} else {
                 lastDepth=obj.depth;
                 obj=obj.father;
             }
+//            desc(sout.call); // pippo
+//            sout("\n");
         }
     
         /// maximum (whole system) level
@@ -881,6 +827,7 @@ version(noHwloc){} else {
         }
         /// internal method that returns the underlying hwloc_obj
         hwloc_obj_t hwlocObjForNumaNode(NumaNode n){
+            if (n.level==-1) abort();
             if (n.level==-1) throw new Exception("invalid node",__FILE__,__LINE__);
             return hwloc_get_obj_by_depth(topology,levelMapping[n.level].depth,n.pos);
         }
@@ -891,24 +838,56 @@ version(noHwloc){} else {
         }
         /// super node of the given node
         NumaNode superNode(NumaNode node){
+            if (!(node.level+1<levelMapping.length)) abort;//pippo
             assert(node.level+1<levelMapping.length,"no super node for node at top level"); // return itself?
             auto obj=hwlocObjForNumaNode(node);
-            assert(obj!is null);
+            if (obj is null){
+                throw new Exception(collectAppender(delegate void(CharSink s){
+                    s("no object for node "); writeOut(s,node);  s("\n");
+                }),__FILE__,__LINE__);
+            }
             auto prevDepth=levelMapping[node.level+1].depth;
             while (obj.depth>prevDepth){
                 obj=obj.father;
                 assert(obj!is null);
             }
-            assert(obj.depth==prevDepth);
-            return NumaNode(node.level+1,obj.logical_index);
+            if (obj.depth==prevDepth){
+                return NumaNode(node.level+1,obj.logical_index);
+            } else {
+                auto maxL=maxLevel;
+                while(true){
+                    for (int ilevel=node.level+1;ilevel<=maxL;++ilevel){
+                        if (obj.depth==levelMapping[ilevel].depth){
+                            return NumaNode(ilevel,obj.logical_index);
+                        } else if (obj.depth>levelMapping[ilevel].depth) {
+                            break;
+                        }
+                    }
+                    if (obj.depth==0) break;
+                    obj=obj.father;
+                }
+            }
+            throw new Exception(collectAppender(delegate void(CharSink s){
+                s("no superNode for node "); writeOut(s,node);  s("\n");
+            }),__FILE__,__LINE__);
         }
         /// loops on the subnodes (level of subnodes is uniform, but might be 2 rather than node.level-1)
         SimpleIteratorI!(NumaNode) subNodes(NumaNode node){
             assert(node.level!=0,"no subnode of the last level"); // return an empty iterator?
             auto obj=hwlocObjForNumaNode(node);
+            if (obj is null){
+                throw new Exception(collectAppender(delegate void(CharSink s){
+                    s("no hwlocObjForNumaNode for node "); writeOut(s,node);  s("\n");
+                }),__FILE__,__LINE__);
+            }
             auto nextDepth=levelMapping[node.level-1].depth;
-            while (obj.depth<nextDepth-1 && obj.arity==1){
+            while (obj !is null && obj.depth<nextDepth-1 && obj.arity==1){
                 obj=obj.first_child;
+            }
+            if (obj is null){
+                throw new Exception(collectAppender(delegate void(CharSink s){
+                    s("no subnodes for node "); writeOut(s,node);  s("\n");
+                }),__FILE__,__LINE__); // return an empty iterator?
             }
             auto childrens=obj.children[0..obj.arity];
             return new RandomChildernIterator(this,childrens,0,node.level-1);
@@ -1099,7 +1078,12 @@ version(noHwloc){} else {
             return true;
         }
         void desc(CharSink sink){
+            auto s=dumper(sink);
+            s("<HwlocTopology@")(cast(void*)this)("\n");
+            s("  levelMapping:")(levelMapping)("\n");
+            s("  backMapping:")(backMapping)("\n");
             writeOutTopo(sink,cast(Topology!(NumaNode))this);
+            s(">");
         }
     }
 }

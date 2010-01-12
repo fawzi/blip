@@ -7,7 +7,7 @@
  */
 module blip.sync.Flag;
 import blip.sync.Atomic;
-import tango.core.sync.Mutex;
+import blip.t.core.sync.Mutex;
 
 static if (LockVersion){
     /// Flag that can be used to communicate that data is ready between threads
