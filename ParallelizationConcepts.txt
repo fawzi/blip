@@ -2,8 +2,7 @@ Blip.parellel
 =============
 
 an overview of the parallelization strategies available in the blip library
-
-by Fawzi Mohamed
+    by Fawzi Mohamed
 
 Parallelization hierarchy
 -------------------------
@@ -43,11 +42,20 @@ similar).
 
 Obviously one wants to take advantage of these computing resources.
 
-The optimal choice is to use a number of threads equal to the number of hardware
-threads, and subdivide the work so that all thread are busy.
+Threads are an obvious way to try to use these resources, but in my opinion
+normally they are not a very good primitive to expose to the programmer, because
+they work well when their number is equal to the number of executing units, an
+worse when it is very different. So the optimal choice is to use a number of
+threads equal to the number of hardware threads, and subdivide the work so that
+all thread are busy.
 
-Subdividing the the work in n_thread chunk is a natural choice, but it isn't
-much flexible with respect to noise, and having other work concurrently.
+Subdividing the the work in n_threads chunks is a natural choice. This is
+possible, but not so easy, as this number is not constant, and this approach is
+not robust with respect to having other work progress concurrently (both by your
+own program and by the OS). The same task A might be executed both alone and
+concurrently with task B, so finding the correct number of threads to assign to
+the task A is not easy.
+
 Assuming that tasks management/switching costs x it is much better to try to
 subdivide the problem in as many tasks as possible, but making sure that each
 task on average still needs y>>x time to execute (for example y~10x)
@@ -135,6 +143,12 @@ it is possible to:
 Some languages try have special syntax for some of these operations, but
 normally the program does not have so many of them to make any special syntax
 really worth it, it should be clean, but method calling work just well enough.
+
+Another concept useful to build parallel programs are dataflow variables.
+Dataflow variables are variables that can be set several times but always to the
+same value. Reading a dataflow variable blocks until a value is set. The nice
+thing about dataflow variables is that they do not introduce race conditions: a
+program using them either always blocks or never does.
 
 Using this you have solution that does work well most of the time. Most of the
 time is not always, sometime you need to ensure that a task stays on one
