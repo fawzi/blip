@@ -53,6 +53,10 @@ static this(){
         //    sequentialTask=new SequentialTask("sequentialWorkManager",defaultTask,true);
         //}
     }
-    Log.lookup("blip.parallel.smp").level(Logger.Level.Info,true);
+    version(DetailedLog){
+        Log.lookup("blip.parallel.smp").level(Logger.Level.Info,true);
+    } else {
+        Log.lookup("blip.parallel.smp").level(Logger.Level.Warn,true);
+    }
 }
 

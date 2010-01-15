@@ -1,6 +1,6 @@
 include $(ARCHDIR)/dmd.rules
 include $(ARCHDIR)/osx.inc
 
-DFLAGS_COMP=-g -debug -version=SuspendOneAtTime -version=NoReuse
-#-version=TrackQueues 
+DFLAGS_COMP=-g -debug -version=SuspendOneAtTime 
+#-version=TrackQueues -version=DetailedLog -version=NoReuse
 CFLAGS_COMP=-g

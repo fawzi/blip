@@ -19,20 +19,22 @@ import blip.sync.Atomic;
 import blip.container.FiberPool;
 import blip.container.Deque;
 import tango.core.Memory:GC;
+version(TrackQueues) import blip.io.Console;
 
 enum TaskFlags:uint{
-    None=0, /// no flags
-    NoSpawn=1, /// the task will not spawn other tasks
-    NoYield=1<<1, /// the task will not yield
-    TaskSet=1<<2, /// the task is basically just a collection of other tasks
-    Pin=1<<3,    /// the task should be pinned (i.e. cannot be stealed)
+    None=0,         /// no flags
+    NoSpawn=1,      /// the task will not spawn other tasks
+    NoYield=1<<1,   /// the task will not yield
+    TaskSet=1<<2,   /// the task is basically just a collection of other tasks
+    Pin=1<<3,       /// the task should be pinned (i.e. cannot be stealed)
     HoldTasks=1<<4, /// tasks are holded
-    FiberPoolTransfer=1<<5, /// the fiber pool is transferred to subtasks
-    Resubmit=1<<6,          /// the task should be resubmitted
-    ThreadPinned=1<<7,      /// the task should stay pinned to the same thread
-    Delaying=1<<8,          /// the task is being put on hold
-    Delayed=1<<9,           /// the task is on hold
-    WaitingSubtasks=1<<10,  /// the task is waiting for subtasks to end
+    FiberPoolTransfer=1<<5,      /// the fiber pool is transferred to subtasks
+    Resubmit=1<<6,               /// the task should be resubmitted
+    ThreadPinned=1<<7,           /// the task should stay pinned to the same thread
+    Delaying=1<<8,               /// the task is being put on hold
+    Delayed=1<<9,                /// the task is on hold
+    Delay=(Delaying|Delayed),    /// the task has been delayed and restarted
+    WaitingSubtasks=1<<10,       /// the task is waiting for subtasks to end
     ImmediateSyncSubtasks=1<<11, /// subtasks submitted with spawnTaskSync are executed immediately if possible
 }
 
@@ -153,6 +155,7 @@ const int SimpleTaskLevel=int.max/2;
 Task noTask;
 
 /// thread local data to store current task
+/// setting this to TaskI triggers bugs in some compilers when taking the delegate of some methods
 ThreadLocal!(TaskI) taskAtt;
 
 static this(){
@@ -185,7 +188,8 @@ class Task:TaskI{
     version(NoTaskLock){ } else {
         Mutex taskLock; /// lock to update task numbers and status (remove and use atomic ops)
     }
-    TaskSchedulerI _scheduler; /// scheduer of the current task
+    TaskSchedulerI _scheduler; /// scheduler of the current task
+    TaskSchedulerI _oldScheduler; /// scheduler of the task
     Semaphore waitSem; /// lock to wait for task end
 
     /// the task should be resubmitted
@@ -357,7 +361,16 @@ class Task:TaskI{
     /// executes the actual task (after all the required setup)
     void internalExe(){
         assert(taskOp !is null);
-        taskOp();
+        if ((flags & TaskFlags.Delay)!=TaskFlags.Delay){
+            assert((flags & TaskFlags.Delay)==0);
+            taskOp();
+        } else {
+            assert(fiber!is null);
+            synchronized(taskLock) {
+                flags=flags&(~(TaskFlags.Delay|TaskFlags.Resubmit));
+            }
+            fiber.call();
+        }
     }
     /// executes the task (called by the executing thread, performs all setups)
     /// be careful overriding this (probably you should override internalExe)
@@ -386,29 +399,27 @@ class Task:TaskI{
                 taskAtt.val=this;
                 internalExe();
             }
-            if (resubmit) {
-                bool resub=true;
-                assert((flags & TaskFlags.Delayed)==0);
-                version(NoTaskLock){
-                    volatile auto flagsAtt=flags;
-                    while (flagsAtt & TaskFlags.Delaying){
-                        if (atomicCASB(flags,(flagsAtt & ~TaskFlags.Delaying)|TaskFlags.Delayed,flagsAtt)){
-                            assert((flagsAtt & TaskFlags.Delayed)==0);
-                            resub=false;
-                            break;
-                        }
-                    }
-                } else {
-                    synchronized(taskLock){
-                        if (flags & TaskFlags.Delaying){
-                            flags=(flags & ~TaskFlags.Delaying)|TaskFlags.Delayed;
-                            resub=false;
-                        }
-                    }
+            bool resub=resubmit;
+            synchronized(taskLock){
+                switch(flags & TaskFlags.Delay){
+                case cast(TaskFlags)0:
+                    break;
+                case TaskFlags.Delaying:
+                    flags=cast(TaskFlags)((flags & (~TaskFlags.Delaying)) | TaskFlags.Delayed);
+                    resub=false;
+                    break;
+                case TaskFlags.Delayed:
+                    assert(0,"already delayed task");
+                case TaskFlags.Delay:
+                    resub=true;
+                    break;
+                default:
+                    assert(0);
                 }
-                if (resub)
-                    scheduler.addTask(this);
-            } else {
+            }
+            if (resub) {
+                scheduler.addTask(this);
+            } else if((flags&TaskFlags.Delay)==0){
                 startWaiting();
             }
         } else {
@@ -479,6 +490,7 @@ class Task:TaskI{
         version(NoReuse){ } else {
             volatile auto refCountAtt=refCount;
             if (refCountAtt==1){
+                version(TrackQueues) sout("will reuse task "~taskName~"\n");
                 if (this.classinfo == Task.classinfo){
                     auto tPool=defaultSchedulerPools().taskPool;
                     tPool.giveBack(this); // already returns the fiber
@@ -499,7 +511,7 @@ class Task:TaskI{
             if (oldTasks==1){
                 if (atomicCASB(statusAtt,TaskStatus.PostExec,TaskStatus.WaitingEnd)){
                     callOnFinish=true;
-                    assert(flags & (TaskFlags.WaitingSubtasks|TaskFlags.Delayed|TaskFlags.Delaying)==0);
+                    assert(flags & (TaskFlags.WaitingSubtasks|TaskFlags.Delay)==0);
                 } else {
                     volatile memoryBarrier!(true,false,false,true)();
                      while ((flagsAtt & TaskFlags.WaitingSubtasks)!=0){
@@ -517,7 +529,7 @@ class Task:TaskI{
                     if (status==TaskStatus.WaitingEnd){
                         status=TaskStatus.PostExec;
                         callOnFinish=true;
-                        assert((flags & (TaskFlags.WaitingSubtasks|TaskFlags.Delayed|TaskFlags.Delaying))==0,"flags="~to!(char[])(flags));
+                        assert((flags & (TaskFlags.WaitingSubtasks|TaskFlags.Delay))==0,"flags="~to!(char[])(flags));
                     } else if ((flags & TaskFlags.WaitingSubtasks)!=0){
                         flags=flags & (~TaskFlags.WaitingSubtasks);
                         callOnFinish=true;
@@ -533,45 +545,36 @@ class Task:TaskI{
             }
         }
     }
-    /// resubmits this task that has been delayed, returns true if resubmission was actually performed
+    /// resubmits this task that has been delayed
     /// by default it throws if the task wasn't delayed
     void resubmitDelayed(){
         version(NoTaskLock){
-            volatile auto flagsAtt=flags;
-            while ((flagsAtt & (TaskFlags.Delaying | TaskFlags.Delayed))!=0){
-                if (flagsAtt & TaskFlags.Delaying){
-                    if (atomicCASB(flags,flagsAtt & (~TaskFlags.Delaying),flagsAtt)){
-                        assert((flagsAtt& TaskFlags.Delayed)==0);
-                        return;
-                    }
-                } else { // (flags & TaskFlags.Delayed)!=0
-                    if (atomicCASB(flags,flagsAtt & (~TaskFlags.Delayed),flagsAtt)){
-                        assert((flagsAtt& TaskFlags.Delaying)==0);
-                        scheduler.addTask(this);
-                        return;
-                    }
-                }
-            }
+            assert(false,"unimplemented");
         } else {
+            version(TrackQueues) sout("will resubmit task "~taskName~"\n");
             bool resub=false;
             synchronized(taskLock){
-                if ((flags & TaskFlags.Delaying)!=0){
-                    flags= flags & (~TaskFlags.Delaying);
-                    assert((flags & TaskFlags.Delayed)==0);
-                    return;
-                } else if ((flags & TaskFlags.Delayed)!=0){
-                    flags=flags & (~TaskFlags.Delayed);
-                    assert((flags & TaskFlags.Delaying)==0);
+                switch(cast(TaskFlags)(flags & TaskFlags.Delay)){
+                case cast(TaskFlags)0:
+                    throw new ParaException("resubmitDelayed called on non delayed task ("~taskName~")",
+                        __FILE__,__LINE__);
+                case TaskFlags.Delaying:
+                    flags= cast(TaskFlags)(flags | TaskFlags.Delayed);
+                    break;
+                case TaskFlags.Delayed:
+                    flags= cast(TaskFlags)(flags | TaskFlags.Delaying);
                     resub=true;
+                    break;
+                case TaskFlags.Delay:
+                    assert(0);
+                default:
+                    assert(0);
                 }
             }
             if (resub){
                 scheduler.addTask(this);
-                return;
             }
         }
-        throw new ParaException("resubmitDelayed called on non delayed task ("~taskName~")",
-            __FILE__,__LINE__);
     }
     /// delays the current task (which should be yieldable)
     /// opStart is executed after the task has been flagged as delayed, but before
@@ -586,10 +589,22 @@ class Task:TaskI{
         }
         assert((flags & (TaskFlags.Delaying | TaskFlags.Delayed))==0);
         version(NoTaskLock){
-            atomicOp(flags,delegate TaskFlags(TaskFlags f){ return t|TaskFlags.Resubmit|TaskFlags.Delaying; });
+            assert(false,"unimplemented");
         } else {
             synchronized(taskLock){
-                flags|= TaskFlags.Resubmit|TaskFlags.Delaying;
+                switch(cast(TaskFlags)(flags & TaskFlags.Delay)){
+                case cast(TaskFlags)0:
+                    flags|=TaskFlags.Delaying;
+                    break;
+                case TaskFlags.Delaying:
+                    assert(0,"delaying delaying task");
+                case TaskFlags.Delayed:
+                    assert(0,"delaying delayed task");
+                case TaskFlags.Delay:
+                    assert(0,"delay before full restart");// allow??
+                default:
+                    assert(0);
+                }
             }
         }
         if (!mightYield) {
@@ -599,7 +614,28 @@ class Task:TaskI{
             if (opStart!is null){
                 opStart();
             }
-            scheduler.yield();
+            volatile auto flagAtt=flags;
+            bool do_yield=false;
+            synchronized(taskLock){
+                switch(cast(TaskFlags)(flags & TaskFlags.Delay)){
+                default:
+                    assert(0);
+                case cast(TaskFlags)0:
+                    assert(0);
+                case TaskFlags.Delaying:
+                    do_yield=true;
+                    break;
+                case TaskFlags.Delayed:
+                    assert(0);
+                case TaskFlags.Delay:
+                    flags=cast(TaskFlags)(flags & (~TaskFlags.Delay));
+                    do_yield=false;
+                    break;
+                }
+            }
+            if (do_yield) {
+                scheduler.yield();
+            }
         }
     }
     /// called before spawning a new subtask
@@ -640,7 +676,7 @@ class Task:TaskI{
     }
     /// operation that spawn the given task as subtask of this one
     void spawnTask(TaskI task){
-        spawnTask(task,{scheduler.addTask(task);});
+        spawnTask(task,delegate void(){scheduler.addTask(task);});
     }
     /// spawn a task and waits for its completion
     void spawnTaskSync(TaskI task){
@@ -658,7 +694,7 @@ class Task:TaskI{
             tAtt.delay({
                 if ((flags & TaskFlags.ImmediateSyncSubtasks)!=0){
                     // add something like && rand.uniform!(bool)() to avoid excessive task length?
-                    spawnTask(task,{ task.execute(); });
+                    spawnTask(task,delegate void(){ task.execute(); });
                 } else {
                     this.spawnTask(task);
                 }

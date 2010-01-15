@@ -7,7 +7,7 @@ import tango.io.device.Array;
 import tango.io.model.IConduit;
 import blip.container.GrowableArray;
 import blip.BasicModels;
-import tango.core.stacktrace.TraceExceptions;
+version(NoTrace){} else { import tango.core.stacktrace.TraceExceptions; }
 import blip.io.StreamConverters;
 import blip.io.BasicIO;
 

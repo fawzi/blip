@@ -1,5 +1,6 @@
 module tstRpc;
 import blip.io.Console;
+version(NoTrace){} else { import tango.core.stacktrace.TraceExceptions; }
 
 class A{
     static A globalA;

@@ -74,7 +74,7 @@ interface TaskSchedulerI:BasicObjectI {
 // and are not really used alone
 
 /// methods needed in a queued task
-interface TaskI:SubtaskNotificationsI,SubmittingI{
+interface TaskI:SubtaskNotificationsI{
     /// executes the task
     void execute(bool sequential=false);
     /// returns the status of the task
@@ -122,18 +122,9 @@ interface TaskI:SubtaskNotificationsI,SubmittingI{
     FiberPool fiberPool(bool canBeNull=false);
     /// gives back the task for later reuse (makes the task invalid)
     bool tryReuse();
-}
-
-/// notifications called by direct subtasks
-interface SubtaskNotificationsI:BasicObjectI {
-    /// called before spawning a new subtask
-    void willSpawn(TaskI st);
-    /// subtask has finished
-    void subtaskEnded(TaskI st);
-}
-
-/// methods to submit a task
-interface SubmittingI:BasicObjectI {
+    
+    // methods to submit a task, merged them here due to http://d.puremagic.com/issues/show_bug.cgi?id=3706
+    // interface SubmittingI:BasicObjectI {
     /// submits this task (with the given supertask, or with the actual task as supertask)
     TaskI submit(TaskI t=null);
     /// submits the current task and maybe yields the current one (if not SequentialWorkManager)
@@ -152,6 +143,16 @@ interface SubmittingI:BasicObjectI {
     void resubmitDelayed();
     /// executes the task, and waits for its completion
     void executeNow(TaskI t=null);
+    //}
+    
+}
+
+/// notifications called by direct subtasks
+interface SubtaskNotificationsI:BasicObjectI {
+    /// called before spawning a new subtask
+    void willSpawn(TaskI st);
+    /// subtask has finished
+    void subtaskEnded(TaskI st);
 }
 
 /// exception for parallelization problems

@@ -57,66 +57,71 @@ class Deque(T):CopiableObjectI{
     }
     /// returns the first element that matches the given filter
     bool popFront(ref T el,bool delegate(T) filter){
-        bool retRes(){
-            baseArr[start]=T.init;
-            start=(start+1)%baseArr.length;
-            --nEl;
-            return true;
-        }
-        synchronized(this){
-            size_t i=0;
-            bool res=false;
-            while (i<length){
-                if (filter(opIndex(i))){
-                    el=opIndex(i);
-                    res=true;
-                    break;
+        debug(SafeDeque){
+            synchronized(this){
+                size_t i=0;
+                bool res=false;
+                while (i<length){
+                    if (filter(opIndex(i))){
+                        el=opIndex(i);
+                        res=true;
+                        break;
+                    }
+                    ++i;
                 }
                 ++i;
+                while (i<length){
+                    opIndexAssign(opIndex(i-1),i);
+                    ++i;
+                }
+                if (res) popBack();
+                return res;
             }
-            ++i;
-            while (i<length){
-                opIndexAssign(opIndex(i-1),i);
-                ++i;
+        } else {
+            bool retRes(){
+                baseArr[start]=T.init;
+                start=(start+1)%baseArr.length;
+                --nEl;
+                return true;
             }
-            if (res) popBack();
-            return res;
-/+            if (nEl==0) return false;
-            T res=baseArr[start];
-            auto pAtt=start;
-            if(filter(baseArr[pAtt])){
-                el=baseArr[start];
-                return retRes();
-            } else {
-                size_t to1=start+nEl;
-                if (to1>baseArr.length){
-                    auto to2=baseArr.length-start;
-                    for (size_t i=1;i<to2;++i){
-                        if (filter(baseArr[start+i])){
-                            el=baseArr[start+i];
-                            memmove(baseArr.ptr+start+1,baseArr.ptr+start,i);
-                            return retRes();
-                        }
-                    }
-                    for (size_t i=0;i<nEl-to2;++i){
-                        if (filter(baseArr[i])){
-                            el=baseArr[i];
-                            memmove(baseArr.ptr+i,baseArr.ptr+i+1,nEl-to2-i-1);
-                            baseArr[nEl-to2-1]=T.init;
-                            --nEl;
-                            return true;
-                        }
-                    }
+            synchronized(this){
+                if (nEl==0) return false;
+                T res=baseArr[start];
+                auto pAtt=start;
+                if(filter(baseArr[pAtt])){
+                    el=baseArr[start];
+                    return retRes();
                 } else {
-                    for (size_t i=1;i<nEl;++i){
-                        if (filter(baseArr[start+i])){
-                            el=baseArr[start+i];
-                            memmove(baseArr.ptr+start+1,baseArr.ptr+start,i);
-                            return retRes();
+                    size_t to1=start+nEl;
+                    if (to1>baseArr.length){
+                        auto to2=baseArr.length-start;
+                        for (size_t i=1;i<to2;++i){
+                            if (filter(baseArr[start+i])){
+                                el=baseArr[start+i];
+                                memmove(baseArr.ptr+start+1,baseArr.ptr+start,i);
+                                return retRes();
+                            }
+                        }
+                        for (size_t i=0;i<nEl-to2;++i){
+                            if (filter(baseArr[i])){
+                                el=baseArr[i];
+                                memmove(baseArr.ptr+i,baseArr.ptr+i+1,nEl-to2-i-1);
+                                baseArr[nEl-to2-1]=T.init;
+                                --nEl;
+                                return true;
+                            }
+                        }
+                    } else {
+                        for (size_t i=1;i<nEl;++i){
+                            if (filter(baseArr[start+i])){
+                                el=baseArr[start+i];
+                                memmove(baseArr.ptr+start+1,baseArr.ptr+start,i);
+                                return retRes();
+                            }
                         }
                     }
                 }
-            }+/
+            }
         }
         return false;
     }
@@ -148,58 +153,62 @@ class Deque(T):CopiableObjectI{
     }
     /// returns the last element that matches the given filter
     bool popBack(ref T el,bool delegate(T) filter){
-        synchronized(this){
-            bool res;
-            size_t pos=nEl;
-            while (pos!=0){
-                --pos;
-                if (filter(opIndex(pos))){
-                    el=opIndex(pos);
-                    res=true;
-                    break;
+        version(SafeDeque){
+            synchronized(this){
+                bool res;
+                size_t pos=nEl;
+                while (pos!=0){
+                    --pos;
+                    if (filter(opIndex(pos))){
+                        el=opIndex(pos);
+                        res=true;
+                        break;
+                    }
                 }
+                while (pos!=0){
+                    --pos;
+                    opIndexAssign(opIndex(pos+1),pos);
+                }
+                return res;
             }
-            while (pos!=0){
-                --pos;
-                opIndexAssign(opIndex(pos+1),pos);
-            }
-            return res;
-            /+
-            if (nEl==0) return false;
-            if (filter(baseArr[(start+nEl-1)%baseArr.length])){
-                el=baseArr[(start+nEl-1)%baseArr.length];
-                baseArr[(start+nEl-1)%baseArr.length]=T.init;
-                --nEl;
-                return true;
-            }
-            size_t i=start+nEl;
-            if (i>=baseArr.length){
-                size_t ii=i-baseArr.length+1;
-                while(ii!=0){
-                    --ii;
-                    if (filter(baseArr[ii])){
-                        el=baseArr[ii];
-                        memmove(baseArr.ptr+ii,baseArr.ptr+ii+1,i-baseArr.length-ii);
-                        baseArr[(start+nEl-1)-baseArr.length]=T.init;
+        } else {
+            synchronized(this){
+                if (nEl==0) return false;
+                if (filter(baseArr[(start+nEl-1)%baseArr.length])){
+                    el=baseArr[(start+nEl-1)%baseArr.length];
+                    baseArr[(start+nEl-1)%baseArr.length]=T.init;
+                    --nEl;
+                    return true;
+                }
+                size_t i=start+nEl;
+                if (i>=baseArr.length){
+                    size_t ii=i-baseArr.length+1;
+                    while(ii!=0){
+                        --ii;
+                        if (filter(baseArr[ii])){
+                            el=baseArr[ii];
+                            memmove(baseArr.ptr+ii,baseArr.ptr+ii+1,i-baseArr.length-ii);
+                            baseArr[(start+nEl-1)-baseArr.length]=T.init;
+                            --nEl;
+                            return true;
+                        }
+                    }
+                    i=baseArr.length;
+                }
+                while(i!=start){
+                    --i;
+                    if (filter(baseArr[i])){
+                        el=baseArr[i];
+                        memmove(baseArr.ptr+start+1,baseArr.ptr+start,i-start);
+                        baseArr[start]=T.init;
                         --nEl;
+                        ++start;
                         return true;
                     }
                 }
-                i=baseArr.length;
             }
-            while(i!=start){
-                --i;
-                if (filter(baseArr[i])){
-                    el=baseArr[i];
-                    memmove(baseArr.ptr+start+1,baseArr.ptr+start,i-start);
-                    baseArr[start]=T.init;
-                    --nEl;
-                    ++start;
-                    return true;
-                }
-            }+/
+            return false;
         }
-        return false;
     }
     /// returns the last element of the array and drops it
     T popBack(){
@@ -226,16 +235,17 @@ class Deque(T):CopiableObjectI{
         synchronized(this){
             size_t to1=start+nEl;
             if (to1>baseArr.length){
-                auto to2=baseArr.length-start;
-                for (size_t i=0;i<to2;++i){
-                    if (auto res=loopBody(baseArr[start+i])) return res;
+                auto to2=baseArr.length;
+                for (size_t i=start;i<to2;++i){
+                    if (auto res=loopBody(baseArr[i])) return res;
                 }
-                for (size_t i=to2;i<nEl;++i){
-                    if (auto res=loopBody(baseArr[i-to1])) return res;
+                to1-=baseArr.length;
+                for (size_t i=0;i<nEl;++i){
+                    if (auto res=loopBody(baseArr[i])) return res;
                 }
             } else {
-                for (size_t i=0;i<nEl;++i){
-                    if (auto res=loopBody(baseArr[start+i])) return res;
+                for (size_t i=start;i<to1;++i){
+                    if (auto res=loopBody(baseArr[i])) return res;
                 }
             }
         }
@@ -245,17 +255,22 @@ class Deque(T):CopiableObjectI{
     int opApply(int delegate(ref size_t i,ref T) loopBody){
         synchronized(this){
             size_t to1=start+nEl;
+            size_t ii=0;
             if (to1>baseArr.length){
-                auto to2=baseArr.length-start;
-                for (size_t i=0;i<to2;++i){
-                    if (auto res=loopBody(i,baseArr[start+i])) return res;
+                auto to2=baseArr.length;
+                for (size_t i=start;i<to2;++i){
+                    if (auto res=loopBody(ii,baseArr[i])) return res;
+                    ++ii;
                 }
-                for (size_t i=to2;i<nEl;++i){
-                    if (auto res=loopBody(i,baseArr[i-to1])) return res;
+                to1-=baseArr.length;
+                for (size_t i=0;i<nEl;++i){
+                    if (auto res=loopBody(ii,baseArr[i])) return res;
+                    ++ii;
                 }
             } else {
-                for (size_t i=0;i<nEl;++i){
-                    if (auto res=loopBody(i,baseArr[start+i])) return res;
+                for (size_t i=start;i<to1;++i){
+                    if (auto res=loopBody(ii,baseArr[i])) return res;
+                    ++ii;
                 }
             }
         }

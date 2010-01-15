@@ -17,7 +17,11 @@ import blip.parallel.smp.Numa;
 import blip.container.Cache;
 
 static this(){
-    Log.lookup("blip.parallel.smp.exec").level(Logger.Level.Info,true);
+    version(DetailedLog){
+        Log.lookup("blip.parallel.smp.exec").level(Logger.Level.Info,true);
+    } else {
+        Log.lookup("blip.parallel.smp.exec").level(Logger.Level.Warn,true);
+    }
 }
 
 /// executes the task immediately in the current context

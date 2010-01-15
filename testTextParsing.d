@@ -5,7 +5,7 @@ import tango.io.stream.Lines;
 import tango.math.Math;
 import blip.rtest.BasicGenerators;
 import blip.text.UtfUtils;
-import tango.core.stacktrace.TraceExceptions;
+version(NoTrace){} else { import tango.core.stacktrace.TraceExceptions; }
 import blip.io.Console;
 
 void main(){

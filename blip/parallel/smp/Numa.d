@@ -33,7 +33,7 @@ import blip.serialization.StringSerialize;
 import blip.BasicModels;
 import blip.util.Grow:growLength;
 import blip.io.BasicIO;
-import blip.io.Console;//pippo
+import blip.io.Console;
 import blip.t.stdc.stdlib:abort;
 import blip.container.GrowableArray:collectAppender;
 version(Windows){
@@ -838,7 +838,6 @@ version(noHwloc){} else {
         }
         /// super node of the given node
         NumaNode superNode(NumaNode node){
-            if (!(node.level+1<levelMapping.length)) abort;//pippo
             assert(node.level+1<levelMapping.length,"no super node for node at top level"); // return itself?
             auto obj=hwlocObjForNumaNode(node);
             if (obj is null){

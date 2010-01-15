@@ -21,6 +21,8 @@ import blip.container.BitVector;
 import blip.container.AtomicSLink;
 import blip.io.Console;
 import blip.sync.Atomic;
+import tango.stdc.stdlib: abort; // pippo
+import blip.t.core.stacktrace.StackTrace; // pippo
 
 // locking order, be careful to change that to avoid deadlocks
 // especially addSched and redirectedTask are sensible
@@ -290,6 +292,7 @@ class PriQScheduler:TaskSchedulerI {
                 raiseRunlevel(SchedulerRunLevel.Stopped);
             }
         }
+        superScheduler.subtaskDeactivated(st);
     }
     /// returns wether the current task should be added
     bool shouldAddTask(TaskI t){
@@ -648,7 +651,7 @@ class MultiSched:TaskSchedulerI {
         st.retain();
     }
     /// subtask has stopped execution (but is not necessarily finished)
-    /// this has to be called by the executer
+    /// this has to be called by the inner scheduler
     void subtaskDeactivated(TaskI st){
         synchronized(this){
             if (activeTasks[st]>1){
@@ -656,10 +659,6 @@ class MultiSched:TaskSchedulerI {
             } else {
                 activeTasks.remove(st);
             }
-        }
-        if (!(st.scheduler is this)){
-            assert(st.scheduler!is null,"task without scheduler...");
-            st.scheduler.subtaskDeactivated(st);
         }
         if (!st.tryReuse()){
             st.release();
@@ -1214,9 +1213,11 @@ class MExecuter:ExecuterI{
                 log.info("Work thread "~Thread.getThis().name~" starting task "~
                     (t is null?"*NULL*":t.taskName));
                 if (t is null) return;
+                auto schedAtt=t.scheduler; // the task scheduler can change just after execution, but before subtaskDeactivated is called...
                 t.execute(false);
-                scheduler.subtaskDeactivated(t);
-                log.info("Work thread "~Thread.getThis().name~" finished task "~t.taskName);
+                auto tName=t.taskName;
+                schedAtt.subtaskDeactivated(t);
+                log.info("Work thread "~Thread.getThis().name~" finished task "~tName);
             }
             catch(Exception e) {
                 log.error("exception in working thread ");
