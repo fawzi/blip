@@ -1041,13 +1041,25 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
     /// adds a task to be executed
     void addTask(TaskI t){
         // try starved, otherwise random...
-        synchronized(this){
-            foreach(p;starved[schedLevel].loopTrue){
-                addIfNonExistent(p);
-                t.scheduler=scheds[p];
-                scheds[p].addTask0(t);
+        while(true) {
+            bool hasStarved=false;
+            size_t pos;
+            synchronized(this){
+                foreach(p;starved[schedLevel].loopTrue){
+                    hasStarved=true;
+                    pos=p;
+                    break;
+                }
+            }
+            if (!hasStarved) break;
+            addIfNonExistent(pos);
+            if (starved[schedLevel][pos]) {
+                t.scheduler=scheds[pos];
+                scheds[pos].addTask0(t);
                 return;
             }
+        }
+        synchronized(this){
             size_t i=this.rand.uniformR(scheds.length);
             size_t j=this.rand.uniformR(scheds.length-1);
             if (j>=i) ++j;

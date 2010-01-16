@@ -47,11 +47,11 @@ static this(){
     version(SequentialWorkManager){
         sequentialTask=immediateTask;
     } else {
-        //version(NoNuma){
+        version(NoNuma){
             sequentialTask=immediateTask;
-        //} else { // pippo to do sequential task is broken
-        //    sequentialTask=new SequentialTask("sequentialWorkManager",defaultTask,true);
-        //}
+        } else { // pippo to do sequential task is broken
+            sequentialTask=new SequentialTask("sequentialWorkManager",defaultTask,true);
+        }
     }
     version(DetailedLog){
         Log.lookup("blip.parallel.smp").level(Logger.Level.Info,true);

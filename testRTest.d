@@ -9,7 +9,7 @@ import tango.util.log.Config;
 import blip.t.util.log.Log;
 import blip.io.BasicIO;
 import blip.io.Console;
-version(NoTrace){} else { import tango.core.stacktrace.TraceExceptions; }
+version(Trace){ import tango.core.stacktrace.TraceExceptions; }
 
 private int[4] specialNrs=[0,2,5,8];
 
@@ -83,9 +83,8 @@ void main(char[][]argv){
 
     auto expectedFailures=[0,0,0,1,1,0,0,0,0,1,0,0,0,1,0,0,0,2,0,0,0,1,1];
     failTests.runTestsTask().autorelease.submit(defaultTask).wait();
-    sout("pippo testRTest Wait is over\n");
     foreach (i,t;tests){
-        t.runTestsTask().submit(sequentialTask);
+        t.runTestsTask().submit(immediateTask);
         if(t.stat.failedTests!=expectedFailures[i]){
             throw new Exception("test `"~t.testName~"` had "~ctfe_i2a(t.stat.failedTests)~" failures, expected "~ctfe_i2a(expectedFailures[i]));
         }

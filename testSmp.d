@@ -8,6 +8,7 @@ version(NoTrace){} else { import tango.core.stacktrace.TraceExceptions; }
 import blip.io.Console; // pippo
 
 class STask{
+    static gVal=0;
     char[] name;
     double sleepTime;
     void delegate()op;
@@ -76,6 +77,14 @@ class STask{
         });
         sout(name~" waked!\n");
     }
+    
+    void updateG(){
+        if(gVal!=0) assert(0);
+        gVal+=1;
+        writeOutSN();
+        if(gVal!=1) assert(0);
+        gVal-=1;
+    }
 }
 
 void testOnFinish(){
@@ -134,13 +143,57 @@ void testExecuteNow(){
         tt.executeNow();
     }
 }
+
 void testSequential(){
-    
+    Task("testOnFinish1",&((new STask("singleTask")).updateG))
+        .appendOnFinish({sout("Run onFinish of testOnFinish1\n");}).autorelease().submit(sequentialTask);
+    {
+        auto t=new STask("subShort",2.0);
+        t.op=&t.submit1;
+        auto tt=Task("testOnFinish2",&t.updateG);
+        tt.appendOnFinish({sout("Run onFinish of testOnFinish2\n");});
+        tt.autorelease.submit(sequentialTask);
+    }
+    {
+        auto t=new STask("subLong",0.1);
+        t.op=&t.submit1;
+        auto tt=Task("testOnFinish3",&t.updateG);
+        tt.appendOnFinish({sout("Run onFinish of testOnFinish3\n");});
+        tt.submit(sequentialTask);
+    }
+    {
+        auto t=new STask("subShort",2.0);
+        t.op=&t.submit3;
+        auto tt=Task("testOnFinish4",&t.updateG)
+            .appendOnFinish(delegate void(){sout("Run onFinish of testOnFinish4\n");});
+        tt.autorelease.submit(sequentialTask);
+    }
+    {
+        auto t=new STask("singleTaskDelayShort");
+        t.op=&t.immediateWakeUp;
+        Task("testDelay1",&t.updateG)
+            .appendOnFinish(delegate void(){sout("Run onFinish of testDelay1\n");}).autorelease.submit(sequentialTask);
+    }
+    {
+        auto t=new STask("singleTaskDelayLong");
+        t.op=&t.lateWakeUp;
+        Task("testDelay2",&t.updateG)
+            .appendOnFinish(delegate void(){sout("Run onFinish of testDelay2\n");}).autorelease.submit(sequentialTask);
+    }
+    Task("testExecuteNow1",&((new STask("singleTask")).updateG))
+        .appendOnFinish(delegate void(){sout("Run onFinish of testExecuteNow1\n");}).executeNow(sequentialTask);
+    {
+        auto t=new STask("subShort");
+        t.op=&t.submit3;
+        auto tt=Task("testExecuteNow2",&t.updateG)
+            .appendOnFinish(delegate void(){sout("Run onFinish of testExecuteNow2\n");});
+        tt.executeNow(sequentialTask);
+    }
 }
 
 void tests(){
-    //sout("testOnFinish\n");
-    //testOnFinish();
+    sout("testOnFinish\n");
+    testOnFinish();
     sout("testDelay\n");
     testDelay();
     sout("testExecuteNow\n");

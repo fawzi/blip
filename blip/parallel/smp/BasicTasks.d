@@ -682,6 +682,7 @@ class Task:TaskI{
     void spawnTaskSync(TaskI task){
         auto tAtt=taskAtt.val;
         if (tAtt is null || ((cast(RootTask)tAtt)!is null) || tAtt is noTask || !tAtt.mightYield){
+            scheduler.logger.warn("unsafe execution in spawnTaskSync of task "~tAtt.taskName~"\n");
             task.retain();
             this.spawnTask(task);
             if (!task.status==TaskStatus.Finished)
@@ -691,10 +692,10 @@ class Task:TaskI{
             }
         } else {
             (cast(Task)task).appendOnFinish(&tAtt.resubmitDelayed);
-            tAtt.delay({
+            tAtt.delay(delegate void(){
                 if ((flags & TaskFlags.ImmediateSyncSubtasks)!=0){
                     // add something like && rand.uniform!(bool)() to avoid excessive task length?
-                    spawnTask(task,delegate void(){ task.execute(); });
+                    this.spawnTask(task,delegate void(){ task.execute(); });
                 } else {
                     this.spawnTask(task);
                 }
@@ -1107,6 +1108,7 @@ class SequentialTask:RootTask{
     void spawnTaskSync(TaskI task){
         auto tAtt=taskAtt.val;
         if (tAtt is null || ((cast(RootTask)tAtt)!is null) || tAtt is noTask || !tAtt.mightYield){
+            log.warn("dangerous spawned task Sync "~taskName~"\n");
             task.retain();
             this.spawnTask(task);
             if (!task.status==TaskStatus.Finished)
