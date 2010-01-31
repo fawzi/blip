@@ -1,5 +1,5 @@
-module blip.rpc.RpcMpi;
-import blip.rpc.RpcBase;
+module blip.parallel.rpc.RpcMpi;
+import blip.parallel.rpc.RpcBase;
 import blip.parallel.mpi.Mpi;
 import blip.serialization.Serialization;
 import blip.container.GrowableArray;

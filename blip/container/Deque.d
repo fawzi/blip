@@ -240,7 +240,7 @@ class Deque(T):CopiableObjectI{
                     if (auto res=loopBody(baseArr[i])) return res;
                 }
                 to1-=baseArr.length;
-                for (size_t i=0;i<nEl;++i){
+                for (size_t i=0;i<to1;++i){
                     if (auto res=loopBody(baseArr[i])) return res;
                 }
             } else {
@@ -263,7 +263,7 @@ class Deque(T):CopiableObjectI{
                     ++ii;
                 }
                 to1-=baseArr.length;
-                for (size_t i=0;i<nEl;++i){
+                for (size_t i=0;i<to1;++i){
                     if (auto res=loopBody(ii,baseArr[i])) return res;
                     ++ii;
                 }

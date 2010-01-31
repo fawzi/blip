@@ -355,29 +355,66 @@ class SNChannel:Channel,BasicObjectI{
 class SNCart(int dimG):Cart!(dimG){
     int[dimG] _dims;
     int[dimG] _zeros;
+    int[dimG] _periodic;
     LinearComm _baseComm;
-    this(LinearComm baseComm){
+    this(LinearComm baseComm,int[] dims,int[] periodic){
         _dims[]=1;
         _zeros[]=0;
+        _periodic[]=1;
         _baseComm=baseComm;
     }
     int[] dims(){
         return _dims;
     }
+    int[] periodic(){
+        return _periodic;
+    }
     int[] myPos(){
         return _zeros;
     }
     Channel opIndex(int[dimG] pos){
-        assert(pos==_zeros,"invalid index");
-        return _baseComm[0];
+        return _baseComm[pos2rank(pos)];
     }
     LinearComm baseComm(){
         return _baseComm;
     }
-    int baseIdx(int[dimG] pos){
-        assert(pos==_zeros,"invalid index");
-        return 0;
+    int pos2rank(int[dimG] pos){
+        int res=0;
+        int dd=1;
+        foreach(i,p;pos[1..$]){
+            assert(p<_dims[i],"pos out of bounds");
+            res+=p*dd;
+            dd*=_dims[i];
+        }
+        return res;
     }
+    int[] rank2pos(int rank,int[dimG] pos){
+        if (rank==0){
+            pos[]=0;
+            return pos;
+        }
+        int dd=1;
+        foreach(i,p;_dims){
+            assert(p>0,"out of bound rank for 0 sized cart");
+            pos[i]=rank%p;
+            rank/=p;
+        }
+        assert(rank==0,"out of bound rank");
+    }
+    void shift(int direction, int disp, out int rank_source, out int rank_dest){
+        assert(0<=direction && direction<dimG,"direction out of bounds");
+        int[dimG] p2;
+        p2[]=myPos;
+        p2[direction]=(p2[direction]+disp)%_dims[direction];
+        if (p2[direction]<0)
+            p2[direction]+=_dims[direction];
+        rank_dest=pos2rank(p2);
+        p2[direction]=(p2[direction]-2*disp)%_dims[direction];
+        if (p2[direction]<0)
+            p2[direction]+=_dims[direction];
+        rank_source=pos2rank(p2);
+    }
+    
 }
 
 /// a linear communicator for a single process
@@ -417,17 +454,17 @@ class SNLinearComm:LinearComm,BasicObjectI{
         assert(newRank==0,"only 1 process thing available");
         return this;
     }
-    Cart!(2) mkCart(int[2] dims,int[2] periodic,bool reorder){
+    Cart!(2) mkCart(char[] name,int[2] dims,int[2] periodic,bool reorder){
         assert(dims==[1,1],"only 1 process thing available");
-        return new SNCart!(2)(this);
+        return new SNCart!(2)(new SNLinearComm(channels,name),dims,periodic);
     }
-    Cart!(3) mkCart(int[3] dims,int[3] periodic,bool reorder){
+    Cart!(3) mkCart(char[] name,int[3] dims,int[3] periodic,bool reorder){
         assert(dims==[1,1,1],"only 1 process thing available");
-        return new SNCart!(3)(this);
+        return new SNCart!(3)(new SNLinearComm(channels,name),dims,periodic);
     }
-    Cart!(4) mkCart(int[4] dims,int[4] periodic,bool reorder){
+    Cart!(4) mkCart(char[] name,int[4] dims,int[4] periodic,bool reorder){
         assert(dims==[1,1,1,1],"only 1 process thing available");
-        return new SNCart!(4)(this);
+        return new SNCart!(4)(new SNLinearComm(channels,name),dims,periodic);
     }
     int nextTag(){
         return counter.next();
@@ -478,17 +515,6 @@ class SNLinearComm:LinearComm,BasicObjectI{
             dataIn[]=dataOut;
         }
         void scatter(T[] dataOut,int[] outCounts, int[] outStarts, T[] dataIn,int root,int tag=0){
-            assert(outCounts.length==dim,"invalid outCounts length");
-            assert(outStarts.length==dim,"invalid outStarts length");
-            assert(0<=root && root<dim,"invalid root");
-            dataIn[]=dataOut[outStarts[0]..outStarts[0]+outCounts[0]];
-        }
-        void allScatter(T[] dataOut,T[] dataIn,int root,int tag=0){
-            assert(root==0);
-            assert(dataOut.length%dim==0);
-            dataIn[]=dataOut;
-        }
-        void allScatter(T[] dataOut,int[] outCounts, int[] outStarts, T[] dataIn,int root,int tag=0){
             assert(outCounts.length==dim,"invalid outCounts length");
             assert(outStarts.length==dim,"invalid outStarts length");
             assert(0<=root && root<dim,"invalid root");
@@ -569,15 +595,18 @@ class SNLinearComm:LinearComm,BasicObjectI{
     alias cOp7.gather        gather       ;
     alias cOp7.allGather     allGather    ;
     alias cOp7.scatter       scatter      ;
-    alias cOp7.allScatter    allScatter   ;
     alias cOp7.reduceScatter reduceScatter;
     alias cOp7.alltoall      alltoall     ;
     alias cOp8.gather        gather       ;
     alias cOp8.allGather     allGather    ;
     alias cOp8.scatter       scatter      ;
-    alias cOp8.allScatter    allScatter   ;
     alias cOp8.reduceScatter reduceScatter;
     alias cOp8.alltoall      alltoall     ;
+    alias cOp9.gather        gather       ;
+    alias cOp9.allGather     allGather    ;
+    alias cOp9.scatter       scatter      ;
+    alias cOp9.reduceScatter reduceScatter;
+    alias cOp9.alltoall      alltoall     ;
     
     void barrier(){}
     void registerHandler(ChannelHandler handler,int tag){

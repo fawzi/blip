@@ -2,6 +2,7 @@
 /// a mpiWorld static constant is available, if mpi is available it uses it, otherwise
 /// SingleNode is used. The interface exposed is the same.
 module blip.parallel.mpi.Mpi;
+
 version(mpi)
 {
     public import blip.parallel.mpi.MpiModels;
@@ -12,6 +13,12 @@ version(mpi)
     import blip.container.Deque;
     import blip.BasicModels;
     import blip.sync.UniqueNumber;
+    import blip.container.AtomicSLink;
+    import blip.container.GrowableArray;
+    import blip.io.Console;
+    import blip.io.BasicIO;
+    import blip.t.core.Thread;
+    import blip.t.stdc.config;
 
     template MPI_DatatypeForType(T){
         static if (is(T==ubyte)){
@@ -74,81 +81,86 @@ version(mpi)
         static MpiSerializer freeList;
         MpiSerializer next;
         int tag;
-        SerializedMessage msg;
+        GrowableArray!(ubyte) msgData;
         Channel target;
-        bool localBuf;
-        static MpiSerializer opCall(Channel target,int tag,ubyte[] buf=null){
+        
+        static MpiSerializer opCall(Channel target,int tag,ubyte[] buf=null,
+            GASharing sharing=GASharing.GlobalNoFree){
             auto newS=popFrom(freeList);
             if (newS is null){
-                IOArray arr;
-                if (buf.length>0){
-                    arr=new IOArray(buf,0,512);
-                    localBuf=true;
-                } else {
-                    arr=new IOArray(512,512);
-                    localBuf=false;
-                }
-                newS=new MpiSerializer(arr);
+                newS=new MpiSerializer(target,tag,buf);
             } else {
                 if (buf.length>0){
-                    auto arr=cast(IOArray)((cast(BinaryHandlers!())handlers).writer);
-                    arr.assign(buf,0,512);
+                    newS.msgData.assign(buf,0,sharing);
                 }
+                newS.tag=tag;
+                newS.target=target;
+                newS.next=null;
             }
             return newS;
         }
         void giveBack(){
+            tag=AnyTag;
+            if (msgData.sharing!=GASharing.Global){
+                msgData.deallocData();
+            } else {
+                msgData.clearData();
+            }
             insertAt(freeList,this);
         }
-        this(size_t capacity=512,size_t grow=512){
-            super(new IOArray(capacity,grow));
+        this(Channel target,int tag,ubyte[] buf=null,
+            GASharing sharing=GASharing.GlobalNoFree){
+            auto ga=new GrowableArray!(ubyte)(buf,0,sharing);
+            super(&ga.appendVoid);
+            this.msgData=ga;
+            this.target=target;
+            this.tag=tag;
         }
         void writeStartRoot() {
             super.writeStartRoot();
-            assert(msg.tag!=AnyTag);
+            assert(tag!=AnyTag);
             assert(target!is null);
-            msg.tag=tag;
         }
         void writeEndRoot() {
             super.writeEndRoot();
-            assert(msg.tag==tag);
+            assert(tag!=AnyTag);
+            assert(target!is null);
         }
         void close(){
-            auto arr=cast(IOArray)((cast(BinaryHandlers!())handlers).writer);
-            msg.msg=arr.slice;
             Task("MpiSerializerClose",{
-                target.send(msg.msg,msg.tag);
+                target.send(msgData.data,tag);
             }).autorelease.executeNow(target.sendTask);
-            arr.assign(null,0);
-            if (handleMsg!is null){
-                if (handleMsg(msg)){
-                    clearMsg();
-                }
-            }
             super.close();
             giveBack();
         }
-        void useBuf(ubyte[] buf){
-            auto arr=cast(IOArray)((cast(BinaryHandlers!())handlers).writer);
-            arr.assign(buf,0,512);
+        void useBuf(ubyte[] buf,GASharing sharing=GASharing.GlobalNoFree){
+            msgData.assign(buf,0,sharing);
         }
         void clearMsg(){
-            msg.tag=AnyTag;
-            msg.msg=null;
+            tag=AnyTag;
+            msgData.clearData();
         }
     }
 
     class MpiUnserializer:SBinUnserializer{
         static MpiUnserializer freeList;
         SerializedMessage msg;
+        MpiUnserializer next;
         static MpiUnserializer opCall(SerializedMessage msg){
             auto newS=popFrom(freeList);
             if (newS is null){
-                newS=new MpiSerializer(msg);
+                newS=new MpiUnserializer(msg);
+            } else {
+                newS.msg=msg;
+                (cast(IOArray)newS.reader).assign(msg.msg);
+                newS.next=null;
             }
             return newS;
         }
         void giveBack(){
+            msg.tag=AnyTag;
+            msg.msg=null;
+            (cast(IOArray)reader).assign(null,0);
             insertAt(freeList,this);
         }
         this(SerializedMessage msg){
@@ -161,14 +173,9 @@ version(mpi)
         }
         void readEndRoot() {
             super.readEndRoot();
-            assert(res.tag!=AnyTag);
+            assert(msg.tag!=AnyTag);
         }
         void close(){
-            msg.msg=Variant.init;
-            msg.tag=AnyTag;
-            auto tmp=arr.assign;
-            arr.assign(null,0);
-            //delete tmp;
             giveBack();
         }
     
@@ -214,122 +221,177 @@ version(mpi)
             if (MPI_Probe(otherRank, tag, comm.comm, &status)!=MPI_SUCCESS){
                 throw new MpiException("MPI_Probe failed",__FILE__,__LINE__);
             }
-            tag=status.tag;
+            tag=status.MPI_TAG;
             int count;
-            if (MPI_Get_count(&status, MPI_DatatypeForType!(ubyte), count)!=MPI_SUCCESS){
+            if (MPI_Get_count(&status, MPI_DatatypeForType!(ubyte), &count)!=MPI_SUCCESS){
                 throw new MpiException("MPI_Get_count failed",__FILE__,__LINE__);
             }
             buf.length=count;
             recv(buf,tag);
-            return MpiUnserializer(SerializedMessage(status.tag,buf));
+            return MpiUnserializer(SerializedMessage(status.MPI_TAG,buf));
         }
-        void send(T)(T valOut,int tag=0){
-            static if(is(T U:U[])){
-                int count=valOut.length;
-                void * buf=valOut.ptr;
-                auto dataType=MPI_DatatypeForType!(U);
-            } else {
-                int count=1;
-                void * buf=&valOut;
-                auto dataType=MPI_DatatypeForType!(T);
-            }
+        template sendT(T){
+            void send(T valOut,int tag=0){
+                static if(is(T U:U[])){
+                    int count=valOut.length;
+                    void * buf=valOut.ptr;
+                    auto dataType=MPI_DatatypeForType!(U);
+                } else {
+                    int count=1;
+                    void * buf=&valOut;
+                    auto dataType=MPI_DatatypeForType!(T);
+                }
         
-            if (MPI_Send(buf, count, dataType, otherRank, tag, comm.comm)!=MPI_SUCCESS){
-                throw new MpiException("MPI_Send failed",__FILE__,__LINE__);
+                if (MPI_Send(buf, count, dataType, otherRank, tag, comm.comm)!=MPI_SUCCESS){
+                    throw new MpiException("MPI_Send failed",__FILE__,__LINE__);
+                }
             }
         }
-        int recv(T)(out T valIn, int tag=0){
-            static if(is(T U:U[])){
-                int count=valIn.length;
-                void * buf=valIn.ptr;
-                auto dataType=MPI_DatatypeForType!(U);
-            } else {
-                int count=1;
-                void * buf=&valIn;
-                auto dataType=MPI_DatatypeForType!(T);
-            }
+        // ugly but needed at the moment...
+        mixin sendT!(int[])    s1;
+        mixin sendT!(double[]) s2;
+        mixin sendT!(ubyte[])  s3;
+        alias s1.send send;
+        alias s2.send send;
+        alias s3.send send;
         
-            MPI_Status status;
-            if (MPI_Recv(buf, count, dataType, otherRank, tag, comm.comm,&status)!=MPI_SUCCESS){
-                throw new MpiException("MPI_Send failed",__FILE__,__LINE__);
+        template recvT(T){
+            int recv(ref T valIn, int tag=0){
+                static if(is(T U:U[])){
+                    int count=valIn.length;
+                    void * buf=valIn.ptr;
+                    auto dataType=MPI_DatatypeForType!(U);
+                } else {
+                    int count=1;
+                    void * buf=&valIn;
+                    auto dataType=MPI_DatatypeForType!(T);
+                }
+        
+                MPI_Status status;
+                if (MPI_Recv(buf, count, dataType, otherRank, tag, comm.comm,&status)!=MPI_SUCCESS){
+                    throw new MpiException("MPI_Send failed",__FILE__,__LINE__);
+                }
+                return status.MPI_TAG;
             }
         }
+        // ugly but needed at the moment...
+        mixin recvT!(int[])    r1;
+        mixin recvT!(double[]) r2;
+        mixin recvT!(ubyte[])  r3;
+        alias r1.recv recv;
+        alias r2.recv recv;
+        alias r3.recv recv;
+        
         void sendStr(char[] s, int tag=0){
-            send(s,tag);
+            sendT!(char[]).send(s,tag);
         }
-        void recvStr(ref char[] s,int tag=0){
+        int recvStr(ref char[] s,int tag=0){
             MPI_Status status;
             if (MPI_Probe(otherRank, tag, comm.comm, &status)!=MPI_SUCCESS){
                 throw new MpiException("MPI_Probe failed",__FILE__,__LINE__);
             }
             int count;
-            if (MPI_Get_count(&status, MPI_DatatypeForType!(char), count)!=MPI_SUCCESS){
+            if (MPI_Get_count(&status, MPI_DatatypeForType!(char), &count)!=MPI_SUCCESS){
                 throw new MpiException("MPI_Get_count failed",__FILE__,__LINE__);
             }
             s.length=count;
-            recv(s,tag);
+            return recvT!(char[]).recv(s,tag);
         }
         void close(){ }
     
-        void sendrecv(T)(T sendV,ref T recvV,Channel recvChannel){
-            if (recvChannel is this){
-                assert(data.length==0);
-                recvV=sendV;
-            } else {
-                recvChannel.send(sendV);
-                recvChannel.recv(recvV);
+        template sendrecvT(T){
+            int sendrecv(T sendV,ref T recvV,Channel recvChannel,int sendTag=0,int recvTag=0){
+                if (recvChannel is this){
+                    static if(is(T U:U[])){
+                        recvV[]=sendV;
+                    } else {
+                        recvV=sendV;
+                    }
+                } else {
+                    sendT!(T).send(sendV,sendTag);
+                    return recvChannel.recv(recvV,recvTag);
+                }
             }
         }
-    
+        // ugly but needed at the moment...
+        mixin sendrecvT!(int[])    sr1;
+        mixin sendrecvT!(double[]) sr2;
+        mixin sendrecvT!(ubyte[])  sr3;
+        alias sr1.sendrecv sendrecv;
+        alias sr2.sendrecv sendrecv;
+        alias sr3.sendrecv sendrecv;
+        
         void desc(void delegate(char[]) sink){
             auto s=dumper(sink);
-            s("{<MPIChannel@")(cast(void*)this)(">\n");
-            s("  otherRank:")(otherRank)(",\n");
-            s("  comm:MpiLinearComm@")(cast(void*)comm)(">\n");
+            s("{<MpiChannel@")(cast(void*)this)(">\n");
+            s("  otherRank:")(this.otherRank)(",\n");
+            s("  comm:MpiLinearComm@")(cast(void*)this.comm)(">\n");
             s("}");
         }
     }
 
     class MpiCart(int dimG):Cart!(dimG){
+        char[] name;
         int[dimG] _dims;
         int[dimG] _myPos;
-        LinearComm _baseComm;
-        this(MpiLinearComm baseComm){
-            _dims[]=1;
-            _zeros[]=0;
-            _baseComm=baseComm;
-            int MPI_Cart_coords(MPI_Comm comm, int rank, int maxdims, int *coords);
-            int MPI_Cart_create(MPI_Comm old_comm, int ndims, int *dims,
-                                               int *periods, int reorder, MPI_Comm *comm_cart);
-            int MPI_Cart_get(MPI_Comm comm, int maxdims, int *dims,
-                                            int *periods, int *coords);
-            int MPI_Cart_map(MPI_Comm comm, int ndims, int *dims,
-                                            int *periods, int *newrank);
-            int MPI_Cart_rank(MPI_Comm comm, int *coords, int *rank);
-            int MPI_Cart_shift(MPI_Comm comm, int direction, int disp,
-                                              int *rank_source, int *rank_dest);
+        int[dimG] _periods;
+        MpiLinearComm _baseComm;
+        this(MpiLinearComm baseComm,char[] name,int[]dims,int[] periods,bool reorder=true){
+            assert(dims.length==dimG,"invalid number of dimensions");
+            assert(periods is null || periods.length==dimG,"invalid number of dimensions");
+            
+            MPI_Comm newComm;
+            if (MPI_Cart_create(baseComm.comm,dimG,dims.ptr,
+                periods.ptr,reorder,&newComm)!=MPI_SUCCESS)
+            {
+                throw new MpiException("creation of cart failed",__FILE__,__LINE__);
+            }
+            auto bComm=new MpiLinearComm(newComm,name);
+            this(bComm);
+        }
         
+        this(MpiLinearComm baseComm){
+            this._baseComm=baseComm;
+            if (MPI_Cart_get(_baseComm.comm, dimG, _dims.ptr,
+                _periods.ptr,_myPos.ptr)!=MPI_SUCCESS)
+            {
+                throw new MpiException("MPI_Cart_get failed",__FILE__,__LINE__);
+            }
         }
         int[] dims(){
             return _dims;
         }
-        Channel opIndex(int[dimG] pos){
-            assert(pos==_zeros,"invalid index");
-            return _baseComm[0];
+        int[] myPos(){
+            return _myPos;
+        }
+        int[] periodic(){
+            return _periods;
         }
         LinearComm baseComm(){
             return _baseComm;
         }
-        int toBaseIdx(int[dimG] pos){
-            assert(pos==_zeros,"invalid index");
-            return 0;
-        }
-        int[] fromBaseIdx(int rank,int[] res=null){
-            res.length=3;
-            if (MPI_Cart_coords(comm, rank, 3, res.ptr)!=MPI_SUCCESS){
-                throw new MpiException("MPI_Cart_coords failure",__FILE__,__LINE__);
+        int pos2rank(int[dimG] pos){
+            int res;
+            if(MPI_Cart_rank(_baseComm.comm,pos.ptr,&res)!=MPI_SUCCESS){
+                throw new MpiException("MPI_Cart_rank failed",__FILE__,__LINE__);
             }
-        
+            return res;
+        }
+        Channel opIndex(int[dimG] pos){
+            return _baseComm[pos2rank(pos)];
+        }
+        int[] rank2pos(int rank,int[dimG] pos){
+            if (MPI_Cart_coords(_baseComm.comm, rank, dimG, pos.ptr)!=MPI_SUCCESS){
+                throw new MpiException("MPI_Cart_coords failed",__FILE__,__LINE__);
+            }
+            return pos;
+        }
+        void shift(int direction, int disp, out int rank_source, out int rank_dest){
+            if (MPI_Cart_shift(_baseComm.comm, direction, disp,
+                &rank_source, &rank_dest)!=MPI_SUCCESS)
+            {
+                throw new MpiException("MPI_Cart_shift failed",__FILE__,__LINE__);
+            }
         }
     }
 
@@ -358,12 +420,12 @@ version(mpi)
                         if (MPI_Probe(MPI_ANY_SOURCE,tag, comm.comm,&status)!=MPI_SUCCESS){
                             throw new MpiException("Mpi probe failed",__FILE__,__LINE__);
                         }
-                        handler(status.tag,comm[status.source]);
+                        handler(comm[status.MPI_SOURCE],status.MPI_TAG);
                     }
                 } catch (Exception e){
                     serr(collectAppender(delegate void(CharSink s){
                         dumper(s)("Error in mpi handler for comm ")(comm.name)(" tag:")(tag)("\n");
-                        e.desc(s);
+                        e.writeOut(serr.call);
                     }));
                 }
             }
@@ -385,7 +447,7 @@ version(mpi)
                 throw new MpiException("could not get rank of communicator",__FILE__,__LINE__);
             }
             counter=UniqueNumber!(int)(10);
-            channels=new MPIChannel[](dim);
+            channels=new MpiChannel[](dim);
         }
         char[] name(){
             return _name;
@@ -419,288 +481,287 @@ version(mpi)
             }
             return new MpiLinearComm(newComm);
         }
-        Cart!(2) mkCart(int[2] dims,int[2] periodic,bool reorder){
-            MPI_Comm newComm;
-            if (MPI_Cart_create(comm, 2, dims.ptr,
-                    periodic.ptr, (reorder?1:0), &newComm)!=MPI_SUCCESS)
-            {
-                throw new MpiException("cart create failed",__FILE__,__LINE__);
-            }
-            return new MPICart!(2)(this,newComm);
+        Cart!(2) mkCart(char[] name,int[2] dims,int[2] periodic,bool reorder){
+            return new MpiCart!(2)(this,name,dims,periodic,reorder);
         }
-        Cart!(3) mkCart(int[3] dims,int[3] periodic,bool reorder){
-            MPI_Comm newComm;
-            if (MPI_Cart_create(comm, 3, dims.ptr,
-                    periodic.ptr, (reorder?1:0), &newComm)!=MPI_SUCCESS)
-            {
-                throw new MpiException("cart create failed",__FILE__,__LINE__);
-            }
-            return new MPICart!(3)(this,newComm);
+        Cart!(3) mkCart(char[] name,int[3] dims,int[3] periodic,bool reorder){
+            return new MpiCart!(3)(this,name,dims,periodic,reorder);
         }
-        Cart!(4) mkCart(int[4] dims,int[4] periodic,bool reorder){
-            MPI_Comm newComm;
-            if (MPI_Cart_create(comm, 4, dims.ptr,
-                    periodic.ptr, (reorder?1:0), &newComm)!=MPI_SUCCESS)
-            {
-                throw new MpiException("cart create failed",__FILE__,__LINE__);
-            }
-            return new MPICart!(4)(this,newComm);
+        Cart!(4) mkCart(char[] name,int[4] dims,int[4] periodic,bool reorder){
+            return new MpiCart!(4)(this,name,dims,periodic,reorder);
         }
     
         int nextTag(){
             return counter.next();
         }
     
-        void bcast(T)(ref T val,int root,int tag=0){
-            if (_dim<=1) return;
-            static if(is(T U:U[])){
-                int count=val.length;
-                void * buf=val.ptr;
-                auto dataType=MPI_DatatypeForType!(U);
-            } else {
-                int count=1;
-                void * buf=&val;
-                auto dataType=MPI_DatatypeForType!(T);
+        template collOp1(T){
+            void bcast(ref T val,int root,int tag=0){
+                if (channels.length<=1) return;
+                static if(is(T U:U[])){
+                    int count=val.length;
+                    void * buf=val.ptr;
+                    auto dataType=MPI_DatatypeForType!(U);
+                } else {
+                    int count=1;
+                    void * buf=&val;
+                    auto dataType=MPI_DatatypeForType!(T);
+                }
+                if (MPI_Bcast(buf, count, dataType, root, comm)!=MPI_SUCCESS){
+                    throw new MpiException("MPI_Bcast failed",__FILE__,__LINE__);
+                }
             }
-            if (MPI_Bcast(buf, count, dataType, root, comm)!=MPI_SUCCESS){
-                throw new MpiException("MPI_Bcast failed",__FILE__,__LINE__);
-            }
-        }
     
-        void reduce(T)(T valOut, ref T valIn, int root,MPI_Op op,int tag=0){
-            static if(is(T U:U[])){
-                int count=valOut.length;
-                assert(valIn.length==count,"in and out nned to have the same size");
-                void * bufOut=valOut.ptr;
-                void * bufIn=valIn.ptr;
-                auto dataType=MPI_DatatypeForType!(U);
-            } else {
-                int count=1;
-                void * bufOut=&valOut;
-                void * bufIn=&valIn;
-                auto dataType=MPI_DatatypeForType!(T);
+            void reduce(T valOut, ref T valIn, int root,MPI_Op op,int tag=0){
+                static if(is(T U:U[])){
+                    int count=valOut.length;
+                    assert(valIn.length==count,"in and out nned to have the same size");
+                    void * bufOut=valOut.ptr;
+                    void * bufIn=valIn.ptr;
+                    auto dataType=MPI_DatatypeForType!(U);
+                } else {
+                    int count=1;
+                    void * bufOut=&valOut;
+                    void * bufIn=&valIn;
+                    auto dataType=MPI_DatatypeForType!(T);
+                }
+                if (MPI_Reduce ( bufOut, bufIn, count, dataType, op, root, comm )!=MPI_SUCCESS){
+                    throw new MpiException("MPI_Reduce failed",__FILE__,__LINE__);
+                }
             }
-            if (MPI_Reduce ( bufOut, bufIn, count, dataType, op, root, comm )!=MPI_SUCCESS){
-                throw new MpiException("MPI_Reduce failed",__FILE__,__LINE__);
-            }
-        }
 
-        void allReduce(T)(T valOut, ref T valIn,MPI_Op op,int tag=0){
-            static if(is(T U:U[])){
-                int count=valOut.length;
-                assert(valIn.length==count,"in and out nned to have the same size");
-                void * bufOut=valOut.ptr;
-                void * bufIn=valIn.ptr;
-                auto dataType=MPI_DatatypeForType!(U);
-            } else {
-                int count=1;
-                void * bufOut=&valOut;
-                void * bufIn=&valIn;
-                auto dataType=MPI_DatatypeForType!(T);
-            }
-            if (MPI_Allreduce ( bufOut, bufIn, count, dataType, op, comm )!=MPI_SUCCESS){
-                throw new MpiException("MPI_Allreduce failed",__FILE__,__LINE__);
-            }
-        }
-    
-        void gather(T)(T[] dataOut,T[] dataIn,int root,int tag=0){
-            assert(0<=root && root<dim,"invalid root");
-            if (dim==1){
-                dataIn[0..dataOut.length]=dataOut;
-                return;
-            }
-            if (MPI_Gather(dataOut.ptr, dataOut.length, MPI_DatatypeForType!(T),
-                        dataIn.ptr, dataIn.length, MPI_DatatypeForType!(T),
-                        root, comm)!=MPI_SUCCESS)
-            {
-                throw new MpiException("MPI_Gather failed",__FILE__,__LINE__);
+            void allReduce(T valOut, ref T valIn,MPI_Op op,int tag=0){
+                static if(is(T U:U[])){
+                    int count=valOut.length;
+                    assert(valIn.length==count,"in and out nned to have the same size");
+                    void * bufOut=valOut.ptr;
+                    void * bufIn=valIn.ptr;
+                    auto dataType=MPI_DatatypeForType!(U);
+                } else {
+                    int count=1;
+                    void * bufOut=&valOut;
+                    void * bufIn=&valIn;
+                    auto dataType=MPI_DatatypeForType!(T);
+                }
+                if (MPI_Allreduce ( bufOut, bufIn, count, dataType, op, comm )!=MPI_SUCCESS){
+                    throw new MpiException("MPI_Allreduce failed",__FILE__,__LINE__);
+                }
             }
         }
-        void gather(T)(T[] dataOut,T[] dataIn,int[] inStarts,int[] inCounts,int root,int tag=0){
-            assert(inCounts.length==dim,"invalid inCounts length");
-            assert(inStarts.length==dim,"invalid inStarts length");
-            assert(0<=root && root<dim,"invalid root");
-            if (dim==1){
-                dataIn[inStarts[0]..inStarts[0]+dataOut.length]=dataOut;
-                return;
-            }
-            if (MPI_Gatherv(dataOut.ptr, dataOut.length, MPI_DatatypeForType!(T),
-                dataIn.ptr, inCounts.ptr, inStarts.ptr,
-                MPI_DatatypeForType!(T), root, comm)!=MPI_SUCCESS)
-            {
-                throw new MpiException("MPI_Gatherv failed",__FILE__,__LINE__);
-            }
-        }
-        void allGather(T)(T[] dataOut,T[] dataIn,int tag=0){
-            assert(0<=root && root<dim,"invalid root");
-            if (dim==1){
-                dataIn[0..dataOut.length]=dataOut;
-                return;
-            }
-            if (MPI_Allgather(dataOut.ptr, dataOut.length, MPI_DatatypeForType!(T),
-                        dataIn.ptr, dataIn.length, MPI_DatatypeForType!(T),
-                        comm)!=MPI_SUCCESS)
-            {
-                throw new MpiException("MPI_Gather failed",__FILE__,__LINE__);
-            }
-        }
-        void allGather(T)(T[] dataOut,T[] dataIn,int[] inStarts,int[] inCounts,int root,int tag=0){
-            assert(inCounts.length==dim,"invalid inCounts length");
-            assert(inStarts.length==dim,"invalid inStarts length");
-            assert(0<=root && root<dim,"invalid root");
-            if (dim==1){
-                dataIn[inStarts[0]..inStarts[0]+dataOut.length]=dataOut;
-                return;
-            }
-            if (MPI_Allgatherv(dataOut.ptr, dataOut.length, MPI_DatatypeForType!(T),
-                dataIn.ptr, inCounts.ptr, inStarts.ptr,
-                MPI_DatatypeForType!(T), comm)!=MPI_SUCCESS)
-            {
-                throw new MpiException("MPI_Gatherv failed",__FILE__,__LINE__);
-            }
-        }
-
-        void scatter(T)(T[] dataOut,T[] dataIn,int root,int tag=0){
-            assert(dataOut.length%dim==0);
-            if (dim==1){
-                dataIn[]=dataOut;
-                return;
-            }
-            if (MPI_Scatter(dataOut.ptr, dataOut.length/dim, MPI_DatatypeForType!(T),
+        template collOp2(T){
+            void gather(T[] dataOut,T[] dataIn,int root,int tag=0){
+                assert(0<=root && root<dim,"invalid root");
+                if (dim==1){
+                    dataIn[0..dataOut.length]=dataOut;
+                    return;
+                }
+                if (MPI_Gather(dataOut.ptr, dataOut.length, MPI_DatatypeForType!(T),
                             dataIn.ptr, dataIn.length, MPI_DatatypeForType!(T),
                             root, comm)!=MPI_SUCCESS)
-            {
-                throw new MpiException("MPI_Scatter failed",__FILE__,__LINE__);
+                {
+                    throw new MpiException("MPI_Gather failed",__FILE__,__LINE__);
+                }
             }
-        }
-        void scatter(T)(T[] dataOut,int[] outCounts, int[] outStarts, T[] dataIn,int root,int tag=0){
-            assert(outCounts.length==dim,"invalid outCounts length");
-            assert(outStarts.length==dim,"invalid outStarts length");
-            assert(0<=root && root<dim,"invalid root");
-            if (dim==1){
-                dataIn[]=dataOut[outStarts[0]..outStarts[0]+outCounts[0]];
-                return;
+            void gather(T[] dataOut,T[] dataIn,int[] inStarts,int[] inCounts,int root,int tag=0){
+                assert(inCounts.length==dim,"invalid inCounts length");
+                assert(inStarts.length==dim,"invalid inStarts length");
+                assert(0<=root && root<dim,"invalid root");
+                if (dim==1){
+                    dataIn[inStarts[0]..inStarts[0]+dataOut.length]=dataOut;
+                    return;
+                }
+                if (MPI_Gatherv(dataOut.ptr, dataOut.length, MPI_DatatypeForType!(T),
+                    dataIn.ptr, inCounts.ptr, inStarts.ptr,
+                    MPI_DatatypeForType!(T), root, comm)!=MPI_SUCCESS)
+                {
+                    throw new MpiException("MPI_Gatherv failed",__FILE__,__LINE__);
+                }
             }
-            if (MPI_Scatterv(dataOut.ptr, outCounts.ptr, outStarts,
-                             MPI_DatatypeForType!(T), dataIn.ptr, dataIn.length,
-                             MPI_DatatypeForType!(T), root, comm)!=MPI_SUCCESS)
-            {
-                throw new MpiException("MPI_Scatterv failed",__FILE__,__LINE__);
-            }
-        }
-        void allScatter(T)(T[] dataOut,T[] dataIn,int tag=0){
-            assert(dataOut.length%dim==0);
-            if (dim==1){
-                dataIn[]=dataOut;
-                return;
-            }
-            if (MPI_Scatter(dataOut.ptr, dataOut.length/dim, MPI_DatatypeForType!(T),
+            void allGather(T[] dataOut,T[] dataIn,int tag=0){
+                if (dim==1){
+                    dataIn[0..dataOut.length]=dataOut;
+                    return;
+                }
+                if (MPI_Allgather(dataOut.ptr, dataOut.length, MPI_DatatypeForType!(T),
                             dataIn.ptr, dataIn.length, MPI_DatatypeForType!(T),
                             comm)!=MPI_SUCCESS)
-            {
-                throw new MpiException("MPI_Scatter failed",__FILE__,__LINE__);
-            }
-        }
-        void allScatter(T)(T[] dataOut,int[] outCounts, int[] outStarts, T[] dataIn,int tag=0){
-            assert(outCounts.length==dim,"invalid outCounts length");
-            assert(outStarts.length==dim,"invalid outStarts length");
-            if (dim==1){
-                dataIn[]=dataOut[outStarts[0]..outStarts[0]+outCounts[0]];
-                return;
-            }
-            if (MPI_Scatterv(dataOut.ptr, outCounts.ptr, outStarts,
-                             MPI_DatatypeForType!(T), dataIn.ptr, dataIn.length,
-                             MPI_DatatypeForType!(T), comm)!=MPI_SUCCESS)
-            {
-                throw new MpiException("MPI_Scatterv failed",__FILE__,__LINE__);
-            }
-        }
-    
-        void reduceScatter(T)(T[]outData,T[]inData,MPI_Op op){
-            assert(outData.length==inData.length*dim,"invalid lengths");
-            if (dim==1){
-                inData[0..outData.length]=outData;
-                return;
-            }
-            static if(is(typeof(&MPI_Reduce_scatter_block))){
-                if (MPI_Reduce_scatter_block(outData.ptr, inData.ptr, inData.length, 
-                        MPI_DatatypeForType!(T), op, comm)!=MPI_SUCCESS)
                 {
-                    throw new MpiException("MPI_Reduce_scatter_block failed",__FILE__,__LINE__);
+                    throw new MpiException("MPI_Gather failed",__FILE__,__LINE__);
                 }
-            } else {
-                scope inCounts=new int[](dim);
-                inCounts[]=inData.length;
+            }
+            void allGather(T[] dataOut,T[] dataIn,int[] inStarts,int[] inCounts,int tag=0){
+                assert(inCounts.length==dim,"invalid inCounts length");
+                assert(inStarts.length==dim,"invalid inStarts length");
+                if (dim==1){
+                    dataIn[inStarts[0]..inStarts[0]+dataOut.length]=dataOut;
+                    return;
+                }
+                if (MPI_Allgatherv(dataOut.ptr, dataOut.length, MPI_DatatypeForType!(T),
+                    dataIn.ptr, inCounts.ptr, inStarts.ptr,
+                    MPI_DatatypeForType!(T), comm)!=MPI_SUCCESS)
+                {
+                    throw new MpiException("MPI_Gatherv failed",__FILE__,__LINE__);
+                }
+            }
+
+            void scatter(T[] dataOut,T[] dataIn,int root,int tag=0){
+                assert(dataOut.length%dim==0);
+                if (dim==1){
+                    dataIn[]=dataOut;
+                    return;
+                }
+                if (MPI_Scatter(dataOut.ptr, dataOut.length/dim, MPI_DatatypeForType!(T),
+                                dataIn.ptr, dataIn.length, MPI_DatatypeForType!(T),
+                                root, comm)!=MPI_SUCCESS)
+                {
+                    throw new MpiException("MPI_Scatter failed",__FILE__,__LINE__);
+                }
+            }
+            void scatter(T[] dataOut,int[] outCounts, int[] outStarts, T[] dataIn,int root,int tag=0){
+                assert(outCounts.length==dim,"invalid outCounts length");
+                assert(outStarts.length==dim,"invalid outStarts length");
+                assert(0<=root && root<dim,"invalid root");
+                if (dim==1){
+                    dataIn[]=dataOut[outStarts[0]..outStarts[0]+outCounts[0]];
+                    return;
+                }
+                if (MPI_Scatterv(dataOut.ptr, outCounts.ptr, outStarts.ptr,
+                                 MPI_DatatypeForType!(T), dataIn.ptr, dataIn.length,
+                                 MPI_DatatypeForType!(T), root, comm)!=MPI_SUCCESS)
+                {
+                    throw new MpiException("MPI_Scatterv failed",__FILE__,__LINE__);
+                }
+            }
+    
+            void reduceScatter(T[]outData,T[]inData,MPI_Op op){
+                assert(outData.length==inData.length*dim,"invalid lengths");
+                if (dim==1){
+                    inData[0..outData.length]=outData;
+                    return;
+                }
+                static if(is(typeof(&MPI_Reduce_scatter_block))){
+                    if (MPI_Reduce_scatter_block(outData.ptr, inData.ptr, inData.length, 
+                            MPI_DatatypeForType!(T), op, comm)!=MPI_SUCCESS)
+                    {
+                        throw new MpiException("MPI_Reduce_scatter_block failed",__FILE__,__LINE__);
+                    }
+                } else {
+                    scope inCounts=new int[](dim);
+                    inCounts[]=inData.length;
+                    if (MPI_Reduce_scatter(outData.ptr, inData.ptr, inCounts.ptr,
+                                               MPI_DatatypeForType!(T), op, comm)!=MPI_SUCCESS)
+                    {
+                        throw new MpiException("MPI_Reduce_scatter (block) failed",__FILE__,__LINE__);
+                    }
+                }
+            }
+            void reduceScatter(T[]outData,T[]inData,int[]inCounts,MPI_Op op)
+            in{
+                assert(outData.length==inData.length*dim,"invalid lengths");
+                assert(inCounts[myRank]==inData.length,"invalid inData length");
+                size_t sum=0;
+                foreach (i;inCounts) sum+=i;
+                assert(outData.length==sum,"inconsistent inCounts and outData length");
+            }
+            body{
+                if (dim==1){
+                    assert(inCounts[0]<=outData.length && inCounts[0]==inData.length,"incorrect lengths");
+                    inData[0..outData.length]=outData;
+                    return;
+                }
                 if (MPI_Reduce_scatter(outData.ptr, inData.ptr, inCounts.ptr,
                                            MPI_DatatypeForType!(T), op, comm)!=MPI_SUCCESS)
                 {
-                    throw new MpiException("MPI_Reduce_scatter (block) failed",__FILE__,__LINE__);
+                    throw new MpiException("MPI_Reduce_scatter failed",__FILE__,__LINE__);
+                }
+            }
+
+            void alltoall(T[] dataOut,T[] dataIn,int tag=0){
+                assert(dataOut.length%dim==0,"invalid dataOut length");
+                assert(dataIn.length%dim==0,"invalid dataIn length");
+                if (dim==1){
+                    dataIn[0..dataOut.length]=dataIn;
+                    return;
+                }
+                if (MPI_Alltoall(dataOut.ptr, dataOut.length/dim, MPI_DatatypeForType!(T),
+                                 dataIn.ptr, dataIn.length/dim, MPI_DatatypeForType!(T),comm)!=MPI_SUCCESS)
+                {
+                    throw new MpiException("MPI_Alltoall failed",__FILE__,__LINE__);
+                }
+            }
+            void alltoall(T[] dataOut,int[] outCounts,int[] outStarts,
+                T[] dataIn,int[] inCounts, int[] inStarts,int tag=0)
+            in {
+                assert(outCounts.length==dim,"invalid outCounts length");
+                assert(outStarts.length==dim,"invalid outStarts length");
+                assert(inCounts.length==dim,"invalid inCounts length");
+                assert(inStarts.length==dim,"invalid inStarts length");
+                assert(dataIn.length>inStarts[$]+inCounts[$]);
+                for (int irank=1;irank<dim;++irank){
+                    assert(inStarts[irank]>=inStarts[irank-1]+inCounts[irank-1]);
+                }
+                assert(dataOut.length>outStarts[$]+outCounts[$]);
+                for (int irank=1;irank<dim;++irank){
+                    assert(outStarts[irank]>=outStarts[irank-1]+outCounts[irank-1]);
+                }
+            }
+            body {
+                if (dim==1){
+                    dataIn[inStarts[0]..inStarts[0]+dataOut.length]=dataOut;
+                    return;
+                }
+                if (MPI_Alltoallv(dataOut.ptr, outCounts.ptr, outStarts.ptr,
+                                  MPI_DatatypeForType!(T), dataIn.ptr, inCounts.ptr,
+                                  inStarts.ptr, MPI_DatatypeForType!(T),comm)!=MPI_SUCCESS)
+                {
+                    throw new MpiException("MPI_Alltoallv failed",__FILE__,__LINE__);
                 }
             }
         }
-        void reduceScatter(T)(T[]outData,T[]inData,int[]inCounts,MPI_Op op)
-        in{
-            assert(outData.length==inData.length*dim,"invalid lengths");
-            assert(inCounts[myRank]==inData.length,"invalid inData length");
-            size_t sum=0;
-            foreach (i;inCounts) sum+=i;
-            assert(outData.length==sum,"inconsistent inCounts and outData length");
-        }
-        body{
-            if (dim==1){
-                assert(inCounts[0]==outData.length && inCounts[0]==inData.length,"incorrect lengths");
-                inData[0..outData.lengths]=outData;
-                return;
-            }
-            if (MPI_Reduce_scatter(outData.ptr, inData.ptr, inCounts.ptr,
-                                       MPI_DatatypeForType!(T), op, comm)!=MPI_SUCCESS)
-            {
-                throw new MpiException("MPI_Reduce_scatter failed",__FILE__,__LINE__);
-            }
-        }
-
-        void alltoall(T)(T[] dataOut,T[] dataIn,int tag=0){
-            assert(dataOut.length%dim==0,"invalid dataOut length");
-            assert(dataIn.length%dim==0,"invalid dataIn length");
-            if (dim==1){
-                dataIn[0..dataOut.length]=dataIn;
-                return;
-            }
-            if (MPI_Alltoall(dataOut.ptr, dataOut.length/dim, MPI_DatatypeForType!(T),
-                             dataIn.ptr, dataIn.length/dim, MPI_DatatypeForType!(T),comm)!=MPI_SUCCESS)
-            {
-                throw new MpiException("MPI_Alltoall failed",__FILE__,__LINE__);
-            }
-        }
-        void alltoall(T)(T[] dataOut,int[] outCounts,int[] outStarts,
-            T[] dataIn,int[] inCounts, int[] inStarts,int tag=0)
-        in {
-            assert(outCounts.length==dim,"invalid outCounts length");
-            assert(outStarts.length==dim,"invalid outStarts length");
-            assert(inCounts.length==dim,"invalid inCounts length");
-            assert(inStarts.length==dim,"invalid inStarts length");
-            assert(dataIn.length>inStarts[$]+inCounts[$]);
-            for (int irank=1;irank<dim;++irank){
-                assert(inStarts[irank]>=inStarts[irank-1]+inCounts[irank-1]);
-            }
-            assert(dataOut.length>outStarts[$]+outCounts[$]);
-            for (int irank=1;irank<dim;++irank){
-                assert(outStarts[irank]>=outStarts[irank-1]+outCounts[irank-1]);
-            }
-        }
-        body {
-            if (dim==1){
-                dataIn[inStarts[0]..inStarts[0]+dataOut.length]=outData;
-                return;
-            }
-            if (MPI_Alltoallv(dataOut.ptr, outCounts.ptr, outStarts.ptr,
-                              MPI_DatatypeForType!(T), dataIn.ptr, inCounts.ptr,
-                              inStarts.ptr, MPI_DatatypeForType!(T),comm)!=MPI_SUCCESS)
-            {
-                throw new MpiException("MPI_Alltoallv failed",__FILE__,__LINE__);
-            }
-        }
-    
+        // ugly but needed at the moment
+        mixin collOp1!(int)      cOp1;
+        mixin collOp1!(int[])    cOp2;
+        mixin collOp1!(double)   cOp3;
+        mixin collOp1!(double[]) cOp4;
+        mixin collOp1!(ubyte)    cOp5;
+        mixin collOp1!(ubyte[])  cOp6;
+        mixin collOp2!(int)      cOp7;
+        mixin collOp2!(double)   cOp8;
+        mixin collOp2!(ubyte)    cOp9;
+        alias cOp1.bcast         bcast        ;
+        alias cOp1.reduce        reduce       ;
+        alias cOp1.allReduce     allReduce    ;
+        alias cOp2.bcast         bcast        ;
+        alias cOp2.reduce        reduce       ;
+        alias cOp2.allReduce     allReduce    ;
+        alias cOp3.bcast         bcast        ;
+        alias cOp3.reduce        reduce       ;
+        alias cOp3.allReduce     allReduce    ;
+        alias cOp4.bcast         bcast        ;
+        alias cOp4.reduce        reduce       ;
+        alias cOp4.allReduce     allReduce    ;
+        alias cOp5.bcast         bcast        ;
+        alias cOp5.reduce        reduce       ;
+        alias cOp5.allReduce     allReduce    ;
+        alias cOp6.bcast         bcast        ;
+        alias cOp6.reduce        reduce       ;
+        alias cOp6.allReduce     allReduce    ;
+        alias cOp7.gather        gather       ;
+        alias cOp7.allGather     allGather    ;
+        alias cOp7.scatter       scatter      ;
+        alias cOp7.reduceScatter reduceScatter;
+        alias cOp7.alltoall      alltoall     ;
+        alias cOp8.gather        gather       ;
+        alias cOp8.allGather     allGather    ;
+        alias cOp8.scatter       scatter      ;
+        alias cOp8.reduceScatter reduceScatter;
+        alias cOp8.alltoall      alltoall     ;
+        alias cOp9.gather        gather       ;
+        alias cOp9.allGather     allGather    ;
+        alias cOp9.scatter       scatter      ;
+        alias cOp9.reduceScatter reduceScatter;
+        alias cOp9.alltoall      alltoall     ;
+        
         void barrier(){
             if (MPI_Barrier(comm)!=MPI_SUCCESS){
                 throw new MpiException("MPI_Barrier failed",__FILE__,__LINE__);
@@ -708,15 +769,37 @@ version(mpi)
         }
     
         void registerHandler(ChannelHandler handler,int tag){
-            serv=new HandlerServer(this,handler,tag);
+            auto serv=new HandlerServer(this,handler,tag);
             if ((tag in handlers)is null){
-                throw new MpiException("handler already present for tag "~to!(char[])(tag),
+                throw new MpiException(collectAppender(delegate void(CharSink s){
+                    s("handler already present for tag "); writeOut(s,tag); }),
                     __FILE__,__LINE__);
             }
             handlers[tag]=serv;
-            t=new Thread(&serv.run);
+            auto t=new Thread(&serv.run);
             t.isDaemon=true;
             t.start();
+        }
+    
+        void desc(void delegate(char[]) sink){
+            desc(sink,true);
+        }
+        void desc(void delegate(char[]) sink,bool shortDesc){
+            auto s=dumper(sink);
+            s("{<MpiLinearComm@")(cast(void*)this)(">\n");
+            s("  name:")(this.name)(",\n");
+            s("  myRank:")(this._myRank)(",\n");
+            s("  dim:")(this.channels.length)(",\n");
+            if (!shortDesc){
+                s("  channels:[");
+                foreach(i,c;channels){
+                    if (i!=0) s(",");
+                    s(c);
+                }
+                s("],\n");
+            }
+            s("  comm:")(cast(void*)this.comm)("\n");
+            s("}");
         }
     
     }

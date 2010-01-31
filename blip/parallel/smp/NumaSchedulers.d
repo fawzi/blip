@@ -1,4 +1,5 @@
 /// schedulers that take advantage of numa topology
+// to do onStarving, add time info
 module blip.parallel.smp.NumaSchedulers;
 import blip.t.core.Thread;
 import blip.t.core.Variant:Variant;
@@ -7,6 +8,8 @@ import blip.t.core.sync.Semaphore;
 import blip.t.math.Math;
 import blip.t.util.log.Log;
 import blip.t.math.random.Random;
+import blip.t.time.Time;
+import blip.t.time.Clock;
 import blip.io.BasicIO;
 import blip.container.GrowableArray;
 import blip.TemplateFu:ctfe_i2a;
@@ -28,7 +31,7 @@ import blip.t.core.stacktrace.StackTrace; // pippo
 // especially addSched and redirectedTask are sensible
 //
 // PriQSched(this): never lock anything else
-// PriQSched(queue.lock): never lock anything else
+// PriQSched(queue.lock): locks PriQSched(this)
 // 
 // MultiSched(this): never lock anything else
 // MultiSched(queue): lock PriQSched(queue.lock), *(this)
@@ -82,6 +85,8 @@ class PriQScheduler:TaskSchedulerI {
     MultiSched superScheduler;
     /// liked list for pool of schedulers
     PriQScheduler next;
+    /// how long this scheduler has been waiting with no tasks executing
+    Time waitingSince;
     Cache _nnCache;
     /// cache at numa node level
     Cache nnCache(){
@@ -106,6 +111,7 @@ class PriQScheduler:TaskSchedulerI {
         _rootTask=new RootTask(this,0,name~"RootTask");
         runLevel=SchedulerRunLevel.Running;
         raiseRunlevel(superScheduler.runLevel);
+        waitingSince=Time.max;
     }
     void reset(char[] name,MultiSched superScheduler){
         this.name=name;
@@ -120,6 +126,7 @@ class PriQScheduler:TaskSchedulerI {
         inSuperSched=0;
         runLevel=SchedulerRunLevel.Running;
         raiseRunlevel(superScheduler.runLevel);
+        waitingSince=Time.max;
     }
     void addTask0(TaskI t){
         assert(t.status==TaskStatus.NonStarted ||
@@ -147,6 +154,13 @@ class PriQScheduler:TaskSchedulerI {
             if (inSuperSched==0) {
                 inSuperSched=1;
                 addToSuperSched=true;
+            }
+            if (queue.nEntries==1){
+                synchronized(this){
+                    if (activeTasks.length==0){
+                        waitingSince=Clock.now;
+                    }
+                }
             }
         }
         if (addToSuperSched) superScheduler.addSched(this);
@@ -268,6 +282,7 @@ class PriQScheduler:TaskSchedulerI {
             } else {
                 activeTasks[st]=1;
             }
+            waitingSince=Time.max;
         }
     }
     /// subtask has stopped execution (but is not necessarily finished)
@@ -281,6 +296,9 @@ class PriQScheduler:TaskSchedulerI {
                 activeTasks.remove(st);
                 if (runLevel>=SchedulerRunLevel.StopNoTasks && queue.nEntries==0){
                     checkRunLevel=true;
+                }
+                if (activeTasks.length==0){
+                    waitingSince=Clock.now;
                 }
             }
         }
@@ -660,9 +678,7 @@ class MultiSched:TaskSchedulerI {
                 activeTasks.remove(st);
             }
         }
-        if (!st.tryReuse()){
-            st.release();
-        }
+        st.reuseOrRelease();
     }
     /// returns wether the current task should be added (check for starvation)
     bool shouldAddTask(TaskI t){
@@ -792,6 +808,7 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
     /// logger for execution info
     Logger _execLogger;
     Cache[] nnCaches; /// numa node caches
+    OnStarvingScheduler onStarvingSched; /// scheduler for low priority (idle) tasks
     
     /// logger for task execution messages
     Logger execLogger(){
@@ -851,11 +868,17 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
         runLevel=SchedulerRunLevel.Configuring;
         log=Log.lookup(loggerPath);
         _execLogger=Log.lookup(exeLoggerPath);
+        this.onStarvingSched=new OnStarvingScheduler(this);
         addStarvingSched(NumaNode(schedLevel,0));
     }
     
+    /// root task execution in one of the schedulers
     TaskI rootTask(){
         return _rootTask;
+    }
+    /// root task for things that should be executed only if nothing else is executing
+    TaskI onStarvingTask(){
+        return onStarvingSched.rootTask();
     }
     
     /// numa node cache for the given node
@@ -973,6 +996,9 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
             oldSuper=superN;
         }
         auto t=el.nextTaskImmediate();
+        if (t is null){
+            onStarvingSched.queue.popFront(t);
+        }
         return t;
     }
     bool redirectedTask(TaskI t,MultiSched sched,int stealLevelMax=int.max){
@@ -1285,3 +1311,115 @@ class MExecuter:ExecuterI{
     }
 }
 
+/// scheduler for the onStarving queue
+class OnStarvingScheduler:TaskSchedulerI{
+    StarvationManager mainSched;
+    Deque!(TaskI) queue; /// tasks to execute only if a scheduler is starving (i.e. low priority tasks)
+    TaskI _rootTask; /// root task that adds to the onStarvingQueue
+    
+    this(StarvationManager st){
+        this.queue=new Deque!(TaskI)();
+        this.mainSched=st;
+        this._rootTask=new RootTask(this,0,mainSched.name~"OnStarvingRootTask");
+    }
+    
+    /// random source (for scheduling)
+    RandomSync rand(){
+        return mainSched.rand();
+    }
+    /// changes the current run level of the scheduler
+    /// the level can be only raised and the highest run level is "stopped"
+    void raiseRunlevel(SchedulerRunLevel level){
+        mainSched.raiseRunlevel(level);
+    }
+    /// adds a task to the scheduler queue (might redirect the task)
+    void addTask(TaskI t){
+        queue.append(t);
+        TaskI t2;
+        int isched;
+        synchronized(mainSched){
+            foreach(p;mainSched.starved[mainSched.schedLevel].loopTrue){
+                if (queue.popFront(t2)){
+                    isched=p;
+                }
+                break;
+            }
+        }
+        if (t2!is null){
+            mainSched.addIfNonExistent(isched);
+            t2.scheduler=mainSched;
+            mainSched.scheds[isched].addTask(t2);
+        }
+    }
+    /// adds a task to the scheduler queue (will not redirect the task)
+    void addTask0(TaskI t){
+        addTask(t);
+    }
+    /// returns the next task, blocks unless the scheduler is stopped
+    TaskI nextTask(){
+        assert(0,"not supposed to be called for OnStarvingScheduler");
+    }
+    /// subtask has started execution (automatically called by nextTask)
+    void subtaskActivated(TaskI st){
+        assert(0,"not supposed to be called for OnStarvingScheduler");
+    }
+    /// subtask has stopped execution (but is not necessarily finished)
+    /// this has to be called by the executer
+    void subtaskDeactivated(TaskI st){
+        assert(0,"not supposed to be called for OnStarvingScheduler");
+    }
+    /// returns the executer for this scheduler
+    ExecuterI executer(){
+        return mainSched.executer();
+    }
+    /// sets the executer for this scheduler
+    void executer(ExecuterI nExe){
+        mainSched.executer(nExe);
+    }
+    /// logger for task/scheduling messages
+    Logger logger(){
+        return mainSched.logger();
+    }
+    /// yields the current fiber if the scheduler is not sequential
+    void yield(){
+        mainSched.yield();
+    }
+    /// maybe yields the current fiber (use this to avoid creating too many tasks)
+    void maybeYield(){
+        mainSched.maybeYield();
+    }
+    /// root task, the easy way to add tasks to this scheduler
+    TaskI rootTask(){
+        return _rootTask;
+    }
+    /// description
+    void desc(void delegate(char[]) s){
+        desc(s,false);
+    }
+    /// possibly short description
+    void desc(void delegate(char[]) s,bool shortVersion){
+        s("<OnStarvingScheduler@");writeOut(s,cast(void*)this);
+        if (shortVersion) {
+            s(" >");
+            return;
+        }
+        s("\n");
+        s("  mainSched:"); writeOut(s,mainSched,true); s(",\n");
+        s("  queue:"); writeOut(s,queue); s(",\n");
+        s(" >");
+        
+    }
+    /// if there are many queued tasks (and one should try not to queue too many of them)
+    bool manyQueued(){
+        return mainSched.manyQueued();
+    }
+    /// number of simple tasks wanted
+    int nSimpleTasksWanted(){
+        return mainSched.nSimpleTasksWanted();
+    }
+    /// a cache local to the current numa node (useful for memory pools)
+    Cache nnCache(){
+        return mainSched.nnCache();
+    }
+    
+}

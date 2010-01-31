@@ -1,6 +1,11 @@
 /// implementation of oz like dataflow variables (at smp level)
+///
+/// The unification between unset variables is just istantaneous and onesided
+/// unify(a,b); unify(b,4); does not automatically set a=4.
+/// change the behaviour???
 module blip.parallel.smp.DataFlowVar;
 import blip.parallel.smp.SmpModels;
+import blip.parallel.smp.WorkManager:taskAtt;
 import blip.sync.Atomic;
 import blip.t.core.Thread;
 import blip.container.GrowableArray;
@@ -19,41 +24,49 @@ class WaitList{
 }
 
 struct WaitListPtr{
-    WaitList _ptr;
-    
+    union WaitListU{
+        WaitList wlist;
+        void*    ptr;
+        size_t   data;
+    }
+    WaitListU data;
     bool ifNoVal(void delegate(WaitList) op){
-        volatile WaitList p=_ptr;
-        if (((cast(size_t)cast(void*)p)&1)==1){
-            while(((cast(size_t)cast(void*)p)&3)==3){
+        volatile void *p=data.ptr;
+        if (((cast(size_t)p)&1)==1){
+            while(((cast(size_t)p)&3)==3){
+                assert((cast(size_t)p)==3,"invalid value ");
                 Thread.yield();
-                volatile p=_ptr; // spin
+                volatile p=data.ptr; // spin
             }
             return false;
         } else if (p is null){
             auto w=new WaitList(); // should use cache, and avoid allocation
             memoryBarrier!(false,false,false,true)();
-            atomicCAS(_ptr,w,cast(WaitList)null);
-            p=_ptr;
+            atomicCAS(data.wlist,w,cast(WaitList)null);
+            p=data.ptr;
         }
         assert(p!is null,"unexpected null");
-        synchronized(p){
-            if (p==_ptr){
-                op(p);
+        WaitList wl=cast(WaitList)p;
+        synchronized(wl){
+            if (wl is data.wlist){
+                op(wl);
                 return true;
             } else {
-                do {
-                    volatile p=_ptr;
+                while(true) {
+                    volatile p=data.ptr;
+                    if (((cast(size_t)p)&3)!=3) break;
                     Thread.yield();
-                } while(((cast(size_t)cast(void*)p)&3)==3);
-                volatile assert(((cast(size_t)cast(void*)_ptr)&1)==1,"no val when expected one");
+                }
+                volatile assert(((cast(size_t)p)&1)==1,"no val when expected one");
+                static if (is(typeof(this.value))) memoryBarrier!(true,false,false,false)();
             }
         }
         return false;
     }
     /// returns true if the value has been set (useful for the fast path)
     bool hasVal(){
-        if (((cast(size_t)cast(void*)_ptr) & 3)==1){
-            memoryBarrier!(true,false,false,false)();
+        if ((data.data & 3)==1){
+            static if (is(typeof(this.value))) memoryBarrier!(true,false,false,false)();
             return true;
         } else {
             return false;
@@ -66,9 +79,9 @@ struct WaitListPtr{
         });
     }
     
-    void maybeSetValShort(ref WaitList newVal){
+    void maybeSetValShort(ref WaitListPtr newVal){
         while(true){
-            volatile size_t nV=cast(size_t)cast(void*)newVal;
+            volatile size_t nV=newVal.data.data;
             switch (nV&3){
             case 0:
                 return;
@@ -87,20 +100,21 @@ struct WaitListPtr{
     void setValShort(size_t newVal){
         assert((newVal&3)==1,"newVal binary rep has to end with 01");
         while(true){
-            volatile WaitList oldV=_ptr;
-            switch((cast(size_t)cast(void*)oldV)&3){
+            volatile void* oldV=data.ptr;
+            switch((cast(size_t)oldV)&3){
             case 0:
-                if (atomicCASB(_ptr,cast(WaitList)cast(void*)newVal,oldV)){
+                if (atomicCASB(data.data,newVal,cast(size_t)oldV)){
                     if (oldV !is null){
-                        oldV.notify();
+                        (cast(WaitList)oldV).notify();
                     }
                     return;
                 }
+                break; // spin
             case 1:
-                if (cast(size_t)cast(void*)_ptr !is newVal){
+                if (data.data !is newVal){
                     throw new Exception(collectAppender(delegate void(CharSink sink){
                         auto s=dumper(sink);
-                        s("invalid change of value from ")(cast(size_t)cast(void*)_ptr)(" to ")(newVal);
+                        s("invalid change of value from ")(data.data)(" to ")(newVal);
                     }),__FILE__,__LINE__);
                 }
                 return;
@@ -115,28 +129,38 @@ struct WaitListPtr{
 
     void setValLong(void delegate(bool) setOp){
         while(true){
-            volatile WaitList oldV=_ptr;
-            switch((cast(size_t)cast(void*)oldV)&3){
+            volatile void* oldV=data.ptr;
+            switch((cast(size_t)oldV)&3){
             case 0:
-                void *waitP=cast(void*)(cast(size_t)3);
-                if (atomicCASB(_ptr,cast(WaitList)cast(Object)waitP,oldV)){
+                size_t waitP=3;
+                if (atomicCASB(data.data,waitP,cast(size_t)oldV)){
                     if (oldV !is null){
-                        synchronized(oldV){
+                        auto wl=cast(WaitList)oldV;
+                        synchronized(wl){
                             setOp(false);
                             memoryBarrier!(false,false,false,true)();
-                            void *valP=cast(void*)(cast(size_t)1);
-                            if (!atomicCASB(_ptr,cast(WaitList)cast(Object)valP,cast(WaitList)cast(Object)waitP)){
-                                    throw new Exception("internal error, expected value 3",__FILE__,__LINE__);
+                            size_t valP=1;
+                            if (!atomicCASB(data.data,valP,waitP)){
+                                throw new Exception("internal error, expected value 3",__FILE__,__LINE__);
                             }
-                            oldV.notify();
+                            wl.notify();
+                        }
+                    } else {
+                        setOp(false);
+                        memoryBarrier!(false,false,false,true)();
+                        size_t valP=1;
+                        if (!atomicCASB(data.data,valP,waitP)){
+                            throw new Exception("internal error, expected value 3",__FILE__,__LINE__);
                         }
                     }
                     return;
                 }
+                break; // spin
             case 1:
                 setOp(true);
                 return;
             case 3:
+                assert((cast(size_t)oldV)==3);
                 Thread.yield();
                 break; // spin
             default:
@@ -175,7 +199,7 @@ void unifyVals(T)(ref T a, ref T b){
 struct DataFlow(T){
     WaitListPtr waitL;
     static if (T.sizeof>=size_t.sizeof && !is(T==bool)){
-        T val;
+        T value;
     }
     
     void opAssign(T newVal){
@@ -186,12 +210,12 @@ struct DataFlow(T){
             } else {
                 waitL.setValShort(cast(size_t) 1);
             }
-        } else static if (T.sizeof>=size_t.sizeof){
+        } else static if (is(typeof(this.value))){
             waitL.setValLong(delegate void(bool hasV){
                 if (hasV){
-                    unifyVals(val,newVal);
+                    unifyVals(value,newVal);
                 } else {
-                    val=newVal;
+                    value=newVal;
                 }
             });
         } else {
@@ -218,12 +242,12 @@ struct DataFlow(T){
             });
         }
         static if (is(T==bool)){
-            assert(cast(size_t)waitL._ptr==5 || cast(size_t)waitL._ptr==1,"unexpected value");
-            return cast(size_t)waitL._ptr==5;
+            assert(waitL.data.data==5 || waitL.data.data==1,"unexpected value");
+            return waitL.data.data==5;
         } else static if (T.sizeof>=size_t.sizeof){
-            return val;
+            return value;
         } else {
-            size_t rVal=cast(size_t)waitL._ptr;
+            size_t rVal=waitL.data.data;
             assert((rVal&3)==1,"unexpected value");
             T res;
             ubyte *v=cast(ubyte*)&res;
@@ -232,16 +256,32 @@ struct DataFlow(T){
                 *v=cast(ubyte)(rVal&0xFF);
                 ++ib;
             }
+            return res;
         }
     }
 
     void val(T newV){
-        opAssign(newV);
+        opSliceAssign(newV);
     }
     
-    void opAssign(DataFlow newVal){
+    void opSliceAssign(T newVal){
+        opAssign(newVal);
+    }
+    void opSliceAssign(DataFlow newVal){
         size_t rVal=1;
-        waitL.maybeSetValShort(newVal.waitL._ptr);
+        static if (is(typeof(this.value))){
+            waitL.maybeSetValShort(newVal.waitL);
+        } else {
+            if (newVal.waitL.hasVal){
+                waitL.setValLong(delegate void(bool hasV){
+                    if (hasV){
+                        unifyVals(value,newVal);
+                    } else {
+                        value=newVal;
+                    }
+                });
+            }
+        }
     }
     
     T opCall(){
@@ -249,6 +289,6 @@ struct DataFlow(T){
     }
     
     void unify(DataFlow b){
-        opAssign(b);
+        opSliceAssign(b);
     }
 }

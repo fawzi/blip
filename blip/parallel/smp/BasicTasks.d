@@ -189,7 +189,6 @@ class Task:TaskI{
         Mutex taskLock; /// lock to update task numbers and status (remove and use atomic ops)
     }
     TaskSchedulerI _scheduler; /// scheduler of the current task
-    TaskSchedulerI _oldScheduler; /// scheduler of the task
     Semaphore waitSem; /// lock to wait for task end
 
     /// the task should be resubmitted
@@ -481,9 +480,7 @@ class Task:TaskI{
         if (superTask !is null){
             superTask.subtaskEnded(this);
         }
-        if (!tryReuse()){
-            release();
-        }
+        reuseOrRelease();
     }
     /// tries to give back the task for later reuse
     bool tryReuse(){
@@ -502,6 +499,12 @@ class Task:TaskI{
             }
         }
         return false;
+    }
+    /// common operation: either reuse the task or release it
+    void reuseOrRelease(){
+        if (!tryReuse()){
+            release();
+        }
     }
     /// called when a subtasks has finished
     void subtaskEnded(TaskI st){
@@ -682,14 +685,14 @@ class Task:TaskI{
     void spawnTaskSync(TaskI task){
         auto tAtt=taskAtt.val;
         if (tAtt is null || ((cast(RootTask)tAtt)!is null) || tAtt is noTask || !tAtt.mightYield){
-            scheduler.logger.warn("unsafe execution in spawnTaskSync of task "~tAtt.taskName~"\n");
+            if (tAtt !is null && ((cast(RootTask)tAtt)is null) && tAtt !is noTask && !tAtt.mightYield) {
+                scheduler.logger.warn("unsafe execution in spawnTaskSync of task "~task.taskName~" in "~tAtt.taskName~"\n");
+            }
             task.retain();
             this.spawnTask(task);
-            if (!task.status==TaskStatus.Finished)
+            if (task.status!=TaskStatus.Finished)
                 task.wait();
-            if (!task.tryReuse()){
-                task.release();
-            }
+            task.reuseOrRelease();
         } else {
             (cast(Task)task).appendOnFinish(&tAtt.resubmitDelayed);
             tAtt.delay(delegate void(){
@@ -1108,14 +1111,14 @@ class SequentialTask:RootTask{
     void spawnTaskSync(TaskI task){
         auto tAtt=taskAtt.val;
         if (tAtt is null || ((cast(RootTask)tAtt)!is null) || tAtt is noTask || !tAtt.mightYield){
-            log.warn("dangerous spawned task Sync "~taskName~"\n");
+            if (tAtt !is null && ((cast(RootTask)tAtt)is null) && tAtt !is noTask && !tAtt.mightYield) {
+                scheduler.logger.warn("unsafe execution in spawnTaskSync of task "~task.taskName~" in "~tAtt.taskName~"\n");
+            }
             task.retain();
             this.spawnTask(task);
-            if (!task.status==TaskStatus.Finished)
+            if (task.status!=TaskStatus.Finished)
                 task.wait();
-            if (!task.tryReuse()){
-                task.release();
-            }
+            task.reuseOrRelease();
         } else {
             (cast(Task)task).appendOnFinish(&tAtt.resubmitDelayed);
             tAtt.delay({

@@ -1,4 +1,4 @@
-module blip.rpc.RpcBase;
+module blip.parallel.rpc.RpcBase;
 import blip.parallel.smp.SmpModels;
 import blip.serialization.StringSerialize;
 import blip.serialization.Serialization;
@@ -390,7 +390,7 @@ class BasicProxy:Proxy{
     }
     static ClassMetaInfo metaI;
     static this(){
-        metaI=ClassMetaInfo.createForType!(typeof(this))("blip.rpc.BasicProxy");
+        metaI=ClassMetaInfo.createForType!(typeof(this))("blip.parallel.rpc.BasicProxy");
         metaI.addFieldOfType!(char[])("proxyObjUrl","url identifying the proxied object");
         metaI.addFieldOfType!(char[])("proxyName","name identifying the class of the proxy object");
     }

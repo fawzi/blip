@@ -20,7 +20,7 @@ alias void delegate(Channel,int) ChannelHandler;
 /// represents a comunication channel with a task
 interface Channel{
     TaskI sendTask();
-    TaskI recvTask();
+    TaskI recvTask(); // remove???
     /// send might be sent while serializing or only when you send close, thus close should be sent...
     /// can be called from any task
     Serializer sendTag(int tag=0,ubyte[] buf=null);
@@ -55,10 +55,13 @@ interface Channel{
 /// higher dimensional distribution of processors
 interface Cart(int dimG){
     int[] dims();
+    int[] periodic();
     int[] myPos();
     Channel opIndex(int[dimG] pos);
     LinearComm baseComm();
-    int baseIdx(int[dimG] pos);
+    int pos2rank(int[dimG] pos);
+    int[] rank2pos(int rank,int[dimG] pos);
+    void shift(int direction, int disp, out int rank_source, out int rank_dest);
 }
 
 /// collective operations, represents an mpi communicator, 1D
@@ -70,9 +73,9 @@ interface LinearComm:BasicObjectI{
     int myRank();
     Channel opIndex(int rank);
     LinearComm split(int color,int newRank);
-    Cart!(2) mkCart(int[2] dims,int[2] periodic, bool reorder);
-    Cart!(3) mkCart(int[3] dims,int[3] periodic, bool reorder);
-    Cart!(4) mkCart(int[4] dims,int[4] periodic, bool reorder);
+    Cart!(2) mkCart(char[]name,int[2] dims,int[2] periodic, bool reorder);
+    Cart!(3) mkCart(char[]name,int[3] dims,int[3] periodic, bool reorder);
+    Cart!(4) mkCart(char[]name,int[4] dims,int[4] periodic, bool reorder);
     int nextTag();
     
     void bcast(ref double,int,int tag=0);
@@ -113,12 +116,6 @@ interface LinearComm:BasicObjectI{
     void scatter(int[] dataOut,int[] outCounts, int[] outStarts, int[] dataIn,int root,int tag=0);
     void scatter(double[] dataOut,int[] outCounts, int[] outStarts, double[] dataIn,int root,int tag=0);
     void scatter(ubyte[] dataOut,int[] outCounts, int[] outStarts, ubyte[] dataIn,int root,int tag=0);
-    void allScatter(int[] dataOut,int[] dataIn,int root,int tag=0);
-    void allScatter(double[] dataOut,double[] dataIn,int root,int tag=0);
-    void allScatter(ubyte[] dataOut,ubyte[] dataIn,int root,int tag=0);
-    void allScatter(int[] dataOut,int[] outCounts, int[] outStarts, int[] dataIn,int root,int tag=0);
-    void allScatter(double[] dataOut,int[] outCounts, int[] outStarts, double[] dataIn,int root,int tag=0);
-    void allScatter(ubyte[] dataOut,int[] outCounts, int[] outStarts, ubyte[] dataIn,int root,int tag=0);
     
     void reduceScatter(int[]outData,int[]inData,MPI_Op op);
     void reduceScatter(double[]outData,double[]inData,MPI_Op op);

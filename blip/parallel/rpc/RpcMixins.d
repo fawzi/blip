@@ -1,6 +1,6 @@
 /// mixins to vend (publish/export) and aquire an object
 /// have to be mixed in in the class
-module blip.rpc.RpcMixins;
+module blip.parallel.rpc.RpcMixins;
 import blip.serialization.SerializationMixins:extractFieldsAndDocs;
 public import blip.t.util.log.Log;
 

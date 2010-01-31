@@ -166,6 +166,7 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
     } else static if (is(T==byte)||is(T==ubyte)||is(T==short)||is(T==ushort)||
         is(T==int)||is(T==uint)||is(T==long)||is(T==ulong))
     {
+        bool sign=true;
         static if (is(S[0]==char[])){
             if (args[0].length>0){
                 switch (args[0][0]){
@@ -187,6 +188,28 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
                     }
                     sink(str);
                     return;
+                case 'd','D':
+                    if (args[0].length>1 && args[0][1]>='0' && args[0][1]<='9'){
+                        int w1=cast(int)(args[0][1]-'0');
+                        for (size_t ii=2;ii<args[0].length && args[0][ii]>='0' && args[0][ii]<='9';++ii)
+                        {
+                            w1=10*w1+cast(int)(args[0][ii]-'0');
+                        }
+                        auto v2=v;
+                        int w2=0;
+                        if (v2<0) ++w2;
+                        while (v2!=0){
+                            v2/=10;
+                            ++w2;
+                        }
+                        if (w2<w1 && v<0){
+                            sink("-");
+                            sign=false;
+                        }
+                        for(int ii=w2;ii<w1;++ii){
+                            sink("0");
+                        }
+                    }
                 default:
                 }
             }
@@ -200,7 +223,11 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
                 v=cast(T)(v/10);
                 --pos;
             }
-            res[pos]='-';
+            if (sign){
+                res[pos]='-';
+            } else {
+                ++pos;
+            }
             sink(res[pos..$]);
         } else if (v==0){
             sink("0");
