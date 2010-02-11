@@ -34,12 +34,12 @@ class SNSerializer:SBinSerializer{
     int tag;
     SNMessage res;
     SNChannel target;
-    GrowableArray!(ubyte) content;
+    LocalGrowableArray!(ubyte) content;
     static SNSerializer opCall(){
         return new SNSerializer();
     }
     this(ubyte[] buf=null,bool local=false){
-        content=new GrowableArray!(ubyte)(buf,0,GASharing.GlobalNoFree);
+        content=lGrowableArray!(ubyte)(buf,0,GASharing.GlobalNoFree);
         super(&content.appendVoid);
         tag=AnyTag;
         res.tag=AnyTag;

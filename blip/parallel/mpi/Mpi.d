@@ -81,7 +81,7 @@ version(mpi)
         static MpiSerializer freeList;
         MpiSerializer next;
         int tag;
-        GrowableArray!(ubyte) msgData;
+        LocalGrowableArray!(ubyte) msgData;
         Channel target;
         
         static MpiSerializer opCall(Channel target,int tag,ubyte[] buf=null,
@@ -110,7 +110,7 @@ version(mpi)
         }
         this(Channel target,int tag,ubyte[] buf=null,
             GASharing sharing=GASharing.GlobalNoFree){
-            auto ga=new GrowableArray!(ubyte)(buf,0,sharing);
+            auto ga=lGrowableArray(buf,0,sharing);
             super(&ga.appendVoid);
             this.msgData=ga;
             this.target=target;
@@ -322,7 +322,7 @@ version(mpi)
         alias sr3.sendrecv sendrecv;
         
         void desc(void delegate(char[]) sink){
-            auto s=dumper(sink);
+            auto s=dumperP(sink);
             s("{<MpiChannel@")(cast(void*)this)(">\n");
             s("  otherRank:")(this.otherRank)(",\n");
             s("  comm:MpiLinearComm@")(cast(void*)this.comm)(">\n");
@@ -424,7 +424,7 @@ version(mpi)
                     }
                 } catch (Exception e){
                     serr(collectAppender(delegate void(CharSink s){
-                        dumper(s)("Error in mpi handler for comm ")(comm.name)(" tag:")(tag)("\n");
+                        dumperP(s)("Error in mpi handler for comm ")(comm.name)(" tag:")(tag)("\n");
                         e.writeOut(serr.call);
                     }));
                 }
@@ -785,7 +785,7 @@ version(mpi)
             desc(sink,true);
         }
         void desc(void delegate(char[]) sink,bool shortDesc){
-            auto s=dumper(sink);
+            auto s=dumperP(sink);
             s("{<MpiLinearComm@")(cast(void*)this)(">\n");
             s("  name:")(this.name)(",\n");
             s("  myRank:")(this._myRank)(",\n");

@@ -2,6 +2,7 @@
 /// author: fawzi
 module blip.io.Console;
 import blip.io.BasicIO;
+import blip.io.BasicStreams;
 import tango.io.Console;
 import blip.io.StreamConverters;
 
@@ -19,10 +20,10 @@ OutStreamI serrStream;
 static this(){
     auto stdOut=new StreamStrWriter!(char)(Cout.output);
     auto stdErr=new StreamStrWriter!(char)(Cerr.output);
-    soutUnsafe=dumper(&stdOut.writeStrFlushNl);
+    soutUnsafe=dumperP(&stdOut.writeStrFlushNl);
     soutStream=new BasicStrStream!()(&stdOut.writeStrFlushNl,&stdOut.flush);
-    sout=dumper(&stdOut.writeStrSyncFlushNl);
-    serr=dumper(&stdErr.writeStrFlushNl);
+    sout=dumperP(&stdOut.writeStrSyncFlushNl);
+    serr=dumperP(&stdErr.writeStrFlushNl);
     serrStream=new BasicStrStream!()(&stdErr.writeStrFlushNl,&stdErr.flush);
 }
 

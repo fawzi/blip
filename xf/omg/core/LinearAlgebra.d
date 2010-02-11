@@ -1,5 +1,5 @@
 module xf.omg.core.LinearAlgebra;
-
+version(NoFix){} else {
 private {
 	import xf.omg.core.Algebra;
 	import xf.omg.core.Fixed;
@@ -1599,4 +1599,5 @@ static T cross(T)(T a, T b) {
 		a.z * b.x - b.z * a.x,
 		a.x * b.y - b.x * a.y
 	);
+}
 }

@@ -97,7 +97,7 @@ class Dottable(T,int rank1,S,int rank2,bool scanAxis=false, bool randomLayout=fa
     }
     void printData(void delegate(char[]) sink,char[] formatEl="{,10}", index_type elPerLine=10,
         char[] indent=""){
-        auto s=dumper(sink);
+        auto s=dumperP(sink);
         s(indent)("Dottable{\n");
         s(indent)("axis1=")(this.axis1)("\n");
         s(indent)("axis2=")(this.axis2)("\n");

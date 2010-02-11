@@ -39,8 +39,9 @@ class MpiProtocolHandler: ProtocolHandler{
     }
     /// registers a mpi communicator handler
     static void registerMpiProtocolHandler(MpiProtocolHandler pH){
-        scope arr=new GrowableArray!(char)();
-        arr(pH.comm.name)("-"); writeOut(&arr.appendArr,pH.tag);
+        char[128] buf;
+        auto arr=lGrowableArray!(char)(buf,0,GASharing.Local);
+        dumperP(&arr)(pH.comm.name)("-")(pH.tag);
         char[] commName=arr.takeData();
         synchronized(MpiProtocolHandler.classinfo){
             if ((commName in mpiProtocolHandlers)is null)
@@ -68,9 +69,9 @@ class MpiProtocolHandler: ProtocolHandler{
         this.comm=comm;
         this.tag=tag;
         char[128] buf;
-        scope arr=new GrowableArray!(char)(buf,0,GASharing.Local);
-        dumper(arr)("mpi-sbin://")(comm.myRank)(":")(comm.name)("-")(tag);
-        _handlerUrl=arr.takeData(true);
+        auto arr=lGrowableArray!(char)(buf,0,GASharing.Local);
+        dumperP(&arr)("mpi-sbin://")(comm.myRank)(":")(comm.name)("-")(tag);
+        _handlerUrl=arr.takeData();
         newRequestId=UniqueNumber!(size_t)(10);
     }
     
@@ -168,7 +169,7 @@ class MpiProtocolHandler: ProtocolHandler{
                     __FILE__,__LINE__);
             }
             auto obj=publisher.objectNamed(url.path[1]);
-            auto arr=new GrowableArray!(ubyte)(buf,0,GASharing.GlobalNoFree);
+            auto arr=lGrowableArray!(ubyte)(buf,0,GASharing.GlobalNoFree);
             auto s=new SBinSerializer(&arr.appendVoid);
             s(url.url(buf2));
             serArgs(s);

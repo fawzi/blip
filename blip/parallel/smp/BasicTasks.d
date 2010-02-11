@@ -931,7 +931,7 @@ class Task:TaskI{
     }
     /// prints the fields (superclasses can override this an call it through super)
     void fieldsDesc(void delegate(char[]) sink){
-        auto s=dumper(sink);
+        auto s=dumperP(sink);
         s("  level=")(level)(",\n");
         s("  taskOp:");
         if (taskOp is null)
@@ -983,8 +983,17 @@ class Task:TaskI{
         s("  mightSpawn:")(mightSpawn);
     }
     /// waits for the task to finish
-    void wait(){
+    void wait()
+    in{
+        assert(refCount>0,"waiting on released tasks is dangerous");
+    }
+    out{
+        assert(refCount>0,"waiting on released tasks is dangerous");
+    }
+    body{
+        Semaphore wSem;
         if (status!=TaskStatus.Finished){
+            volatile wSem=waitSem;
             if (waitSem is null) {
                 version(NoTaskLock){
                     volatile auto statusAtt=statusAtt;
@@ -998,15 +1007,19 @@ class Task:TaskI{
                     }
                 } else {
                     synchronized(taskLock) {
-                         if (status!=TaskStatus.Finished && waitSem is null) {
-                             waitSem=new Semaphore();
+                         if (status!=TaskStatus.Finished){
+                             if (waitSem is null) {
+                                 waitSem=new Semaphore();
+                             } else {
+                                 return;
+                             }
                          }
                     }
                 }
             }
             if (status!=TaskStatus.Finished) {
                 assert(waitSem !is null);
-                volatile auto wSem=waitSem;
+                volatile wSem=waitSem;
                 wSem.wait();
                 //assert(status==TaskStatus.Finished,"unexpected status after wait");
                 wSem.notify();

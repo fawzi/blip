@@ -7,17 +7,34 @@ import blip.text.UtfUtils: convertToString;
 
 /// extent of a slice of a buffer
 enum SliceExtent{ Partial, Maximal, ToEnd }
+/// end of file marker
 enum :size_t{Eof=size_t.max}
 
+/// a delegate that will write out to a character sink
 alias void delegate(void delegate(char[]))  OutWriter;
+/// a delegate that will write out to a binary sink
 alias void delegate(void delegate(void[]))  BinWriter;
+/// a delegate that reads in from a character source
 alias size_t delegate(char[], SliceExtent slice,out bool iterate)  OutReader;
+/// a delegate that reads in from a binary source
 alias size_t delegate(ubyte[], SliceExtent slice,out bool iterate) BinReader;
+/// a character sink
 alias void delegate(char[]) CharSink;
+/// a binary sink
 alias void delegate(void[]) BinSink;
+/// a basic character reader (can be used to build more advanced objects that can handle OutReader, see blip.io.BufferIn)
 alias size_t delegate(char[])  CharRead;
+/// a basic character reader (can be used to build more advanced objects that can handle OutReader and BinReader)
 alias size_t delegate(void[]) BinRead;
 
+/// io exception
+class IOException: Exception{
+    this(char[]msg,char[] file, long line){
+        super(msg,file,line);
+    }
+}
+
+/// sample output string
 interface OutStreamI{
     void rawWriteStr(char[]);
     void rawWriteStr(wchar[]);
@@ -323,8 +340,12 @@ struct Dumper(T){
             u(call);
         } else static if (is(typeof(call(u)))){
             call(u);
+        } else static if (is(typeof((*call)(u)))){
+            (*call)(u);
         } else static if (is(typeof(writeOut(call,u)))){ 
             writeOut(call,u);
+        } else static if (is(typeof(writeOut(*call,u)))){ 
+            writeOut(*call,u);
         } else {
             static assert(0,"Dumper!("~T.stringof~") cannot handle "~U.stringof);
         }
@@ -340,90 +361,15 @@ Dumper!(T) dumper(T)(T c){
     res.call=c;
     return res;
 }
-
-/// basic stream based on a binary sink
-class BasicBinStream: OutStreamI{
-    BinSink sink;
-    void delegate() _flush;
-    this(BinSink s,void delegate()f=null){
-        this.sink=s;
-        this._flush=f;
-    }
-    void rawWrite(void[] a){
-        this.sink(a);
-    }
-    void rawWriteStrD(char[]s){
-        this.sink(s);
-    }
-    void rawWriteStr(char[]s){
-        this.sink(s);
-    }
-    void rawWriteStr(wchar[]s){
-        this.sink(s.ptr[0..(s.length*wchar.sizeof)]);
-    }
-    void rawWriteStr(dchar[]s){
-        this.sink(s.ptr[0..(s.length*dchar.sizeof)]);
-    }
-    CharSink charSink(){
-        return &this.rawWriteStrD; // cast(void delegate(char[]))rawWriteStr does not work on older compilers
-    }
-    BinSink binSink(){
-        return sink;
-    }
-    void flush(){
-        if (_flush!is null) _flush();
+/// helper to easily dump out data that controls that it receives a pointer like el
+Dumper!(T) dumperP(T)(T c){
+    static if(is(typeof(c is null))){
+        assert(!(c is null),"dumper cannot be null");
+        Dumper!(T) res;
+        res.call=c;
+        return res;
+    } else {
+        static assert(0,"non pointer like argument "~T.stringof);
     }
 }
 
-/// basic stream based on a string sink
-class BasicStrStream(T=char): OutStreamI{
-    void delegate(T[]) sink;
-    void delegate() _flush;
-    this(void delegate(T[]) s,void delegate()f=null){
-        this.sink=s;
-        this._flush=f;
-    }
-    void rawWrite(void[] a){
-        writeOut(this.sink,(cast(ubyte*)a.ptr)[0..a.length],"x");
-    }
-    /// writes a raw string
-    void writeStr(U)(U[]data){
-        static if (is(U==T[])){
-            sink(data);
-        } else static if (is(U==char[])||is(U==wchar[])||is(U==dchar[])){
-            T[] s;
-            if (t.length<240){
-                T[256] buf;
-                s=convertToString!(T)(t,buf);
-            } else {
-                s=convertToString!(T)(t);
-            }
-            sink(s);
-        }
-    }
-    // alias writeStr!(char)  rawWriteStr;
-    // alias writeStr!(wchar) rawWriteStr;
-    // alias writeStr!(dchar) rawWriteStr;
-    void rawWriteStr(char[]s){
-        writeStr(s);
-    }
-    void rawWriteStr(wchar[]s){
-        writeStr(s);
-    }
-    void rawWriteStr(dchar[]s){
-        writeStr(s);
-    }
-    void flush(){
-        if (_flush!is null) _flush();
-    }
-    CharSink charSink(){
-        static if (is(T==char)){
-            return sink;
-        } else {
-            return &this.writeStr!(char); // cast(void delegate(char[]))rawWriteStr does not work on older compilers
-        }
-    }
-    BinSink binSink(){
-        return &this.rawWrite;
-    }
-}

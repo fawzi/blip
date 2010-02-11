@@ -5,7 +5,7 @@
 ///
 /// a more resilient and scaling cluster structure can be created with chimera if gpl is ok
 /// http://current.cs.ucsb.edu/projects/chimera , that should be available as part of dchem
-module blip.parallel.cluster.Cluster;
+module blip.parallel.cluster.ThightCluster;
 import blip.serialization.Serialization;
 import blip.io.BasicIO;
 import blip.container.GrowableArray;

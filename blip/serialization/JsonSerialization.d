@@ -30,7 +30,7 @@ class JsonSerializer(T=char) : Serializer {
     /// constructor usin a sink delegate
     this(void delegate(T[])sink){
         super(new FormattedWriteHandlers!()(sink));
-        s=dumper(handlers.charSink());
+        s=dumperP(handlers.charSink());
         writeCount=0;
         atStart=true;
         compact=true;

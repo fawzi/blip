@@ -3,7 +3,7 @@ module blip.io.StreamConverters;
 import tango.io.model.IConduit: OutputStream;
 import tango.core.Array: find;
 
-class StreamWriter{
+final class StreamWriter{
     OutputStream writer;
     this(OutputStream s){
         writer=s;

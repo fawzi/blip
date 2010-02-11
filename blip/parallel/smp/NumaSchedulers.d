@@ -341,7 +341,7 @@ class PriQScheduler:TaskSchedulerI {
     /// (might not be a snapshot if other threads modify it while printing)
     /// non threadsafe
     void desc(void delegate(char[]) sink,bool shortVersion){
-        auto s=dumper(sink);
+        auto s=dumperP(sink);
         s("<PriQScheduler@"); writeOut(sink,cast(void*)this);
         if (shortVersion) {
             s(" >");
@@ -435,8 +435,6 @@ class MultiSched:TaskSchedulerI {
     Deque!(PriQScheduler) queue;
     /// semaphore for non busy waiting
     Semaphore zeroSem;
-    /// how many are waiting on the semaphore... (not all semaphores give that info)
-    int zeroLock;
     /// numa not this schedule is connected to
     NumaNode numaNode;
     /// logger for problems/info
@@ -595,17 +593,15 @@ class MultiSched:TaskSchedulerI {
     }
     void addSched(PriQScheduler sched){
         synchronized(queue){
-            queue.append(sched);
-            starvationManager.rmStarvingSched(this);
-            version(TrackQueues) {
-                log.info(collectAppender(delegate void(CharSink s){
-                    s("MultiSched "); s(name); s(" added sched@"); writeOut(s,cast(void*)sched);
-                }));
-            }
-            if (zeroLock>0){
-                atomicAdd(zeroLock,-1);
+            if (queue.appendL(sched)==0){
+                version(TrackQueues) {
+                    log.info(collectAppender(delegate void(CharSink s){
+                        s("MultiSched "); s(name); s(" added sched@"); writeOut(s,cast(void*)sched);
+                    }));
+                }
                 zeroSem.notify();
             }
+            starvationManager.rmStarvingSched(this);
         }
     }
     /// returns nextTask (blocks, returns null only when stopped)
@@ -639,11 +635,9 @@ class MultiSched:TaskSchedulerI {
                 t=starvationManager.trySteal(this,acceptLevel);
             }
             if (t is null) {
-                atomicAdd(zeroLock,1);
                 zeroSem.wait();
                 synchronized(queue){
-                    if (zeroLock>0 && (queue.length>0 || runLevel==SchedulerRunLevel.Stopped)){
-                        atomicAdd(zeroLock,-1);
+                    if (queue.length>0 || runLevel==SchedulerRunLevel.Stopped){
                         zeroSem.notify();
                     }
                 }
@@ -709,7 +703,7 @@ class MultiSched:TaskSchedulerI {
     /// (might not be a snapshot if other threads modify it while printing)
     /// non threadsafe
     void desc(void delegate(char[]) sink,bool shortVersion){
-        auto s=dumper(sink);
+        auto s=dumperP(sink);
         s("<MultiSched@"); writeOut(sink,cast(void*)this);
         if (shortVersion) {
             s(" >");
@@ -747,9 +741,7 @@ class MultiSched:TaskSchedulerI {
             }
         }
         if (callOnStop){
-            if (atomicOp(zeroLock,delegate typeof(zeroLock)(typeof(zeroLock) x){ if (x>0) return x-1; return x; })>0){
-                zeroSem.notify();
-            }
+            zeroSem.notify();
             onStop();
         }
     }
@@ -770,7 +762,7 @@ class MultiSched:TaskSchedulerI {
     int nSimpleTasksWanted(){ return 4; }
     /// writes just the scheduling status in a way that looks good
     void writeStatus(CharSink sink,int indentL){
-        auto s=dumper(sink);
+        auto s=dumperP(sink);
         synchronized(queue){
             s("{ class:MultiSched, name:\"")(name)("\", scheds:\n");
             foreach(i,sched;queue){
@@ -821,7 +813,7 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
         void ind(int l){
             writeSpace(sink,indentL+l);
         }
-        auto s=dumper(sink);
+        auto s=dumperP(sink);
         auto maxScheds=topo.nNodes(schedLevel);
         auto schedsN=scheds;
         synchronized(this){
@@ -1152,7 +1144,7 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
     /// (might not be a snapshot if other threads modify it while printing)
     /// non threadsafe
     void desc(void delegate(char[]) sink,bool shortVersion){
-        auto s=dumper(sink);
+        auto s=dumperP(sink);
         s("<StarvationManager@"); writeOut(sink,cast(void*)this);
         if (shortVersion) {
             s(" >");
@@ -1302,8 +1294,8 @@ class MExecuter:ExecuterI{
                 n=topo.superNode(n);
             }
             char[128] buf;
-            scope s=new GrowableArray!(char)(buf,0);
-            s("Work thread ")(Thread.getThis().name)(" pinned to");
+            scope s=lGrowableArray!(char)(buf,0);
+            dumperP(&s)("Work thread ")(Thread.getThis().name)(" pinned to");
             writeOut(&s.appendArr,exeNode);
             log.info(s.data);
             topo.bindToNode(n);

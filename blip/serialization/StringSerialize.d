@@ -9,14 +9,14 @@ import blip.container.GrowableArray;
 /// utility method to serialize just one object to an array of the given type
 U[] serializeToArray(T,U=char)(T t,U[] buf=cast(U[])null){
     U[256] buf2;
-    scope GrowableArray!(U) arr;
+    LocalGrowableArray!(U) arr;
     if (buf.length>0){
-        arr=new GrowableArray!(U)(buf,0,GASharing.GlobalNoFree);
+        arr.init(buf,0,GASharing.GlobalNoFree);
     } else {
-        arr=new GrowableArray!(U)(buf2,0,GASharing.Local);
+        arr.init(buf2,0,GASharing.Local);
     }
     serializeToSink(&arr.appendArr,t);
-    return arr.takeData(true);
+    return arr.takeData();
 }
 
 void serializeToSink(U,T)(void delegate(T[]) sink,U t){

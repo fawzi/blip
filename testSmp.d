@@ -18,7 +18,7 @@ class STask{
         {
             auto tAtt=taskAtt.val;
             sout(collectAppender(delegate void(CharSink sink){
-                auto s=dumper(sink);
+                auto s=dumperP(sink);
                 s(name)(" from task ")(tAtt.taskName)(" started\n");
             }));
         }
@@ -36,7 +36,7 @@ class STask{
         {
             auto tAtt=taskAtt.val;
             sout(collectAppender(delegate void(CharSink sink){
-                auto s=dumper(sink);
+                auto s=dumperP(sink);
                 s(name)(" from task ")(tAtt.taskName)(" ended\n");
             }));
         }

@@ -22,7 +22,7 @@ class Citation{
         }
     }
     void desc(void delegate(char[]) sink){
-        auto s=dumper(sink);
+        auto s=dumperP(sink);
         s("[")(key)("] ")(citation);
         if (refs.length>0){
             s(" refs:");

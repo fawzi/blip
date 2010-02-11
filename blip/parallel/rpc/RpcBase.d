@@ -279,10 +279,10 @@ class BasicVendor:ObjVendorI{
             break;
         default:
             char[256] buf;
-            scope appender=new GrowableArray!(char)(buf,0,GASharing.Local);
-            appender("unknown function ")(fName)(" ")(__FILE__)(" ");
+            auto appender=lGrowableArray!(char)(buf,0,GASharing.Local);
+            dumperP(&appender)("unknown function ")(fName)(" ")(__FILE__)(" ");
             writeOut(&appender.appendArr,__LINE__);
-            exceptionReply(sendRes,reqId,appender.takeData(true));
+            exceptionReply(sendRes,reqId,appender.takeData());
         }
     }
     

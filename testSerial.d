@@ -276,7 +276,7 @@ void testBinUnserial(T)(T a){
         sout("in the buffer:-----\n");
         buf.seek(0,IOStream.Anchor.Begin);
         char[128] buf2;
-        scope arr=new GrowableArray!(char)(buf2,0);
+        auto arr=lGrowableArray!(char)(buf2,0);
         foreach (i,ub;cast(ubyte[])buf.slice){
             writeOut(&arr.appendArr,ub);
             arr(" ");
@@ -341,7 +341,7 @@ void testBinUnserial2(T,U)(T a,ref U b){
         sout("in the buffer:-----\n");
         buf.seek(0,IOStream.Anchor.Begin);
         char[128] buf2;
-        scope arr=new GrowableArray!(char)(buf2,0);
+        auto arr=lGrowableArray!(char)(buf2,0);
         foreach (i,ub;cast(ubyte[])buf.slice){
             writeOut(&arr.appendArr,ub);
             arr(" ");

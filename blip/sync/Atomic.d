@@ -12,7 +12,7 @@
  * better the absence of atomic ops
  *
  * Copyright: Copyright (C) 2009. Fawzi Mohamed All rights reserved.
- * License:   BSD style & AFL: $(LICENSE)
+ * License:   apache 2.0
  * Authors:   Fawzi Mohamed
  */
 module blip.sync.Atomic;
@@ -200,6 +200,18 @@ version( LDC )
 
 static if (!is(typeof(LockVersion))) {
     enum{LockVersion=false}
+}
+
+// use stricter fences
+enum{strictFences=false}
+
+/// utility function for a write barrier (disallow store and store reorderig)
+void writeBarrier(){
+    memoryBarrier!(false,false,strictFences,true)();
+}
+/// utility function for a read barrier (disallow load and load reorderig)
+void readBarrier(){
+    memoryBarrier!(true,strictFences,false,false)();
 }
 
 /// atomic swap
@@ -671,9 +683,6 @@ T atomicOp(T)(ref T val, T delegate(T) f){
     }
     return oldV;
 }
-
-// use stricter fences
-enum{strictFences=false}
 
 /// reads a flag (ensuring that other accesses can not happen before you read it)
 T flagGet(T)(ref T flag){

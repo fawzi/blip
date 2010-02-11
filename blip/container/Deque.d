@@ -131,6 +131,17 @@ class Deque(T):CopiableObjectI{
         if (popFront(res)) return res;
         assert(0,"popFront on empty Deque");
     }
+    /// appends an element at the end of the array and returns the new length
+    size_t appendL(T val){
+        synchronized(this){
+            if (nEl==baseArr.length){
+                growLen();
+            }
+            baseArr[(start+nEl)%baseArr.length]=val;
+            ++nEl;
+            return nEl-1;
+        }
+    }
     /// appends an element at the end of the array
     void append(T val){
         synchronized(this){

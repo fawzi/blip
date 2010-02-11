@@ -1,5 +1,5 @@
 module xf.omg.core.Fixed;
-
+version(NoFix){} else {
 private {
 	import tango.util.Convert : convTo = to;
 	import tango.math.Math : rndint;
@@ -185,3 +185,4 @@ template fixedT(int intBits, int fracBits) {
 }
 
 alias fixedT!(16, 16)	fixed;
+}

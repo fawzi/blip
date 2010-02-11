@@ -23,8 +23,10 @@ enum GASharing{
 /// the data returned is Global, so that a dup is done if it uses a local buffer, and
 /// *only* in that case.
 ///
+/// local (stack) storage, do not pass this around (use GrowableArray for that)
+///
 /// should overload math ops if T supports them?
-final class GrowableArray(T){
+struct LocalGrowableArray(T){
     T*dataPtr;
     size_t dataLen;
     size_t capacity;
@@ -32,7 +34,7 @@ final class GrowableArray(T){
     /// new appender using a (sharing) buffer buf, that contains len valid data
     /// (buf,0,GASharing.Local) to initialize if with a local buffer, (arr) to initialize it with
     /// a (non local) array of valid data
-    this(T[]buf=null,size_t len=size_t.max,GASharing sharing=GASharing.GlobalNoFree){
+    void init(T[]buf=null,size_t len=size_t.max,GASharing sharing=GASharing.GlobalNoFree){
         capacity=buf.length;
         dataPtr=buf.ptr;
         if (len>buf.length){
@@ -67,14 +69,13 @@ final class GrowableArray(T){
     }
     
     void desc(void delegate(char[])sink){
-        auto s=dumper(sink);
+        auto s=dumperP(sink);
         s("<GrowableArray@")(cast(void*)this.dataPtr)(" len:")(this.dataLen);
         s(" capacity:")(capacity)(" sharing:")(cast(int)sharing)(">")("\n");
     }
     /// appends to the array
-    GrowableArray opCall(V)(V v){
+    void opCall(V)(V v){
         opCatAssign(v);
-        return this;
     }
     static if(is(T==ubyte)){
         void appendVoid(void[]t){
@@ -124,8 +125,8 @@ final class GrowableArray(T){
         return dataPtr[0..dataLen];
     }
     /// returns of the data contained in this object, and clears the content of this object.
-    /// data is guaranteed to be global if guaranteeGlobal is true
-    T[] takeData(bool guaranteeGlobal=false){
+    /// data is guaranteed to be global if guaranteeGlobal is true (default)
+    T[] takeData(bool guaranteeGlobal=true){
         auto res=dataPtr[0..dataLen];
         if(sharing==GASharing.Local && guaranteeGlobal){
             res=res.dup;
@@ -194,12 +195,29 @@ final class GrowableArray(T){
         return 0;
     }
 }
+/// utility alias, use GrowableArray if you want to pass around GrowableArrays
+template GrowableArray(T){
+    alias LocalGrowableArray!(T)* GrowableArray;
+}
+/// utility method to create a new GrowableArray that can be passed around
+GrowableArray!(T) growableArray(T)(T[]buf=null,size_t len=size_t.max,GASharing sharing=GASharing.GlobalNoFree){
+    auto res=new LocalGrowableArray!(T);
+    res.init(buf,len,sharing);
+    return res;
+}
+/// utility method to initialize a LocalGrowableArray
+LocalGrowableArray!(T) lGrowableArray(T)(T[]buf=null,size_t len=size_t.max,GASharing sharing=GASharing.GlobalNoFree){
+    LocalGrowableArray!(T) res;
+    res.init(buf,len,sharing);
+    return res;
+}
 
 /// collects what is appended by the appender in a single array and returns it
 /// it buf is provided the appender tries to use it (but allocates if extra space is needed)
 T[] collectAppender(T)(void delegate(void delegate(T[])) appender,char[] buf=null){
     T[512/T.sizeof] buf2;
     if (buf.length==0) buf=buf2;
-    scope arr=new GrowableArray!(T)(buf,0,((buf.ptr is buf2.ptr)?GASharing.Local:GASharing.GlobalNoFree));
-    return arr(appender).takeData(true);
+    auto arr=lGrowableArray(buf,0,((buf.ptr is buf2.ptr)?GASharing.Local:GASharing.GlobalNoFree));
+    arr(appender);
+    return arr.takeData();
 }

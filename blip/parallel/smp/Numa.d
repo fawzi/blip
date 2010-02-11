@@ -300,7 +300,7 @@ interface NumaTopology: Topology!(NumaNode){
 }
 
 void writeOutTopo(NodeType)(void delegate(char[]) sink,Topology!(NodeType) topo){
-    auto s=dumper(sink);
+    auto s=dumperP(sink);
     for (int ilevel=topo.maxLevel;ilevel!=0;--ilevel){
         s("level(")(ilevel)("){");
         if (topo.isPartition(ilevel)){
@@ -1077,7 +1077,7 @@ version(noHwloc){} else {
             return true;
         }
         void desc(CharSink sink){
-            auto s=dumper(sink);
+            auto s=dumperP(sink);
             s("<HwlocTopology@")(cast(void*)this)("\n");
             s("  levelMapping:")(levelMapping)("\n");
             s("  backMapping:")(backMapping)("\n");
