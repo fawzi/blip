@@ -2,7 +2,7 @@
 /// author: Fawzi
 module blip.io.BufferIn;
 
-class BufferIn(TInt,TOut=TInt){
+final class BufferIn(TInt,TOut=TInt){
     static if (is(TInt==void)){
         alias ubyte TBuf;
     } else {
@@ -29,6 +29,7 @@ class BufferIn(TInt,TOut=TInt){
     this(size_t delegate(TInt[]) basicReader,size_t bufLen=512,size_t encodingOverhead=0){
         this(basicReader,new TInt[](bufLen),encodingOverhead);
     }
+    
     void loadMore(bool insist=true){
         if (slice==SliceExtent.ToEnd) return;
         if (bufLen+encodingOverhead<buf.length){
@@ -67,7 +68,7 @@ class BufferIn(TInt,TOut=TInt){
             if (bufLen==Eof){
                 bufLen=0;
                 slice=SliceExtent.ToEnd;
-                throw new IOException("unexpected Eof in consume",__FILE__,__LINE__);
+                throw new BIOException("unexpected Eof in consume",__FILE__,__LINE__);
             }
         }
         bufPos+=amount;
@@ -93,11 +94,11 @@ class BufferIn(TInt,TOut=TInt){
             return;
         }
         outPtr[0..bufLen]=buf[bufPos..bufPos+bufLen];
-        if (slice==SliceExtent.ToEnd) throw new IOException("unexpected Eof in readExact",__FILE__,__LINE__);
+        if (slice==SliceExtent.ToEnd) throw new BIOException("unexpected Eof in readExact",__FILE__,__LINE__);
         readNow=_read(outPtr[bufLen..outLen]);
         if (readNow==Eof){
             slice=SliceExtent.ToEnd;
-            throw new IOException("unexpected Eof in readExact",__FILE__,__LINE__);
+            throw new BIOException("unexpected Eof in readExact",__FILE__,__LINE__);
         }
         auto outPos=bufLen+readNow;
         bufPos=0;
@@ -106,7 +107,7 @@ class BufferIn(TInt,TOut=TInt){
             readNow=_read(buf);
             if (readNow==Eof){
                 slice=SliceExtent.ToEnd;
-                throw new IOException("unexpected Eof in readExact",__FILE__,__LINE__);
+                throw new BIOException("unexpected Eof in readExact",__FILE__,__LINE__);
             }
             auto toCopy=outLen-outPos;
             if (toCopy>readNow){
@@ -127,7 +128,10 @@ class BufferIn(TInt,TOut=TInt){
         bool readSome=false;
         while (true){
             bool iterate=false;
-            TOut[] bufOut=(cast(TOut*)(buf.ptr+bufPos))[0..bufLen/OutToIn];
+            TOut[] bufOut1=(cast(TOut*)(buf.ptr+bufPos))[0..bufLen/OutToIn];
+            auto bufOut=cropRight(bufOut);
+            if (slice!=SliceExtent.ToEnd || bufOut.length==bufOut1.length)
+                throw new BIOException("invalid utf data at end of stream",__FILE__,__LINE__);
             auto consumed=r(bufOut,slice,iterate);
             switch (consumed){
             case Eof:
@@ -136,9 +140,9 @@ class BufferIn(TInt,TOut=TInt){
                     loadMore(true);
                     break;
                 case SliceExtent.Maximal:
-                    throw new IOException("window too small to parse",__FILE__,__LINE__);
+                    throw new BIOException("window too small to parse",__FILE__,__LINE__);
                 case SliceExtent.ToEnd:
-                    throw new IOException("cannot read past Eof",__FILE__,__LINE__);
+                    throw new BIOException("cannot read past Eof",__FILE__,__LINE__);
                 default:
                     throw new Exception("invalid SliceExtent",__FILE__,__LINE__);
                 }

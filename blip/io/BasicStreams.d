@@ -5,9 +5,11 @@ import blip.io.BasicIO;
 final class BasicBinStream: OutStreamI{
     BinSink sink;
     void delegate() _flush;
-    this(BinSink s,void delegate()f=null){
+    void delegate() _close;
+    this(BinSink s,void delegate()f=null,void delegate()c=null){
         this.sink=s;
         this._flush=f;
+        this._close=c;
     }
     void rawWrite(void[] a){
         this.sink(a);
@@ -33,15 +35,21 @@ final class BasicBinStream: OutStreamI{
     void flush(){
         if (_flush!is null) _flush();
     }
+    void close(){
+        if (_close!is null)
+            _close();
+    }
 }
 
 /// basic stream based on a string sink, uses the type T as native type, the others are converted
 final class BasicStrStream(T=char): OutStreamI{
     void delegate(T[]) sink;
     void delegate() _flush;
-    this(void delegate(T[]) s,void delegate()f=null){
+    void delegate() _close;
+    this(void delegate(T[]) s,void delegate()f=null,void delegate()c=null){
         this.sink=s;
         this._flush=f;
+        this._close=c;
     }
     void rawWrite(void[] a){ // written in hex format
         writeOut(this.sink,(cast(ubyte*)a.ptr)[0..a.length],"x");
@@ -86,22 +94,28 @@ final class BasicStrStream(T=char): OutStreamI{
     BinSink binSink(){
         return &this.rawWrite;
     }
+    void close(){
+        if (_close!is null)
+            _close();
+    }
 }
 
 /// basic stream based on a binary sink, no encoding conversion for strings, dangerous to mix!
 final class BufferedBinStream: OutStreamI{
     BinSink _sink;
     void delegate() _flush;
+    void delegate() _close;
     ubyte[] buf;
     size_t content;
 
-    this(BinSink s,size_t bufDim=512, void delegate()f=null){
-        this(s,new ubyte[](bufDim),f);
+    this(BinSink s,size_t bufDim=512, void delegate()f=null, void delegate()c=null){
+        this(s,new ubyte[](bufDim),f,c);
     }
-    this(BinSink s,ubyte[] buf,void delegate()f=null){
+    this(BinSink s,ubyte[] buf,void delegate()f=null, void delegate()c=null){
         this._sink=s;
         this.buf=buf;
         this._flush=f;
+        this._close=c;
         this.content=0;
     }
     void sink(void[]data){
@@ -162,23 +176,29 @@ final class BufferedBinStream: OutStreamI{
         }
         if (_flush!is null) _flush();
     }
+    void close(){
+        if (_close!is null)
+            _close();
+    }
 }
 
 /// basic stream based on a string sink, uses the type T as native type, the others are converted
 final class BufferedStrStream(T=char): OutStreamI{
     void delegate(T[]) _sink;
     void delegate() _flush;
+    void delegate() _close;
     T[] buf;
     size_t content;
     
-    this(CharSink s,size_t bufDim=512,void delegate()f=null){
-        this(s,new T[](bufDim),f);
+    this(CharSink s,size_t bufDim=512,void delegate()f=null,void delegate()c=null){
+        this(s,new T[](bufDim),f,c);
     }
     
-    this(CharSink s,T[] buf,void delegate()f=null){
+    this(CharSink s,T[] buf,void delegate()f=null,void delegate()c=null){
         this._sink=s;
         this.buf=buf;
         this._flush=f;
+        this._close=c;
         this.content=0;
     }
     
@@ -255,5 +275,9 @@ final class BufferedStrStream(T=char): OutStreamI{
     }
     BinSink binSink(){
         return &this.rawWrite;
+    }
+    void close(){
+        if (_close!is null)
+            _close();
     }
 }

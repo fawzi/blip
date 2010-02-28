@@ -485,7 +485,8 @@ class Serializer {
     void delegate(Serializer) serializerCloseCallback;
     
     objectId[void*]             ptrToObjectId;
-    objectId                        lastObjectId;
+    objectId                    lastObjectId;
+    Variant[char[]]             context;
     SerializationLevel serializationLevel;
     bool removeCycles;
     bool structHasId;
@@ -493,7 +494,7 @@ class Serializer {
     enum AutoReset:int {
         None,
         ResetCache,
-        ResetCounters
+        ResetCounters,
     }
     AutoReset autoReset;
 
@@ -996,7 +997,8 @@ class Unserializer {
     ReadHandlers handlers;
 
     void*[objectId]             objectIdToPtr;
-    objectId                        lastObjectId;
+    objectId                    lastObjectId;
+    Variant[char[]]             context;
     SerializationLevel serializationLevel;
     bool recoverCycles;
     bool readStructProxy;

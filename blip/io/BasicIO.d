@@ -16,8 +16,12 @@ alias void delegate(void delegate(char[]))  OutWriter;
 alias void delegate(void delegate(void[]))  BinWriter;
 /// a delegate that reads in from a character source
 alias size_t delegate(char[], SliceExtent slice,out bool iterate)  OutReader;
+/// a handler of OutReader, returns true if something was read
+alias bool delegate(OutReader) OutReaderHandler;
 /// a delegate that reads in from a binary source
 alias size_t delegate(ubyte[], SliceExtent slice,out bool iterate) BinReader;
+/// a handler of BinReader, returns true if something was read
+alias bool delegate(BinReader) BinReaderHandler;
 /// a character sink
 alias void delegate(char[]) CharSink;
 /// a binary sink
@@ -28,9 +32,15 @@ alias size_t delegate(char[])  CharRead;
 alias size_t delegate(void[]) BinRead;
 
 /// io exception
-class IOException: Exception{
+class BIOException: Exception{
     this(char[]msg,char[] file, long line){
         super(msg,file,line);
+    }
+}
+/// exception when the buffer is too small
+class SmallBufferException:BIOException{
+    this(char[]msg,char[]fileN,long lineN){
+        super(msg,fileN,lineN);
     }
 }
 
@@ -43,6 +53,7 @@ interface OutStreamI{
     CharSink charSink();
     BinSink  binSink();
     void flush();
+    void close();
 }
 
 /// helper to build closures

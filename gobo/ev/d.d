@@ -16,7 +16,7 @@ import blip.io.Console;
 import blip.t.stdc.stringz;
 private alias char[] string;
 
-enum: uint
+enum EV: uint
 {
     UNDEF    = EV_UNDEF,
     NONE     = EV_NONE,
@@ -36,93 +36,73 @@ enum: uint
     ERROR    = EV_ERROR,
 }
 
-enum: uint
-{
-    AUTO       = EVFLAG_AUTO,
-    NOENV      = EVFLAG_NOENV,
-    FORKCHECK  = EVFLAG_FORKCHECK,
-    SELECT     = EVBACKEND_SELECT,
-    POLL       = EVBACKEND_POLL,
-    EPOLL      = EVBACKEND_EPOLL,
-    KQUEUE     = EVBACKEND_KQUEUE,
-    DEVPOLL    = EVBACKEND_DEVPOLL,
-    PORT       = EVBACKEND_PORT,
-}
-
-enum
-{
-    NONBLOCK = EVLOOP_NONBLOCK,
-    ONESHOT  = EVLOOP_ONESHOT,
-}
-
-enum Unloop
-{
-    CANCEL = EVUNLOOP_CANCEL,
-    ONE    = EVUNLOOP_ONE,
-    ALL    = EVUNLOOP_ALL,
-}
-
-alias ev_tstamp tstamp;
-
-alias ev_statdata statdata;
-
-int version_major()
-{
-    return ev_version_major();
-}
-
-int version_minor()
-{
-    return ev_version_minor();
-}
-
-uint supported_backends()
-{
-    return ev_supported_backends();
-}
-
-uint recommended_backends()
-{
-    return ev_recommended_backends();
-}
-
-uint embeddable_backends()
-{
-    return ev_embeddable_backends();
-}
-
-tstamp time()
-{
-    return ev_time();
-}
-
-void sleep(tstamp delay)
-{
-    void ev_sleep(tstamp delay);
-}
-
-private extern(C) void* allocator_thunk(alias Fn)(void* ptr, int size)
-{
-    return Fn(ptr, size);
-}
-
-// Fn is void* function(void* ptr, int size)
-void set_allocator(alias Fn)()
-{
-    ev_set_allocator(&allocator_thunk!(Fn));
-}
-
-debug (ev_d_set_allocator)
-{
-    unittest
+/+
+     LibEv{
+    int version_major()
     {
-        static void* alloc(void* ptr, int size)
+        return ev_version_major();
+    }
+
+    int version_minor()
+    {
+        return ev_version_minor();
+    }
+
+    uint supported_backends()
+    {
+        return ev_supported_backends();
+    }
+
+    uint recommended_backends()
+    {
+        return ev_recommended_backends();
+    }
+
+    uint embeddable_backends()
+    {
+        return ev_embeddable_backends();
+    }
+
+    ev_tstamp time()
+    {
+        return ev_time();
+    }
+
+    void sleep(ev_tstamp delay)
+    {
+        void ev_sleep(ev_tstamp delay);
+    }
+
+    private extern(C) void* allocator_thunk(alias Fn)(void* ptr, int size)
+    {
+        return Fn(ptr, size);
+    }
+
+    // Fn is void* function(void* ptr, int size)
+    void set_allocator(alias Fn)()
+    {
+        ev_set_allocator(&allocator_thunk!(Fn));
+    }
+
+    debug (ev_d_set_allocator)
+    {
+        unittest
         {
-            sout("alloc(")(ptr)(", ")(size)(")\n");
-            return null;
+            static void* alloc(void* ptr, int size)
+            {
+                sout("alloc(")(ptr)(", ")(size)(")\n");
+                return null;
+            }
+            set_allocator!(alloc)();
+            gobo.ev.d.loop;
         }
-        set_allocator!(alloc)();
-        gobo.ev.d.loop;
+    }
+
+
+    // Fn is void function(string msg)
+    void set_syserr_cb(alias Fn)()
+    {
+        ev_set_syserr_cb(&syserr_thunk!(Fn));
     }
 }
 
@@ -132,25 +112,46 @@ private extern(C) void syserr_thunk(alias Fn)(char* msg)
     Fn(m);
 }
 
-// Fn is void function(string msg)
-void set_syserr_cb(alias Fn)()
-{
-    ev_set_syserr_cb(&syserr_thunk!(Fn));
-}
-
 unittest
 {
     static void syserr(string msg)
     {
     }
-    set_syserr_cb!(syserr)();
-}
+    Ev.set_syserr_cb!(syserr)();
+}+/
 
 
 private alias extern (C) void function(int, void*) once_callback_t;
 
+/// an evaluator loop
 interface ILoop
 {
+    enum
+    {
+        NONBLOCK = EVLOOP_NONBLOCK,
+        ONESHOT  = EVLOOP_ONESHOT,
+    }
+
+    enum Unloop
+    {
+        CANCEL = EVUNLOOP_CANCEL,
+        ONE    = EVUNLOOP_ONE,
+        ALL    = EVUNLOOP_ALL,
+    }
+    enum Flags: uint
+    {
+        AUTO       = EVFLAG_AUTO,
+        NOENV      = EVFLAG_NOENV,
+        FORKCHECK  = EVFLAG_FORKCHECK,
+    }
+    enum Backend:uint{
+        SELECT     = EVBACKEND_SELECT,
+        POLL       = EVBACKEND_POLL,
+        EPOLL      = EVBACKEND_EPOLL,
+        KQUEUE     = EVBACKEND_KQUEUE,
+        DEVPOLL    = EVBACKEND_DEVPOLL,
+        PORT       = EVBACKEND_PORT,
+    }
 
     alias void delegate(ILoop, int, int) OnceCallback;
 
@@ -158,7 +159,7 @@ interface ILoop
 
     void fork();
 
-    tstamp now();
+    ev_tstamp now();
 
     uint backend();
 
@@ -168,22 +169,22 @@ interface ILoop
 
     void unloop(Unloop how = Unloop.ONE);
 
-    void ioCollectInterval(tstamp interval);
+    void ioCollectInterval(ev_tstamp interval);
 
-    void timeoutCollectInterval(tstamp interval);
+    void timeoutCollectInterval(ev_tstamp interval);
 
     void addref();
 
     void unref();
 
-    void once(int fd, int events, tstamp timeout,
+    void once(int fd, int events, ev_tstamp timeout,
             once_callback_t cb, void* arg = null);
 
-    void once(int fd, int events, tstamp timeout, OnceCallback cb);
+    void once(int fd, int events, ev_tstamp timeout, OnceCallback cb);
 
     void once(int fd, int events, OnceCallback cb);
 
-    void once(tstamp timeout, OnceCallback cb);
+    void once(ev_tstamp timeout, OnceCallback cb);
 
     void feedFdEvent(int fd, int revents);
 
@@ -212,7 +213,7 @@ template MLoop()
         return _ptr;
     }
 
-    tstamp now()
+    ev_tstamp now()
     {
         return ev_now(ptr);
     }
@@ -237,12 +238,12 @@ template MLoop()
         ev_unloop(ptr, how);
     }
 
-    void ioCollectInterval(tstamp interval)
+    void ioCollectInterval(ev_tstamp interval)
     {
         ev_set_io_collect_interval(ptr, interval);
     }
 
-    void timeoutCollectInterval(tstamp interval)
+    void timeoutCollectInterval(ev_tstamp interval)
     {
         ev_set_timeout_collect_interval(ptr, interval);
     }
@@ -257,13 +258,13 @@ template MLoop()
         ev_unref(ptr);
     }
 
-    void once(int fd, int events, tstamp timeout,
+    void once(int fd, int events, ev_tstamp timeout,
             once_callback_t cb, void* arg = null)
     {
         ev_once(ptr, fd, events, timeout, cb, arg);
     }
 
-    void once(int fd, int events, tstamp timeout, OnceCallback cb)
+    void once(int fd, int events, ev_tstamp timeout, OnceCallback cb)
     {
         auto d = new OnceData;
         d.cb = cb;
@@ -277,9 +278,9 @@ template MLoop()
         once(fd, events, -1.0, cb);
     }
 
-    void once(tstamp timeout, OnceCallback cb)
+    void once(ev_tstamp timeout, OnceCallback cb)
     {
-        once(-1, NONE, timeout, cb);
+        once(-1, EV.NONE, timeout, cb);
     }
 
     void feedFdEvent(int fd, int revents)
@@ -301,7 +302,7 @@ class Loop: ILoop
 
     mixin MLoop;
 
-    this(uint flags = AUTO)
+    this(uint flags = Flags.AUTO)
     {
         _ptr = ev_loop_new(flags);
     }
@@ -330,7 +331,7 @@ private class DefaultLoop: ILoop
 
     mixin MLoop;
 
-    this(uint flags = AUTO)
+    this(uint flags = Flags.AUTO)
     {
         _ptr = ev_default_loop(flags);
     }
@@ -379,7 +380,7 @@ private class DefaultLoop: ILoop
 
 private DefaultLoop _loop;
 
-DefaultLoop loop(uint flags = AUTO)
+DefaultLoop loop(uint flags = ILoop.Flags.AUTO)
 {
     if (!_loop) _loop = new DefaultLoop(flags);
     return _loop;
@@ -561,7 +562,7 @@ class Io: IWatcher
 //    import std.c.unix.unix;
     unittest
     {
-        auto w = new Io(0, READ, (Io w, int revents)
+        auto w = new Io(0, EV.READ, (Io w, int revents)
         {
             debug (ev_d_Io)
                 sout("io callback: revents=")(revents)("\n");
@@ -600,18 +601,18 @@ class Timer: ITimer
 
     mixin MTimer!(ev_timer_again);
 
-    this(tstamp after, tstamp repeat, Callback cb, ILoop loop = gobo.ev.d.loop)
+    this(ev_tstamp after, ev_tstamp repeat, Callback cb, ILoop loop = gobo.ev.d.loop)
     {
         init(loop, cb);
         ev_timer_set(ptr, after, repeat);
     }
 
-    this(tstamp after, Callback cb, ILoop loop = gobo.ev.d.loop)
+    this(ev_tstamp after, Callback cb, ILoop loop = gobo.ev.d.loop)
     {
         this(after, 0.0, cb, loop);
     }
 
-    mixin (wproperty!("tstamp", "repeat"));
+    mixin (wproperty!("ev_tstamp", "repeat"));
 
     unittest
     {
@@ -634,7 +635,7 @@ class Periodic: ITimer
 
     mixin MTimer!(ev_periodic_again);
 
-    alias tstamp delegate(Periodic, tstamp) RescheduleCallback;
+    alias ev_tstamp delegate(Periodic, ev_tstamp) RescheduleCallback;
 
     private struct WatcherData
     {
@@ -643,14 +644,14 @@ class Periodic: ITimer
         Periodic watcher;
     }
 
-    private extern(C) static tstamp reschedule_thunk(ev_periodic* watcher,
-            tstamp now)
+    private extern(C) static ev_tstamp reschedule_thunk(ev_periodic* watcher,
+            ev_tstamp now)
     {
         auto d = cast (WatcherData*) watcher.data;
         return d.reschedulecb(d.watcher, now);
     }
 
-    this(tstamp at, tstamp interval, RescheduleCallback reschedulecb,
+    this(ev_tstamp at, ev_tstamp interval, RescheduleCallback reschedulecb,
             Callback cb, ILoop loop = gobo.ev.d.loop)
     {
         init(loop, cb);
@@ -672,18 +673,18 @@ class Periodic: ITimer
 
     mixin (dproperty!("RescheduleCallback", "reschedulecb", RO));
 
-    mixin (wproperty!("tstamp", "offset"));
+    mixin (wproperty!("ev_tstamp", "offset"));
 
-    mixin (wproperty!("tstamp", "interval"));
+    mixin (wproperty!("ev_tstamp", "interval"));
 
-    mixin (wproperty!("tstamp", "at", RO));
+    mixin (wproperty!("ev_tstamp", "at", RO));
 
 }
 
 class At: Periodic
 {
 
-    this(tstamp time, Callback cb, ILoop loop = gobo.ev.d.loop)
+    this(ev_tstamp time, Callback cb, ILoop loop = gobo.ev.d.loop)
     {
         super(time, 0.0, null, cb, loop);
     }
@@ -693,7 +694,7 @@ class At: Periodic
 class Cron: Periodic
 {
 
-    this(tstamp offset, tstamp interval, Callback cb,
+    this(ev_tstamp offset, ev_tstamp interval, Callback cb,
             ILoop loop = gobo.ev.d.loop)
     in {
         assert (interval > 0);
@@ -762,7 +763,7 @@ class Stat: IWatcher
 
     mixin MWatcher!(Stat, ev_stat, ev_stat_start, ev_stat_stop);
 
-    this(string path, tstamp interval, Callback cb, ILoop loop = gobo.ev.d.loop)
+    this(string path, ev_tstamp interval, Callback cb, ILoop loop = gobo.ev.d.loop)
     {
         init(loop, cb);
         ev_stat_set(ptr, toStringz(path.dup), interval);
@@ -778,11 +779,11 @@ class Stat: IWatcher
         ev_stat_stat(loop.ptr, ptr);
     }
 
-    mixin (wproperty!("statdata", "attr", RO));
+    mixin (wproperty!("ev_statdata", "attr", RO));
 
-    mixin (wproperty!("statdata", "prev", RO));
+    mixin (wproperty!("ev_statdata", "prev", RO));
 
-    mixin (wproperty!("tstamp", "interval", RO));
+    mixin (wproperty!("ev_tstamp", "interval", RO));
 
     /+
     void path(string path)

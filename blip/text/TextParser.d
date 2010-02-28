@@ -42,14 +42,14 @@ class TextParser(T) : InputFilter
     CommentType inComment;
     bool skipComments;
     
-    /// gives back the current slice
+/+    /// gives back the current slice (deprecated in favor of peek)
     void unget(){
         line=oldLine;
         col=oldCol;
         source.seek (-cast(long)max(slice.length,charPos-oldCharPos), IOStream.Anchor.Current);
         charPos=oldCharPos;
         slice=slice[0..0];
-    }
+    }+/
     
     /// position of the parsed token
     void parserPos(void delegate(char[]) s){
@@ -766,6 +766,50 @@ class TextParser(T) : InputFilter
     TextParser opCall(U)(ref U t){
         readValue!(U)(t);
         return this;
+    }
+    
+    /// helper structure to peek 
+    struct Peeker{
+        T[] peekedSlice;
+        size_t delegate (T[] data,SliceExtent se) scanner;
+        bool noRaise;
+        bool didRaise=false;
+        size_t scan(T[] data,SliceExtent se){
+            size_t res;
+            if (noRaise){
+                try{
+                    res=scanner(data,se);
+                } catch (Exception e){
+                    didRaise=true;
+                    peekedSlice=data;
+                    return 0;
+                }
+            } else {
+                res=scanner(data,se);
+            }
+            if (res==Eof)
+                return Eof;
+            peekedSlice=data[0..res];
+            return 0;
+        }
+    }
+    /// peeks what is found by the given scanner. If noRaise is true exception are catched,
+    /// if zeroOnFail is false when an exception is raised the full slice evaluated at that moment is
+    /// returned (useful to get the beginning of a very long line that overflows the buffer)
+    char[] peek(size_t delegate (T[] data,SliceExtent se) scanner,bool noRaise=true,bool zeroOnFail=true){
+        Peeker p;
+        p.scanner=scanner;
+        p.noRaise=noRaise;
+        next(&p.scan);
+        if (!p.didRaise){
+            return p.peekedSlice;
+        } else {
+            if (zeroOnFail){
+                return "";
+            } else {
+                return p.peekedSlice;
+            }
+        }
     }
 }
 

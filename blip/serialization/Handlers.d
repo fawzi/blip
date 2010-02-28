@@ -155,6 +155,9 @@ class WriteHandlers: CoreHandlers,OutStreamI{
     BinSink binSink(){
         return &this.rawWrite;
     }
+    void close(){
+        assert(0,"unimplemented");
+    }
 }
 
 /// handlers for reading
@@ -221,12 +224,14 @@ version (BigEndian){
 /// build it on the top of OutputBuffer? would spare a buffer and its copy if SwapBytes is true
 final class BinaryWriteHandlers(bool SwapBytes=isSmallEndian):WriteHandlers{
     void delegate(void[]) writer;
+    void delegate() _close;
     
-    this (void delegate(void[]) writer, void delegate() flusher=null)
+    this (void delegate(void[]) writer, void delegate() flusher=null, void delegate() _close=null)
     {
         super(flusher);
         this.writer=writer;
         this.flusher=flusher;
+        this._close=_close;
         setCoreHandlersFrom_basicWrite();
     }
     
@@ -334,6 +339,11 @@ final class BinaryWriteHandlers(bool SwapBytes=isSmallEndian):WriteHandlers{
     }
     BinSink binSink(){
         return writer;
+    }
+    void close(){
+        flush();
+        if (_close !is null)
+            _close();
     }
 }
 
@@ -455,11 +465,13 @@ final class BinaryReadHandlers(bool SwapBytes=isSmallEndian):ReadHandlers{
 }
 
 /// formatted write handlers written on the top of a simple sink
-final class FormattedWriteHandlers(U=char): WriteHandlers{
+class FormattedWriteHandlers(U=char): WriteHandlers{
     void delegate(U[]) writer;
-    this(void delegate(U[]) writer,void delegate() flusher=null){
+    void delegate() _close;
+    this(void delegate(U[]) writer,void delegate() flusher=null,void delegate() _close=null){
         super(flusher);
         this.writer=writer;
+        this._close=_close;
         setCoreHandlersFrom_basicWrite();
     }
     /// writes a basic type (basic types are atomic types or strings)
@@ -530,6 +542,11 @@ final class FormattedWriteHandlers(U=char): WriteHandlers{
     }
     BinSink binSink(){
         return &this.rawWrite;
+    }
+    void close(){
+        if (_close !is null){
+            _close();
+        }
     }
 }
 

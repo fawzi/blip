@@ -430,7 +430,7 @@ class IOArray : Conduit, InputBuffer, OutputBuffer, Conduit.Seek
                 length = the number of bytes in src
 
                 Returns a chaining reference if all content was written.
-                Throws an IOException indicating eof or eob if not.
+                Throws an BIOException indicating eof or eob if not.
 
                 Remarks:
                 Append an array to this buffer

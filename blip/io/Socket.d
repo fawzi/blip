@@ -39,7 +39,7 @@ class BasicSocket{
         err=getaddrinfo(nodeName,serviceName,&hints,&addressInfo);
         if (err!=0){
             char *errStr= gai_strerror(err);
-            throw new IOException("getaddrinfo error:"~errStr[0..strlen(errStr)],__FILE__,__LINE__);
+            throw new BIOException("getaddrinfo error:"~errStr[0..strlen(errStr)],__FILE__,__LINE__);
         }
 
         socket_t s=-1;
@@ -55,7 +55,7 @@ class BasicSocket{
         }
         freeaddrinfo(addressInfo);
         if (s<0){
-            throw new IOException("could not connect to "~address~" "~service,__FILE__,__LINE__);
+            throw new BIOException("could not connect to "~address~" "~service,__FILE__,__LINE__);
         }
         sock=s;
     }
@@ -71,9 +71,9 @@ class BasicSocket{
                     auto a=lGrowableArray(buf,0);
                     a("IO error:");
                     writeOut(&a.appendArr,errno());
-                    throw new IOException(a.takeData(),__FILE__,__LINE__);
+                    throw new BIOException(a.takeData(),__FILE__,__LINE__);
                 }
-                throw new IOException(buf[0..strlen(buf.ptr)],__FILE__,__LINE__);
+                throw new BIOException(buf[0..strlen(buf.ptr)],__FILE__,__LINE__);
             }
             written+=wNow;
         }
@@ -89,9 +89,9 @@ class BasicSocket{
                 auto a=lGrowableArray(buf,0);
                 a("IO error:");
                 writeOut(&a.appendArr,errno());
-                throw new IOException(a.takeData(),__FILE__,__LINE__);
+                throw new BIOException(a.takeData(),__FILE__,__LINE__);
             }
-            throw new IOException(errMsg,__FILE__,__LINE__);
+            throw new BIOException(errMsg,__FILE__,__LINE__);
         }
     }
     
@@ -136,9 +136,9 @@ class SocketServer{
                 arr.clearData();
                 arr("getaddrinfo error:");
                 writeOut(&arr.appendArr,err);
-                throw new IOException(arr.takeData(),__FILE__,__LINE__);
+                throw new BIOException(arr.takeData(),__FILE__,__LINE__);
             } else {
-                throw new IOException(str[0..strlen(str)],__FILE__,__LINE__);
+                throw new BIOException(str[0..strlen(str)],__FILE__,__LINE__);
             } 
         }
         for (res=res0;res;res=res.ai_next){
@@ -156,7 +156,7 @@ class SocketServer{
         }
         freeaddrinfo(res0);
         if (socks.length==0){
-            throw new IOException("no bind sucessful",__FILE__,__LINE__);
+            throw new BIOException("no bind sucessful",__FILE__,__LINE__);
         }
         FD_ZERO(&selectSet);
         maxDesc=0;
@@ -176,7 +176,7 @@ class SocketServer{
             if (ndesc<0){
                 if (errno!=EINTR){
                     char[128] buf;
-                    throw new IOException(strerror_d(errno,buf),__FILE__,__LINE__);
+                    throw new BIOException(strerror_d(errno,buf),__FILE__,__LINE__);
                 }
             }
             if (ndesc>0){
@@ -197,9 +197,9 @@ class SocketServer{
                                 auto a=lGrowableArray(buf,0,GASharing.Local);
                                 a("error accepting socket ");
                                 writeOut(&a.appendArr,errno);
-                                throw new IOException(a.takeData,__FILE__,__LINE__);
+                                throw new BIOException(a.takeData,__FILE__,__LINE__);
                             }
-                            throw new IOException("error accepting socket "~errMsg,
+                            throw new BIOException("error accepting socket "~errMsg,
                                 __FILE__,__LINE__);
                         }
                         if (addrStrPtr !is null || serviceStrPtr !is null){
@@ -243,7 +243,7 @@ class SocketServer{
             BasicSocket s;
             try{
                 s=accept(&addr);
-            } catch(IOException e){
+            } catch(BIOException e){
                 char[256]buf2;
                 auto a=lGrowableArray(buf2,0);
                 dumperP(&a)("error accepting ")(serviceName)(":");
