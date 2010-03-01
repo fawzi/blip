@@ -7,7 +7,10 @@ private {
 
 
 template cscalar(T, real value) {
-	static if (is(typeof(T.ctFromReal!(value)) == T)) {		// compile-time version
+        static if (is(typeof(T.fracBits))){ // hack for http://d.puremagic.com/issues/show_bug.cgi?id=3792
+	  //static assert (val >= T.minInt && val <= cast(real))T.maxInt);
+	  const T cscalar = { store : cast(int)(value * (1 << T.fracBits)) };
+        } else static if (is(typeof(T.ctFromReal!(value)) == T)) {		// compile-time version
 		const T cscalar = T.ctFromReal!(value);
 	} else static if (is(typeof(T.fromReal(value)) == T)) {
 		const T cscalar = T.fromReal(value);

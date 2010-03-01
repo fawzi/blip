@@ -7,7 +7,7 @@ private {
 	import xf.omg.core.Misc : unitSqNormEpsilon, deg2rad, rad2deg, pi, invSqrt;
 	import tango.util.Convert : convTo = to;
 	import tango.math.Math : sqrt, abs, sin, cos, tan, acos, atan2, asin;
-	import tango.core.Traits : isFloatingPointType;
+	import tango.core.Traits : isFloatingPointType,ctfe_i2a;
 	import blip.serialization.Serialization;
 	import blip.serialization.SerializationMixins;
 }
@@ -1154,6 +1154,19 @@ struct Matrix(flt_, int rows_, int cols_) {
 	}
 }
 
+char[] Matrix_rc(int rows,int cols,int r, int c,char[] src) {
+	bool isExtended = rows + 1 == cols;
+	if (r == rows && isExtended) {
+	        if (r == c) {
+			return "cscalar!(flt, 1)";
+		} else {
+			return "cscalar!(flt, 0)";
+		}
+	} else {
+		return src ~ ".col["~ctfe_i2a(c)~"].row["~ctfe_i2a(r)~"]";
+	}
+}
+
 
 alias Matrix!(float, 2, 2)	mat2;
 alias Matrix!(float, 3, 3)	mat3;
@@ -1382,17 +1395,17 @@ struct Quaternion(flt_) {
 		flt yy = y * y2;	flt yz = y * z2;	flt zz = z * z2;
 		flt wx = w * x2;	flt wy = w * y2;	flt wz = w * z2;
 		
-		mixin(res._rc!(0, 0)("res")~" = cscalar!(flt, 1) - yy - zz;");
-		mixin(res._rc!(1, 0)("res")~" = xy + wz;");
-		mixin(res._rc!(2, 0)("res")~" = xz - wy;");
+		mixin(Matrix_rc(rows,cols,0, 0,"res")~" = cscalar!(flt, 1) - yy - zz;");
+		mixin(Matrix_rc(rows,cols,1, 0,"res")~" = xy + wz;");
+		mixin(Matrix_rc(rows,cols,2, 0,"res")~" = xz - wy;");
 		
-		mixin(res._rc!(0, 1)("res")~" = xy - wz;");
-		mixin(res._rc!(1, 1)("res")~" = cscalar!(flt, 1) - xx - zz;");
-		mixin(res._rc!(2, 1)("res")~" = yz + wx;");
+		mixin(Matrix_rc(rows,cols,0, 1,"res")~" = xy - wz;");
+		mixin(Matrix_rc(rows,cols,1, 1,"res")~" = cscalar!(flt, 1) - xx - zz;");
+		mixin(Matrix_rc(rows,cols,2, 1,"res")~" = yz + wx;");
 		
-		mixin(res._rc!(0, 2)("res")~" = xz + wy;");
-		mixin(res._rc!(1, 2)("res")~" = yz - wx;");
-		mixin(res._rc!(2, 2)("res")~" = cscalar!(flt, 1) - xx - yy;");
+		mixin(Matrix_rc(rows,cols,0, 2,"res")~" = xz + wy;");
+		mixin(Matrix_rc(rows,cols,1, 2,"res")~" = yz - wx;");
+		mixin(Matrix_rc(rows,cols,2, 2,"res")~" = cscalar!(flt, 1) - xx - yy;");
 		
 		return res;
 	}

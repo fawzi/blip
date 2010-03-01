@@ -174,8 +174,6 @@ struct fixed32T(int fracBits_) {
 	}
 }
 
-
-
 template fixedT(int intBits, int fracBits) {
 	static if (32 == intBits + fracBits) {
 		alias fixed32T!(fracBits) fixedT;

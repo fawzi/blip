@@ -13,6 +13,7 @@ import blip.t.core.Traits;
 import blip.t.math.Math: round,sqrt,min,ceil;
 import tango.math.IEEE: feqrel;
 import tango.core.Memory:GC;
+import blip.io.Console; // pippo
 
 /+ ---------------- structural ops -------------------- +/
 
@@ -749,8 +750,9 @@ NArray!(T,rank-reductionFactorFilt!(S)) arrayAxisFilter(T,int rank,S...)(NArray!
 // loops on filtered and non filtered array in parallel (support function)
 char[] axisFilterLoop(T,int rank,V,S...)(char[] loopBody)
 {
-    char[] res="".dup;
-    char[] indent="    ".dup;
+    char[] res;
+    char[] indent;
+    indent~="    ";
     static const int rank2=rank-reductionFactorFilt!(S);
     res~=indent~"const int rank2=rank-reductionFactorFilt!(S);";
     res~=indent~"index_type from,to,step;\n";
@@ -891,14 +893,21 @@ NArray!(T,rank-reductionFactorFilt!(S)) axisFilter1(T,int rank,S...)
     (NArray!(T,rank) a,NArray!(T,rank-reductionFactorFilt!(S)) b,S idx_tup)
 {
     static assert(nArgs!(S)<=rank,"too many indexing arguments");
-    mixin(axisFilterLoop!(T,rank,T,S)("*bPtr0 = *aPtr0;"));
+    version(LDC){
+      serr("LDC bug in axisFilterLoop\n");
+//      serr(axisFilterLoop!(T,rank,T,S)("*bPtr0 = *aPtr0;"));
+      serr("\n--------------\n");
+    } else {
+      mixin(axisFilterLoop!(T,rank,T,S)("*bPtr0 = *aPtr0;"));
+    }
     return b;
 }
 
 /// Filters the array a using indexes, ranges and index arrays and returns the result
 NArray!(T,rank-reductionFactorFilt!(S))axisFilter(T,int rank,S...)(NArray!(T,rank) a,S index){
     static assert(nArgs!(S)<=rank,"too many indexing arguments");
-    return axisFilter1!(T,rank,S)(a,arrayAxisFilter!(T,rank,S)(a,index),index);
+    NArray!(T,rank-reductionFactorFilt!(S)) res=arrayAxisFilter!(T,rank,S)(a,index);
+    return axisFilter1!(T,rank,S)(a,res,index);
 }
 
 /// unfilters an array

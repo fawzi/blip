@@ -739,12 +739,12 @@ else {
                 }
             }
         } else {
-            struct SubView{
+            static struct SubView{
                 NArray baseArray;
                 NArray!(V,rank-1) view;
                 index_type iPos, iDim, stride,idxAtt;
                 static SubView opCall(NArray a, int axis=0)
-                in { assert(0<=axis && axis<rank); }
+                /+in { assert(0<=axis && axis<rank); }
                 out(res){
                     debug(TestNArray){
                         V[] subData=res.view.data;
@@ -753,7 +753,7 @@ else {
                             "subview out of range");
                     }
                 }
-                body {
+                body +/{
                     index_type[rank-1] shape,strides;
                     int ii=0;
                     for(int i=0;i<rank;i++){
