@@ -190,6 +190,8 @@ static if (rank<1)
 else {
     final class NArray : CopiableObjectI, Serializable
     {
+        alias V dtype;
+        alias ArrayFlags Flags;
         // default optimal chunk size for parallel looping
         static index_type defaultOptimalChunkSize=defaultSimpleLoopSize/V.sizeof;
         /// pointer to the element 0,...0 (not necessarily the start of the slice)
@@ -201,11 +203,9 @@ else {
         /// size of the array
         index_type nElArray;
         /// flags to quickly check properties of the array
-        uint flags = Flags.None;
+        uint flags = ArrayFlags.None;
         /// owner of the data if it is manually managed
         Guard mBase = null;
-        alias V dtype;
-        alias ArrayFlags Flags;
         /// the underlying data slice
         V[] data() {
             if (this.nElArray==0) return null;

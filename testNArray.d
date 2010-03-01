@@ -312,7 +312,7 @@ void testFilterMask(T,int rank)(NArray!(T,rank) a, Rand r){
 
 void testAxisFilter(T,int rank)(NArray!(T,rank) a, NArray!(index_type,1)indexes){
     unaryOp!((ref index_type i){ i=abs(i)%a.shape[0]; },1,index_type)(indexes);
-    auto b=axisFilter(a,indexes);
+    auto b=axisFilter!(T,rank,NArray!(index_type,1))(a,indexes);
     auto c=zeros!(T)(a.shape);
     auto d=axisUnfilter1(c,b,indexes);
     assert(c.shape==a.shape);

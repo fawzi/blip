@@ -8,6 +8,7 @@ module blip.text.UtfUtils;
 import Utf=tango.text.convert.Utf;
 import tango.io.model.IConduit;
 public import tango.text.convert.Utf: cropRight, cropLeft;
+public import tango.text.Util:trim;
 
 /// returns the number of code points in the string str, raise if str contains invalid or 
 /// partial characters (but does not explicitly validate)

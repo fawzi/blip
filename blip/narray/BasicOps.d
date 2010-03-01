@@ -462,7 +462,7 @@ S multiplyAll(T,int rank,S=T)(NArray!(T,rank)a){
 /// sum along an axis of the array
 NArray!(S,rank-1) multiplyAxis(T,int rank,S=T)(NArray!(T,rank)a,int axis=-1,NArray!(S,rank-1) res=nullNArray!(S,rank-1))
 {
-    return reduceAxisGen!((ref S x,T y){x*=y;},(ref S x,S y){x*=y;}, (S x){ return cast(S)1; },
+    return reduceAxisGen!(delegate void(ref S x,T y){x=cast(S)(x*y);},delegate void(ref S x,S y){x*=y;},delegate S(S x){ return cast(S)1; },
         T, rank,S)(a,axis,res);
 }
 
@@ -793,7 +793,7 @@ char[] axisFilterLoop(T,int rank,V,S...)(char[] loopBody)
             res~=indent~"aStride"~ctfe_i2a(i)~"*=inc;\n";
         } else static if (is(U:int[])||is(U:long[])||is(U:uint[])||is(U:ulong[])){
             res~=indent~"index_type j"~ctfe_i2a(i)~"_1=idx_tup["~ctfe_i2a(i)~"].length;\n";
-        } else static if (is(U==NArray!(long,1))||is(U==NArray!(int,1))||is(U==NArray!(uint,1))||is(U==NArray!(ulong,1))){
+        } else static if (is(U:NArray!(long,1))||is(U:NArray!(int,1))||is(U:NArray!(uint,1))||is(U:NArray!(ulong,1))){
             res~=indent~"index_type j"~ctfe_i2a(i)~"_1=idx_tup["~ctfe_i2a(i)~"].shape[0];\n";
             res~=indent~"index_type j"~ctfe_i2a(i)~"_2=idx_tup["~ctfe_i2a(i)~"].bStrides[0];\n";
         } else {
@@ -818,7 +818,7 @@ char[] axisFilterLoop(T,int rank,V,S...)(char[] loopBody)
             res~=indent2~"T* aPtr"~ctfe_i2a(rank-i-1)~"=cast(T*)(cast(size_t)aPtr"~ctfe_i2a(rank-i)~
                 "+cast(index_type)(*idx"~ctfe_i2a(i)~")*aStride"~ctfe_i2a(i)~");\n";
             ++ii;
-        } else static if (is(U==NArray!(long,1))||is(U:NArray!(int,1))||is(U:NArray!(uint,1))||is(U:NArray!(ulong,1))){
+        } else static if (is(U:NArray!(long,1))||is(U:NArray!(int,1))||is(U:NArray!(uint,1))||is(U:NArray!(ulong,1))){
             res~=indent;
             static if (is(U:NArray!( long,1))) res~="long";
             static if (is(U:NArray!(  int,1))) res~="int";
@@ -872,7 +872,7 @@ char[] axisFilterLoop(T,int rank,V,S...)(char[] loopBody)
             res~=indent~"bPtr"~ctfe_i2a(rank2-ii-1)~"=cast(T*)(cast(size_t)bPtr"~ctfe_i2a(rank2-ii-1)
                 ~"+bStride"~ctfe_i2a(ii)~");\n";
             res~=indent2~"}\n";
-        } else static if (is(U==NArray!(long,1))||is(U==NArray!(int,1))||is(U==NArray!(uint,1))||is(U==NArray!(ulong,1))){
+        } else static if (is(U:NArray!(long,1))||is(U:NArray!(int,1))||is(U:NArray!(uint,1))||is(U:NArray!(ulong,1))){
             --ii;
             res~=indent~"idx"~ctfe_i2a(i)~"=cast(typeof(idx"~ctfe_i2a(i)~"))"
                 ~"(cast(size_t)idx"~ctfe_i2a(i)~"+j"~ctfe_i2a(i)~"_2);\n";
@@ -893,13 +893,7 @@ NArray!(T,rank-reductionFactorFilt!(S)) axisFilter1(T,int rank,S...)
     (NArray!(T,rank) a,NArray!(T,rank-reductionFactorFilt!(S)) b,S idx_tup)
 {
     static assert(nArgs!(S)<=rank,"too many indexing arguments");
-    version(LDC){
-      serr("LDC bug in axisFilterLoop\n");
-//      serr(axisFilterLoop!(T,rank,T,S)("*bPtr0 = *aPtr0;"));
-      serr("\n--------------\n");
-    } else {
-      mixin(axisFilterLoop!(T,rank,T,S)("*bPtr0 = *aPtr0;"));
-    }
+    mixin(axisFilterLoop!(T,rank,T,S)("*bPtr0 = *aPtr0;"));
     return b;
 }
 
