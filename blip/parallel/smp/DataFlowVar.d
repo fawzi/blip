@@ -170,7 +170,7 @@ struct WaitListPtr{
     }
 }
 
-void unifyVals(T)(ref T a, ref T b){
+void unifyVals(T)(ref T a, T b){
     static if (is(typeof(a.unify(b)))){
         static if(is(typeof(a is null))){
             if (a is null){
@@ -213,16 +213,16 @@ struct DataFlow(T){
         } else static if (is(typeof(this.value))){
             waitL.setValLong(delegate void(bool hasV){
                 if (hasV){
-                    unifyVals(value,newVal);
+                    unifyVals!(T)(value,newVal);
                 } else {
                     value=newVal;
                 }
             });
         } else {
-            size_t rVal=0;
+            rVal=0;
             ubyte *v=cast(ubyte*)&newVal; // this is endiannes dependent...
             for (int ib=0;ib<T.sizeof;++ib){
-                rVal |= cast(size_t)(*ib);
+                rVal |= cast(size_t)(v[ib]);
                 rVal <<= 8;
                 ++ib;
             }
@@ -269,15 +269,15 @@ struct DataFlow(T){
     }
     void opSliceAssign(DataFlow newVal){
         size_t rVal=1;
-        static if (is(typeof(this.value))){
+        static if (!is(typeof(this.value))){
             waitL.maybeSetValShort(newVal.waitL);
         } else {
             if (newVal.waitL.hasVal){
                 waitL.setValLong(delegate void(bool hasV){
                     if (hasV){
-                        unifyVals(value,newVal);
+                        unifyVals!(T)(value,newVal.val);
                     } else {
-                        value=newVal;
+                        value=newVal.val;
                     }
                 });
             }

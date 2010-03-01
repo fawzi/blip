@@ -27,7 +27,7 @@ import tango.core.Traits;
 import tango.core.stacktrace.TraceExceptions;
 import blip.io.BasicIO;
 import blip.io.StreamConverters;
-version(NoTrace){} else { import tango.core.stacktrace.TraceExceptions; }
+version(NoTrace){} else { import tango.core.stacktrace.TraceExceptions; import blip.util.TraceAll; }
 
 /// returns a NArray indexed with the variables of a pLoopIdx or sLoopGenIdx
 char[] NArrayInLoop(char[] arrName,int rank,char[] ivarStr){

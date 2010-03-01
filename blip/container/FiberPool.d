@@ -1,7 +1,7 @@
 module blip.container.FiberPool;
 import blip.container.Pool;
 import blip.t.core.Thread;
-version(NoTrace){} else { import tango.core.stacktrace.TraceExceptions; }
+version(NoTrace){} else { import blip.t.core.stacktrace.TraceExceptions; }
 
 size_t defaultFiberSize=1024*1024; // a largish (1MB) stack
 

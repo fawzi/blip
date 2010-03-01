@@ -776,53 +776,53 @@ else {
                 bool next()
                 out(res){
                     debug(TestNArray){
-                        V[] subData=view.data;
-                        V[] aData=baseArray.data;
+                        V[] subData=this.view.data;
+                        V[] aData=this.baseArray.data;
                         assert(subData.ptr>=aData.ptr && (subData.ptr+subData.length)<=(aData.ptr+aData.length),
                             "subview out of range");
                     }
                 }
                 body {
-                    iPos++;
-                    if (iPos<iDim){
-                        idxAtt+=stride;
-                        view.startPtrArray=cast(V*)(cast(size_t)baseArray.startPtrArray+idxAtt);
+                    this.iPos++;
+                    if (this.iPos<this.iDim){
+                        this.idxAtt+=this.stride;
+                        this.view.startPtrArray=cast(V*)(cast(size_t)this.baseArray.startPtrArray+this.idxAtt);
                         return true;
                     } else {
-                        iPos=iDim;
+                        this.iPos=this.iDim;
                         return false;
                     }
                 }
                 bool next(ref NArray!(V,rank-1) el){
-                    auto res=next();
-                    el=view;
+                    auto res=this.next();
+                    el=this.view;
                     return res;
                 }
                 NArray!(V,rank-1) value(){
-                    return view;
+                    return this.view;
                 }
                 void value(NArray!(V,rank-1) val){
-                    view[]=val;
+                    this.view[]=val;
                 }
                 NArray!(V,rank-1) get(index_type index)
-                in { assert(0<=index && index<iDim,"invalid index in SubView.get"); }
+                in { assert(0<=index && index<this.iDim,"invalid index in SubView.get"); }
                 body {
-                    idxAtt=index*stride;
-                    iPos=index;
-                    view.startPtrArray=cast(V*)(cast(size_t)baseArray.startPtrArray+idxAtt);
-                    return view;
+                    this.idxAtt=index*this.stride;
+                    this.iPos=index;
+                    this.view.startPtrArray=cast(V*)(cast(size_t)this.baseArray.startPtrArray+this.idxAtt);
+                    return this.view;
                 }
                 int opApply( int delegate(ref NArray!(V,rank-1)) loop_body ) {
-                    for (index_type i=iPos;i<iDim;i++){
-                        if (auto r=loop_body(view)) return r;
-                        view.startPtrArray=cast(V*)(cast(size_t)view.startPtrArray+stride);
+                    for (index_type i=this.iPos;i<this.iDim;i++){
+                        if (auto r=loop_body(this.view)) return r;
+                        this.view.startPtrArray=cast(V*)(cast(size_t)this.view.startPtrArray+this.stride);
                     }
                     return 0;
                 }
                 int opApply( int delegate(ref index_type,ref NArray!(V,rank-1)) loop_body ) {
-                    for (index_type i=iPos;i<iDim;i++){
-                        if (auto r=loop_body(i,view)) return r;
-                        view.startPtrArray=cast(V*)(cast(size_t)view.startPtrArray+stride);
+                    for (index_type i=this.iPos;i<this.iDim;i++){
+                        if (auto r=loop_body(i,this.view)) return r;
+                        this.view.startPtrArray=cast(V*)(cast(size_t)this.view.startPtrArray+this.stride);
                     }
                     return 0;
                 }
@@ -837,20 +837,20 @@ else {
                     writeOut(s,rank);
                     s(")\n");
                     s("baseArray:");
-                    baseArray.desc(s);
+                    this.baseArray.desc(s);
                     s(",\n");
                     s("view:");
-                    view.desc(s);
+                    this.view.desc(s);
                     s(",\n");
                     s("idxAtt:");
-                    writeOut(s,idxAtt);
+                    writeOut(s,this.idxAtt);
                     s(",\n");
                     s("iPos:");
-                    writeOut(s,iPos);
+                    writeOut(s,this.iPos);
                     s(", iDim:");
-                    writeOut(s,iDim);
+                    writeOut(s,this.iDim);
                     s(", stride :");
-                    writeOut(s,stride);
+                    writeOut(s,this.stride);
                     s("\n>\n");
                 }
             }
@@ -1257,7 +1257,7 @@ else {
         static if (is(typeof(-V.init))) {
             /// Return a negated version of the array
             NArray opNeg() {
-                NArray res=empty(shape);
+                NArray res=empty(this.shape);
                 binaryOpStr!("*bPtr0=-(*aPtr0);",rank,V,V)(this,res);
                 return res;
             }
@@ -1268,7 +1268,7 @@ else {
             /// But it always makes a full value copy regardless of whether the underlying unary+ 
             /// operator is a no-op.
             NArray opPos() {
-                NArray res=empty(shape);
+                NArray res=empty(this.shape);
                 binaryOpStr!("*bPtr0= +(*aPtr0);",rank,V,V)(this,res);
                 return res;
             }
@@ -1593,28 +1593,28 @@ else {
         }
         body {
             static if(rank==1){
-                if (bStrides[0]>=0)
+                if (this.bStrides[0]>=0)
                     return this;
-                return NArray([-bStrides[0]],this.shape,
-                    cast(V*)(cast(size_t)startPtrArray+bStrides[0]*(this.shape[0]-1)),
-                    newFlags,newBase);
+                return NArray([-this.bStrides[0]],this.shape,
+                    cast(V*)(cast(size_t)this.startPtrArray+this.bStrides[0]*(this.shape[0]-1)),
+                    this.newFlags,this.newBase);
             } else static if(rank==2){
-                if (bStrides[0]>=bStrides[1] && bStrides[0]>=0){
+                if (this.bStrides[0]>=this.bStrides[1] && this.bStrides[0]>=0){
                     return this;
                 } else {
                     index_type[rank] newstrides;
                     index_type newStartIdx=0;
-                    if (bStrides[0]>0){
-                        newstrides[0]=bStrides[0];
+                    if (this.bStrides[0]>0){
+                        newstrides[0]=this.bStrides[0];
                     } else {
-                        newstrides[0]=-bStrides[0];
-                        newStartIdx+=bStrides[0]*(this.shape[0]-1);
+                        newstrides[0]=-this.bStrides[0];
+                        newStartIdx+=this.bStrides[0]*(this.shape[0]-1);
                     }
-                    if (bStrides[1]>0){
-                        newstrides[1]=bStrides[1];
+                    if (this.bStrides[1]>0){
+                        newstrides[1]=this.bStrides[1];
                     } else {
-                        newstrides[1]=-bStrides[1];
-                        newStartIdx+=bStrides[1]*(this.shape[1]-1);
+                        newstrides[1]=-this.bStrides[1];
+                        newStartIdx+=this.bStrides[1]*(this.shape[1]-1);
                     }
                     index_type[rank] newshape;
                     if(newstrides[0]>=newstrides[1]){
@@ -1628,7 +1628,7 @@ else {
                         newstrides[1]=tmp;
                     }
                     return NArray(newstrides,newshape,
-                        cast(V*)(cast(size_t)startPtrArray+newStartIdx),newFlags,newBase);
+                        cast(V*)(cast(size_t)this.startPtrArray+newStartIdx),this.newFlags,this.newBase);
                 }
             } else {
                 int no_reorder=1;
@@ -1638,11 +1638,11 @@ else {
                 index_type[rank] pstrides;
                 index_type newStartIdx=0;
                 for (int i=0;i<rank;++i){
-                    if (bStrides[i]>0){
-                        pstrides[i]=bStrides[i];
+                    if (this.bStrides[i]>0){
+                        pstrides[i]=this.bStrides[i];
                     } else {
-                        pstrides[i]=-bStrides[i];
-                        newStartIdx+=bStrides[i]*(this.shape[i]-1);
+                        pstrides[i]=-this.bStrides[i];
+                        newStartIdx+=this.bStrides[i]*(this.shape[i]-1);
                     }
                 }
                 int[rank] sortIdx;
@@ -1655,7 +1655,7 @@ else {
                 for (int i=0;i<rank;i++)
                     newstrides[i]=pstrides[sortIdx[i]];
                 return NArray(newstrides,newshape,
-                    cast(V*)(cast(size_t)startPtrArray+newStartIdx),newFlags,newBase);
+                    cast(V*)(cast(size_t)startPtrArray+newStartIdx),this.newFlags,this.newBase);
             }
         }
         
@@ -1688,10 +1688,10 @@ else {
             index_type newStartIdx=0;
             for (int i=0;i<rank;++i){
                 if (!invert[i]){
-                    pstrides[i]=-bStrides[i];
+                    pstrides[i]=-this.bStrides[i];
                 } else {
-                    pstrides[i]=-bStrides[i];
-                    newStartIdx+=bStrides[i]*(this.shape[i]-1);
+                    pstrides[i]=-this.bStrides[i];
+                    newStartIdx+=this.bStrides[i]*(this.shape[i]-1);
                 }
             }
             for (int i=0;i<rank;++i){
@@ -1699,7 +1699,7 @@ else {
                 newshape[i]=this.shape[perm[i]];
             }
             return NArray(newstrides,newshape,
-                cast(V*)(cast(size_t)startPtrArray+newStartIdx),newFlags,newBase);
+                cast(V*)(cast(size_t)this.startPtrArray+newStartIdx),this.newFlags,this.newBase);
         }
         
         /// returns a random array
@@ -1750,9 +1750,10 @@ else {
         void serialize(Serializer s){
             index_type[] shp=this.shape;
             s.field(metaI[0],shp);
+            typeof(this) a=this;
             s.customField(metaI[1],{
-                auto ac=s.writeArrayStart(null,size());
-                mixin(sLoopPtr(rank,[""],`s.writeArrayEl(ac,{ s.field(cast(FieldMetaInfo*)null, *Ptr0); } );`,"i"));
+                auto ac=s.writeArrayStart(null,this.size());
+                mixin(sLoopPtr(rank,["a"],`s.writeArrayEl(ac,{ s.field(cast(FieldMetaInfo*)null, *aPtr0); } );`,"i"));
                 s.writeArrayEnd(ac);
             });
         }
@@ -1773,11 +1774,12 @@ else {
             }
             void getData()
             {
-                if (flags == 0) {
+                if (this.flags == 0) {
                     s.serializationError("cannot read data before knowing shape",__FILE__,__LINE__);
                 }
                 auto ac=s.readArrayStart(null);
-                mixin(sLoopPtr(rank,[""],`if (!s.readArrayEl(ac,{ s.field(cast(FieldMetaInfo*)null, *Ptr0); } )) s.serializationError("unexpected number of elements",__FILE__,`~ctfe_i2a(__LINE__)~`);`,"i"));
+                auto a=this;
+                mixin(sLoopPtr(rank,["a"],`if (!s.readArrayEl(ac,{ s.field(cast(FieldMetaInfo*)null, *aPtr0); } )) s.serializationError("unexpected number of elements",__FILE__,`~ctfe_i2a(__LINE__)~`);`,"i"));
                 V dummy;
                 if (s.readArrayEl(ac,{ s.field(cast(FieldMetaInfo*)null, dummy); } ))
                     s.serializationError("unexpected extra elements",__FILE__,__LINE__);

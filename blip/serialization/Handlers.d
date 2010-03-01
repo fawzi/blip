@@ -3,7 +3,11 @@ import tango.core.Tuple;
 import blip.io.BasicIO;
 import tango.io.model.IConduit;
 import tango.text.json.JsonEscape: escape;
-import tango.io.encode.Base64: encode,decode,allocateEncodeSize;
+version(NewTango){
+  import tango.util.encode.Base64: encode,decode,allocateEncodeSize;
+} else {
+  import tango.io.encode.Base64: encode,decode,allocateEncodeSize;
+}
 import blip.t.core.Variant;
 import tango.core.ByteSwap;
 import blip.t.core.Traits: RealTypeOf,ctfe_i2a, ElementTypeOfArray;

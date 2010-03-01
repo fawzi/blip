@@ -1,6 +1,8 @@
 /// buffered input from a basic reader
 /// author: Fawzi
 module blip.io.BufferIn;
+import blip.io.BasicIO;
+import blip.text.UtfUtils;
 
 final class BufferIn(TInt,TOut=TInt){
     static if (is(TInt==void)){

@@ -422,7 +422,7 @@ class Task:TaskI{
                 startWaiting();
             }
         } else {
-            assert(0,"unexpected status in excute: "~status.stringof);
+            assert(0,"unexpected status in excute: "~taskStatusStr(status));
         }
     }
     /// called when the main task is finished, and should start waiting for
@@ -919,7 +919,7 @@ class Task:TaskI{
         } else {
             s("<"); s(this.classinfo.name); s("@"); writeOut(s,cast(void*)this);
             s(" '"); s(taskName); s("' ");
-            s(status.stringof);
+            s(taskStatusStr(status));
             if (shortVersion) {
                 s(" >");
                 return;

@@ -59,90 +59,9 @@ struct DeadPeer{
     long lastEntryId;
 }
 
-/// a cluster of peer to peer servers
-class Cluster{
-    NotificationCenter nCenter; // notifications
-    Variant[char[]] info;
-    char[] sourceId;
-    WeakList!(Peer) workersList;
-    Peer[char[]] workersDict;
-    DeadPeer[] deadPeers;
-    
-    char[] firstAdd(char[]partialSId,char[]baseUrl){
-        auto w=new Worker;
-        char[] fullId;
-        synchronized(workersList){
-            fullId=collectAppender(delegate void(CharSink s){
-                writeOut(s,workersList.lastEntryId+1,":d6");
-                s("_");
-                s(partialSId);
-            });
-            w.sourceId=fullId;
-            w.baseUrl=baseUrl;
-        }
-        //workersList.addLocalEntry0(fullId,w);
-        return fullId;
-    }
-    void removeWorker(WeakList!(Peer),WeakList!(Peer).Entry*){
-        synchronized(this){
-            
-        }
-    }
-    bool knowsSource(char[]s){
-        return (s in workersDict)!is null;
-    }
-}
-
 /// a list of weakly ordered entries: entries with the same origin are ordered,
 /// entries with different origin might be off by one before the merging
 class WeakList(T){
-    char[] name; /// name of the weak list
-    Cluster cluster;
-    
-    T[]     sharedData;     /// data shared by the whole cluster
-    long[]  sharedEntryIds; /// id of the shared data
-    Entry*[] additions;      /// additions since last Sync
-    Entry*[] removals;       /// removals since last Sync
-    
-    long lastEntryIdSync;   /// last entryId that is locally known to be shared over the whole cluster
-    long lastEntryIdGSync;  /// last entryId that is globally known to be shared on the whole cluster
-    long lastEntryId;       /// last entryId
-    
-    DeadPeer[] deadPeers;   /// dead peers (to check if additions are valid or come form a peer that has been disconnected)
-    
-    // callbacks
-    void delegate(WeakList list)         _sharedDataChanged;
-    void delegate(WeakList list,Entry *) _willRemoveEntry;
-    void delegate(WeakList list,Entry *) _didRemoveEntry;
-    void delegate(WeakList list,Entry *) _willAddEntry;
-    void delegate(WeakList list,Entry *) _didAddEntry;
-    
-    void sharedDataChanged(){
-        if (_sharedDataChanged !is null){
-            _sharedDataChanged(this);
-        }
-    }
-    void willRemoveEntry  (Entry *e){
-        if (_willRemoveEntry !is null){
-            _willRemoveEntry(this,e);
-        }
-    }
-    void didRemoveEntry   (Entry *e){
-        if (_didRemoveEntry !is null){
-            _didRemoveEntry(this,e);
-        }
-    }
-    void willAddEntry     (Entry *e){
-        if (_willAddEntry !is null){
-            _willAddEntry(this,e);
-        }
-    }
-    void didAddEntry      (Entry *e){
-        if (_didAddEntry !is null){
-            _didAddEntry(this,e);
-        }
-    }
-    
     /// an entry in the weak list
     struct Entry{
         char[] sourceId;
@@ -177,7 +96,7 @@ class WeakList(T){
         mixin(serializeSome("WeakList!("~T.mangleof~")","sourceId|entryId|data"));
         mixin printOut!();
     }
-    
+
     static class JournalEntry{
         enum Status{
             Added,
@@ -208,14 +127,56 @@ class WeakList(T){
     alias EntryCacheT!() EntryCache;
     
     static Cached!(EntryCache) eCache;
-    static this(){
-        eCache=new Cached!(EntryCache)(cast(EntryCache)null,"Cluster","WeakList!("~T.mangleof~")",
-            Cache.EntryFlags.Purge,
-            delegate EntryCache(){ return new EntryCache(); });
-    }
     
     Deque!(JournalEntry) journal;
     long journalFirstId;
+    
+    char[] name; /// name of the weak list
+    Cluster cluster;
+    
+    T[]     sharedData;     /// data shared by the whole cluster
+    long[]  sharedEntryIds; /// id of the shared data
+    Entry*[] additions;      /// additions since last Sync
+    Entry*[] removals;       /// removals since last Sync
+    
+    long lastEntryIdSync;   /// last entryId that is locally known to be shared over the whole cluster
+    long lastEntryIdGSync;  /// last entryId that is globally known to be shared on the whole cluster
+    long lastEntryId;       /// last entryId
+    
+    DeadPeer[] deadPeers;   /// dead peers (to check if additions are valid or come form a peer that has been disconnected)
+    
+    // callbacks
+    void delegate(WeakList list)         _sharedDataChanged;
+    void delegate(WeakList list,Entry *) _willRemoveEntry;
+    void delegate(WeakList list,Entry *) _didRemoveEntry;
+    void delegate(WeakList list,Entry *) _willAddEntry;
+    void delegate(WeakList list,Entry *) _didAddEntry;
+
+    void sharedDataChanged(){
+        if (_sharedDataChanged !is null){
+            _sharedDataChanged(this);
+        }
+    }
+    void willRemoveEntry  (Entry *e){
+        if (_willRemoveEntry !is null){
+            _willRemoveEntry(this,e);
+        }
+    }
+    void didRemoveEntry   (Entry *e){
+        if (_didRemoveEntry !is null){
+            _didRemoveEntry(this,e);
+        }
+    }
+    void willAddEntry     (Entry *e){
+        if (_willAddEntry !is null){
+            _willAddEntry(this,e);
+        }
+    }
+    void didAddEntry      (Entry *e){
+        if (_didAddEntry !is null){
+            _didAddEntry(this,e);
+        }
+    }
     
     /// adds an entry to the weak list
     Entry *addLocalEntry0(Entry *e){
@@ -266,5 +227,43 @@ class WeakList(T){
     void mergeWith(char[]sourceId){
         
     }
+    static this(){
+        eCache=new Cached!(EntryCache)(cast(EntryCache)null,"Cluster","WeakList!("~T.mangleof~")",
+            Cache.EntryFlags.Purge,
+            delegate EntryCache(){ return new EntryCache(); });
+    }
 }
 
+/// a cluster of peer to peer servers
+class Cluster{
+    NotificationCenter nCenter; // notifications
+    Variant[char[]] info;
+    char[] sourceId;
+    WeakList!(Peer) workersList;
+    Peer[char[]] workersDict;
+    DeadPeer[] deadPeers;
+    
+    char[] firstAdd(char[]partialSId,char[]baseUrl){
+        auto w=new Worker;
+        char[] fullId;
+        synchronized(workersList){
+            fullId=collectAppender(delegate void(CharSink s){
+                writeOut(s,workersList.lastEntryId+1,":d6");
+                s("_");
+                s(partialSId);
+            });
+            w.sourceId=fullId;
+            w.baseUrl=baseUrl;
+        }
+        //workersList.addLocalEntry0(fullId,w);
+        return fullId;
+    }
+    void removeWorker(WeakList!(Peer),WeakList!(Peer).Entry*){
+        synchronized(this){
+            
+        }
+    }
+    bool knowsSource(char[]s){
+        return (s in workersDict)!is null;
+    }
+}

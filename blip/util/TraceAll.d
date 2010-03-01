@@ -1,12 +1,17 @@
 /// simple module to get the stacktrace of all threads
 module blip.util.TraceAll;
 import blip.t.core.Thread;
-import blip.t.core.stacktrace.Stacktrace;
+import blip.t.core.stacktrace.StackTrace;
 import blip.sync.Atomic;
 import blip.io.Console;
 import blip.t.stdc.stdlib;
 version(Posix){
     import tango.stdc.posix.signal;
+    version(NewTango) {} else {
+        private alias void function(int) sHandler;
+        extern (C) void setthread_abortHandler(sHandler f);
+    }
+    
 
     class TraceAll{
         int abortLevel; /// 0: normal run, 1: master established, 2: slave traces, 3: end
@@ -17,15 +22,17 @@ version(Posix){
         this(){
             trace=new BasicTraceInfo();
         }
+        
         void abort(){
             bool waitFor(bool delegate() check){
-                for(int i=0;i<100;++i){
+                for(int i=0;i<1000;++i){
                     for(int j=0;i<1000;++i){
                         volatile auto tLevel=traceLevel;
                         if (check()) return true;
                         Thread.yield();
                     }
                     if (check()) return true;
+                    Thread.sleep(0.01);
                 }
                 return false;
             }
@@ -38,15 +45,24 @@ version(Posix){
                 case 0:
                     nLevel=atomicCAS(abortLevel,1,0);
                     if (nLevel==0) {
+                        serr("\nThread ");
+                        serr(myT.name);
+                        serr("\n");
                         trace.trace();
                         trace.writeOut(serr.call);
+                        if (!atomicCASB(abortLevel,2,1)){
+                            serr("unexpected abort level on master\n");
+                        }
                         synchronized(Thread.classinfo){
-                            if (!atomicCASB(traceLevel,2,1)){
+                            if (!atomicCASB(traceLevel,1,0)){
                                 serr("invalid traceLevel on master\n");
                                 exit(1);
                             }
                             foreach(t;Thread){
                                 if (t!is myT){
+                                    serr("\nThread ");
+                                    serr(t.name);
+                                    serr("\n");
                                     tAtt=null;
                                     traceLevel=1;
                                     writeBarrier();
@@ -71,7 +87,7 @@ version(Posix){
                                         }
                                     } else {
                                         tAtt=null;
-                                        if (!atomicCASB(traceLevel,3,0)){
+                                        if (!atomicCASB(traceLevel,0,3)){
                                             serr("invalid traceLevel on master reset\n");
                                             exit(1);
                                         }
@@ -118,6 +134,9 @@ version(Posix){
         static TraceAll tracer;
         static this(){
             tracer=new TraceAll();
+            version(NewTango) {} else {
+                setthread_abortHandler(function void(int i){ tracer.abort(); });
+            }
         }
     }
 }

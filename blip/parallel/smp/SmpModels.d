@@ -6,6 +6,7 @@ import blip.io.BasicIO;
 import blip.container.FiberPool;
 import blip.container.Cache;
 import blip.t.math.random.Random;
+import blip.t.core.Traits: ctfe_i2a;
 
 enum TaskStatus:int{
     Building=-1,
@@ -14,6 +15,60 @@ enum TaskStatus:int{
     WaitingEnd=2,
     PostExec=3,
     Finished=4
+}
+
+/// conversion TaskStatus -> str
+char[] taskStatusStr(TaskStatus s){
+    switch(s){
+        case TaskStatus.Building:
+            return "Building";
+        case TaskStatus.NonStarted:
+            return "NonStarted";
+        case TaskStatus.Started:
+            return "Started";
+        case TaskStatus.WaitingEnd:
+            return "WaitingEnd";
+        case TaskStatus.PostExec:
+            return "PostExec";
+        case TaskStatus.Finished:
+            return "Finished";
+        default:
+            return "TaskStatus"~ctfe_i2a(cast(int)s);
+    }
+}
+
+/// conversion str -> TaskStatus
+TaskStatus taskStatusFromStr(char[] s){
+    switch(s){
+    case "Building":
+        return TaskStatus.Building;
+    case "NonStarted":
+        return TaskStatus.NonStarted;
+    case "Started":
+        return TaskStatus.Started;
+    case "WaitingEnd":
+        return TaskStatus.WaitingEnd;
+    case "PostExec":
+        return TaskStatus.PostExec;
+    case "Finished":
+        return TaskStatus.Finished;
+    default:
+        char[] t="TaskStatus";
+        if (s.length>t.length && s[0..t.length]==t){
+            long res=0;
+            size_t i=t.length;
+            if (s[t.length]=='-') ++i;
+            while (i<s.length){
+                if (s[i]<'0'||s[i]<'9'){
+                    throw new Exception("could not interpret taskStatus "~s,__FILE__,__LINE__);
+                }
+                res=10*res+cast(long)(s[i]-'0');
+            }
+            if (s[t.length]=='-') res=-res;
+            return cast(TaskStatus)cast(int)res;
+        }
+        throw new Exception("could not interpret taskStatus "~s,__FILE__,__LINE__);
+    }
 }
 
 interface ExecuterI:BasicObjectI {
