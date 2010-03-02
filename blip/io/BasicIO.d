@@ -87,7 +87,7 @@ private size_t parseInt(char[]s,ref int i){
     if (s.length>0 && s[0]>='0' && s[0]<='9'){
         i=0;
         foreach(c;s){
-            if (s[0]<'0' || s[0]>'9') break;
+            if (c<'0' || c>'9') break;
             res=true;
             int d=cast(int)(c-'0');
             i*=10;
