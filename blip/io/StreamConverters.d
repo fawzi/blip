@@ -124,16 +124,16 @@ alias strDumperSyncT!(char) strDumperSync;
 
 class ReadHandler(T):Reader!(T){
     BufferedInput buf;
-    IOArray arr;
+    InputStream arr; // stopgap measure to pass around tango objects (IOArray in particular)
     size_t maxTranscodingOverhead;
     this(BufferedInput b,size_t maxTranscodingOverhead=6){
         buf=b;
         this.maxTranscodingOverhead=maxTranscodingOverhead;
     }
     this(InputStream i,size_t maxTranscodingOverhead=6){
-        buf=cast(BufferedInput)i;
+        buf=cast(BufferedInput)i.input;
         if (buf is null){
-            arr=cast(IOArray)i; // hack just for now to pass the IOArray around... the handler is non functional...
+            arr=i; // hack just for now to pass the IOArray around... the handler is non functional...
             if (arr is null){
                 throw new BIOException("invalid input stream (only BufferedInput subclasses are supported)",__FILE__,__LINE__);
             }
