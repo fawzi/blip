@@ -16,6 +16,7 @@ import blip.t.math.random.Random;
 import blip.t.core.Variant;
 import blip.container.GrowableArray;
 import blip.io.BasicIO;
+import blip.io.StreamConverters;
 
 // duplication of serializer/unserilizer with blip.parallel.Mpi ugly, should probably be abstracted away
 struct SNMessage{
@@ -73,7 +74,7 @@ class SNUnserializer:SBinUnserializer{
         return new SNUnserializer();
     }
     this(){
-        super(new IOArray(0,0));
+        super(toReaderT!(void)(new IOArray(0,0)));
         msg.tag=AnyTag;
     }
     void readStartRoot() {

@@ -64,7 +64,7 @@ version(Posix){
                                     serr(t.name);
                                     serr("\n");
                                     tAtt=null;
-                                    traceLevel=1;
+                                    volatile traceLevel=1;
                                     writeBarrier();
                                     tAtt=t;
                                     Thread.sleep(0.001);

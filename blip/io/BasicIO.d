@@ -1,4 +1,9 @@
 /// basic IO definitions
+/// one has to choose one basic string type for "normal" output, otherwise *everything*
+/// becomes a template. I have choosen char[], but most basic things still are templates,
+/// so even using wchar or dchar as native types should not be too difficult.
+/// It might be a good idea to rename char[] string, so that one could switch
+/// the choosen type more easily later.
 module blip.io.BasicIO;
 import blip.t.util.Convert: formatFloat;
 import blip.t.core.Array: find;
@@ -10,26 +15,27 @@ enum SliceExtent{ Partial, Maximal, ToEnd }
 /// end of file marker
 enum :size_t{Eof=size_t.max}
 
-/// a delegate that will write out to a character sink
-alias void delegate(void delegate(char[]))  OutWriter;
-/// a delegate that will write out to a binary sink
-alias void delegate(void delegate(void[]))  BinWriter;
-/// a delegate that reads in from a character source
-alias size_t delegate(char[], SliceExtent slice,out bool iterate)  OutReader;
-/// a handler of OutReader, returns true if something was read
-alias bool delegate(OutReader) OutReaderHandler;
-/// a delegate that reads in from a binary source
-alias size_t delegate(ubyte[], SliceExtent slice,out bool iterate) BinReader;
-/// a handler of BinReader, returns true if something was read
-alias bool delegate(BinReader) BinReaderHandler;
 /// a character sink
 alias void delegate(char[]) CharSink;
 /// a binary sink
 alias void delegate(void[]) BinSink;
-/// a basic character reader (can be used to build more advanced objects that can handle OutReader, see blip.io.BufferIn)
-alias size_t delegate(char[])  CharRead;
-/// a basic character reader (can be used to build more advanced objects that can handle OutReader and BinReader)
+/// a delegate that will write out to a character sink
+alias void delegate(void delegate(char[]))  OutWriter;
+/// a delegate that will write out to a binary sink
+alias void delegate(void delegate(void[]))  BinWriter;
+
+/// a basic character reader (can be used to build more advanced objects that can handle CharReader, see blip.io.BufferIn)
+alias size_t delegate(char[]) CharRead;
+/// a basic binary reader (can be used to build more advanced objects that can handle CharReader and BinReader)
 alias size_t delegate(void[]) BinRead;
+/// a delegate that reads in from a character source
+alias size_t delegate(char[], SliceExtent slice,out bool iterate) CharReader;
+/// a delegate that reads in from a binary source
+alias size_t delegate(void[], SliceExtent slice,out bool iterate) BinReader;
+/// a handler of CharReader, returns true if something was read
+alias bool delegate(CharReader)CharReaderHandler;
+/// a handler of BinReader, returns true if something was read
+alias bool delegate(BinReader) BinReaderHandler;
 
 /// io exception
 class BIOException: Exception{
@@ -44,7 +50,7 @@ class SmallBufferException:BIOException{
     }
 }
 
-/// sample output string
+/// output stream
 interface OutStreamI{
     void rawWriteStr(char[]);
     void rawWriteStr(wchar[]);
@@ -55,6 +61,30 @@ interface OutStreamI{
     void flush();
     void close();
 }
+
+/// a reader of elements of type T
+interface Reader(T){
+    /// read some data into the given buffer
+    size_t readSome(T[]);
+    /// character reader handler
+    bool handleReader(size_t delegate(T[], SliceExtent slice,out bool iterate) r);
+    /// shutdown the input source
+    void shutdownInput();
+}
+
+/// one or more readers
+interface MultiReader{
+    enum Mode{ Binary=1, Char=2, Wchar=4, Dchar=8 }
+    /// returns the modes this reader supports
+    uint modes();
+    /// returns the native modes of this reader (less overhead)
+    uint nativeModes();
+    Reader!(char)  readerChar();
+    Reader!(wchar) readerWchar();
+    Reader!(dchar) readerDchar();
+    Reader!(void)  readerBin();
+}
+
 
 /// helper to build closures
 struct OutW(S...){
@@ -384,3 +414,24 @@ Dumper!(T) dumperP(T)(T c){
     }
 }
 
+/// fills out outBuf, or throws an exception
+void readExact(TInt,TOut)(size_t delegate(TInt[]) rSome,TOut[]outBuf){
+    static assert(TInt.sizeof<=TOut.sizeof,"internal size needs to be smaller than external");
+    static assert(TOut.sizeof%TInt.sizeof==0,"external size needs to be a multiple of internal size");
+    enum :size_t{OutToIn=TOut.sizeof/TInt.sizeof}
+    
+    if (outBuf.length%TInt.sizeof!=0){
+        throw new BIOException("external size needs to be a multiple of internal size",__FILE__,__LINE__);
+    }
+
+    auto outLen=outBuf.length*OutToIn;
+    auto outPtr=cast(TBuf*)outBuf.ptr;
+    size_t readTot=0;
+    while(readTot!=outLen){
+        auto readNow=rSome(outPtr[readTot..outLen]);
+        if (readNow==Eof){
+            throw new BIOException("unexpected Eof in readExact",__FILE__,__LINE__);
+        }
+        readTot+=readNow;
+    }
+}

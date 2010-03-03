@@ -1500,8 +1500,8 @@ class Unserializer {
                         readDebugPtr(fieldMeta,cast(void*)&t);
                     }
                 }
-            } else static if (is(T==OutReader)) {
-                readOutReader(fieldMeta,t);
+            } else static if (is(T==CharReader)) {
+                readCharReader(fieldMeta,t);
             } else static if (is(T==BinReader)) {
                 readBinReader(fieldMeta,t);
             } else {
@@ -1545,11 +1545,11 @@ class Unserializer {
     }
     
     /// reads with a generic text reader
-    void readOutReader(FieldMetaInfo f,OutReader r){
+    void readCharReader(FieldMetaInfo f,CharReader r){
         handlers.handle(r);
     }
     /// reads with a generic binary reader
-    void readOutReader(FieldMetaInfo f,BinReader r){
+    void readCharReader(FieldMetaInfo f,BinReader r){
         handlers.handle(r);
     }
     /// reads something that has a custom write operation

@@ -237,7 +237,7 @@ class SBinUnserializer: Unserializer {
         this.reader=h;
         lastMetaId=3;
     }
-    this(InputStream s){
+    this(Reader!(void) s){
         this(new BinaryReadHandlers!()(s));
     }
     class FieldMismatchException:Exception{

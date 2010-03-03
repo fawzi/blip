@@ -19,6 +19,7 @@ version(mpi)
     import blip.io.BasicIO;
     import blip.t.core.Thread;
     import blip.t.stdc.config;
+    import blip.io.StreamConverters;
 
     template MPI_DatatypeForType(T){
         static if (is(T==ubyte)){
@@ -165,7 +166,7 @@ version(mpi)
         }
         this(SerializedMessage msg){
             this.msg=msg;
-            super(new IOArray(msg.msg,msg.msg.length));
+            super(toReaderT!(void)(new IOArray(msg.msg,msg.msg.length)));
         }
         void readStartRoot() {
             assert(msg.tag!=AnyTag);

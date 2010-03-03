@@ -16,6 +16,7 @@ import tango.core.Exception: IOException;
 import blip.text.TextParser;
 import blip.text.UtfUtils;
 import blip.BasicModels;
+import blip.io.StreamConverters: ReadHandler;
 
 /// the non array core types
 template isBasicCoreType(T){
@@ -90,8 +91,8 @@ class CoreHandlers{
             handleOutWriter(t);
         } else static if (is(T==BinWriter)){
             handleBinWriter(t);
-        } else static if (is(T==OutReader)){
-            handleOutReader(t);
+        } else static if (is(T==CharReader)){
+            handleCharReader(t);
         } else static if (is(T==BinReader)){
             handleBinReader(t);
         } else {
@@ -105,7 +106,7 @@ class CoreHandlers{
     void handleBinWriter(BinWriter w){
         assert(0,"unimplemented");
     }
-    void handleOutReader(OutReader w){
+    void handleCharReader(CharReader w){
         assert(0,"unimplemented");
     }
     void handleBinReader(BinReader w){
@@ -210,7 +211,7 @@ class ReadHandlers: CoreHandlers{
     /// current read position (only informative)
     void parserPos(void delegate(char[]) s){
     }
-    void handleOutReader(OutReader r){
+    void handleCharReader(CharReader r){
         throw new Exception("unimplemented",__FILE__,__LINE__);
     }
     void handleBinReader(BinReader r){
@@ -356,9 +357,11 @@ final class BinaryWriteHandlers(bool SwapBytes=isSmallEndian):WriteHandlers{
 final class BinaryReadHandlers(bool SwapBytes=isSmallEndian):ReadHandlers{
     InputStream       reader;
     
-    this (InputStream reader)
+    this (Reader!(void) reader)
     {
-        this.reader=reader;
+        auto tReader=cast(ReadHandler!(void))reader;
+        if (tReader is null){ assert(0,"only tango readers supported at the moment"); }
+        this.reader=((tReader.buf is null)?cast(InputStream)tReader.arr:cast(InputStream)tReader.buf);
         setCoreHandlersFrom_basicRead();
     }
     
@@ -570,7 +573,7 @@ final class FormattedReadHandlers(T):ReadHandlers{
     }
     /// reads a basic type
     void basicRead(U)(ref U t){
-        static if (is(U==OutReader)){
+        static if (is(U==CharReader)){
             outRead(t);
         } else static if (is(U==BinReader)){
             binRead(t);

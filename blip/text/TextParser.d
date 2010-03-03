@@ -20,6 +20,7 @@ import blip.io.BasicIO;
 import blip.container.GrowableArray;
 import blip.text.UtfUtils;
 import blip.BasicModels;
+import blip.io.StreamConverters: ReadHandler,toReaderChar;
 
 /// a class that does a stream parser, for things in which white space amount
 /// is not relevant (it is just a separator)
@@ -734,21 +735,39 @@ class TextParser(T) : InputFilter
         }
     }
 
-    /// Instantiate with a buffer
-    this(InputStream stream = null,T[]delims=cast(T[])",;:{}[]",size_t maxTranscodingOverhead=6,
+    /// Instantiate with a Reader
+    this(Reader!(T) reader = null,T[]delims=cast(T[])",;:{}[]",size_t maxTranscodingOverhead=6,
         bool skipComments=true, bool newlineIsSpace=true)
-    {       
-        super (stream);
-        if (stream)
-            set (stream);
+    {
+        auto tReader=cast(ReadHandler!(T))reader;
+        if (tReader is null){
+            assert(0,"at the moment only tango based readers are accepted (should change soon)");
+        }
+        auto iStr=((tReader.buf is null)?cast(InputStream)tReader.arr:cast(InputStream)tReader.buf);
+        super(iStr);
+        if (iStr)
+            setS(iStr);
         this.maxTranscodingOverhead=maxTranscodingOverhead;
         this.delims=delims;
         this.skipComments=skipComments;
         this.newlineIsSpace=newlineIsSpace;
     }
 
+    /+/// Instantiate with a buffer
+    this(InputStream stream = null,T[]delims=cast(T[])",;:{}[]",size_t maxTranscodingOverhead=6,
+        bool skipComments=true, bool newlineIsSpace=true)
+    {       
+        super (stream);
+        if (stream)
+            setS(stream);
+        this.maxTranscodingOverhead=maxTranscodingOverhead;
+        this.delims=delims;
+        this.skipComments=skipComments;
+        this.newlineIsSpace=newlineIsSpace;
+    }+/
+
     /// Set the provided stream as the scanning source
-    TextParser set (InputStream stream)
+    TextParser setS(InputStream stream)
     {
         assert (stream);
         source = BufferedInput.create (stream);
@@ -814,9 +833,9 @@ class TextParser(T) : InputFilter
 }
 
 debug(UnitTest){
-    import tango.io.device.Array;
+    import blip.io.IOArray;
     unittest{
-        auto p=new TextParser!(char)(new Array("åbôdåbôåbôdåbôdåbôd 12tz_rk tt 23.4 +7.2i \t6.4+3.2i \"a string with space\" \"escapedString\\\"\"\na,b#comment\nc\n"));
+        auto p=new TextParser!(char)(toReaderChar(new IOArray("åbôdåbôåbôdåbôdåbôd 12tz_rk tt 23.4 +7.2i \t6.4+3.2i \"a string with space\" \"escapedString\\\"\"\na,b#comment\nc\n")));
         int i;
         real r;
         ireal ir;

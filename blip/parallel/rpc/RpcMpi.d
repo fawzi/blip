@@ -11,6 +11,7 @@ import blip.sync.UniqueNumber;
 import blip.io.IOArray;
 import blip.parallel.smp.WorkManager;
 import blip.io.BasicIO;
+import blip.io.StreamConverters;
 
 /// handles vending (and possibly also receiving the results if using one channel for both)
 class MpiProtocolHandler: ProtocolHandler{
@@ -175,7 +176,7 @@ class MpiProtocolHandler: ProtocolHandler{
             serArgs(s);
             auto arr2=new IOArray(arr.takeData);
             arr.assign(cast(ubyte[])buf2,0,GASharing.GlobalNoFree);
-            auto u=new SBinUnserializer(arr2);
+            auto u=new SBinUnserializer(toReaderT!(void)(arr2));
             obj.remoteMainCall(url.path[2],urlDecode(url.anchor),u,
                 delegate void(ubyte[]reqId,void delegate(Serializer)sRes){
                     sRes(s);

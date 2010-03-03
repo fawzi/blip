@@ -3,7 +3,7 @@ import blip.io.Console;
 import blip.serialization.Handlers;
 import blip.serialization.Serialization;
 import blip.rtest.RTest;
-import tango.io.device.Array;
+import blip.io.IOArray;
 import tango.io.model.IConduit;
 import blip.container.GrowableArray;
 import blip.BasicModels;
@@ -243,10 +243,10 @@ void testUnserial(T)(T a){
 /// unserialization test
 void testJsonUnserial(T)(T a){
     version(UnserializationTrace) sout("testing unserialization of "~T.stringof~"\n");
-    auto buf=new Array(1000,1000);
+    auto buf=new IOArray(1000,1000);
     auto js=new JsonSerializer!()(strDumper(buf));
     js(a);
-    auto jus=new JsonUnserializer!()(buf);
+    auto jus=new JsonUnserializer!()(toReaderT!(char)(buf));
     T sOut;
     version(UnserializationTrace) sout("XXXXXX Unserialization start\n");
     jus(sOut);
@@ -268,7 +268,7 @@ void testJsonUnserial(T)(T a){
 /// unserialization test
 void testBinUnserial(T)(T a){
     version(UnserializationTrace) sout("testing unserialization of "~T.stringof~"\n");
-    auto buf=new Array(1000,1000);
+    auto buf=new IOArray(1000,1000);
     auto js=new SBinSerializer(binaryDumper(buf));
     js(a);
     version(UnserializationTrace) {
@@ -293,7 +293,7 @@ void testBinUnserial(T)(T a){
         js2(a);
         sout("XXXXXX Unserialization start\n");
     }
-    auto jus=new SBinUnserializer(buf);
+    auto jus=new SBinUnserializer(toReaderT!(void)(buf));
     T sOut;
     jus(sOut);
     version(UnserializationTrace){
@@ -314,10 +314,10 @@ void testUnserial2(T,U)(void delegate(void function(T,U)) testF){
 /// unserialization test2 Json
 void testJsonUnserial2(T,U)(T a,ref U sOut){
     version(UnserializationTrace) sout("testing json unserialization of "~T.stringof~"\n");
-    auto buf=new Array(1000,1000);
+    auto buf=new IOArray(1000,1000);
     auto js=new JsonSerializer!()(strDumper(buf));
     js(a);
-    auto jus=new JsonUnserializer!()(buf);
+    auto jus=new JsonUnserializer!()(toReaderT!(char)(buf));
     version(UnserializationTrace) sout("XXXXXX Unserialization start\n");
     jus(sOut);
     version(UnserializationTrace) {
@@ -333,7 +333,7 @@ void testJsonUnserial2(T,U)(T a,ref U sOut){
 /// unserialization test2 Bin
 void testBinUnserial2(T,U)(T a,ref U b){
     version(UnserializationTrace) sout("testing binary unserialization of "~T.stringof~"\n");
-    auto buf=new Array(1000,1000);
+    auto buf=new IOArray(1000,1000);
     auto js=new SBinSerializer(binaryDumper(buf));
     js(a);
     version(UnserializationTrace) {
@@ -357,7 +357,7 @@ void testBinUnserial2(T,U)(T a,ref U b){
         sout("----\n");
         sout("XXXXXX Unserialization start\n");
     }
-    auto jus=new SBinUnserializer(buf);
+    auto jus=new SBinUnserializer(toReaderT!(void)(buf));
     jus(b);
     version(UnserializationTrace){
         sout("XXXXXX Unserialization end\n");
@@ -452,7 +452,7 @@ void main(){
 
     version(noComplex){ }
     else {
-    auto buf=new Array(`{ id:3,
+    auto buf=new IOArray(`{ id:3,
       x:36331662,
       y:504414800,
       a:-1894881897,
@@ -503,7 +503,7 @@ void main(){
       z:19578
     }
     `);
-    auto jus=new JsonUnserializer!()(buf);
+    auto jus=new JsonUnserializer!()(toReaderT!(char)(buf));
     B b1,b2;
     version(UnserializationTrace) sout("XX unserial reference\n");
     jus(b1);

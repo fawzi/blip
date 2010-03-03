@@ -21,7 +21,7 @@ import blip.container.GrowableArray;
 import tango.math.Math: abs,min,max,sqrt;
 import tango.math.IEEE: feqrel;
 import blip.serialization.Serialization;
-import tango.io.device.Array;
+import blip.io.IOArray;
 import blip.BasicModels;
 import tango.core.Traits;
 import tango.core.stacktrace.TraceExceptions;
@@ -627,9 +627,9 @@ void testConvolveNN(T,int rank,Border border)(NArray!(T,rank)inA,NArray!(T,rank)
 }
 
 void testSerial(T,int rank)(NArray!(T,rank)a){
-    auto buf=new Array(1000,1000);
+    auto buf=new IOArray(1000,1000);
     auto s=new JsonSerializer!(char)(strDumper(buf));
-    auto u=new JsonUnserializer!(char)(buf);
+    auto u=new JsonUnserializer!(char)(toReaderT!(char)(buf));
     s(a);
     NArray!(T,rank) b;
     u(b);

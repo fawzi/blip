@@ -1,12 +1,13 @@
 module testTextParsing;
 import blip.text.TextParser;
-import tango.io.device.Array;
+import blip.io.IOArray;
 import tango.io.stream.Lines;
 import tango.math.Math;
 import blip.rtest.BasicGenerators;
 import blip.text.UtfUtils;
 version(NoTrace){} else { import tango.core.stacktrace.TraceExceptions; }
 import blip.io.Console;
+import blip.io.StreamConverters;
 
 void main(){
     assert(nCodePoints("abc")==3);
@@ -23,7 +24,7 @@ void main(){
     assert(nCodePoints("abcabcabcabc"d)==12);
     assert(nCodePoints("åbôdåbôdabbdabddåbôdabc"d)==23);
     
-    auto p=new TextParser!(char)(new Array("12tz,rk tt 23.4 +7.2i \t6.4+3.2i \"a string with space\" \"escapedString\\\"\"\n"));
+    auto p=new TextParser!(char)(toReaderChar(new IOArray("12tz,rk tt 23.4 +7.2i \t6.4+3.2i \"a string with space\" \"escapedString\\\"\"\n")));
     int i;
     real r;
     ireal ir;

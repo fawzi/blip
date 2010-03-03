@@ -4,9 +4,10 @@ import tango.io.model.IConduit;
 import tango.core.Array: find;
 import blip.text.UtfUtils: cropRight;
 import blip.container.GrowableArray;
-import blip.io.BasicIO: BIOException, SliceExtent,SmallBufferException;
+import blip.io.BasicIO: BIOException, SliceExtent,SmallBufferException,MultiReader,Reader;
 import BIO=blip.io.BasicIO;
 import tango.io.stream.Buffered;
+import blip.io.IOArray;
 
 final class StreamWriter{
     OutputStream writer;
@@ -121,8 +122,9 @@ void delegate(T[]) strDumperSyncT(T)(OutputStream s){
 alias strDumperT!(char) strDumper;
 alias strDumperSyncT!(char) strDumperSync;
 
-class ReadHandler(T){
+class ReadHandler(T):Reader!(T){
     BufferedInput buf;
+    IOArray arr;
     size_t maxTranscodingOverhead;
     this(BufferedInput b,size_t maxTranscodingOverhead=6){
         buf=b;
@@ -131,7 +133,10 @@ class ReadHandler(T){
     this(InputStream i,size_t maxTranscodingOverhead=6){
         buf=cast(BufferedInput)i;
         if (buf is null){
-            throw new BIOException("invalid input stream (only BufferedInput subclasses are supported)",__FILE__,__LINE__);
+            arr=cast(IOArray)i; // hack just for now to pass the IOArray around... the handler is non functional...
+            if (arr is null){
+                throw new BIOException("invalid input stream (only BufferedInput subclasses are supported)",__FILE__,__LINE__);
+            }
         }
         this.maxTranscodingOverhead=maxTranscodingOverhead;
     }
@@ -195,7 +200,20 @@ class ReadHandler(T){
         } while(iter);
         return matchSuccess;
     }
+    /// read
+    size_t readSome(T[] a){
+        return buf.read(a);
+    }
+    /// shutdown the input source
+    void shutdownInput(){
+    }
 }
+
+Reader!(T) toReaderT(T)(InputStream i){
+    return new ReadHandler!(T)(i);
+}
+
+alias toReaderT!(char) toReaderChar;
 
 bool delegate(size_t delegate(T[],SliceExtent,out bool)) readHandlerT(T)(InputStream i){
     auto h=new ReadHandler!(T)(i);
@@ -205,7 +223,50 @@ bool delegate(size_t delegate(T[],SliceExtent,out bool)) readHandlerT(T)(InputSt
 alias readHandlerT!(char) strReaderHandler;
 alias readHandlerT!(void) binaryReaderHandler;
 
-class ConduitEmulator: IConduit
+/// a class that supports all reading streams on the top of a binary stream
+/// convenient, but innerently unsafe
+final class MultiInput: MultiReader{
+    Reader!(char)   _readerChar;
+    Reader!(wchar)  _readerWchar;
+    Reader!(dchar)  _readerDchar;
+    Reader!(void)   _readerBin;
+    uint _modes=MultiReader.Mode.Binary|MultiReader.Mode.Char|
+        MultiReader.Mode.Wchar|MultiReader.Mode.Dchar;
+    uint _nativeModes=MultiReader.Mode.Binary|MultiReader.Mode.Char|
+        MultiReader.Mode.Wchar|MultiReader.Mode.Dchar;
+    
+    this(InputStream inStream){
+        _readerBin  =new ReadHandler!(void)(inStream);
+        _readerChar =new ReadHandler!(char)(inStream);
+        _readerWchar=new ReadHandler!(wchar)(inStream);
+        _readerDchar=new ReadHandler!(dchar)(inStream);
+    }
+    uint modes(){
+        return _modes;
+    }
+    uint nativeModes(){
+        return _nativeModes;
+    }
+    Reader!(char) readerChar(){
+        assert(_readerChar!is null);
+        return _readerChar;
+    }
+    Reader!(wchar) readerWchar(){
+        assert(_readerWchar!is null);
+        return _readerWchar;
+    }
+    Reader!(dchar) readerDchar(){
+        assert(_readerDchar!is null);
+        return _readerDchar;
+    }
+    Reader!(void)  readerBin(){
+        assert(_readerBin!is null);
+        return _readerBin;
+    }
+}
+
+
+final class ConduitEmulator: IConduit
 {
     void delegate(void[]) sink;
     void delegate() _flush;

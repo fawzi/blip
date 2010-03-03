@@ -10,6 +10,7 @@ import blip.text.TextParser;
 import blip.text.UtfUtils;
 import blip.container.GrowableArray;
 import blip.io.BasicIO;
+import blip.io.StreamConverters;
 
 class JsonSerializer(T=char) : Serializer {
     int depth;
@@ -253,7 +254,7 @@ class JsonUnserializer(T=char) : Unserializer {
     this(TextParser!(T)r){
         this(new FormattedReadHandlers!(T)(r));
     }
-    this(InputStream s){
+    this(Reader!(T) s){
         this(new TextParser!(T)(s));
     }
     class FieldMismatchException:Exception{
