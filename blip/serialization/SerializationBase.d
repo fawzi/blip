@@ -120,6 +120,7 @@ enum TypeKind{
     ArrayElK,
     AAKeyK,
     AAValK,
+    VoidPtr,
     UndefK
 }
 
@@ -301,8 +302,10 @@ ClassMetaInfo getSerializationInfoForType(T)(){
                 mixin("return "~strForCoreType!(V)~"MetaInfo;");
             }
         }
+    } else static if (is(T==void*)){
+        return voidPtrMetaInfo;
     } else static if (is(typeof(*T))){
-        return getSerializationInfoForType!(T)();
+        return getSerializationInfoForType!(typeof(*T))();
     } else {
         return SerializationRegistry().getMetaInfo(typeid(T));
     }
@@ -339,16 +342,20 @@ ClassMetaInfo getSerializationInfoForVar(T)(T t){
 ClassMetaInfo arrayMetaInfo;
 ClassMetaInfo aaMetaInfo;
 ClassMetaInfo dictMetaInfo;
+ClassMetaInfo voidPtrMetaInfo;
 static this(){
     arrayMetaInfo=new ClassMetaInfo("array",null,null,null,TypeKind.ArrayK,
-        cast(void* function(ClassMetaInfo))null); // use a unique type for each array type?
+        cast(void* function(ClassMetaInfo))null); // use a different type for each array type?
     aaMetaInfo=new ClassMetaInfo("aa",null,null,null,TypeKind.AAK,
-        cast(void* function(ClassMetaInfo))null); // use a unique type for each aa type?
+        cast(void* function(ClassMetaInfo))null); // use a different type for each aa type?
     dictMetaInfo=new ClassMetaInfo("dict",null,null,null,TypeKind.DictK,
-        cast(void* function(ClassMetaInfo))null); // use a unique type for each dict type?
+        cast(void* function(ClassMetaInfo))null); // use a different type for each dict type?
+    voidPtrMetaInfo=new ClassMetaInfo("voidPtr",null,null,null,TypeKind.VoidPtr,
+        cast(void* function(ClassMetaInfo))null);
     SerializationRegistry().register!(int[])(arrayMetaInfo);
     SerializationRegistry().register!(int[int])(aaMetaInfo);
     SerializationRegistry().register!(int[char[]])(dictMetaInfo);
+    SerializationRegistry().register!(void*)(voidPtrMetaInfo);
 }
 
 char[] coreTypesMetaInfoMixStr(){
@@ -405,6 +412,8 @@ class SerializationRegistry {
     Object keyOf(T)() {
         static if (is(T == class)) {
             return T.classinfo;
+        } else static if (is(T==void*)){
+            return voidPtrMetaInfo;
         } else {
             return typeid(T);
         }
@@ -870,13 +879,18 @@ class Serializer {
                     writeNull(fieldMeta);
                     return;
                 }
-                if (is(typeof(*T.init)==struct)||is(isArrayType!(typeof(*T.init)))||is(typeof(*T.init)==class)){
+                static if (is(typeof(*t)==struct)||is(isArrayType!(typeof(*t)))||is(typeof(*t)==class)){
                     this.field!(typeof(*t))(fieldMeta, *t);
                 } else {
-                    if (recursePtr){
-                        // it is not guaranteed that reading in will recover the same situation that was dumped...
-                        sout("X recursing pointer\n");
-                        this.field!(typeof(*t))(fieldMeta, *t);
+                    static if (is(typeof(*t))){
+                        if (recursePtr){
+                            // it is not guaranteed that reading in will recover the same situation that was dumped...
+                            sout("X recursing pointer\n");
+                            this.field!(typeof(*t))(fieldMeta, *t);
+                        } else {
+                            sout("X debug pointer\n");
+                            writeDebugPtr(fieldMeta,cast(void*)t);
+                        }
                     } else {
                         sout("X debug pointer\n");
                         writeDebugPtr(fieldMeta,cast(void*)t);
@@ -1000,8 +1014,9 @@ class Unserializer {
     objectId                    lastObjectId;
     Variant[char[]]             context;
     SerializationLevel serializationLevel;
-    bool recoverCycles;
+    bool recoverCycles=true;
     bool readStructProxy;
+    bool recursePtr=false;
     void delegate(Unserializer) rootObjStartCallback;
     void delegate(Unserializer) rootObjEndCallback;
     void delegate(Unserializer) unserializerCloseCallback;
@@ -1231,8 +1246,8 @@ class Unserializer {
                         "metaInfo not set by readAndInstantiateClass ("~T.stringof~")");
                     assert(t!is null," object not allocated by readAndInstantiateClass ("
                         ~T.stringof~")");
-                    assert(metaInfo.ci == t.classinfo,"error in meta info of type '"
-                        ~t.classinfo.name~"'("~T.stringof~")");
+                    assert(metaInfo.ci == (cast(Object)t).classinfo,"error in meta info of type '"
+                        ~(cast(Object)t).classinfo.name~"'("~T.stringof~") got to "~metaInfo.ci.name);
                     if (recoverCycles && oid!=cast(objectId)0) {
                         objectIdToPtr[oid]=cast(void*)cast(Object)t;
                     }
@@ -1488,16 +1503,21 @@ class Unserializer {
                     version(UnserializationTrace) sout("Y pointer to struct or class\n");
                     this.field!(typeof(*t))(fieldMeta, *t);
                 } else {
-                    if (recursePtr){
-                        // it is not guaranteed that reading in will recover the same situation that was dumped...
-                        version(UnserializationTrace) sout("Y recursing pointer\n");
-                        if (t is null){
-                            t=new typeof(*T.init);
+                    static if (is(typeof(*t))){
+                        if (recursePtr){
+                            // it is not guaranteed that reading in will recover the same situation that was dumped...
+                            version(UnserializationTrace) sout("Y recursing pointer\n");
+                            if (t is null){
+                                t=new typeof(*T.init);
+                            }
+                            this.field!(typeof(*t))(fieldMeta, *t);
+                        } else {
+                            version(UnserializationTrace) sout("Y debug pointer\n");
+                            readDebugPtr(fieldMeta,cast(void**)&t);
                         }
-                        this.field!(typeof(*t))(fieldMeta, *t);
                     } else {
                         version(UnserializationTrace) sout("Y debug pointer\n");
-                        readDebugPtr(fieldMeta,cast(void*)&t);
+                        readDebugPtr(fieldMeta,cast(void**)&t);
                     }
                 }
             } else static if (is(T==CharReader)) {

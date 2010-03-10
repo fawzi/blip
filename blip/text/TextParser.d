@@ -55,7 +55,7 @@ class TextParser(T) : InputFilter
     /// position of the parsed token
     void parserPos(void delegate(char[]) s){
         dumperP(s)("line:")(oldLine)(" col:")(oldCol)(" token:\"")(convertToString!(char)(escape(slice)))("\"\n");
-        dumperP(s)("context:<<")(convertToString!(char)(cast(T[])source.slice))(">>\n");
+        dumperP(s)("nextText:<<")(convertToString!(char)(cast(T[])source.slice))(">>\n");
     }
     /// exception during parsing (adds parser position info)
     static class ParsingException:Exception{
@@ -782,8 +782,8 @@ class TextParser(T) : InputFilter
         return slice;
     }
     /// easy to use wisper interface
-    TextParser opCall(U)(ref U t){
-        readValue!(U)(t);
+    TextParser opCall(U)(ref U t,bool longLived=true){
+        readValue!(U)(t,longLived);
         return this;
     }
     
@@ -829,6 +829,15 @@ class TextParser(T) : InputFilter
                 return p.peekedSlice;
             }
         }
+    }
+}
+
+/// if s is a quoted string unescapes it
+T[] maybeUnescape(T)(T[] s){
+    if (s.length>1 && s[0]=='"' && s[$-1]=='"'){
+        return unescape(s[1..$-1]);
+    } else {
+        return s;
     }
 }
 

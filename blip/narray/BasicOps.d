@@ -13,7 +13,6 @@ import blip.t.core.Traits;
 import blip.t.math.Math: round,sqrt,min,ceil;
 import tango.math.IEEE: feqrel;
 import tango.core.Memory:GC;
-import blip.io.Console; // pippo
 
 /+ ---------------- structural ops -------------------- +/
 

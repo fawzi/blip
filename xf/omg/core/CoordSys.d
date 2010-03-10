@@ -1,5 +1,4 @@
 module xf.omg.core.CoordSys;
-version(NoFix){} else {
 private {
 	import xf.omg.core.LinearAlgebra;
 }
@@ -94,5 +93,4 @@ struct CoordSys {
 	char[] toString(){
 		return "{" ~ origin.toString ~ ";" ~ rotation.toString ~ "}";
 	}
-}
 }

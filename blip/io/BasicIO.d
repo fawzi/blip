@@ -83,6 +83,7 @@ interface MultiReader{
     Reader!(wchar) readerWchar();
     Reader!(dchar) readerDchar();
     Reader!(void)  readerBin();
+    void shutdownInput();
 }
 
 
@@ -112,7 +113,7 @@ OutWriter outWriter(T,S...)(T v,S args){
     return OutW!(T,S).closure(v,args);
 }
 /// parses an integer
-private size_t parseInt(char[]s,ref int i){
+private size_t parseInt(T)(T[]s,ref int i){
     size_t res=0;
     if (s.length>0 && s[0]>='0' && s[0]<='9'){
         i=0;
@@ -144,18 +145,27 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
     static if(is(typeof(sink1 is null))){
         assert(!(sink1 is null),"null sink in writeOut");
     }
-    static if(is(S[0]==char[])){
+    static if (is(typeof(sink1(" ")))){
+        alias char Char;
+    } else static if (is(typeof(sink1(" "w)))){
+        alias wchar Char;
+    } else static if (is(typeof(sink1(" "d)))){
+        alias dchar Char;
+    } else {
+        static assert(0,"invalid sink in writeOut");
+    }
+    static if(is(S[0]==Char[])){
         int width=0;
-        void delegate(char[]) sink;
+        void delegate(Char[]) sink;
         static if(is(V==typeof(sink))){
             sink=sink1;
         } else {
-            sink=delegate void(char[] s){ sink1(s); };
+            sink=delegate void(Char[] s){ sink1(s); };
         }
         auto startC=find(args[0],',')+1;
         if (startC<args[0].length && parseInt(args[0][startC..$],width)>0){
             if (width<0) assert(0,"unsupported negative width");// (alloc storage and do it?)
-            sink=delegate void(char[] s){
+            sink=delegate void(Char[] s){
                 sink1(s);
                 if (s.length>width){
                     width=0;
@@ -171,20 +181,22 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
         alias sink1 sink;
     }
     static if (is(T S:S[])){
-        static if(is(S==char)){
+        static if(is(S==Char)){
             sink(v);
-        } else static if(is(S==wchar)||is(S==dchar)){
+        } else static if(is(S==char)||is(S==wchar)||is(S==dchar)){
             char[] s;
             if (t.length<128){
-                char[256] buf;
-                s=convertToString!(char)(t,buf);
+                Char[256] buf;
+                s=convertToString!(Char)(t,buf);
             } else {
-                s=convertToString!(char)(t);
+                s=convertToString!(Char)(t);
             }
             sink(s);
         } else static if(is(S==void)||is(S==ubyte)){
-            auto digits="0123456789abcdef";
-            char[32] buf;
+            auto digits=[cast(Char)'0',cast(Char)'1',cast(Char)'2',cast(Char)'3',cast(Char)'4',
+            cast(Char)'5',cast(Char)'6',cast(Char)'7',cast(Char)'8',cast(Char)'9',
+            cast(Char)'a',cast(Char)'b',cast(Char)'c',cast(Char)'d',cast(Char)'e',cast(Char)'f'];
+            Char[32] buf;
             size_t ii=0;
             auto p=cast(ubyte*)v.ptr;
             for(int i=0;i<v.length;++i){
@@ -226,11 +238,14 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
     {
         bool sign=true;
         static if (is(S[0]==char[])){
+            
             if (args[0].length>0){
                 switch (args[0][0]){
                 case 'x':
-                    auto digits="0123456789abcdef";
-                    char[T.sizeof*2] str;
+                    const digits=[cast(Char)'0',cast(Char)'1',cast(Char)'2',cast(Char)'3',cast(Char)'4',
+                    cast(Char)'5',cast(Char)'6',cast(Char)'7',cast(Char)'8',cast(Char)'9',
+                    cast(Char)'a',cast(Char)'b',cast(Char)'c',cast(Char)'d',cast(Char)'e',cast(Char)'f'];
+                    Char[T.sizeof*2] str;
                     for(int i=0;i<T.sizeof/4;++i){
                         auto d=(0xF & v);
                         str[str.length-i]=digits[d];
@@ -238,8 +253,10 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
                     sink(str);
                     return;
                 case 'X':
-                    auto digits="0123456789ABCDEF";
-                    char[T.sizeof*2] str;
+                    const digits=[cast(Char)'0',cast(Char)'1',cast(Char)'2',cast(Char)'3',cast(Char)'4',
+                    cast(Char)'5',cast(Char)'6',cast(Char)'7',cast(Char)'8',cast(Char)'9',
+                    cast(Char)'A',cast(Char)'B',cast(Char)'C',cast(Char)'D',cast(Char)'E',cast(Char)'F'];
+                    Char[T.sizeof*2] str;
                     for(int i=0;i<T.sizeof/4;++i){
                         auto d=(0xF & v);
                         str[str.length-i]=digits[d];
@@ -277,7 +294,7 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
             int pos=res.length-1;
             while(v<0){
                 auto r=v%10;
-                res[pos]=cast(char)(cast(T)'0'-r);
+                res[pos]=cast(Char)(cast(T)'0'-r);
                 v=cast(T)(v/10);
                 --pos;
             }
@@ -290,11 +307,11 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
         } else if (v==0){
             sink("0");
         } else {
-            char[22] res;
+            Char[22] res;
             int pos=res.length-1;
             while(v>0){
                 auto r=v%10;
-                res[pos]=cast(char)(cast(T)'0'+r);
+                res[pos]=cast(Char)(cast(T)'0'+r);
                 v=cast(T)(v/10);
                 --pos;
             }
@@ -302,14 +319,14 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
         }
     } else static if (is(T==bool)){
         if (v){
-            sink("1");
+            sink([cast(Char)'1']);
         } else {
-            sink("0");
+            sink([cast(Char)'0']);
         }
     } else static if (is(T==float)||is(T==double)||is(T==real)){
         char[40] buf;
         int prec=6;
-        static if (is(S[0]==char[])){
+        static if (is(S[0]==Char[])){
             if (args[0].length>1){
                 parseInt(args[0][1..$],prec);
             }
@@ -318,7 +335,7 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
     } else static if (is(T==ifloat)||is(T==idouble)||is(T==ireal)){
         char[40] buf;
         int prec=6;
-        static if (is(S[0]==char[])){
+        static if (is(S[0]==Char[])){
             if (args[0].length>1){
                 parseInt(args[0][1..$],prec);
             }
@@ -328,7 +345,7 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
     } else static if (is(T==cfloat)||is(T==cdouble)||is(T==creal)){
         char[40] buf;
         int prec=6;
-        static if (is(S[0]==char[])){
+        static if (is(S[0]==Char[])){
             if (args[0].length>1){
                 parseInt(args[0][1..$],prec);
             }
@@ -351,9 +368,9 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
     } else {
         static if (is(typeof(v is null))){
             if (v is null) {
-                sink("<");
-                sink(T.stringof);
-                sink(" *NULL*>");
+                sink([cast(Char)'<']);
+                sink(convertToString!(Char)(T.stringof));
+                sink(convertToString!(Char)(" *NULL*>"));
                 return;
             }
         }

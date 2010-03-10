@@ -16,8 +16,22 @@ import blip.parallel.smp.WorkManager;
 /// guard object to deallocate large arrays that contain inner pointers
 class Guard{
     ubyte[] data;
+    uint refCount;
     this(void[] data){
         this.data=cast(ubyte[])data;
+        refCount=1;
+    }
+    void retain(){
+        assert(refCount!=0);
+        ++refCount;
+    }
+    void release(){
+        assert(refCount!=0);
+        --refCount;
+        if (refCount==0){
+            GC.free(data.ptr);
+            data=null;
+        }
     }
     this(size_t size,bool scanPtr=false){
         GC.BlkAttr attr;
@@ -26,6 +40,7 @@ class Guard{
         ubyte* mData2=cast(ubyte*)GC.malloc(size);
         if(mData2 is null) throw new Exception("malloc failed");
         data=mData2[0..size];
+        refCount=1;
     }
     ~this(){
         GC.free(data.ptr);
@@ -105,6 +120,13 @@ struct BulkArray(T){
         ptr=newData.ptr;
         ptrEnd=ptr+newData.length;
     }
+    /// sets data ana guard to the one of the given guard
+    void dataOfGuard(Guard g){
+        guard=g;
+        ptr=cast(T*)g.data.ptr;
+        ptrEnd=ptr+g.data.length/T.sizeof;
+    }
+    
     static BulkArray opCall(){
         BulkArray b;
         return b;
@@ -176,9 +198,16 @@ struct BulkArray(T){
         BulkArray(data[i..j],guard)[]=val;
     }
     /// copies an bulk array
-    void opSliceAssign(BulkArray b){
+    void copyFrom(V)(BulkArray!(V) b){
         if (b.length!=length) throw new Exception("different length",__FILE__,__LINE__);
-        memcpy(data.ptr,b.data.ptr,length*T.sizeof);
+        static if(is(T==V)){
+            memcpy(data.ptr,b.data.ptr,length*T.sizeof);
+        } else {
+            baBinaryOpStr!("*aPtr0=cast(typeof(*aPtr0))bPtr0;",T,V)(*this,b);
+        }
+    }
+    void opSliceAssign(BulkArray b){
+        copyFrom!(T)(b);
     }
     void opSliceAssign(T val){
         foreach(ref v;pLoop())
@@ -189,10 +218,18 @@ struct BulkArray(T){
         return ptrEnd-ptr;
     }
     /// shallow copy of the array
-    BulkArray dup(){
-        BulkArray n=BulkArray(length);
-        memcpy(n.data.ptr,data.ptr,length*T.sizeof);
+    BulkArray!(V) dupT(V=T)(){
+        auto n=BulkArray!(V)(length);
+        static if (is(T==V)){
+            memcpy(n.data.ptr,data.ptr,length*T.sizeof);
+        } else {
+            baBinaryOpStr!("*aPtr0=cast(typeof(*aPtr0))bPtr0;",T,V)(*this,b);
+        }
         return n;
+    }
+    /// ditto
+    BulkArray dup(){
+        return dupT!(T)();
     }
     /// deep copy of the array
     BulkArray deepdup(){

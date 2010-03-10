@@ -488,8 +488,27 @@ class JsonUnserializer(T=char) : Unserializer {
             }
             while(1){
                 if(!stackTop.missingLabels.remove(stackTop.labelToRead)){
-                    serializationError("unexpected extra object field "~stackTop.labelToRead,
-                        __FILE__,__LINE__);
+                    serializationError(collectAppender(delegate void(CharSink sink){ auto s=dumperP(sink);
+                        s("unexpected extra object field '")(stackTop.labelToRead)("'");
+                        if (field !is null){
+                            if (field.name.length!=0)
+                                s(" in '")(field.name)("'");
+                            if (field.metaInfo !is null && field.metaInfo.className.length!=0){
+                                if (field.name.length==0)
+                                    s(" in element ");
+                                s(" of type ")(field.metaInfo.className);
+                            }
+                        }
+                        s(", known fields:");
+                        bool first=true;
+                        foreach (f;metaInfo){
+                            if (!f.pseudo){
+                                if (!first) s(",");
+                                first=false;
+                                s("'")(f.name)("'");
+                            }
+                        }
+                    }),__FILE__,__LINE__);
                     // should try to skip it?
                 }
                 fieldRead=true;

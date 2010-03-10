@@ -3,6 +3,8 @@
 /// The unification between unset variables is just istantaneous and onesided
 /// unify(a,b); unify(b,4); does not automatically set a=4.
 /// change the behaviour???
+///
+/// author: Fawzi Mohamed
 module blip.parallel.smp.DataFlowVar;
 import blip.parallel.smp.SmpModels;
 import blip.parallel.smp.WorkManager:taskAtt;
@@ -12,7 +14,7 @@ import blip.container.GrowableArray;
 import blip.io.BasicIO;
 
 class WaitList{
-    TaskI[]waiting;
+    TaskI[]waiting; // using this rather than delegates because it is more self descriptive
     void notify(){
         synchronized(this){
             foreach(t;waiting){

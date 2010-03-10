@@ -1,5 +1,4 @@
 module xf.omg.core.LinearAlgebra;
-version(NoFix){} else {
 private {
 	import xf.omg.core.Algebra;
 	import xf.omg.core.Fixed;
@@ -95,6 +94,7 @@ struct Vector(flt_, int dim_) {
 		static if (dim >= 4) w = scalar!(flt)(v.w);
 	}
 
+    alias set opSliceAssign;
 	
 	static if (dim == 2) {
 		static Vector opCall(flt x = cscalar!(flt, 0), flt y = cscalar!(flt, 0)) {
@@ -560,6 +560,7 @@ struct Matrix(flt_, int rows_, int cols_) {
 		return res;
 	}
 	
+	mixin(serializeSome("","cell"));
 	
 	flt cgetRC(int r, int c)() {
 		assert (ok);
@@ -840,6 +841,17 @@ struct Matrix(flt_, int rows_, int cols_) {
 		public alias opX_!("/")		opDiv;
 	}
 
+    void set(V,int rows, int cols)(ref Matrix!(V,rows,cols) o){
+        assert (ok);
+		assert (o.ok);
+		
+		foreach (c; Range!(cols)) {
+			foreach (r; Range!(rows)) {
+				col[c].row[r] = scalar!(flt)(o.col[c].row[r]);
+			}
+		}
+    }
+    alias set opSliceAssign;
 
 	private void opMXAssign_(char[] x)(ref Matrix rhs) {
 		assert (ok);
@@ -855,7 +867,6 @@ struct Matrix(flt_, int rows_, int cols_) {
 	
 	public alias opMXAssign_!("+")	opAddAssign;
 	public alias opMXAssign_!("-")		opSubAssign;
-	
 	
 	Matrix opMul(ref Matrix rhs) {
 		assert (ok);
@@ -1612,5 +1623,4 @@ static T cross(T)(T a, T b) {
 		a.z * b.x - b.z * a.x,
 		a.x * b.y - b.x * a.y
 	);
-}
 }

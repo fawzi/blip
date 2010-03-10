@@ -40,7 +40,7 @@ char[][] extractFieldsAndDocs(char[] fieldsDoc){
 /// serializes some fields
 /// basic version, does not work for subclasses serialized with external structs
 /// (should take the logic from the Xpose version)
-char[] serializeSome(char[] typeName1,char[]fieldsDoc){
+char[] serializeSome(char[] typeName1,char[]fieldsDoc,bool classAddPost=true){
     char[] typeName=typeName1;
     char[] res="";
     res~="static ClassMetaInfo metaI;\n";
@@ -103,15 +103,19 @@ char[] serializeSome(char[] typeName1,char[]fieldsDoc){
         static if (!is(typeof(SuperType.init.preSerialize(Serializer.init)))) {
             void preSerialize(Serializer s){ }
         }
+        static if (!is(typeof(SuperType.init.preUnserialize(Unserializer.init)))) {
+            typeof(this) preUnserialize(Unserializer s){ return this; }
+        }`;
+    if (classAddPost){
+        res~=`
         static if (!is(typeof(SuperType.init.postSerialize(Serializer.init)))) {
             void postSerialize(Serializer s){ }
         }
-        static if (!is(typeof(SuperType.init.preUnserialize(Unserializer.init)))) {
-            typeof(this) preUnserialize(Unserializer s){ return this; }
-        }
         static if (!is(typeof(SuperType.init.postUnserialize(Unserializer.init)))) {
             typeof(this) postUnserialize(Unserializer s){ return this; }
-        }
+        }`;
+    }
+    res~=`
         void serialize(Serializer s){
             static if (is(typeof(SuperType.init.serialize(s)))){
                 super.serialize(s);

@@ -263,6 +263,12 @@ final class MultiInput: MultiReader{
         assert(_readerBin!is null);
         return _readerBin;
     }
+    void shutdownInput(){
+        if (_readerChar !is null) _readerChar.shutdownInput();
+        else if (_readerWchar !is null ) _readerWchar.shutdownInput();
+        else if (_readerDchar !is null ) _readerDchar.shutdownInput();
+        else if (_readerBin !is null ) _readerBin.shutdownInput();
+    }
 }
 
 

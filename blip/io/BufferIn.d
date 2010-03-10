@@ -269,7 +269,7 @@ final class BufferIn(TInt):Reader!(TInt){
 
 /// a class that supports all reading streams on the top of a binary stream
 /// convenient, but innerently unsafe
-final class MixedSource/+: MultiReader+/{
+final class MixedSource: MultiReader {
     Reader!(char)   _readerChar;
     Reader!(wchar)  _readerWchar;
     Reader!(dchar)  _readerDchar;
@@ -309,6 +309,12 @@ final class MixedSource/+: MultiReader+/{
     Reader!(void)  readerBin(){
         assert(_readerBin!is null);
         return _readerBin;
+    }
+    void shutdownInput(){
+        if (_readerChar !is null) _readerChar.shutdownInput();
+        else if (_readerWchar !is null ) _readerWchar.shutdownInput();
+        else if (_readerDchar !is null ) _readerDchar.shutdownInput();
+        else if (_readerBin !is null ) _readerBin.shutdownInput();
     }
 }
 
@@ -371,6 +377,11 @@ final class StringReader(T): MultiReader{
         assert(_readerBin!is null);
         return _readerBin;
     }
-    
+    void shutdownInput(){
+        if (_readerChar !is null) _readerChar.shutdownInput();
+        else if (_readerWchar !is null ) _readerWchar.shutdownInput();
+        else if (_readerDchar !is null ) _readerDchar.shutdownInput();
+        else if (_readerBin !is null ) _readerBin.shutdownInput();
+    }
 }
 

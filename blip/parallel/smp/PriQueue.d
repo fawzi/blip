@@ -11,6 +11,7 @@ import blip.container.AtomicSLink;
 import blip.io.Console;//pippo
 
 /// a simple priority queue optimized for adding high priority tasks
+/// (otherwise a heap implementation would be better)
 /// the public interface consists of
 /// - insert (insert a new element )
 /// - popNext (remove the next element, keeping into account priority, blocking)
