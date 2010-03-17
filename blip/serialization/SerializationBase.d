@@ -538,13 +538,18 @@ class Serializer {
         handlers.flush();
     }
     /// writes the given root object
+    /// if it is a pointer (and not void*) then it is indirected once before feeding it on
+    /// (to handle this in structs better)
     /// you should only use the field method to write in the serialization methods
     typeof(this) opCall(T)(T o) {
         if (rootObjStartCallback){
             rootObjStartCallback(this);
         }
         writeStartRoot();
-        static if(is(typeof(*o))){
+        static if(isStaticArrayType!(T)){
+            auto arr=o[];
+            field!(typeof(arr))(cast(FieldMetaInfo *)null,arr);
+        } else static if(is(typeof(*o)) && is(T==typeof(*o)*)){
             field!(typeof(*o))(cast(FieldMetaInfo *)null,*o);
         } else {
             field!(T)(cast(FieldMetaInfo *)null,o);
@@ -1191,12 +1196,14 @@ class Unserializer {
                 }));
             }
         } else static if (is(T == interface) && !is(T==Serializable)) {
-            auto o=cast(Serializable)t;
-            if (o is null){
-                serializationError("unserialization of interface not derived from Serializable",
-                    __FILE__,__LINE__);
-            }
+            static assert(is(T:Serializable),"unserialization of interface "~T.stringof~" not derived from Serializable");
+            auto o=cast(Serializable)cast(Object)t;
             field!(Serializable)(fieldMeta,o);
+            t=cast(T)cast(Object)o;
+            if (o !is null && t is null){
+                serializationError("error unserialized object cannot be casted to "~T.stringof~
+                    " from "~(cast(Object)o).classinfo.name,__FILE__,__LINE__);
+            }
             version(UnserializationTrace) sout("Y readInterfaceObject\n");
         } else {
             ClassMetaInfo metaInfo;
@@ -1271,7 +1278,7 @@ class Unserializer {
                     }
                     scope(exit) {
                         sObj=sObj.postUnserialize(this);
-                        t=cast(T)sObj;
+                        t=cast(T)cast(Object)sObj;
                         version(UnserializationTrace) {
                             sout(collectAppender(delegate void(CharSink s){
                                 s("Y after postUnserialize obj is at ");

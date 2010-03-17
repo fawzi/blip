@@ -245,11 +245,13 @@ class JsonUnserializer(T=char) : Unserializer {
     TextParser!(T) reader;
     alias T[] S;
     bool fieldRead;
+    bool sloppyCommas;
     const Eof=TextParser!(T).Eof;
     
     this(FormattedReadHandlers!(T)h){
         super(h);
         this.reader=h.reader;
+        this.sloppyCommas=false;
     }
     this(TextParser!(T)r){
         this(new FormattedReadHandlers!(T)(r));
@@ -308,7 +310,13 @@ class JsonUnserializer(T=char) : Unserializer {
     /// returns true if an element was read
     override bool readArrayEl(ref PosCounter ac, void delegate() readEl) {
         if (ac.length==ac.pos) return false;
-        if (ac.pos!=0 && !reader.skipString(cast(S)",",false)){
+        if (sloppyCommas){
+            reader.skipString(cast(S)",",false);
+            if (reader.skipString(cast(S)"]",false)){
+                ac.end;
+                return false;
+            }
+        } else if (ac.pos!=0 && (!reader.skipString(cast(S)",",false))){
             if (reader.skipString(cast(S)"]",false)){
                 ac.end;
                 return false;
@@ -352,7 +360,7 @@ class JsonUnserializer(T=char) : Unserializer {
             ac.end;
             return false;
         }
-        if (!reader.skipString(cast(S)",",false)){
+        if (((!reader.skipString(cast(S)",",false))||sloppyCommas)){
             if (reader.skipString(cast(S)"}",false)){
                 ac.end;
                 return false;
@@ -517,6 +525,10 @@ class JsonUnserializer(T=char) : Unserializer {
                 stackTop=top; // might have been reallocated
                 switch (sep){
                     case ",":
+                        if (sloppyCommas) reader.getSeparator();
+                    case "":
+                        if ((!sloppyCommas) &&  sep!=",")
+                            serializationError("expected ',' or '}'",__FILE__,__LINE__);
                         reader(stackTop.labelToRead);
                         if (stackTop.labelToRead.length==0) serializationError("empty label name",
                             __FILE__,__LINE__);

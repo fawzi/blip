@@ -11,7 +11,26 @@ private {
 	import blip.serialization.SerializationMixins;
 }
 
-
+/// mixin to loop on vectors and mantrixes
+char[] vectMLoopMixin(char[][] names,char[] op){
+    char[] res=`
+    {`;
+    foreach(n;names){
+        res~=`
+        auto `~n~`Ptr=&(`~n~`.cell[0]);`;
+    }
+    res~=`
+        foreach (i; Range!(T.dim)) {
+            `~op;
+    foreach(n;names){
+        res~=`
+            ++`~n~`Ptr;`;
+    }
+    res~=`
+        }
+    }`;
+    return res;
+}
 
 // ------------------------------------------------------------------------------------------------------------------------------------------------------------
 // Vector
@@ -37,7 +56,14 @@ struct Vector(flt_, int dim_) {
 		}
 	}
 	
+	alias vectMLoopMixin simpleLoopMixin;
 	
+	flt opIndex(int i){
+	    return cell[i];
+	}
+	void opIndexAssign(flt v,int i){
+	    cell[i]=v;
+	}
 	static if (2 == dim) const static Vector zero = { x : cscalar!(flt, 0), y : cscalar!(flt, 0) };
 	static if (3 == dim) const static Vector zero = { x : cscalar!(flt, 0), y : cscalar!(flt, 0), z : cscalar!(flt, 0) };
 	static if (4 == dim) const static Vector zero = { x : cscalar!(flt, 0), y : cscalar!(flt, 0), z : cscalar!(flt, 0), w : cscalar!(flt, 0) };
@@ -59,7 +85,13 @@ struct Vector(flt_, int dim_) {
 
 	static if (4 == dim) const static Vector unitW = { x : cscalar!(flt, 0), y : cscalar!(flt, 0), z : cscalar!(flt, 0), w : cscalar!(flt, 1) };
 	
-
+    void axpby(V)(Vector!(V,dim)x,V a=cscalar!(V,1),flt b=cscalar!(flt,1)){
+        if (b==cscalar!(flt,1)){
+            mixin(vectMLoopMixin(["this","x"],"*thisPtr += a*(*xPtr);"));
+        } else {
+            mixin(vectMLoopMixin(["this","x"],"*thisPtr = (*thisPtr)*b+a*(*xPtr);"));
+        }
+    }
 	
 	
 	bool ok() {
@@ -87,11 +119,18 @@ struct Vector(flt_, int dim_) {
 	
 
 	void set(T)(T v) {
-		assert (v.ok);
-		static if (dim >= 1) x = scalar!(flt)(v.x);
-		static if (dim >= 2) y = scalar!(flt)(v.y);
-		static if (dim >= 3) z = scalar!(flt)(v.z);
-		static if (dim >= 4) w = scalar!(flt)(v.w);
+		static if (is(T:flt)){
+			static if (dim >= 1) x = v;
+			static if (dim >= 2) y = v;
+			static if (dim >= 3) z = v;
+			static if (dim >= 4) w = v;
+		} else {
+			assert (v.ok);
+			static if (dim >= 1) x = scalar!(flt)(v.x);
+			static if (dim >= 2) y = scalar!(flt)(v.y);
+			static if (dim >= 3) z = scalar!(flt)(v.z);
+			static if (dim >= 4) w = scalar!(flt)(v.w);
+		}
 	}
 
     alias set opSliceAssign;
@@ -517,7 +556,6 @@ private struct Column(flt, int rows) {
 	}
 }
 
-
 struct Matrix(flt_, int rows_, int cols_) {
 	static assert ((rows == cols || rows + 1 == cols) && rows >= 2 && cols <= 4);
 	const bool isExtended = rows + 1 == cols;
@@ -525,6 +563,7 @@ struct Matrix(flt_, int rows_, int cols_) {
 	alias flt_ flt;
 	const int rows = rows_;
 	const int cols = cols_;
+	const int dim = rows_*cols_;
 
 	static assert (isRingType!(flt));
 	private const bool fieldOps = isFieldType!(flt);
@@ -536,7 +575,6 @@ struct Matrix(flt_, int rows_, int cols_) {
 		Repeat!(flt, rows*cols)	tuple;
 		flt[rows*cols]					cell;
 	}
-	
 	
 	bool ok() {
 		debug {
@@ -553,7 +591,16 @@ struct Matrix(flt_, int rows_, int cols_) {
 	alias ok isOK;
 	alias ok isCorrect;
 	
+	alias vectMLoopMixin simpleLoopMixin;
 	
+	void axpby(U,V)(U x,V a=cscalar!(V,1),flt b=cscalar!(flt,1)){
+        if (b==cscalar!(flt,1)){
+            mixin(vectMLoopMixin(["this","x"],"*thisPtr += scalar!(flt)(a*(*xPtr));"));
+        } else {
+            mixin(vectMLoopMixin(["this","x"],"*thisPtr = scalar!(flt)((*thisPtr)*b+a*(*xPtr));"));
+        }
+    }
+    
 	static Matrix opCall(flt[] raw) {
 		Matrix res = void;
 		(&res.col[0].row[0])[0..rows*cols] = raw[0..rows*cols];
@@ -848,6 +895,15 @@ struct Matrix(flt_, int rows_, int cols_) {
 		foreach (c; Range!(cols)) {
 			foreach (r; Range!(rows)) {
 				col[c].row[r] = scalar!(flt)(o.col[c].row[r]);
+			}
+		}
+    }
+    void set()(flt o){
+        assert (ok);
+		
+		foreach (c; Range!(cols)) {
+			foreach (r; Range!(rows)) {
+				col[c].row[r] = o;
 			}
 		}
     }
@@ -1478,6 +1534,20 @@ struct Quaternion(flt_) {
 		return res;
 	}
 	
+    void axpby(V)(Quaternion!(V)x,V a=cscalar!(V,1),flt b=cscalar!(flt,1)){
+        if (b==cscalar!(flt,1)){
+            xyzw.axpby(x,a,b);
+            flt det = magnitude();
+            if (det==cscalar!(flt,0)){
+                *this=identity;
+            } else {
+                x/=det;
+                y/=det;
+                z/=det;
+                w/=det;
+            }
+        }
+    }
 	
 	static Quaternion slerp(Quaternion A, Quaternion B, real time) {
 		assert (A.ok);

@@ -1,18 +1,19 @@
 /*******************************************************************************
     A stream that ignores all that is written to it
+    Tango compatibility (to be removed).
         copyright:      Copyright (c) 2008. Fawzi Mohamed
         license:        Apache 2.0
         version:        Initial release: July 2008
         author:         Fawzi Mohamed
 *******************************************************************************/
-module blip.NullStream;
+module blip.io.NullStream;
 import tango.io.device.Conduit;
 
 /// a conduit that discards its input
 class NullConduit: Conduit{
     char[] toString (){
         return "NullConduit";
-    } 
+    }
 
     size_t bufferSize () { return 256u;}
 

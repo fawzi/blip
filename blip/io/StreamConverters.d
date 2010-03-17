@@ -204,8 +204,9 @@ class ReadHandler(T):Reader!(T){
     size_t readSome(T[] a){
         return buf.read(a);
     }
-    /// shutdown the input source
+    /// shutdown the input source (also closes the input)
     void shutdownInput(){
+        buf.close();
     }
 }
 

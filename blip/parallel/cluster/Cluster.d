@@ -17,7 +17,7 @@ import blip.util.NotificationCenter;
 import blip.container.Pool;
 import blip.container.Cache;
 
-interface RemoteTask:Serializable{
+/+interface RemoteTask:Serializable{
     char[]name();
     void do_task(Cluster c);
 }
@@ -36,12 +36,12 @@ class Worker{
     }
 }
 
-
 class Peer{
     char[] sourceId;
     char[] baseUrl;
     mixin(serializeSome("blip.parallel.cluster.Worker","sourceId|baseUrl"));
     mixin printOut!();
+    this(){}
     this(char[] sourceId,char[] baseUrl){
         this.sourceId=sourceId;
         this.baseUrl=baseUrl;
@@ -267,3 +267,4 @@ class Cluster{
         return (s in workersDict)!is null;
     }
 }
++/

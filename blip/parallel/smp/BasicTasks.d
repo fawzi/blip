@@ -176,6 +176,8 @@ class Task:TaskI{
     FiberPool fPool; /// if non null allocates a fiber executing taskOp with the given stack (unless Sequential)
     
     LinkedList!(void delegate()) onFinish; /// actions to execute sequentially at the end of the task
+    void delegate() onFinish0;// placeholder to have onFinish tasks without allocation
+    void delegate() onFinish1;// placeholder to have onFinish tasks without allocation
     
     TaskI _superTask; /// super task of this task
     char[] _taskName; /// name of the task (might be null, for debugging purposes)
@@ -221,7 +223,10 @@ class Task:TaskI{
             fiber=null;
         }
         fPool=null;
-        onFinish.clear();
+        onFinish0=null;
+        onFinish1=null;
+        if(onFinish!is null)
+            onFinish.clear();
         _superTask=null;
         _taskName=null;
         holdedSubtasks=null;
@@ -336,7 +341,7 @@ class Task:TaskI{
         this.taskOp=taskOp;
         this.fiber=fiber;
         this.generator=generator;
-        this.onFinish=new LinkedList!(void delegate())();
+        this.onFinish=null;
         this._superTask=null;
         this._scheduler=null;
         this.resubmit=false;
@@ -459,9 +464,15 @@ class Task:TaskI{
             }
             taskAtt.val=this;
             assert(status==TaskStatus.PostExec);
-            if (onFinish !is null) {
-                foreach(t;onFinish){
-                    t();
+            if (onFinish0 !is null){
+                onFinish0();
+                if (onFinish1 !is null){
+                    onFinish1();
+                    if (onFinish !is null) {
+                        foreach(t;onFinish){
+                            t();
+                        }
+                    }
                 }
             }
             version(NoTaskLock){
@@ -755,8 +766,16 @@ class Task:TaskI{
     // ------------------------ task setup ops -----------------------
     /// adds an onFinish operation
     Task appendOnFinish(void delegate() onF) {
+        assert(onF!is null,"null tasks not accepted");
         assert(status==TaskStatus.Building,"appendOnFinish allowed only during task building"); // change?
-        onFinish.append(onF);
+        if (onFinish0 is null){
+            onFinish0=onF;
+        } else if (onFinish1 is null){
+            onFinish1=onF;
+        } else {
+            if (onFinish is null) onFinish=new LinkedList!(void delegate())();
+            onFinish.append(onF);
+        }
         return this;
     }
     /// changes the level of the task (before submittal)
@@ -952,14 +971,19 @@ class Task:TaskI{
             s("associated");
         s(",\n");
         s("  onFinish:[");
-        bool atStart=true;
-        foreach (t;onFinish){
-            if (!atStart) s(", ");
-            atStart=true;
-            if (t is null)
-                s("*NULL*");
-            else
-                s("associated");
+        if (onFinish0!is null){
+            s("associated");
+            if (onFinish1!is null){
+                s(",associated");
+                if (onFinish!is null){
+                    foreach (t;onFinish){
+                        if (t is null)
+                            s(",*NULL*");
+                        else
+                            s(",associated");
+                    }
+                }
+            }
         }
         s("],\n");
         s("  superTask=");

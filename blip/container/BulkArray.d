@@ -72,6 +72,21 @@ struct BulkArray(T){
             }
         }
     }
+/+    template unaryOp(char[]op){
+        static void unaryOp(U)(ref BulkArray!(U)a){
+            baUnaryOpStr!(op,U)(a);
+        }
+    }
+    template binOp(char[]op){
+        static void binOp(U,V)(ref BulkArray!(U)a,ref BulkArray!(V)b){
+            baBinaryOpStr!(op,U,V)(a,b);
+        }
+    }
+    template triOp(char[]op){
+        static void triOp(U,V,W)(ref BulkArray!(U)a,ref BulkArray!(V)b,ref BulkArray!(W)c){
+            baTertiaryOpStr!(op,U,V,W)(a,b,c);
+        }
+    }+/
     ClassMetaInfo getSerializationMetaInfo(){
         return metaI;
     }
@@ -180,8 +195,20 @@ struct BulkArray(T){
         assert(i>0&&j<=length,"slicing index out of bounds");
         return BulkArray(data[i..j],guard);
     }
+    /// ditto
+    BulkArray opSlice(size_t i,size_t j){
+        assert(i<=j,"slicing with i>j"); // allow???
+        assert(i>0&&j<=length,"slicing index out of bounds");
+        return BulkArray(data[i..j],guard);
+    }
     /// sets a slice of the array
     void opIndexAssign(T val,size_t i,size_t j){
+        assert(i<=j,"slicing with i>j"); // allow???
+        assert(i>0&&j<=length,"slicing index out of bounds");
+        BulkArray(data[i..j],guard)[]=val;
+    }
+    /// ditto
+    void opSliceAssign(T val,size_t i,size_t j){
         assert(i<=j,"slicing with i>j"); // allow???
         assert(i>0&&j<=length,"slicing index out of bounds");
         BulkArray(data[i..j],guard)[]=val;
@@ -203,7 +230,12 @@ struct BulkArray(T){
         static if(is(T==V)){
             memcpy(data.ptr,b.data.ptr,length*T.sizeof);
         } else {
-            baBinaryOpStr!("*aPtr0=cast(typeof(*aPtr0))bPtr0;",T,V)(*this,b);
+            baBinaryOpStr!(`
+            static if(is(typeof((*aPtr0)[]=(*bPtr0)))){
+                (*aPtr0)[]=(*bPtr0);
+            }else {
+                *aPtr0=cast(typeof(*aPtr0))*bPtr0;
+            }`,T,V)(*this,b);
         }
     }
     void opSliceAssign(BulkArray b){
@@ -223,7 +255,12 @@ struct BulkArray(T){
         static if (is(T==V)){
             memcpy(n.data.ptr,data.ptr,length*T.sizeof);
         } else {
-            baBinaryOpStr!("*aPtr0=cast(typeof(*aPtr0))bPtr0;",T,V)(*this,b);
+            baBinaryOpStr!(`
+            static if(is(typeof((*aPtr0)[]=(*bPtr0)))){
+                (*aPtr0)[]=(*bPtr0);
+            }else {
+                *aPtr0=cast(typeof(*aPtr0))*bPtr0;
+            }`,V,T)(n,*this);
         }
         return n;
     }
@@ -460,17 +497,28 @@ static bool BulkArrayIsDummy(T)(BulkArray!(T) b){
     return (b.flags & BulkArray!(T).Flags.Dummy)!=0;
 }
 
-void baUnaryOpStr(char[] opStr,T)(BulkArray!(T) a){
+void baUnaryOpStr(char[] opStr,T)(ref BulkArray!(T) a){
     for (aPtr0=a.ptr;aPtr0!=ptrEnd;++aPtr0){
         mixin(opStr);
     }
 }
 
-void baBinaryOpStr(char[] opStr,T,U)(BulkArray!(T) a,BulkArray!(U) b){
+void baBinaryOpStr(char[] opStr,T,U)(ref BulkArray!(T) a,ref BulkArray!(U) b){
     assert(a.length==b.length,"binaryOpStr only on equally sized arrays");
     U * bPtr0=b.ptr;
     T* aPtrEnd=a.ptrEnd;
     for (T *aPtr0=a.ptr;aPtr0!=aPtrEnd;++aPtr0,++bPtr0){
+        mixin(opStr);
+    }
+}
+
+void baTertiaryOpStr(char[] opStr,T,U,V)(ref BulkArray!(T) a,ref BulkArray!(U) b,ref BulkArray!(V) c){
+    assert(a.length==b.length,"binaryOpStr only on equally sized arrays");
+    assert(a.length==c.length,"binaryOpStr only on equally sized arrays");
+    U * bPtr0=b.ptr;
+    V * cPtr0=b.ptr;
+    T* aPtrEnd=a.ptrEnd;
+    for (T *aPtr0=a.ptr;aPtr0!=aPtrEnd;++aPtr0,++bPtr0,++cPtr0){
         mixin(opStr);
     }
 }

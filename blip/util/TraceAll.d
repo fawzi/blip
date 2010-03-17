@@ -25,14 +25,14 @@ version(Posix){
         
         void abort(){
             bool waitFor(bool delegate() check){
-                for(int i=0;i<1000;++i){
-                    for(int j=0;i<1000;++i){
+                for(int i=0;i<500;++i){
+                    for(int j=0;i<100;++i){
                         volatile auto tLevel=traceLevel;
                         if (check()) return true;
                         Thread.yield();
                     }
                     if (check()) return true;
-                    Thread.sleep(0.01);
+                    Thread.sleep(0.001);
                 }
                 return false;
             }
@@ -75,13 +75,14 @@ version(Posix){
                                     if (traceLevel!=3){
                                         if (atomicCASB(traceLevel,1,0)){
                                             tAtt=null;
-                                            serr("a thread did not respond\n");
+                                            serr("a thread did not respond, race with the GC??, skipping it, but probably further tracing will fail...\n");
                                             Thread.sleep(0.1);
                                         } else {
                                             waitFor(delegate bool(){ volatile auto tLevel=traceLevel; return tLevel==3; });
                                             if (traceLevel!=3){
-                                                serr("a thread trace failed\n");
+                                                serr("a thread trace failed, exiting\n");
                                                 abortLevel=5;
+                                                exit(1);
                                                 return;
                                             }
                                         }
@@ -98,6 +99,7 @@ version(Posix){
                             }
                         }
                     }
+                    exit(10);
                     break;
                 case 1: // wait
                     Thread.yield();
@@ -112,21 +114,27 @@ version(Posix){
                             volatile tAtt1=tAtt;
                             if(tAtt1!is myT){
                                 serr("double signaling or interrupted tracing\n");
-                                atomicCASB(traceLevel,1,2);
-                                return;
+                                abortLevel=5;
+                                exit(2);
+                                //atomicCASB(traceLevel,1,2);
+                                //return;
                             }
                             trace.trace();
                             writeBarrier();
                             if (!atomicCASB(traceLevel,3,2)){
                                 serr("trace collision\n");
+                                abortLevel=5;
+                                exit(3);
                             }
                             return;
                         } else {
                             serr("double signaling in trace\n");
+                            abortLevel=5;
+                            exit(4);
                         }
                     }
                 default:
-                    exit(2);
+                    exit(5);
                     return;
                 }
             }

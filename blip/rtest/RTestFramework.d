@@ -762,7 +762,7 @@ template checkTestInitArgs(S...){
 ///   acceptable: variable that can be set to false if the actual configuration should be skipped
 ///     (never set it unconditionally true)
 template testInit(char[] checkInit="", char[] manualInit=""){
-
+    
     /// creates a test that executes the given function and fails if it throws an exception
     SingleRTest testNoFail(S...)(char[] testName, void delegate(S) testF,long sourceLine=-1,
         char[] sourceFile="unknown",TestControllerI testController=null,
@@ -795,6 +795,20 @@ template testInit(char[] checkInit="", char[] manualInit=""){
         return new SingleRTest(testName,sourceLine,sourceFile,nArgs!(S),&doTest,
             testSize, testController, failureLog, r,Variant(testF));
     }
+    /// ditto
+    SingleRTest testNoFailF(S...)(char[] testName, void function(S) testF,long sourceLine=-1,
+        char[] sourceFile="unknown",TestControllerI testController=null,
+        TestSize testSize=TestSize(),CharSink failureLog=null,Rand r=null)
+    {
+        struct WrapF{
+            void function(S) fun;
+            void dlg(S arg){ fun(arg); }
+        }
+        auto dlg=new WrapF;
+        dlg.fun=testF;
+        return testNoFail(testName,&dlg.dlg,sourceLine,sourceFile,
+            testController,testSize,failureLog,r);
+    }
     
     /// creates a test that executes the given function and fails if no exception is raised
     SingleRTest testFail(S...)(char[] testName, void delegate(S) testF,long sourceLine=-1L,
@@ -825,6 +839,20 @@ template testInit(char[] checkInit="", char[] manualInit=""){
         }
         return new SingleRTest(testName,sourceLine,sourceFile,nArgs!(S),&doTest,
             testSize, testController, failureLog, r,Variant(testF));
+    }
+    /// ditto
+    SingleRTest testFailF(S...)(char[] testName, void function(S) testF,long sourceLine=-1,
+        char[] sourceFile="unknown",TestControllerI testController=null,
+        TestSize testSize=TestSize(),CharSink failureLog=null,Rand r=null)
+    {
+        struct WrapF{
+            void function(S) fun;
+            void dlg(S arg){ fun(arg); }
+        }
+        auto dlg=new WrapF;
+        dlg.fun=testF;
+        return testFail(testName,&dlg.dlg,sourceLine,sourceFile,
+            testController,testSize,failureLog,r);
     }
     
     /// creates a test that checks that the given function returns true
@@ -868,6 +896,20 @@ template testInit(char[] checkInit="", char[] manualInit=""){
         }
         return new SingleRTest(testName,sourceLine,sourceFile,nArgs!(S),&doTest,
             testSize, testController, failureLog, r,Variant(testF));
+    }
+    /// ditto
+    SingleRTest testTrueF(S...)(char[] testName, bool function(S) testF,long sourceLine=-1,
+        char[] sourceFile="unknown",TestControllerI testController=null,
+        TestSize testSize=TestSize(),CharSink failureLog=null,Rand r=null)
+    {
+        struct WrapF{
+            bool function(S) fun;
+            bool dlg(S arg){ return fun(arg); }
+        }
+        auto dlg=new WrapF;
+        dlg.fun=testF;
+        return testTrue(testName,&dlg.dlg,sourceLine,sourceFile,
+            testController,testSize,failureLog,r);
     }
 
     /// creates a test that checks that the given function returns false
@@ -914,5 +956,19 @@ template testInit(char[] checkInit="", char[] manualInit=""){
         }
         return new SingleRTest(testName,sourceLine,sourceFile,nArgs!(S),&doTest,
             testSize, testController, failureLog, r,Variant(testF));
+    }
+    /// ditto
+    SingleRTest testFalseF(S...)(char[] testName, bool function(S) testF,long sourceLine=-1,
+        char[] sourceFile="unknown",TestControllerI testController=null,
+        TestSize testSize=TestSize(),CharSink failureLog=null,Rand r=null)
+    {
+        struct WrapF{
+            bool function(S) fun;
+            bool dlg(S arg){ return fun(arg); }
+        }
+        auto dlg=new WrapF;
+        dlg.fun=testF;
+        return testFalse(testName,&dlg.dlg,sourceLine,sourceFile,
+            testController,testSize,failureLog,r);
     }
 }
