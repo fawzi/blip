@@ -174,11 +174,17 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
                 }
             };
         }
+        alias sink sinkDlg;
         scope(exit){
             writeSpace(sink1,width);
         }
     } else {
         alias sink1 sink;
+        static if (is(typeof(sink1) == void delegate(Char[]))){
+            alias sink1 sinkDlg;
+        } else {
+            void delegate(Char[]) sinkDlg=delegate void(Char[]s){ sink1(s); };
+        }
     }
     static if (is(T S:S[])){
         static if(is(S==Char)){
@@ -378,10 +384,14 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
             v.desc(sink,args);
         } else static if(is(typeof(v.desc(sink.call,args)))){
             v.desc(sink.call,args);
+        } else static if(is(typeof(v.desc(sinkDlg,args)))){
+            v.desc(sinkDlg,args);
         } else static if(is(typeof(v.desc(sink)))){
             v.desc(sink);
         } else static if(is(typeof(v.desc(sink.call)))){
             v.desc(sink.call);
+        } else static if(is(typeof(v.desc(sinkDlg)))){
+            v.desc(sinkDlg);
         } else static if (is(typeof(v.toString()))){
             sink(v.toString);
         }else{

@@ -1,4 +1,4 @@
-module tstRpc;
+module testRpc;
 import blip.io.Console;
 version(NoTrace){} else { import tango.core.stacktrace.TraceExceptions; }
 

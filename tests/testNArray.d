@@ -14,7 +14,7 @@ import blip.narray.NArray;
 import blip.narray.TestSupport;
 import tango.math.random.Random: rand;
 import blip.narray.Convolve;
-import blip.TemplateFu;
+import blip.util.TemplateFu;
 import blip.parallel.smp.WorkManager;
 import tango.util.log.Config;
 import blip.container.GrowableArray;

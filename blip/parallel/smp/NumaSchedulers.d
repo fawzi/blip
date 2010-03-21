@@ -12,7 +12,7 @@ import blip.t.time.Time;
 import blip.t.time.Clock;
 import blip.io.BasicIO;
 import blip.container.GrowableArray;
-import blip.TemplateFu:ctfe_i2a;
+import blip.util.TemplateFu:ctfe_i2a;
 import blip.parallel.smp.PriQueue;
 import blip.parallel.smp.SmpModels;
 import blip.parallel.smp.BasicTasks;

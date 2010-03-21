@@ -11,7 +11,7 @@ import tango.util.container.LinkedList;
 import blip.io.BasicIO;
 import blip.container.GrowableArray;
 import blip.t.core.sync.Semaphore;
-import blip.TemplateFu:ctfe_i2a;
+import blip.util.TemplateFu:ctfe_i2a;
 import blip.parallel.smp.SmpModels;
 import blip.BasicModels;
 import blip.container.Pool;

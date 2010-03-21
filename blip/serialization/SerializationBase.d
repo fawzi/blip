@@ -13,7 +13,7 @@ import blip.io.BasicIO;
 import blip.BasicModels;
 import tango.util.container.HashSet;
 import tango.text.Util;
-import blip.TemplateFu;
+import blip.util.TemplateFu;
 import tango.text.Regex;
 import blip.container.GrowableArray;
 public import blip.t.core.Traits;

@@ -9,7 +9,7 @@
 module blip.narray.TestSupport;
 import blip.narray.NArray;
 import blip.narray.Convolve;
-import blip.TemplateFu;
+import blip.util.TemplateFu;
 import blip.container.GrowableArray;
 import blip.t.math.Math: abs,min,max;
 import blip.rtest.RTest;

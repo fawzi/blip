@@ -50,6 +50,7 @@ IDENT=$(shell $(TOOLDIR)/archName.sh)-$(DC_SHORT)-$(VERSION)
 
 SRCDIR=$(BLIP_HOME)
 TESTS_DIR=$(BLIP_HOME)/tests
+EXE_DIR=$(BLIP_HOME)/exe
 OBJDIRBASE=$(BLIP_HOME)
 OBJDIR=$(OBJDIRBASE)/blipBuild/objs-$(IDENT)
 ARCHDIR=$(BLIP_HOME)/build/arch
@@ -111,15 +112,16 @@ $(LIB):  $(OBJS)
 	rm -f $@
 	$(mkLib) $@ $(OBJS)
 	$(ranlib) $@
-	cp $(OBJDIR)/$(LIB) $(BLIP_HOME)/$(INSTALL_LIB)
+	mkdir -p $(BLIP_HOME)/libs
+	cp $(OBJDIR)/$(LIB) $(BLIP_HOME)/libs/$(INSTALL_LIB)
 
-$(TESTS:%=$(OBJDIR)/%.d):$(TESTS:%=$(SRCDIR)/%.d)
-	cp $(SRCDIR)/$(shell basename $@) $@
+$(TESTS:%=$(OBJDIR)/%.d):$(TESTS:%=$(TESTS_DIR)/%.d)
+	cp $(TESTS_DIR)/$(shell basename $@) $@
 
 $(TESTS:%=_%): _% : $(OBJDIR)/%.$(OBJ_EXT) $(LIB)
 	$(DC) $(OUT_NAME)$@ $(@:_%=$(OBJDIR)/%.$(OBJ_EXT)) $(LIB_DIR). $(LIB_LINK)blip $(EXTRA_LIBS)
-	mkdir -p $(TESTS_DIR)
-	cp $@ $(TESTS_DIR)/$(@:_%=%)
+	mkdir -p $(EXE_DIR)
+	cp $@ $(EXE_DIR)/$(@:_%=%)
 
 $(TESTS):
 	@mkdir -p $(OBJDIR)
@@ -156,6 +158,7 @@ clean-all:
 
 distclean:
 	rm -rf $(OBJDIRBASE)/blipBuild/objs-*
+	rm -rf $(EXE_DIR)
 
 ifeq ($(shell if [ -e "$(OBJDIR)/intermediate.rule" ]; then echo 1; fi;),1)
 include $(OBJDIR)/intermediate.rule

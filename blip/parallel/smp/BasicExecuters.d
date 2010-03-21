@@ -7,7 +7,7 @@ import blip.io.Console;
 import blip.t.util.log.Log;
 import blip.io.BasicIO;
 import blip.container.GrowableArray;
-import blip.TemplateFu:ctfe_i2a;
+import blip.util.TemplateFu:ctfe_i2a;
 import blip.parallel.smp.SmpModels;
 import blip.parallel.smp.BasicSchedulers;
 import blip.parallel.smp.BasicTasks;

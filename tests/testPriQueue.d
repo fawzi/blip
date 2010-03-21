@@ -1,4 +1,4 @@
-module PriQueueTest;
+module testPriQueue;
 import blip.parallel.smp.BasicTasks;
 import blip.parallel.smp.PriQueue;
 import blip.io.Console;

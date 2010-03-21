@@ -141,7 +141,7 @@ makeFlags="$silent TANGO_HOME=$TANGO_HOME $build_dir"
 if [ -n "$clean" ]; then
     $make $makeFlags distclean
 fi
-rm libblip-*
+rm -f libs/libblip-*
 if [ -z "$noopt" ]; then
     $make $makeFlags EXTRA_LIBS="$extra_libs_opt" VERSION=opt lib || die "error building the opt version"
 fi
@@ -150,7 +150,7 @@ if [ -n "$tests" ] ; then
     $make $makeFlags EXTRA_LIBS="$extra_libs" VERSION=$version || die "error building the tests"
 fi
 installDir=`dirname $compiler`/../lib
-for l in libblip-* ; do
+for l in libs/libblip-* ; do
     echo "$l -> $installDir"
     cp $l $installDir
 done

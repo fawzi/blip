@@ -40,7 +40,7 @@
 *******************************************************************************/
 module blip.rtest.BasicGenerators;
 import blip.t.core.Traits;
-import blip.TemplateFu;
+import blip.util.TemplateFu;
 import blip.t.math.Math;
 import blip.t.math.random.Random: Rand=Random;
 

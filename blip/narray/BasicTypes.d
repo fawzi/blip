@@ -40,7 +40,7 @@ module blip.narray.BasicTypes;
 import tango.core.Memory: GC;
 import blip.t.core.Array: sort;
 import blip.t.stdc.string: memset,memcpy,memcmp;
-import blip.TemplateFu;
+import blip.util.TemplateFu;
 import blip.t.core.Traits;
 import blip.t.math.Math: abs;
 import blip.rtest.RTest;

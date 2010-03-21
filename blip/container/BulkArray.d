@@ -12,6 +12,8 @@ import blip.serialization.Serialization;
 import blip.serialization.SerializationMixins;
 import blip.container.AtomicSLink;
 import blip.parallel.smp.WorkManager;
+import blip.io.BasicIO;
+import blip.container.GrowableArray;
 
 /// guard object to deallocate large arrays that contain inner pointers
 class Guard{
@@ -72,21 +74,6 @@ struct BulkArray(T){
             }
         }
     }
-/+    template unaryOp(char[]op){
-        static void unaryOp(U)(ref BulkArray!(U)a){
-            baUnaryOpStr!(op,U)(a);
-        }
-    }
-    template binOp(char[]op){
-        static void binOp(U,V)(ref BulkArray!(U)a,ref BulkArray!(V)b){
-            baBinaryOpStr!(op,U,V)(a,b);
-        }
-    }
-    template triOp(char[]op){
-        static void triOp(U,V,W)(ref BulkArray!(U)a,ref BulkArray!(V)b,ref BulkArray!(W)c){
-            baTertiaryOpStr!(op,U,V,W)(a,b,c);
-        }
-    }+/
     ClassMetaInfo getSerializationMetaInfo(){
         return metaI;
     }
@@ -175,8 +162,14 @@ struct BulkArray(T){
         return res;
     }
     /// returns the adress of element i
-    T* ptrI(size_t i){
-        assert(ptr+i<ptrEnd,"index out of bounds");
+    T* ptrI(size_t i)
+    in{
+        if (ptr+i>=ptrEnd){
+            assert(0,collectAppender(delegate void(CharSink sink){
+                dumperP(sink)("index of BulkArray out of bounds:")(i)(" for array of size ")(ptrEnd-ptr);
+            }));
+        }
+    } body {
         return ptr+i;
     }
     /// returns element i
@@ -186,25 +179,25 @@ struct BulkArray(T){
     }
     /// assign element i
     void opIndexAssign(T val,size_t i){
-        assert(ptr+i<ptrEnd,"index out of bounds");
+        assert(ptr+i<ptrEnd,"index out of bounds ");
         *(ptr+i)=val;
     }
     /// returns a slice of the array
     BulkArray opIndex(size_t i,size_t j){
         assert(i<=j,"slicing with i>j"); // allow???
-        assert(i>0&&j<=length,"slicing index out of bounds");
+        assert(i>=0&&j<=length,"slicing index out of bounds");
         return BulkArray(data[i..j],guard);
     }
     /// ditto
     BulkArray opSlice(size_t i,size_t j){
         assert(i<=j,"slicing with i>j"); // allow???
-        assert(i>0&&j<=length,"slicing index out of bounds");
+        assert(i>=0&&j<=length,"slicing index out of bounds");
         return BulkArray(data[i..j],guard);
     }
     /// sets a slice of the array
     void opIndexAssign(T val,size_t i,size_t j){
         assert(i<=j,"slicing with i>j"); // allow???
-        assert(i>0&&j<=length,"slicing index out of bounds");
+        assert(i>=0&&j<=length,"slicing index out of bounds");
         BulkArray(data[i..j],guard)[]=val;
     }
     /// ditto

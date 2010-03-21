@@ -1,12 +1,12 @@
 /*******************************************************************************
-    TemplateFu contains various template stuff that I found useful to put
-    in a single module
+    TemplateFu contains various template/ctfe stuff that I found useful to put
+    in a single module (but most of it migrated to tango.core.Traits)
         copyright:      Copyright (c) 2008. Fawzi Mohamed
         license:        BSD style: $(LICENSE)
         version:        Initial release: July 2008
         author:         Fawzi Mohamed
 *******************************************************************************/
-module blip.TemplateFu;
+module blip.util.TemplateFu;
 import blip.t.core.Traits;
 
 /// returns the number of arguments in the tuple (its length)
@@ -90,4 +90,21 @@ T ctfe_powI(T)(T x,int p){
     for (int i=0;i<p;++i)
         xx*=x;
     return xx;
+}
+
+struct Fun2Dlg(T,S...){
+    T function(S) fun;
+    T dlg(S args){
+        static if(is(T==void)){
+            fun(args);
+        } else {
+            return fun(args);
+        }
+    }
+}
+
+T delegate(S) fun2Dlg(T,S...)(T function(S) fun){
+    auto res=new Fun2Dlg!(T,S);
+    res.fun=fun;
+    return &res.dlg;
 }

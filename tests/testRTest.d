@@ -3,7 +3,7 @@ module testRTest;
 import blip.io.Console;
 import blip.rtest.RTest;
 import blip.io.NullStream;
-import blip.TemplateFu;
+import blip.util.TemplateFu;
 import blip.parallel.smp.WorkManager;
 import tango.util.log.Config;
 import blip.t.util.log.Log;

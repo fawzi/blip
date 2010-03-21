@@ -9,7 +9,7 @@
 module blip.narray.Convolve;
 import blip.narray.BasicTypes;
 import blip.narray.BasicOps;
-import blip.TemplateFu;
+import blip.util.TemplateFu;
 import blip.t.core.Traits;
 import blip.t.math.Math:min;
 debug(ConvolveCheckAccess) import blip.container.GrowableArray;
