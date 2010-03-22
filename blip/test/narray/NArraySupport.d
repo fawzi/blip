@@ -6,7 +6,7 @@
         version:        Initial release: July 2008
         author:         Fawzi Mohamed
 *******************************************************************************/
-module blip.narray.TestSupport;
+module blip.test.narray.NArraySupport;
 import blip.narray.NArray;
 import blip.narray.Convolve;
 import blip.util.TemplateFu;

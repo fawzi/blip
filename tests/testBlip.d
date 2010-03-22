@@ -1,13 +1,9 @@
 /*******************************************************************************
-    module that creates an executable that extensively tests NArray
-    
-        copyright:      Copyright (c) 2008. Fawzi Mohamed
-        license:        BSD style: $(LICENSE)
-        version:        Initial release: July 2008
+    module that creates an executable that executes all automatic tests of blip
         author:         Fawzi Mohamed
 *******************************************************************************/
-module testNArray;
-import blip.test.narray.NArrayTests;
+module testBlip;
+import blip.test.BlipTests;
 import blip.io.Console;
 import blip.io.BasicIO;
 import tango.math.random.Random;
@@ -16,5 +12,5 @@ version(NoTrace){} else { import tango.core.stacktrace.TraceExceptions; import b
 
 void main(char[][] args){
     sout(rand.toString()); sout("\n");
-    mainTestFun(args,narrayTests!()());
+    mainTestFun(args,blipTests!()());
 }

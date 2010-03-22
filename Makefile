@@ -81,7 +81,7 @@ EXCLUDE_DEP_ALL=$(EXCLUDE_DEP_COMP) object.di ^tango.*
 
 OBJS=$(MODULES:%=%.$(OBJ_EXT))
 
-TESTS=testTextParsing testRTest testSerial testNArrayPerf testNuma testHwloc testSmp testNArray
+TESTS=testTextParsing testRTest testSerial testNArrayPerf testNuma testHwloc testSmp testNArray testBlip
 .PHONY: _genDeps newFiles build clean distclean _tests tests lib $(TESTS)
 
 lib: $(OBJDIR)/MODULES.inc $(OBJDIR)/intermediate.rule
