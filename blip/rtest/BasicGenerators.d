@@ -43,6 +43,7 @@ import blip.t.core.Traits;
 import blip.util.TemplateFu;
 import blip.t.math.Math;
 import blip.t.math.random.Random: Rand=Random;
+import blip.io.BasicIO;
 
 /// returns a positive number, most likely mean+hardMin, in [hardMin,hardMax]
 int generateSize(Rand r,int mean=4,int hardMin=0,int hardMax=-3) {
@@ -51,6 +52,18 @@ int generateSize(Rand r,int mean=4,int hardMin=0,int hardMax=-3) {
     res+=hardMin;
     if (hardMax>0 && res>hardMax) return hardMax;
     return res;
+}
+
+struct SizeLikeNumber(int mean=4,int hardMin=0,int hardMax=-3){
+    int val;
+    static SizeLikeNumber randomGenerate(Rand r){
+        SizeLikeNumber res;
+        res.val=generateSize(r,mean,hardMin,hardMax);
+        return res;
+    }
+    void desc(void delegate(char[])sink){
+        writeOut(sink,val);
+    }
 }
 
 /// randomizes the contents of the array

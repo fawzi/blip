@@ -130,7 +130,11 @@ char[] printArgs(int nargs,char[] printC="sout.call",char[] indent="    "){
     char[] res="".dup;
     res~=indent~"try{\n";
     for (int i=0;i<nargs;++i){
-        res~=indent~"    "~printC~"(\"arg"~ctfe_i2a(i)~": \"); writeOut("~printC~",arg["~ctfe_i2a(i)~"]); "~printC~"(\"\\n\");\n";
+        res~=indent~"    static if(is(typeof(writeOut("~printC~",arg["~ctfe_i2a(i)~"])))){\n";
+        res~=indent~"        "~printC~"(\"arg"~ctfe_i2a(i)~": \"); writeOut("~printC~",arg["~ctfe_i2a(i)~"]); "~printC~"(\"\\n\");\n";
+        res~=indent~"    } else {\n";
+        res~=indent~"        "~printC~"(\"non printable argument of type \"~(typeof(arg["~ctfe_i2a(i)~"]).stringof)~\" as writeOut cannot handle it.\\n\");\n";
+        res~=indent~"    }\n";
     }
     res~=indent~"}catch (Exception e) {\n";
     res~=indent~"    sout.call(collectAppender(delegate void(void delegate(char[])s){ s(\"could not print arguments due to exception\"); writeOut(sout.call,e.toString); sout(\"\\n\");}));\n";
@@ -526,7 +530,7 @@ class SingleRTest{
     }
     /// task that executes runTests
     Task runTestsTask(int testFactor=1,char[] rngState=null,int[] counterVal=null){
-        auto closure=new RunTestsArgs(this,false,testFactor,rngState,counterVal);
+        auto closure=new RunTestsArgs(this,true,testFactor,rngState,counterVal);
         return Task(testName,closure.yieldableCall());
     }
     /// constructor
@@ -802,7 +806,7 @@ template testInit(char[] checkInit="", char[] manualInit=""){
     {
         struct WrapF{
             void function(S) fun;
-            void dlg(S arg){ fun(arg); }
+            void dlg(S arg){ this.fun(arg); }
         }
         auto dlg=new WrapF;
         dlg.fun=testF;
@@ -847,7 +851,7 @@ template testInit(char[] checkInit="", char[] manualInit=""){
     {
         struct WrapF{
             void function(S) fun;
-            void dlg(S arg){ fun(arg); }
+            void dlg(S arg){ this.fun(arg); }
         }
         auto dlg=new WrapF;
         dlg.fun=testF;
@@ -904,7 +908,7 @@ template testInit(char[] checkInit="", char[] manualInit=""){
     {
         struct WrapF{
             bool function(S) fun;
-            bool dlg(S arg){ return fun(arg); }
+            bool dlg(S arg){ return this.fun(arg); }
         }
         auto dlg=new WrapF;
         dlg.fun=testF;
@@ -964,7 +968,7 @@ template testInit(char[] checkInit="", char[] manualInit=""){
     {
         struct WrapF{
             bool function(S) fun;
-            bool dlg(S arg){ return fun(arg); }
+            bool dlg(S arg){ return this.fun(arg); }
         }
         auto dlg=new WrapF;
         dlg.fun=testF;

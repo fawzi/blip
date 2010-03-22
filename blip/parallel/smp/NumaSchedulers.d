@@ -100,6 +100,8 @@ class PriQScheduler:TaskSchedulerI {
         assert(superScheduler!is null);
         this.superScheduler=superScheduler;
         this._nnCache=superScheduler.nnCache();
+        assert(_nnCache!is null,"null cache!");
+        assert(pQLevelPool!is null,"null pQLevelPool");
         version(NoReuse){
             queue=new PriQueue!(TaskI)();
         } else {

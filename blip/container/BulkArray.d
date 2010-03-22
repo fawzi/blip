@@ -14,6 +14,7 @@ import blip.container.AtomicSLink;
 import blip.parallel.smp.WorkManager;
 import blip.io.BasicIO;
 import blip.container.GrowableArray;
+import blip.io.Console; // pippo
 
 /// guard object to deallocate large arrays that contain inner pointers
 class Guard{
@@ -78,7 +79,7 @@ struct BulkArray(T){
         return metaI;
     }
     void serialize(Serializer s){
-        T[] dArray=data;
+        T[] dArray=this.data;
         auto ac=s.writeArrayStart(null,dArray.length);
         FieldMetaInfo *elMetaInfoP=null;
         version(PseudoFieldMetaInfo){
@@ -88,7 +89,7 @@ struct BulkArray(T){
             elMetaInfoP=&elMetaInfo;
         }
         foreach (ref d;dArray){
-            s.writeArrayEl(ac,{ s.field(elMetaInfoP, d); } );
+            s.writeArrayEl(ac,delegate void(){ s.field(elMetaInfoP, d); } );
         }
         s.writeArrayEnd(ac);
     }
@@ -109,24 +110,24 @@ struct BulkArray(T){
                 ++pos;
             } )) {}
         dArray.length=pos;
-        ptr=dArray.ptr;
-        ptrEnd=ptr+dArray.length;
-        guard=new Guard(dArray);
+        this.ptr=dArray.ptr;
+        this.ptrEnd=this.ptr+dArray.length;
+        this.guard=new Guard(dArray);
     }
     
     /// data as array
     T[] data(){
-        return ptr[0..(ptrEnd-ptr)];
+        return this.ptr[0..(this.ptrEnd-this.ptr)];
     }
     void data(T[] newData){
-        ptr=newData.ptr;
-        ptrEnd=ptr+newData.length;
+        this.ptr=newData.ptr;
+        this.ptrEnd=this.ptr+newData.length;
     }
     /// sets data ana guard to the one of the given guard
     void dataOfGuard(Guard g){
-        guard=g;
-        ptr=cast(T*)g.data.ptr;
-        ptrEnd=ptr+g.data.length/T.sizeof;
+        this.guard=g;
+        this.ptr=cast(T*)g.data.ptr;
+        this.ptrEnd=this.ptr+g.data.length/T.sizeof;
     }
     
     static BulkArray opCall(){
@@ -164,64 +165,64 @@ struct BulkArray(T){
     /// returns the adress of element i
     T* ptrI(size_t i)
     in{
-        if (ptr+i>=ptrEnd){
+        if (this.ptr+i>=this.ptrEnd){
             assert(0,collectAppender(delegate void(CharSink sink){
-                dumperP(sink)("index of BulkArray out of bounds:")(i)(" for array of size ")(ptrEnd-ptr);
+                dumperP(sink)("index of BulkArray out of bounds:")(i)(" for array of size ")(this.ptrEnd-this.ptr);
             }));
         }
     } body {
-        return ptr+i;
+        return this.ptr+i;
     }
     /// returns element i
     DynamicArrayType!(T) opIndex(size_t i){
-        assert(ptr+i<ptrEnd,"index out of bounds");
-        return ptr[i];
+        assert(this.ptr+i<this.ptrEnd,"index out of bounds");
+        return this.ptr[i];
     }
     /// assign element i
     void opIndexAssign(T val,size_t i){
-        assert(ptr+i<ptrEnd,"index out of bounds ");
-        *(ptr+i)=val;
+        assert(this.ptr+i<this.ptrEnd,"index out of bounds ");
+        *(this.ptr+i)=val;
     }
     /// returns a slice of the array
     BulkArray opIndex(size_t i,size_t j){
         assert(i<=j,"slicing with i>j"); // allow???
-        assert(i>=0&&j<=length,"slicing index out of bounds");
-        return BulkArray(data[i..j],guard);
+        assert(i>=0&&j<=this.length,"slicing index out of bounds");
+        return BulkArray(this.data[i..j],this.guard);
     }
     /// ditto
     BulkArray opSlice(size_t i,size_t j){
         assert(i<=j,"slicing with i>j"); // allow???
-        assert(i>=0&&j<=length,"slicing index out of bounds");
-        return BulkArray(data[i..j],guard);
+        assert(i>=0&&j<=this.length,"slicing index out of bounds");
+        return BulkArray(this.data[i..j],this.guard);
     }
     /// sets a slice of the array
     void opIndexAssign(T val,size_t i,size_t j){
         assert(i<=j,"slicing with i>j"); // allow???
-        assert(i>=0&&j<=length,"slicing index out of bounds");
-        BulkArray(data[i..j],guard)[]=val;
+        assert(i>=0&&j<=this.length,"slicing index out of bounds");
+        BulkArray(this.data[i..j],this.guard)[]=val;
     }
     /// ditto
     void opSliceAssign(T val,size_t i,size_t j){
         assert(i<=j,"slicing with i>j"); // allow???
-        assert(i>0&&j<=length,"slicing index out of bounds");
-        BulkArray(data[i..j],guard)[]=val;
+        assert(i>0&&j<=this.length,"slicing index out of bounds");
+        BulkArray(this.data[i..j],this.guard)[]=val;
     }
     /// gets a slice of the array as normal array (this will get invalid when dis array is collected)
     T[] getSlice(size_t i,size_t j){
         assert(i<=j,"slicing with i>j"); // allow???
-        assert(i>0&&j<=length,"slicing index out of bounds");
-        return data[i..j];
+        assert(i>0&&j<=this.length,"slicing index out of bounds");
+        return this.data[i..j];
     }
     void opIndexAssign(BulkArray val,size_t i,size_t j){
         assert(i<=j,"slicing with i>j"); // allow???
-        assert(i>0&&j<=length,"slicing index out of bounds");
-        BulkArray(data[i..j],guard)[]=val;
+        assert(i>0&&j<=this.length,"slicing index out of bounds");
+        BulkArray(this.data[i..j],this.guard)[]=val;
     }
     /// copies an bulk array
     void copyFrom(V)(BulkArray!(V) b){
         if (b.length!=length) throw new Exception("different length",__FILE__,__LINE__);
         static if(is(T==V)){
-            memcpy(data.ptr,b.data.ptr,length*T.sizeof);
+            memcpy(this.ptr,b.ptr,this.length*T.sizeof);
         } else {
             baBinaryOpStr!(`
             static if(is(typeof((*aPtr0)[]=(*bPtr0)))){
@@ -233,10 +234,6 @@ struct BulkArray(T){
     }
     void opSliceAssign(BulkArray b){
         copyFrom!(T)(b);
-    }
-    void opSliceAssign(T val){
-        foreach(ref v;pLoop())
-            v=val;
     }
     /// length of the array
     size_t length(){
@@ -287,17 +284,23 @@ struct BulkArray(T){
             int ret=loopBody(*aPtr);
             if (ret) return ret;
         }
+        return 0;
     }
     int opApply(int delegate(ref size_t i,ref DynamicArrayType!(T) v) loopBody){
         T*aPtr=ptr;
-        for (size_t i=ptrEnd-aPtr;i!=0;--i,++aPtr){
+        assert(ptrEnd>=aPtr,"invalid ptrEnd");
+        size_t nEl=ptrEnd-aPtr;
+        for (size_t i=0;i!=nEl;++i,++aPtr){
             int ret=loopBody(i,*aPtr);
             if (ret) return ret;
         }
+        return 0;
     }
     /// parallel foreach loop structure
+    /// could be more aggressive in reusing the slice structs, but the difference should be only in the log_2(n) region
     struct PLoop{
         int res;
+        Exception e;
         T* start;
         T* end;
         size_t index;
@@ -311,20 +314,48 @@ struct BulkArray(T){
             int delegate(ref DynamicArrayType!(T) v) loopBody;
             Slice1 *next;
             void exec(){
-                for (T*tPtr=start;tPtr!=end;++tPtr){
-                    auto res=loopBody(*tPtr);
-                    if (res){
-                        context.res=res;
-                        return;
+                try{
+                    if (context.res!=0) return;
+                    if(end-start>context.optimalBlockSize){
+                        auto newChunk=popFrom(context.freeList1);
+                        if (newChunk is null){
+                            newChunk=new Slice1;
+                            newChunk.loopBody=loopBody;
+                            newChunk.context=context;
+                        }
+                        auto newChunk2=popFrom(context.freeList1);
+                        if (newChunk2 is null){
+                            newChunk2=new Slice1;
+                            newChunk2.loopBody=loopBody;
+                            newChunk2.context=context;
+                        }
+                        auto mid=(end-start)/2;
+                        if (mid>context.optimalBlockSize) // try to have exact multiples of optimalBlockSize (so that one can have a fast path for it)
+                            mid=((mid+context.optimalBlockSize-1)/context.optimalBlockSize)*context.optimalBlockSize;
+                        newChunk.start=start;
+                        start+=mid;
+                        newChunk.end=start;
+                        newChunk2.start=start;
+                        newChunk2.end=end;
+                        Task("BulkArrayPLoop0sub",&newChunk.exec).appendOnFinish(&newChunk.giveBack).autorelease.submit();
+                        Task("BulkArrayPLoop0sub2",&newChunk2.exec).appendOnFinish(&newChunk2.giveBack).autorelease.submit();
+                    } else {
+                        for (T*tPtr=start;tPtr!=end;++tPtr){
+                            auto res=loopBody(*tPtr);
+                            if (res){
+                                context.res=res;
+                                return;
+                            }
+                        }
                     }
+                } catch (Exception e){
+                    context.e=e;
+                    context.res=-1;
                 }
             }
             void giveBack(){
+                this.next=null;
                 insertAt(context.freeList1,this);
-            }
-            void exec2(){
-                exec();
-                giveBack();
             }
         }
         struct Slice2{
@@ -335,97 +366,98 @@ struct BulkArray(T){
             size_t index;
             Slice2 *next;
             void exec(){
-                for (T*tPtr=start;tPtr!=end;++tPtr){
-                    auto res=loopBody(index,*tPtr);
-                    if (res){
-                        context.res=res;
-                        return;
+                try{
+                    if (context.res!=0) return;
+                    if (end-start>context.optimalBlockSize){
+                        auto newChunk=popFrom(context.freeList2);
+                        if (newChunk is null){
+                            newChunk=new Slice2;
+                            newChunk.loopBody=loopBody;
+                            newChunk.context=context;
+                        }
+                        auto newChunk2=popFrom(context.freeList2);
+                        if (newChunk2 is null){
+                            newChunk2=new Slice2;
+                            newChunk2.loopBody=loopBody;
+                            newChunk2.context=context;
+                        }
+                        auto mid=(end-start)/2;
+                        if (mid>context.optimalBlockSize) // try to have exact multiples of optimalBlockSize (so that one can have a fast path for it)
+                            mid=((mid+context.optimalBlockSize-1)/context.optimalBlockSize)*context.optimalBlockSize;
+                        newChunk.start=start;
+                        start+=mid;
+                        newChunk.end=start;
+                        newChunk.index=index;
+                        index+=mid;
+                        newChunk2.start=start;
+                        newChunk2.end=end;
+                        newChunk2.index=index;
+                        Task("BulkArrayPLoop0sub",&newChunk.exec).appendOnFinish(&newChunk.giveBack).autorelease.submit();
+                        Task("BulkArrayPLoop0sub2",&newChunk2.exec).appendOnFinish(&newChunk2.giveBack).autorelease.submit();
+                    } else {
+                        auto idx=index;
+                        for (T*tPtr=start;tPtr!=end;++tPtr){
+                            auto res=loopBody(idx,*tPtr);
+                            if (res!=0){
+                                context.res=res;
+                                return;
+                            }
+                            ++idx;
+                        }
                     }
-                    ++index;
+                } catch(Exception e){
+                    context.e=e;
+                    context.res=-1;
                 }
             }
             void giveBack(){
+                this.next=null;
                 insertAt(context.freeList2,this);
-            }
-            void exec2(){
-                exec();
-                giveBack();
             }
         }
         static PLoop opCall(BulkArray array,size_t optimalBlockSize){
             PLoop it;
             assert(! BulkArrayIsDummy(array), "array cannot be null");
+            assert(optimalBlockSize!=0,"optimalBlockSize cannot be 0");
             it.start=array.ptr;
             it.end=array.ptrEnd;
             it.index=0;
             it.optimalBlockSize=optimalBlockSize;
+            it.e=null;
             return it;
         }
         int opApply(int delegate(ref DynamicArrayType!(T) v) loopBody){
             if (end-start>optimalBlockSize*2){
-                Task("BulkArrayPLoop0",
-                    delegate void(){
-                        while(start-end>optimalBlockSize*3/2 && res==0){
-                            auto newChunk=popFrom(freeList1);
-                            if (newChunk is null){
-                                newChunk=new Slice1;
-                                newChunk.loopBody=loopBody;
-                                newChunk.context=this;
-                            }
-                            newChunk.start=start;
-                            start+=optimalBlockSize;
-                            newChunk.end=start;
-                            index+=optimalBlockSize;
-                            Task("BulkArrayPLoop0sub",&newChunk.exec2).autorelease.submitYield();
-                        }
-                        if (res==0){
-                            for (T*aPtr=start;aPtr!=end;++aPtr){
-                                int ret=loopBody(*aPtr);
-                                if (ret) {
-                                    res=ret;
-                                    break; // needs to keep the context valid while sub runs might use it...
-                                }
-                            }
-                        }
-                    },TaskFlags.TaskSet).executeNow();
+                Slice1 newChunk;
+                newChunk.loopBody=loopBody;
+                newChunk.context=this;
+                newChunk.start=start;
+                newChunk.end=end;
+                Task("BulkArrayPLoop0",&newChunk.exec).executeNow();
+                if (e!is null){
+                    throw new Exception("Exception in BulkArray PLoop",__FILE__,__LINE__,e);
+                }
                 return res;
             } else {
                 for (T*aPtr=start;aPtr!=end;++aPtr){
                     int ret=loopBody(*aPtr);
-                    if (ret) return ret;
+                    if (ret!=0) return ret;
                 }
             }
             return 0;
         }
         int opApply(int delegate(ref size_t i,ref DynamicArrayType!(T) v) loopBody){
             if (end-start>optimalBlockSize*2){
-                Task("BulkArrayPLoop1",
-                    delegate void(){
-                        while(start-end>optimalBlockSize*3/2 && res==0){
-                            auto newChunk=popFrom(freeList2);
-                            if (newChunk is null){
-                                newChunk=new Slice2;
-                                newChunk.loopBody=loopBody;
-                                newChunk.context=this;
-                            }
-                            newChunk.start=start;
-                            start+=optimalBlockSize;
-                            newChunk.end=start;
-                            newChunk.index=index;
-                            index+=optimalBlockSize;
-                            Task("BulkArrayPLoop1sub",&newChunk.exec2).autorelease.submitYield();
-                        }
-                        if (res==0){
-                            for (T*aPtr=start;aPtr!=end;++aPtr){
-                                int ret=loopBody(index,*aPtr);
-                                if (ret) {
-                                    res=ret;
-                                    break; // needs to keep the context valid while sub runs might use it...
-                                }
-                                ++index;
-                            }
-                        }
-                    }).executeNow();
+                Slice2 newChunk;
+                newChunk.loopBody=loopBody;
+                newChunk.context=this;
+                newChunk.start=start;
+                newChunk.end=end;
+                newChunk.index=index;
+                Task("BulkArrayPLoop1",&newChunk.exec).executeNow();
+                if (e!is null){
+                    throw new Exception("Exception in BulkArray PLoop",__FILE__,__LINE__,e);
+                }
                 return res;
             } else {
                 size_t len=end-start;
@@ -445,6 +477,10 @@ struct BulkArray(T){
     /// return what is needed for a parallel foreach loop on the array
     PLoop pLoop(size_t optimalBlockSize=defaultOptimalBlockSize){
         return PLoop(*this,optimalBlockSize);
+    }
+    void opSliceAssign(T val){
+        foreach(ref v;pLoop())
+            v=val;
     }
     /// implement an FIterator compliant interface on T*
     final class FIteratorP:FIteratorI!(DynamicArrayType!(T)*){
