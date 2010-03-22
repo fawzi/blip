@@ -14,7 +14,6 @@ import blip.container.AtomicSLink;
 import blip.parallel.smp.WorkManager;
 import blip.io.BasicIO;
 import blip.container.GrowableArray;
-import blip.io.Console; // pippo
 
 /// guard object to deallocate large arrays that contain inner pointers
 class Guard{

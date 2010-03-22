@@ -8,7 +8,6 @@ import blip.BasicModels;
 import blip.util.Grow:growLength;
 import blip.container.Deque;
 import blip.container.AtomicSLink;
-import blip.io.Console;//pippo
 
 /// a simple priority queue optimized for adding high priority tasks
 /// (otherwise a heap implementation would be better)
@@ -175,8 +174,10 @@ class PriQueue(T){
                     assert(queue !is null);
                     T res;
                     if(!queue.entries.popFront(res)){
-                        sout("Error: expected queue to have entries\n");
-                        desc(sout.call);
+                        throw new Exception(collectAppender(delegate void(CharSink s){
+                            s("Error: expected queue to have entries, queue is:");
+                            desc(s);
+                        }),__FILE__,__LINE__);
                     }
                     assert(res!is null);
                     if (queue.entries.length==0){

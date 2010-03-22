@@ -6,7 +6,7 @@ import blip.io.BasicIO;
 import blip.t.core.Thread;
 import blip.parallel.smp.DataFlowVar;
 version(NoTrace){} else { import tango.core.stacktrace.TraceExceptions; }
-import blip.io.Console; // pippo
+import blip.io.Console;
 
 class STask{
     static gVal=0;

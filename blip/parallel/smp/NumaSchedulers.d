@@ -24,8 +24,6 @@ import blip.container.BitVector;
 import blip.container.AtomicSLink;
 import blip.io.Console;
 import blip.sync.Atomic;
-import tango.stdc.stdlib: abort; // pippo
-import blip.t.core.stacktrace.StackTrace; // pippo
 
 // locking order, be careful to change that to avoid deadlocks
 // especially addSched and redirectedTask are sensible
