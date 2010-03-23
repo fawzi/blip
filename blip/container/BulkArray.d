@@ -432,10 +432,18 @@ struct BulkArray(T){
                 newChunk.context=this;
                 newChunk.start=start;
                 newChunk.end=end;
-                Task("BulkArrayPLoop0",&newChunk.exec).executeNow();
+                Task("BulkArrayPLoop0",&newChunk.exec).autorelease.executeNow();
                 if (e!is null){
                     throw new Exception("Exception in BulkArray PLoop",__FILE__,__LINE__,e);
                 }
+                auto cnk=freeList1;
+                while (cnk !is null){
+                    auto nextC=cnk.next;
+                    cnk.next=null;
+                    delete cnk;
+                    cnk=nextC;
+                }
+                freeList1=null;
                 return res;
             } else {
                 for (T*aPtr=start;aPtr!=end;++aPtr){
@@ -453,10 +461,18 @@ struct BulkArray(T){
                 newChunk.start=start;
                 newChunk.end=end;
                 newChunk.index=index;
-                Task("BulkArrayPLoop1",&newChunk.exec).executeNow();
+                Task("BulkArrayPLoop1",&newChunk.exec).autorelease.executeNow();
                 if (e!is null){
                     throw new Exception("Exception in BulkArray PLoop",__FILE__,__LINE__,e);
                 }
+                auto cnk=freeList2;
+                while (cnk !is null){
+                    auto nextC=cnk.next;
+                    cnk.next=null;
+                    delete cnk;
+                    cnk=nextC;
+                }
+                freeList2=null;
                 return res;
             } else {
                 size_t len=end-start;

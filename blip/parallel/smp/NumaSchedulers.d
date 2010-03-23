@@ -108,10 +108,16 @@ class PriQScheduler:TaskSchedulerI {
         this._rand=new RandomSync();
         this.inSuperSched=0;
         log=Log.lookup(loggerPath);
-        _rootTask=new RootTask(this,0,name~"RootTask");
         runLevel=SchedulerRunLevel.Running;
-        raiseRunlevel(superScheduler.runLevel);
+        auto levelN=this.superScheduler.runLevel;
+        if (runLevel < cast(int)levelN){
+            runLevel=levelN;
+            if (runLevel==SchedulerRunLevel.Stopped){
+                log.warn("adding task "~name~" to stopped scheduler...");
+            }
+        }
         waitingSince=Time.max;
+        _rootTask=new RootTask(this,0,name~"RootTask");
     }
     void reset(char[] name,MultiSched superScheduler){
         this.name=name;
@@ -125,7 +131,13 @@ class PriQScheduler:TaskSchedulerI {
         stealLevel=int.max;
         inSuperSched=0;
         runLevel=SchedulerRunLevel.Running;
-        raiseRunlevel(superScheduler.runLevel);
+        auto levelN=this.superScheduler.runLevel;
+        if (runLevel < cast(int)levelN){
+            runLevel=levelN;
+            if (runLevel==SchedulerRunLevel.Stopped){
+                log.warn("adding task "~name~" to stopped scheduler...");
+            }
+        }
         waitingSince=Time.max;
     }
     void addTask0(TaskI t){
@@ -247,7 +259,17 @@ class PriQScheduler:TaskSchedulerI {
             return false;
         }
         t.scheduler=targetScheduler;
+        version(TrackQueues){
+            log.info(collectAppender(delegate void(CharSink sink){
+                sink("stealing task "); writeOut(sink,t,true); sink(" from ");
+                writeOut(sink,this,true); sink(" to "); writeOut(sink,targetScheduler,true); sink("\n");
+            }));
+        }
         targetScheduler.addTask0(t);
+        /+  pippo to do
+        // in general this is dangerous, as the scheduler might get reused in the meantime...
+        // should be rewritten for example collecting first all tasks and adding them at once
+        // (adding a addTasks0 method)
         auto scheduler2=t.scheduler;
         if(scheduler2 is null) scheduler2=targetScheduler;
         while (true){
@@ -257,8 +279,14 @@ class PriQScheduler:TaskSchedulerI {
                 return true;
             }
             t2.scheduler=scheduler2;
+            version(TrackQueues){
+                log.info(collectAppender(delegate void(CharSink sink){
+                    sink("stealing other task "); writeOut(sink,t2,true); sink(" from ");
+                    writeOut(sink,this,true); sink(" to "); writeOut(sink,scheduler2,true); sink("\n");
+                }));
+            }
             scheduler2.addTask0(t2);
-        }
+        }+/
     }
     /// description (for debugging)
     /// non threadsafe
@@ -1028,8 +1056,8 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
     bool addIfNonExistent(size_t pos){
         assert(pos<topo.nNodes(schedLevel),"cannot add more schedulers than nodes");
         raiseRunlevel(SchedulerRunLevel.Running);
-        if (scheds.length<=pos){
-            synchronized(this){
+        synchronized(this){
+            if (scheds.length<=pos){
                 for(size_t pAtt=scheds.length;pAtt<=pos;++pAtt){
                     ++nRunningScheds;
                     auto nAtt=pos2numa(pAtt);
@@ -1045,8 +1073,8 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
                 if (scheds.length<topo.nNodes(schedLevel)&&runLevel!=SchedulerRunLevel.Stopped){
                     addStarvingSched(pos2numa(scheds.length));
                 }
+                return true;
             }
-            return true;
         }
         return false;
     }

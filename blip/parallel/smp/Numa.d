@@ -806,8 +806,6 @@ version(noHwloc){} else {
                 lastDepth=obj.depth;
                 obj=obj.father;
             }
-//            desc(sout.call); // pippo
-//            sout("\n");
         }
     
         /// maximum (whole system) level

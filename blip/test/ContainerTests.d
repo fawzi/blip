@@ -26,12 +26,25 @@ void testLoop(T)(T[] arr1,SizeLikeNumber!(3,1) s){
     foreach(i,v;barr.pLoop(s.val)){
         assert(arr1[i]==v,"BulkArray parallel index loop");
     }
-    static if(is(typeof(T.init+T.init))){
+    barr.pLoop(s.val).opApply(delegate int(ref size_t i,ref T v){
+        assert(arr1[i]==v,"BulkArray parallel index loop");
+        return 0;
+    });
+    static if(is(typeof(T.init+T.init))&&false){
         foreach(ref v;barr.pLoop(s.val)){
             v=v+v;
         }
         foreach(i,v;barr.pLoop(s.val)){
             assert(arr1[i]+arr1[i]==v,"BulkArray parallel no index loop update");
+        }
+        if (arr1.length>0){
+            barr[]=arr1[0];
+            foreach(i,v;barr.pLoop(s.val)){
+                v=v+arr1[i];
+            }
+            foreach(i,v;arr1){
+                assert(barr[i]==v+v,"BulkArray indexing test");
+            }
         }
     }
     

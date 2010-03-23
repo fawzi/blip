@@ -422,7 +422,8 @@ class Task:TaskI{
                 }
             }
             if (resub) {
-                scheduler.addTask(this);
+                volatile auto sched=scheduler;
+                sched.addTask(this);
             } else if((flags&TaskFlags.Delay)==0){
                 startWaiting();
             }
@@ -586,7 +587,8 @@ class Task:TaskI{
                 }
             }
             if (resub){
-                scheduler.addTask(this);
+                volatile auto sched=scheduler;
+                sched.addTask(this);
             }
         }
     }
@@ -690,7 +692,7 @@ class Task:TaskI{
     }
     /// operation that spawn the given task as subtask of this one
     void spawnTask(TaskI task){
-        spawnTask(task,delegate void(){scheduler.addTask(task);});
+        spawnTask(task,delegate void(){ volatile auto sched=scheduler; sched.addTask(task); });
     }
     /// spawn a task and waits for its completion
     void spawnTaskSync(TaskI task){
@@ -711,7 +713,9 @@ class Task:TaskI{
                     // add something like && rand.uniform!(bool)() to avoid excessive task length?
                     this.spawnTask(task,delegate void(){ task.execute(); });
                 } else {
-                    this.spawnTask(task);
+                    // to do: allowing the task to be stolen here introduces some problems
+                    // not sure why, should investigate
+                    spawnTask(task,delegate void(){ volatile auto sched=scheduler; sched.addTask0(task); });
                 }
             });
         }
