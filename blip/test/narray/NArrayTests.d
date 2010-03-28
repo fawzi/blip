@@ -368,11 +368,9 @@ void testDot2x1(T,S)(Dottable!(T,2,S,1,true,true) d){
 }
 
 void testDot1x2(T,S)(Dottable!(T,1,S,2,true,true) d){
-    static int iCall;    
     alias typeof(T.init*S.init) U;
     auto a=d.a;
     auto b=d.b;
-    ++iCall;
     if (d.axis2==1 || d.axis2==-1) b=d.b.T;
     auto refValT=zeros!(MaxPrecTypeOf!(U))(b.shape[1]);
     for (index_type j=0;j<b.shape[1];++j){
@@ -707,7 +705,7 @@ TestCollection narrayRTst1(T,int rank)(TestCollection superColl){
                 autoInitTst.testNoFail("testEig",(Dottable!(T,2,T,1,false,true,true) d){ testEig!(T)(d); },
                     __LINE__,__FILE__,coll);
                 //autoInitTst.testNoFail("testEigh",(Dottable!(T,2,T,1,false,true,true) d){ testEigh!(T)(d); },
-                //    __LINE__,__FILE__,coll);
+                //    __LINE__,__FILE__,coll); // pippo to fix...
                 autoInitTst.testNoFail("testSvd",(Dottable!(T,2,T,1,false,true,false) d){ testSvd!(T)(d); },
                     __LINE__,__FILE__,coll);
             }

@@ -315,7 +315,7 @@ struct BulkArray(T){
             void exec(){
                 try{
                     if (context.res!=0) return;
-                    if(end-start>context.optimalBlockSize){
+                    if(end-start>context.optimalBlockSize*3/2){
                         auto newChunk=popFrom(context.freeList1);
                         if (newChunk is null){
                             newChunk=new Slice1;
@@ -367,7 +367,7 @@ struct BulkArray(T){
             void exec(){
                 try{
                     if (context.res!=0) return;
-                    if (end-start>context.optimalBlockSize){
+                    if (end-start>context.optimalBlockSize*3/2){
                         auto newChunk=popFrom(context.freeList2);
                         if (newChunk is null){
                             newChunk=new Slice2;

@@ -92,10 +92,7 @@ class Dottable(T,int rank1,S,int rank2,bool scanAxis=false, bool randomLayout=fa
         }
         return new Dottable(a,b,axis1,axis2);
     }
-    char[] toString(){
-        return collectAppender(delegate void(void delegate(char[])s){ this.printData(s); });
-    }
-    void printData(void delegate(char[]) sink,char[] formatEl="{,10}", index_type elPerLine=10,
+    void desc(void delegate(char[]) sink,char[] formatEl=",10", index_type elPerLine=10,
         char[] indent=""){
         auto s=dumperP(sink);
         s(indent)("Dottable{\n");
@@ -114,6 +111,9 @@ class Dottable(T,int rank1,S,int rank2,bool scanAxis=false, bool randomLayout=fa
         }
         s(indent)("}\n");
     }
+    char[] toString(){
+        return collectAppender(delegate void(void delegate(char[])s){ this.desc(s); });
+    }
 }
 
 /// a random 1D NArray type T and dimension i (in the arr attribute)
@@ -128,8 +128,16 @@ class SizedRandomNArray(T,int i){
         randNArray(r,res.arr);
         return res;
     }
+    void desc(void delegate(char[]) sink,char[] formatEl=",10", index_type elPerLine=10,
+        char[] indent=""){
+        if (arr is null) {
+            sink("*null*");
+            return;
+        }
+        arr.printData(sink,formatEl,elPerLine,indent);
+    }
     char[] toString(){
-        return arr.toString();
+        return collectAppender(delegate void(void delegate(char[])s){ this.desc(s); });
     }
 }
 /// a random 2D NArray type T and dimension i,j (in the arr attribute)
@@ -144,8 +152,16 @@ class SizedRandomNArray(T,int i,int j){
         randNArray(r,res.arr);
         return res;
     }
+    void desc(void delegate(char[]) sink,char[] formatEl=",10", index_type elPerLine=10,
+        char[] indent=""){
+        if (arr is null) {
+            sink("*null*");
+            return;
+        }
+        arr.printData(sink,formatEl,elPerLine,indent);
+    }
     char[] toString(){
-        return arr.toString();
+        return collectAppender(delegate void(void delegate(char[])s){ this.desc(s); });
     }
 }
 /// a random 3D NArray type T and dimension i,j,k (in the arr attribute)
@@ -160,7 +176,15 @@ class SizedRandomNArray(T,int i,int j,int k){
         randNArray(r,res.arr);
         return res;
     }
+    void desc(void delegate(char[]) sink,char[] formatEl=",10", index_type elPerLine=10,
+        char[] indent=""){
+        if (arr is null) {
+            sink("*null*");
+            return;
+        }
+        arr.printData(sink,formatEl,elPerLine,indent);
+    }
     char[] toString(){
-        return arr.toString();
+        return collectAppender(delegate void(void delegate(char[])s){ this.desc(s); });
     }
 }

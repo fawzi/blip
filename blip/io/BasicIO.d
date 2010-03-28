@@ -392,6 +392,8 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
             v.desc(sink.call);
         } else static if(is(typeof(v.desc(sinkDlg)))){
             v.desc(sinkDlg);
+        } else static if(is(typeof(v.writeOut(sinkDlg)))){
+            v.writeOut(sinkDlg);
         } else static if (is(typeof(v.toString()))){
             sink(v.toString);
         }else{

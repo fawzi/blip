@@ -27,7 +27,7 @@ void main(char[][]argv){
     Log.lookup("blip.parallel.smp.queue").info("pippo");
     CharSink nullPrt=delegate void(char[]s){};
     nullPrt=sout.call;
-    SingleRTest.defaultTestController=new TextController(TextController.OnFailure.StopTest,
+    SingleRTest.defaultTestController=new TextController("",TextController.OnFailure.StopTest,
         TextController.PrintLevel.AllShort,nullPrt,nullPrt,1,false);
     TestCollection failTests=new TestCollection("failTests",__LINE__,__FILE__);
 

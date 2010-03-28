@@ -24,7 +24,7 @@ class Deque(T):CopiableObjectI{
         size_t to1=min(start,baseArr.length-nEl);
         baseArr[nEl..nEl+to1]=baseArr[0..to1];
         if (to1<start){
-            memmove(baseArr.ptr,baseArr.ptr+to1,start-to1);
+            memmove(baseArr.ptr,baseArr.ptr+to1,(start-to1)*T.sizeof);
         }
         baseArr[start-to1..start]=T.init;
     }
@@ -98,14 +98,14 @@ class Deque(T):CopiableObjectI{
                         for (size_t i=1;i<to2;++i){
                             if (filter(baseArr[start+i])){
                                 el=baseArr[start+i];
-                                memmove(baseArr.ptr+start+1,baseArr.ptr+start,i);
+                                memmove(baseArr.ptr+start+1,baseArr.ptr+start,i*T.sizeof);
                                 return retRes();
                             }
                         }
                         for (size_t i=0;i<nEl-to2;++i){
                             if (filter(baseArr[i])){
                                 el=baseArr[i];
-                                memmove(baseArr.ptr+i,baseArr.ptr+i+1,nEl-to2-i-1);
+                                memmove(baseArr.ptr+i,baseArr.ptr+i+1,(nEl-to2-i-1)*T.sizeof);
                                 baseArr[nEl-to2-1]=T.init;
                                 --nEl;
                                 return true;
@@ -115,7 +115,7 @@ class Deque(T):CopiableObjectI{
                         for (size_t i=1;i<nEl;++i){
                             if (filter(baseArr[start+i])){
                                 el=baseArr[start+i];
-                                memmove(baseArr.ptr+start+1,baseArr.ptr+start,i);
+                                memmove(baseArr.ptr+start+1,baseArr.ptr+start,i*T.sizeof);
                                 return retRes();
                             }
                         }
@@ -198,7 +198,7 @@ class Deque(T):CopiableObjectI{
                         --ii;
                         if (filter(baseArr[ii])){
                             el=baseArr[ii];
-                            memmove(baseArr.ptr+ii,baseArr.ptr+ii+1,i-baseArr.length-ii);
+                            memmove(baseArr.ptr+ii,baseArr.ptr+ii+1,(i-baseArr.length-ii)*T.sizeof);
                             baseArr[(start+nEl-1)-baseArr.length]=T.init;
                             --nEl;
                             return true;
@@ -210,7 +210,7 @@ class Deque(T):CopiableObjectI{
                     --i;
                     if (filter(baseArr[i])){
                         el=baseArr[i];
-                        memmove(baseArr.ptr+start+1,baseArr.ptr+start,i-start);
+                        memmove(baseArr.ptr+start+1,baseArr.ptr+start,(i-start)*T.sizeof);
                         baseArr[start]=T.init;
                         --nEl;
                         ++start;

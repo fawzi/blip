@@ -268,6 +268,7 @@ else {
                 contiguos=fortran=(shape[0]==0 || shape[0] == 1 || cast(index_type)V.sizeof == strides[0]);
                 bSize=shape[0]*cast(index_type)V.sizeof;
             } else {
+                fortran=true;
                 index_type sz=cast(index_type)V.sizeof;
                 for (int i=0;i<rank;i++){
                     if (strides[i]!=sz && shape[i]!=1)
@@ -311,8 +312,8 @@ else {
                 } else {
                     static if(rank==2){
                         if (posStrides[0]<=posStrides[1]){
-                            sortIdx[0]=1;
-                            sortIdx[1]=0;
+                            sortIdx[0]=0;
+                            sortIdx[1]=1;
                         } else {
                             sortIdx[0]=1;
                             sortIdx[1]=0;
@@ -320,7 +321,7 @@ else {
                     } else {
                         for (int i=0;i<rank;i++)
                             sortIdx[i]=i;
-                        sortIdx.sort((int x,int y){return strides[x]<posStrides[y];});
+                        sortIdx.sort((int x,int y){return posStrides[x]<posStrides[y];});
                     }
                     index_type sz2=cast(index_type)V.sizeof;
                     bool compact=true;
@@ -611,10 +612,40 @@ else {
                 }
                 *pos=val;
             } else {
-                auto subArr=opIndex(idx_tup);
+                scope subArr=opIndex(idx_tup);
                 subArr[]=val;
             }
             return val;
+        }
+
+        /// adress of the element i (if the array is non continuos and you are using a partial index
+        /// you might be surprised of where the "next" elements are)
+        ///
+        /// could be much faster for partial indexes if it would do opIndex work directly
+        V* ptrI(S...)(S idx_tup)
+        in{
+            static assert(rank>=nArgs!(S),"too many argumens in indexing operation");
+            static if (rank==reductionFactor!(S)){
+                foreach(i,TT;S){
+                    static if(is(TT==int)||is(TT==long)||is(TT==uint)||is(TT==ulong)){
+                        assert(0<=idx_tup[i] && idx_tup[i]<shape[i],"index "~ctfe_i2a(i)~" out of bounds");                        
+                    } else static assert(0,"unexpected type <"~TT.stringof~"> in opIndexAssign");
+                } // else check done in opIndex...
+            }
+        }
+        body{
+            static assert(rank>=nArgs!(S),"too many arguments in indexing operation");
+            static if (rank==reductionFactor!(S)){
+                V* pos=startPtrArray;
+                foreach(i,TT;S){
+                    static assert(is(TT==int)||is(TT==long)||is(TT==uint)||is(TT==ulong),"unexpected type <"~TT.stringof~"> in full indexing");
+                    pos=cast(V*)(cast(size_t)pos+cast(index_type)idx_tup[i]*bStrides[i]);
+                }
+                return pos;
+            } else {
+                scope subArr=opIndex(idx_tup);
+                return subArr.startPtrArray;
+            }
         }
                 
         /// static array indexing (separted from opIndex as potentially less efficient)
@@ -1478,6 +1509,7 @@ else {
         }
             
         /// description of the NArray wrapper, not of the contents, for debugging purposes...
+        /// see printData for the content
         void desc(void delegate(char[]) sink){
             auto s=dumperP(sink);
             if (this is null){
@@ -1529,6 +1561,10 @@ else {
                 res*=this.shape[i];
             }
             return res;
+        }
+        /// ditto
+        size_t length(){
+            return cast(size_t)size();
         }
         /// return the transposed view of the array
         NArray T(){

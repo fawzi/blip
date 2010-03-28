@@ -22,6 +22,7 @@ module blip.narray.LinAlg;
 import blip.narray.BasicTypes;
 import blip.narray.BasicOps;
 import blip.t.math.Math:min,max,round,sqrt,ceil,abs;
+import blip.t.stdc.string:memcpy;
 
 import blip.t.core.Traits:isComplexType,isImaginaryType,ComplexTypeOf,RealTypeOf;
 //import tango.util.log.Trace; //pippo
@@ -527,7 +528,8 @@ else {
         if (!isNullNArray(leftEVect)){
             if (leftEVect.flags & ArrayFlags.Fortran) {
                 lE=NArray!(T,2)([T.sizeof,T.sizeof*a.shape[0]],leftEVect.shape,
-                    cast(T*)leftEVect.startPtrArray,leftEVect.newFlags,leftEVect.newBase);
+                    cast(T*)(leftEVect.startPtrArray+leftEVect.size)-leftEVect.size,
+                    leftEVect.newFlags,leftEVect.newBase);
             } else {
                 lE=NArray!(T,2).empty(leftEVect.shape,true);
             }
@@ -537,7 +539,8 @@ else {
         if (!isNullNArray(rightEVect)){
             if (rightEVect.flags & ArrayFlags.Fortran) {
                 rE=NArray!(T,2)([T.sizeof,T.sizeof*a.shape[0]],rightEVect.shape,
-                    cast(T*)rightEVect.startPtrArray,rightEVect.newFlags,rightEVect.newBase);
+                    cast(T*)(rightEVect.startPtrArray+rightEVect.size)-rightEVect.size,
+                    rightEVect.newFlags,rightEVect.newBase);
             } else {
                 rE=empty!(T)(rightEVect.shape,true);
             }
@@ -572,6 +575,9 @@ else {
                 a1.startPtrArray, a1.bStrides[1]/cast(index_type)T.sizeof, wr.startPtrArray, wi.startPtrArray, lEPtr, lELd, rEPtr, rELd,
                 &workTmp, lwork, info);
             lwork = cast(int)abs(workTmp)+1;
+            if (lwork<2*n && (lEPtr!is null|| rEPtr!is null)){
+                lwork=2*n;
+            }
             scope NArray!(T,1) work = empty!(T)(lwork);
             DLapack.geev(((lEPtr is null)?'N':'V'),((rEPtr is null)?'N':'V'),n,
                 a1.startPtrArray, a1.bStrides[1]/cast(index_type)T.sizeof, wr.startPtrArray, wi.startPtrArray, lEPtr, lELd, rEPtr, rELd,
@@ -579,37 +585,57 @@ else {
             for (int i=0;i<n;++i)
                 eigenval[i]=cast(ComplexTypeOf!(T))(wr[i]+wi[i]*1i);
             if (rEPtr !is null){
-                index_type i=n-1;
-                while(i>=0) {
+                index_type i=0;
+                while(i<n) {
                     if (wi[i]==0){
-                        for (index_type j=n-1;j>=0;--j){
-                            rightEVect[j,i]=cast(ComplexTypeOf!(T))(rE[j,i]);
+                        for (index_type j=0;j<n;++j){
+                            rightEVect[j,i]=cast(ComplexTypeOf!(T))rE[j,i];
                         }
-                        --i;
                     } else {
-                        for (index_type j=n-1;j>=0;--j){
-                            rightEVect[j,i-1]=cast(ComplexTypeOf!(T))(rE[j,i-1]+1i*rE[j,i]);
-                            rightEVect[j,i]=cast(ComplexTypeOf!(T))(rE[j,i-1]-1i*rE[j,i]);
+                        if(i==n) throw new Exception("unexpected eigenvalues sequence",__FILE__,__LINE__);
+                        if (rE.ptrI(0,i) is (cast(T*)(rightEVect.ptrI(0,i+1))))
+                        {
+                            memcpy(work.startPtrArray,rE.ptrI(0,i),2*n*T.sizeof);
+                            for (index_type j=0;j<n;++j){
+                                rightEVect[j,i]  =cast(ComplexTypeOf!(T))(work[j]+1i*work[j+n]);
+                                rightEVect[j,i+1]=cast(ComplexTypeOf!(T))(work[j]-1i*work[j+n]);
+                            }
+                        } else {
+                            for (index_type j=0;j<n;++j){
+                                rightEVect[j,i]  =cast(ComplexTypeOf!(T))(rE[j,i]+1i*rE[j,i+1]);
+                                rightEVect[j,i+1]=cast(ComplexTypeOf!(T))(rE[j,i]-1i*rE[j,i+1]);
+                            }
                         }
-                        i-=2;
+                        ++i;
                     }
+                    ++i;
                 }
             }
             if (lEPtr !is null){
-                index_type i=n-1;
-                while(i>=0) {
+                index_type i=0;
+                while(i<n) {
                     if (wi[i]==0){
-                        for (index_type j=n-1;j>=0;--j){
+                        for (index_type j=0;j<n;++j){
                             leftEVect[j,i]=cast(ComplexTypeOf!(T))lE[j,i];
                         }
-                        --i;
                     } else {
-                        for (index_type j=n-1;j>=0;--j){
-                            leftEVect[j,i-1]=cast(ComplexTypeOf!(T))(lE[j,i-1]+1i*lE[j,i]);
-                            leftEVect[j,i]=cast(ComplexTypeOf!(T))(lE[j,i-1]-1i*lE[j,i]);
+                        if(i==n) throw new Exception("unexpected eigenvalues sequence",__FILE__,__LINE__);
+                        if (lE.ptrI(0,i) is (cast(T*)(leftEVect.ptrI(0,i+1))))
+                        {
+                            memcpy(work.startPtrArray,lE.ptrI(0,i),2*n*T.sizeof);
+                            for (index_type j=0;j<n;++j){
+                                leftEVect[j,i]  =cast(ComplexTypeOf!(T))(work[j]+1i*work[j+n]);
+                                leftEVect[j,i+1]=cast(ComplexTypeOf!(T))(work[j]-1i*work[j+n]);
+                            }
+                        } else {
+                            for (index_type j=0;j<n;++j){
+                                leftEVect[j,i]  =cast(ComplexTypeOf!(T))(lE[j,i]+1i*lE[j,i+1]);
+                                leftEVect[j,i+1]=cast(ComplexTypeOf!(T))(lE[j,i]-1i*lE[j,i+1]);
+                            }
                         }
-                        i-=2;
+                        ++i;
                     }
+                    ++i;
                 }
             }
         }

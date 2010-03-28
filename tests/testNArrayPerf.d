@@ -61,7 +61,7 @@ void tst()
 {
     int ndim=100;
     int nrep=10;
-    
+    auto fEig=&eig!(float);
     ATst a1,a2;
     foreach (t;a1.dims) t=ndim;
     a1.strides[]=[ndim*ndim,ndim,1];
