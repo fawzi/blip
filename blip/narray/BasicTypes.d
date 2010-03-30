@@ -1343,6 +1343,24 @@ else {
             }            
         }
 
+        /// Add another array onto this one in place with scaling
+        void axpby(S,int rank2)(NArray!(S,rank2) o,S alpha=1,V beta=1)
+        in { assert(!(flags&Flags.ReadOnly),"ReadOnly array cannot be assigned"); }
+        body { 
+            static assert(rank==rank2,"axpby accepts only identically shaped arrays");
+            if (beta==1){
+                if (alpha==1){
+                    binaryOpStr!("*aPtr0 += cast("~V.stringof~")(*bPtr0);",rank,V,S)(this,o);
+                } else {
+                    mixin binaryOpStr!("*aPtr0 += cast("~V.stringof~")(alpha*(*bPtr0));",rank,V,S);
+                    binaryOpStr(this,o);
+                }
+            } else {
+                mixin binaryOpStr!("*aPtr0 = cast("~V.stringof~")(beta*(*aPtr0)+alpha*(*bPtr0));",rank,V,S);
+                binaryOpStr(this,o);
+            }
+        }
+
         /// Subtract this array and another one and return a new array.
         NArray!(typeof(V.init-S.init),rank) opSub(S,int rank2)(NArray!(S,rank2) o) { 
             static assert(rank2==rank,"suptraction only on equally shaped arrays");
@@ -1474,10 +1492,6 @@ else {
             assert(0, "Comparison of arrays not allowed");
         }
 
-        char[] toString(){
-            return collectAppender(delegate void(CharSink s){ this.printData(s); });
-        }
-        
         void printData(CharSink s,char[] formatEl=",10", index_type elPerLine=10,
             char[] indent=""){
             s("[");
@@ -1507,7 +1521,37 @@ else {
             }
             s("]");
         }
-            
+
+        struct Printer{
+            NArray arr;
+            char[] formatEl=",10";
+            index_type elPerLine=10;
+            char[] indent="";
+            void desc(CharSink s){
+                if (arr is null){
+                    s("*null*"); /// print an empty array instead???
+                } else {
+                    arr.printData(s,formatEl,elPerLine,indent);
+                }
+            }
+        }
+        
+        /// a struct that prints the contents of this array with the given format
+        Printer dataPrinter(char[] formatEl=",10", index_type elPerLine=10,
+            char[] indent="")
+        {
+            Printer res;
+            res.arr=this;
+            res.formatEl=formatEl;
+            res.elPerLine=elPerLine;
+            res.indent=indent;
+            return res;
+        }
+        
+        char[] toString(){
+            return collectAppender(delegate void(CharSink s){ this.printData(s); });
+        }
+
         /// description of the NArray wrapper, not of the contents, for debugging purposes...
         /// see printData for the content
         void desc(void delegate(char[]) sink){

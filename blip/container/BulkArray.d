@@ -114,9 +114,11 @@ struct BulkArray(T){
         this.guard=new Guard(dArray);
     }
     
+    mixin printOut!();
+    
     /// data as array
     T[] data(){
-        return this.ptr[0..(this.ptrEnd-this.ptr)];
+        return ((this.ptr is null)?null:(this.ptr[0..(this.ptrEnd-this.ptr)]));
     }
     void data(T[] newData){
         this.ptr=newData.ptr;

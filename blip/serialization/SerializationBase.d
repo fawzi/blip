@@ -663,9 +663,8 @@ class Serializer {
                     "No class metaInfo registered for type '"
                     ~t.classinfo.name~"'("~T.stringof~")");
                 ClassMetaInfo metaInfo;
-                if (fieldMeta) {
+                if (fieldMeta!is null && fieldMeta.metaInfo!is null) {
                     metaInfo=fieldMeta.metaInfo;
-                    assert(metaInfo);
                     if (metaInfo.classinfo != t.classinfo) metaInfo=null;
                 }
                 // try first over the Serializable interface.
@@ -712,7 +711,7 @@ class Serializer {
                 } else {
                     if (metaInfo is null){
                         metaInfo = SerializationRegistry().getMetaInfo(t.classinfo);
-                        assert(metaInfo);
+                        assert(metaInfo!is null);
                     }
                     if (metaInfo.externalHandlers){
                         version(SerializationTrace) sout("X using external handlers\n");
@@ -785,9 +784,8 @@ class Serializer {
                     structHasId=false;
                 }
                 ClassMetaInfo metaInfo;
-                if (fieldMeta) {
+                if (fieldMeta !is null && fieldMeta.metaInfo!is null) {
                     metaInfo=fieldMeta.metaInfo;
-                    assert(metaInfo);
                 } else {
                     metaInfo = SerializationRegistry().getMetaInfo(typeid(T));
                 }
@@ -801,7 +799,7 @@ class Serializer {
                         if (metaInfo.externalHandlers.preSerialize){
                             h.preSerialize(this,metaInfo,cast(void*)&t);
                         }
-                        assert(h.serialize);
+                        assert(h.serialize!is null,"missing serialization callback in externalHandlers of "~T.stringof);
                         h.serialize(this,metaInfo,cast(void*)&t);
                         if (metaInfo.externalHandlers.postSerialize){
                             h.postSerialize(this,metaInfo,cast(void*)&t);
@@ -1228,9 +1226,8 @@ class Unserializer {
             }
             static if (is(T == class) || is(T==Serializable)) {
                 if (metaInfo is null){
-                    if (fieldMeta) {
+                    if (fieldMeta !is null && fieldMeta.metaInfo!is null) {
                         metaInfo=fieldMeta.metaInfo;
-                        assert(metaInfo);
                     } else {
                         if (is(T==Serializable)){
                             serializationError("read no class name, and object is only known by interface",
@@ -1364,9 +1361,8 @@ class Unserializer {
             else static if (is(T == struct)) {
                 version(UnserializationTrace) sout("Y reading struct\n");
                 if (metaInfo is null){
-                    if (fieldMeta) {
+                    if (fieldMeta!is null && fieldMeta.metaInfo!is null) {
                         metaInfo=fieldMeta.metaInfo;
-                        assert(metaInfo);
                     } else {
                         if (is(T==Serializable)){
                             serializationError("read no class name, and object is only known by interface",
@@ -1385,9 +1381,8 @@ class Unserializer {
                     version(UnserializationTrace) sout("Y tried proxy\n");
                 }
                 if (metaInfo is null){
-                    if (fieldMeta) {
+                    if (fieldMeta!is null && fieldMeta.metaInfo!is null) {
                         metaInfo=fieldMeta.metaInfo;
-                        assert(metaInfo);
                     } else {
                         metaInfo = SerializationRegistry().getMetaInfo(typeid(T));
                     }
