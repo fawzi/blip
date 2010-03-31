@@ -396,7 +396,9 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
             v.writeOut(sinkDlg);
         } else static if (is(typeof(v.toString()))){
             sink(v.toString);
-        }else{
+        } else static if (is(T U==typedef)){
+            writeOut(sink1,cast(U)v,args);
+        } else{
             static assert(0,"unsupported type in writeOut "~T.stringof);
         }
     }

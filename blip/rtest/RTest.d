@@ -196,11 +196,12 @@ int mainTestFun(char[][] argStr,SingleRTest testSuite){
     args.bind("--","counter",delegate(char[] arg){ counter=parseIArray(arg[1..$]); });
     args.bind("--","test",delegate void(char[] arg){ test=arg[1..$].dup; });
     args.bind("--","on-failure",delegate void(char[] arg){
+        if (arg.length==0) throw new Exception("expected an argument after --on-failure");
         if (arg[0]=='=') arg=arg[1..$];
         switch(arg){
             case "Continue","continue" : onFailure=TextController.OnFailure.Continue; break;
             case "StopTest","stoptest","stop-test": onFailure=TextController.OnFailure.StopTest; break;
-            case "StopAllTests","StopAll","stopall","stopalltests","stop-all-tests":
+            case "stop-all","StopAllTests","StopAll","stopall","stopalltests","stop-all-tests":
             onFailure=TextController.OnFailure.StopAllTests; break;
             case "Throw","throw": onFailure=TextController.OnFailure.Throw; break;
             default:
