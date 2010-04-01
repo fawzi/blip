@@ -993,11 +993,11 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
     TaskI trySteal(MultiSched el,int stealLevel){
         version(TrackQueues){
             log.info(collectAppender(delegate void(CharSink s){
-                s("pre trySteal in "); s(name); s(":");writeStatus(s,4);
+                s("pre trySteal for "); s(el.name); s(" in "); s(name); s(":");writeStatus(s,4);
             }));
             scope(exit){
                 log.info(collectAppender(delegate void(CharSink s){
-                    s("post trySteal in "); s(name); s(":");writeStatus(s,4);
+                    s("post trySteal for "); s(el.name); s(" in "); s(name); s(":");writeStatus(s,4);
                 }));
             }
         }
@@ -1010,7 +1010,10 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
                 auto subP=numa2pos(subN);
                 if (subP<scheds.length && scheds[subP].stealTask(superN.level,el)){
                     auto t=el.nextTaskImmediate();
-                    if (t !is null) return t;
+                    if (t !is null) {
+                        rmStarvingSched(el);
+                        return t;
+                    }
                 }
             }
             oldSuper=superN;
@@ -1018,6 +1021,9 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
         auto t=el.nextTaskImmediate();
         if (t is null){
             onStarvingSched.queue.popFront(t);
+        }
+        if (t!is null){
+            rmStarvingSched(el);
         }
         return t;
     }
