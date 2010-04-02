@@ -126,7 +126,7 @@ struct hwloc_cpuset_t{
             if (i<j){
                 auto newC=alloc();
                 hwloc_cpuset_set_range(newC,i,j-1);
-                hwloc_cpuset_clearset(*this,newC);
+                hwloc_cpuset_andnot(*this,*this,newC);
                 newC.free();
             }
         }
@@ -154,25 +154,25 @@ struct hwloc_cpuset_t{
 
     /** \brief Or set \p modifier_set into set \p set */
     hwloc_cpuset_t opOrAssign(hwloc_cpuset_t s2){
-        hwloc_cpuset_orset(*this,s2);
+        hwloc_cpuset_or(*this,*this,s2);
         return *this;
     }
 
     /** \brief And set \p modifier_set into set \p set */
     hwloc_cpuset_t opAndAssign(hwloc_cpuset_t s2){
-        hwloc_cpuset_andset(*this,s2);
+        hwloc_cpuset_and(*this,*this,s2);
         return *this;
     }
 
     /** \brief Clear set \p modifier_set out of set \p set */
-    hwloc_cpuset_t clearset(hwloc_cpuset_t s2){
-        hwloc_cpuset_clearset(*this,s2);
+    hwloc_cpuset_t andNot(hwloc_cpuset_t s2){
+        hwloc_cpuset_andnot(*this,*this,s2);
         return *this;
     }
 
     /** \brief Xor set \p set with set \p modifier_set */
     hwloc_cpuset_t opXorAssign(hwloc_cpuset_t s2){
-        hwloc_cpuset_xorset(*this,s2);
+        hwloc_cpuset_xor(*this,*this,s2);
         return *this;
     }
 
@@ -204,8 +204,8 @@ struct hwloc_cpuset_t{
      * Smaller least significant bit is smaller.
      * The empty CPU set is considered higher than anything.
      */
-    int compar_first(hwloc_cpuset_t s2){
-        return hwloc_cpuset_compar_first(*this,s2);
+    int compare_first(hwloc_cpuset_t s2){
+        return hwloc_cpuset_compare_first(*this,s2);
     }
 
     /** \brief Compar CPU sets \p set1 and \p set2 using their last bits.
@@ -214,7 +214,7 @@ struct hwloc_cpuset_t{
      * The empty CPU set is considered lower than anything.
      */
     int opCmp(hwloc_cpuset_t s2){
-        return hwloc_cpuset_compar(*this,s2);
+        return hwloc_cpuset_compare(*this,s2);
     }
 
     /** \brief Compute the weight of CPU set \p set */
@@ -307,6 +307,9 @@ void hwloc_cpuset_set_range(hwloc_cpuset_t set, uint begincpu, uint endcpu);
 /** \brief Remove CPU \p cpu from CPU set \p set */
 void hwloc_cpuset_clr(hwloc_cpuset_t set, uint cpu);
 
+/** \brief Remove CPUs from \p begincpu to \p endcpu in CPU set \p set */
+void hwloc_cpuset_clr_range(hwloc_cpuset_t set, uint begincpu, uint endcpu);
+
 /** \brief Test whether CPU \p cpu is part of set \p set */
 int hwloc_cpuset_isset(hwloc_cpuset_t set, uint cpu);
 
@@ -325,17 +328,20 @@ int hwloc_cpuset_intersects (hwloc_cpuset_t set1, hwloc_cpuset_t set2);
 /** \brief Test whether set \p sub_set is part of set \p super_set */
 int hwloc_cpuset_isincluded (hwloc_cpuset_t sub_set, hwloc_cpuset_t super_set);
 
-/** \brief Or set \p modifier_set into set \p set */
-void hwloc_cpuset_orset (hwloc_cpuset_t set, hwloc_cpuset_t modifier_set);
+/** \brief Or sets \p set1 and \p set2 and store the result in set \p res */
+void hwloc_cpuset_or (hwloc_cpuset_t res, hwloc_cpuset_t set1, hwloc_cpuset_t set2);
 
-/** \brief And set \p modifier_set into set \p set */
-void hwloc_cpuset_andset (hwloc_cpuset_t set, hwloc_cpuset_t modifier_set);
+/** \brief And sets \p set1 and \p set2 and store the result in set \p res */
+void hwloc_cpuset_and (hwloc_cpuset_t res, hwloc_cpuset_t set1, hwloc_cpuset_t set2);
 
-/** \brief Clear set \p modifier_set out of set \p set */
-void hwloc_cpuset_clearset (hwloc_cpuset_t set, hwloc_cpuset_t modifier_set);
+/** \brief And set \p set1 and the negation of \p set2 and store the result in set \p res */
+void hwloc_cpuset_andnot (hwloc_cpuset_t res, hwloc_cpuset_t set1, hwloc_cpuset_t set2);
 
-/** \brief Xor set \p set with set \p modifier_set */
-void hwloc_cpuset_xorset (hwloc_cpuset_t set, hwloc_cpuset_t modifier_set);
+/** \brief Xor sets \p set1 and \p set2 and store the result in set \p res */
+void hwloc_cpuset_xor (hwloc_cpuset_t res, hwloc_cpuset_t set1, hwloc_cpuset_t set2);
+
+/** \brief Negate set \p set and store the result in set \p res */
+void hwloc_cpuset_not (hwloc_cpuset_t res, hwloc_cpuset_t set);
 
 /** \brief Compute the first CPU (least significant bit) in CPU set \p set */
 int hwloc_cpuset_first(hwloc_cpuset_t set);
@@ -356,14 +362,14 @@ void hwloc_cpuset_singlify(hwloc_cpuset_t set);
  * Smaller least significant bit is smaller.
  * The empty CPU set is considered higher than anything.
  */
-int hwloc_cpuset_compar_first(hwloc_cpuset_t set1, hwloc_cpuset_t set2);
+int hwloc_cpuset_compare_first(hwloc_cpuset_t set1, hwloc_cpuset_t set2);
 
 /** \brief Compar CPU sets \p set1 and \p set2 using their last bits.
  *
  * Higher most significant bit is higher.
  * The empty CPU set is considered lower than anything.
  */
-int hwloc_cpuset_compar(hwloc_cpuset_t set1, hwloc_cpuset_t set2);
+int hwloc_cpuset_compare(hwloc_cpuset_t set1, hwloc_cpuset_t set2);
 
 /** \brief Compute the weight of CPU set \p set */
 int hwloc_cpuset_weight(hwloc_cpuset_t set);

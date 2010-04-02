@@ -139,9 +139,16 @@ struct CacheInfo{
 
 struct MemoryInfo{
     NumaNode attachedTo;
-    ulong memory_kB;          /**< \brief Size of memory node */
-    ulong huge_page_free;     /**< \brief Number of available huge pages */
-    mixin(serializeSome("",`attachedTo|memory_kB|huge_page_free`));
+    ulong local_memory_kB;          /**< \brief Size of memory node */
+    ulong total_memory_kB;          /**< \brief Size of memory node */
+    struct Pages{
+	ulong size;
+	ulong count;
+	mixin(serializeSome("",`size|count`));
+	mixin printOut!();
+    }
+    Pages[] page_types;
+    mixin(serializeSome("",`attachedTo|local_memory_kB|total_memory_kB|page_types`));
     mixin printOut!();
 }
 
@@ -149,11 +156,8 @@ struct MachineInfo{
     NumaNode attachedTo;
     char[]dmi_board_vendor;       /**< \brief DMI board vendor name */
     char[]dmi_board_name;         /**< \brief DMI board model name */
-    ulong memory_kB;          /**< \brief Size of memory node */
-    ulong huge_page_free;     /**< \brief Number of available huge pages */
-    ulong huge_page_size_kB;      /**< \brief Size of huge pages */
-    mixin(serializeSome("",`attachedTo|dmi_board_vendor|dmi_board_name|memory_kB
-        huge_page_free|huge_page_size_kB`));
+    MemoryInfo memory;
+    mixin(serializeSome("",`attachedTo|dmi_board_vendor|dmi_board_name|memory`));
     mixin printOut!();
 }
 
@@ -770,7 +774,7 @@ version(noHwloc){} else {
             while(obj!is null){
                 switch (obj.type){
                     case HWLOC_OBJ.SYSTEM,HWLOC_OBJ.MACHINE,HWLOC_OBJ.NODE,
-                         HWLOC_OBJ.CORE,HWLOC_OBJ.PROC :
+                         HWLOC_OBJ.CORE,HWLOC_OBJ.PU :
                     ++nLevels;
                     break;
                     default:
@@ -778,7 +782,7 @@ version(noHwloc){} else {
                             ++nLevels;
                     break;
                 }
-                obj=obj.father;
+                obj=obj.parent;
             }
             levelMapping=new LevelMap[nLevels];
         
@@ -788,7 +792,7 @@ version(noHwloc){} else {
             while(obj!is null){
                 switch (obj.type){
                     case HWLOC_OBJ.SYSTEM,HWLOC_OBJ.MACHINE,HWLOC_OBJ.NODE,
-                         HWLOC_OBJ.CORE,HWLOC_OBJ.PROC :
+                         HWLOC_OBJ.CORE,HWLOC_OBJ.PU :
                         ++nLevels;
                         levelMapping[nLevels-1].depth=obj.depth;
                         levelMapping[nLevels-1].partition=true;
@@ -804,7 +808,7 @@ version(noHwloc){} else {
                 for (int d=obj.depth;d<lastDepth;d++)
                     backMapping[d]=nLevels-1;
                 lastDepth=obj.depth;
-                obj=obj.father;
+                obj=obj.parent;
             }
         }
     
@@ -845,7 +849,7 @@ version(noHwloc){} else {
             }
             auto prevDepth=levelMapping[node.level+1].depth;
             while (obj.depth>prevDepth){
-                obj=obj.father;
+                obj=obj.parent;
                 assert(obj!is null);
             }
             if (obj.depth==prevDepth){
@@ -861,7 +865,7 @@ version(noHwloc){} else {
                         }
                     }
                     if (obj.depth==0) break;
-                    obj=obj.father;
+                    obj=obj.parent;
                 }
             }
             throw new Exception(collectAppender(delegate void(CharSink s){
@@ -910,7 +914,7 @@ version(noHwloc){} else {
                 auto depthAtt=levelMapping[mLevel].depth;
                 auto subN=childrens[start];
                 while(subN.depth>depthAtt){
-                    subN=subN.father;
+                    subN=subN.parent;
                 }
                 if (subN.depth!=depthAtt || subN.logical_index!=skipSubnode.pos) break;
             }
@@ -947,58 +951,59 @@ version(noHwloc){} else {
             auto obj=hwlocObjForNumaNode(n);
             while(obj!=null){
                 if (obj.type==HWLOC_OBJ.CACHE) break;
-                obj=obj.father;
+                obj=obj.parent;
             }
             if (obj!is null){
                 auto level=backMapping[obj.depth];
                 auto objDepth=levelMapping[level].depth;
                 auto refObj=obj;
                 while(refObj.depth>objDepth){
-                    refObj=refObj.father;
+                    refObj=refObj.parent;
                 }
                 assert(refObj.depth==objDepth);
                 res.attachedTo=NumaNode(level,refObj.logical_index);
-                res.size_kB=obj.attr.cache.memory_kB;
+                res.size_kB=obj.attr.cache.size/1024;
                 res.sharingLevel=countLeafs(refObj);
                 res.depth=obj.attr.cache.depth; // useful?
             }
             return res;
         }
+
+	MemoryInfo memoryInfoFromHwloc(NumaNode attachedTo,
+				       ref hwloc_obj_memory_s memory)
+	{
+	    MemoryInfo res;
+	    res.attachedTo=attachedTo;
+	    res.local_memory_kB=memory.local_memory/1024;
+	    res.total_memory_kB=memory.total_memory/1024;
+	    res.page_types=new MemoryInfo.Pages[](memory.page_types_len);
+	    foreach(i,p;memory.page_types[0..memory.page_types_len]){
+		res.page_types[i].size=p.size;
+		res.page_types[i].count=p.count;
+	    }
+	    return res;
+	}
+	    
     
         MemoryInfo nextMemory(NumaNode n){
-            MemoryInfo res;
             auto obj=hwlocObjForNumaNode(n);
-            while(obj!=null){
+            while(obj!=null){ // change now that all objects have memory info??
                 if (obj.type==HWLOC_OBJ.NODE || obj.type==HWLOC_OBJ.MACHINE ||
                     obj.type==HWLOC_OBJ.SYSTEM) break;
-                obj=obj.father;
+                obj=obj.parent;
             }
             if (obj!is null){
                 auto level=backMapping[obj.depth];
                 auto objDepth=levelMapping[level].depth;
                 auto refObj=obj;
                 while(refObj.depth>objDepth){
-                    refObj=refObj.father;
+                    refObj=refObj.parent;
                 }
                 assert(refObj.depth==objDepth);
-                res.attachedTo=NumaNode(level,refObj.logical_index);
-                switch(obj.type){
-                case HWLOC_OBJ.NODE:
-                    res.memory_kB=obj.attr.node.memory_kB;
-                    res.huge_page_free=obj.attr.node.huge_page_free;
-                    break;
-                case HWLOC_OBJ.MACHINE:
-                    res.memory_kB=obj.attr.machine.memory_kB;
-                    res.huge_page_free=obj.attr.machine.huge_page_free;
-                    break;
-                case HWLOC_OBJ.SYSTEM:
-                    res.memory_kB=obj.attr.system.memory_kB;
-                    res.huge_page_free=obj.attr.system.huge_page_free;
-                    break;
-                default:
-                    throw new Exception("unexpected type",__FILE__,__LINE__);
-                }
+		return memoryInfoFromHwloc(NumaNode(level,refObj.logical_index),
+					   obj.memory);
             }
+            MemoryInfo res;
             return res;
         }
         MachineInfo nextMachine(NumaNode n){
@@ -1006,14 +1011,14 @@ version(noHwloc){} else {
             auto obj=hwlocObjForNumaNode(n);
             while(obj!=null){
                 if (obj.type==HWLOC_OBJ.MACHINE || obj.type==HWLOC_OBJ.SYSTEM) break;
-                obj=obj.father;
+                obj=obj.parent;
             }
             if (obj!is null){
                 auto level=backMapping[obj.depth];
                 auto objDepth=levelMapping[level].depth;
                 auto refObj=obj;
                 while(refObj.depth>objDepth){
-                    refObj=refObj.father;
+                    refObj=refObj.parent;
                 }
                 assert(refObj.depth==objDepth);
                 res.attachedTo=NumaNode(level,refObj.logical_index);
@@ -1021,16 +1026,10 @@ version(noHwloc){} else {
                 case HWLOC_OBJ.MACHINE:
                     res.dmi_board_vendor =fromStringz(obj.attr.machine.dmi_board_vendor);
                     res.dmi_board_name   =fromStringz(obj.attr.machine.dmi_board_name);
-                    res.memory_kB        =obj.attr.machine.memory_kB        ;
-                    res.huge_page_free   =obj.attr.machine.huge_page_free   ;
-                    res.huge_page_size_kB=obj.attr.machine.huge_page_size_kB;
+                    res.memory=memoryInfoFromHwloc(res.attachedTo,obj.memory);
                     break;
                 case HWLOC_OBJ.SYSTEM:
-                    res.dmi_board_vendor =fromStringz(obj.attr.system.dmi_board_vendor);
-                    res.dmi_board_name   =fromStringz(obj.attr.system.dmi_board_name);
-                    res.memory_kB        =obj.attr.system.memory_kB        ;
-                    res.huge_page_free   =obj.attr.system.huge_page_free   ;
-                    res.huge_page_size_kB=obj.attr.system.huge_page_size_kB;
+                    res.memory=memoryInfoFromHwloc(res.attachedTo,obj.memory);
                     break;
                 default:
                     throw new Exception("unexpected type",__FILE__,__LINE__);
@@ -1043,14 +1042,14 @@ version(noHwloc){} else {
             auto obj=hwlocObjForNumaNode(n);
             while(obj!=null){
                 if (obj.type==HWLOC_OBJ.SOCKET) break;
-                obj=obj.father;
+                obj=obj.parent;
             }
             if (obj!is null){
                 auto level=backMapping[obj.depth];
                 auto objDepth=levelMapping[level].depth;
                 auto refObj=obj;
                 while(refObj.depth>objDepth){
-                    refObj=refObj.father;
+                    refObj=refObj.parent;
                 }
                 assert(refObj.depth==objDepth);
                 res.attachedTo=NumaNode(level,refObj.logical_index);
@@ -1069,7 +1068,7 @@ version(noHwloc){} else {
             }
 
             /* And try to bind ourself there.  */
-            if (hwloc_set_cpubind(topology, cpuset, 0)) {
+            if (hwloc_set_cpubind(topology, cpuset, HWLOC_CPUBIND.THREAD)) {
                 return false;
             }
             return true;
