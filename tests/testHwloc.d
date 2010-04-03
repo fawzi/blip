@@ -7,18 +7,17 @@ version(NoTrace){} else { import tango.core.stacktrace.TraceExceptions; }
 static void print_children(hwloc_topology_t topology, hwloc_obj_t obj, int depth)
 {
         char[128] string;
-	char[20] indent;
-	indent[]=' ';
-	if (depth<indent.length/2) {
-	    indent[2*depth]=0;
-	} else {
-	    indent[19]=0;
+        char[20] indent;
+        indent[]=' ';
+        if (depth<indent.length/2) {
+            indent[2*depth]=0;
+        } else {
+            indent[19]=0;
         }
         int i;
-
         hwloc_obj_type_snprintf(string.ptr,string.length, obj, 0);
-	string[string.length-1]=0;
-        printf("%s%s\n",indent, string.ptr);
+        string[string.length-1]=0;
+        printf("%s%s\n",indent.ptr, string.ptr);
         for (i = 0; i < obj.arity; i++)
                 print_children(topology, obj.children[i], depth + 1);
 }
@@ -71,19 +70,19 @@ int main()
         int depth, i;
         char string[128];
         for (depth = 0; depth < topo_depth; depth++) {
-	    printf("level=%d:\n",depth);
+            printf("level=%d:\n",depth);
                 for (i = 0; i < hwloc_get_nbobjs_by_depth(topology, depth); i++) {
                         hwloc_obj_type_snprintf(string.ptr, string.length,
                                         hwloc_get_obj_by_depth(topology, depth, i), 0);
                         printf("%s\n", string.ptr);
                 }
-	    printf("finished level%d\n",depth);
+            printf("finished level%d\n",depth);
         }
-	printf("end arrayStyle\n");
+        printf("end arrayStyle\n");
 
         /* Walk the topology with a tree style.  */
         print_children(topology, hwloc_get_root_obj(topology), 0);
-	printf("end recursiveStyle\n");
+        printf("end recursiveStyle\n");
 
 
         /* Print the number of sockets.  */
