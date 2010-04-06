@@ -211,7 +211,7 @@ struct BulkArray(T){
     /// gets a slice of the array as normal array (this will get invalid when dis array is collected)
     T[] getSlice(size_t i,size_t j){
         assert(i<=j,"slicing with i>j"); // allow???
-        assert(i>0&&j<=this.length,"slicing index out of bounds");
+        assert(i>=0&&j<=this.length,"slicing index out of bounds");
         return this.data[i..j];
     }
     void opIndexAssign(BulkArray val,size_t i,size_t j){
