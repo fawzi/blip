@@ -14,6 +14,7 @@ import blip.container.AtomicSLink;
 import blip.parallel.smp.WorkManager;
 import blip.io.BasicIO;
 import blip.container.GrowableArray;
+import cstdlib = tango.stdc.stdlib : free, malloc;
 
 /// guard object to deallocate large arrays that contain inner pointers
 class Guard{
@@ -31,7 +32,8 @@ class Guard{
         assert(refCount!=0);
         --refCount;
         if (refCount==0){
-            GC.free(data.ptr);
+            //GC.free(data.ptr);
+            cstdlib.free(data.ptr);
             data=null;
         }
     }
@@ -39,13 +41,15 @@ class Guard{
         GC.BlkAttr attr;
         if (!scanPtr)
             attr=GC.BlkAttr.NO_SCAN;
-        ubyte* mData2=cast(ubyte*)GC.malloc(size);
+        //ubyte* mData2=cast(ubyte*)GC.malloc(size);
+        ubyte* mData2=cast(ubyte*)cstdlib.malloc(size);
         if(mData2 is null) throw new Exception("malloc failed");
         data=mData2[0..size];
         refCount=1;
     }
     ~this(){
-        GC.free(data.ptr);
+        //GC.free(data.ptr);
+        cstdlib.free(data.ptr);
     }
 }
 

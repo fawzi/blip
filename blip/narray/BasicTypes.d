@@ -47,9 +47,11 @@ import blip.rtest.RTest;
 import blip.BasicModels;
 import blip.serialization.Serialization;
 import blip.container.GrowableArray;
+import blip.container.Pool;
 import blip.sync.Atomic;
 import blip.parallel.smp.WorkManager;
 import blip.io.BasicIO;
+import cstdlib = tango.stdc.stdlib : free, malloc;
 
 //version=RefCount;
 
@@ -146,6 +148,7 @@ class Guard{
     void *dataPtr;
     size_t dataDim; // just informative, remove?
     size_t refCount; // used to guarantee collection when used with scope objects
+    PoolI!(ubyte[]) pool;
     this(void[] data){
         this.dataPtr=cast(void*)data.ptr;
         this.dataDim=data.length;
@@ -154,7 +157,8 @@ class Guard{
         GC.BlkAttr attr;
         if (!scanPtr)
             attr=GC.BlkAttr.NO_SCAN;
-        dataPtr=cast(void*)GC.malloc(size,attr);
+        //dataPtr=cast(void*)GC.malloc(size,attr);
+        dataPtr=cstdlib.malloc(size);
         if(dataPtr is null && size!=0) throw new Exception("malloc failed");
         dataDim=size;
         refCount=1;
@@ -168,17 +172,26 @@ class Guard{
         void release(){
             assert(refCount>0,"refCount was 0 in release...");
             if (atomicAdd(refCount,-cast(size_t)1)==cast(size_t)1){
-                free();
+                free(true);
             }
         }
     }
     ~this(){
-        free();
+        free(false);
     }
-    void free(){
+    void dispose(){
+        free(true);
+    }
+    void free(bool deterministic){
         void *d=atomicSwap(dataPtr,null);
         if (d !is null) {
-            GC.free(dataPtr);
+            if (deterministic && pool!is null){
+                pool.giveBack((cast(ubyte*)d)[0..dataDim]);
+            } else {
+                // GC.free(d);
+                cstdlib.free(d);
+            }
+            dataDim=0;
         }
     }
 }
