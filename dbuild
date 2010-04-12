@@ -99,9 +99,9 @@ if [ -z "$DCHEM_HOME" ] ; then
 fi
 
 if [ -z "$compiler" ]; then
-    compiler=`$TANGO_HOME/build/tools/guessCompiler.sh --path $DC`
+    compiler=`$BLIP_HOME/build/tools/guessCompiler.sh --path $DC`
 fi
-compShort=`$TANGO_HOME/build/tools/guessCompiler.sh $compiler`
+compShort=`$BLIP_HOME/build/tools/guessCompiler.sh $compiler`
 
 if [ "$version" == "opt" ]; then
     libExt=

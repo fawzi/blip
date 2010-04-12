@@ -62,3 +62,48 @@ int getHash(T,U)(T t,U hash){
         return rt_hash_combine(typeid(T).getHash(&t),hash);
     }
 }
+
+char[] ctfe_rep(char[] s){
+    bool needsDquoteEscape=false;
+    bool needsSQuoteEscape=false;
+    foreach(c;s){
+        switch(c){
+        case '"','\\','\n','\r' :
+            needsDquoteEscape=true;
+            break;
+        case '`':
+            needsSQuoteEscape=true;
+            break;
+        default:
+        }
+    }
+    if (!needsDquoteEscape){
+        return "\""~s~"\"";
+    } if (needsSQuoteEscape){
+        char[] res="\"";
+        size_t i0=0;
+        foreach(i,c;s){
+            switch(c){
+            case '"','\\':
+                res~=s[i0..i];
+                res~='\\';
+                res~=c;
+                break;
+            case '\n':
+                res~=s[i0..i];
+                res~="\\n";
+                break;
+            case '\r':
+                res~=s[i0..i];
+                res~="\\r";
+                break;
+            default:
+            }
+        }
+        res~=s[i0..s.length];
+        res~="\"";
+        return res;
+    } else {
+        return "`"~s~"`";
+    }
+}
