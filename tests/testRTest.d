@@ -22,9 +22,7 @@ arg1=specialNrs[arg1_i]; arg1_nEl=specialNrs.length;`) combNrTst; // combinatori
 
 void main(char[][]argv){
     sout("blip.parallel.smp:")(Log.lookup("blip.parallel.smp").level)("\n");
-    Log.lookup("blip.parallel.smp").info("pippo");
     sout("blip.parallel.smp.queue:")(Log.lookup("blip.parallel.smp.queue").level)("\n");
-    Log.lookup("blip.parallel.smp.queue").info("pippo");
     CharSink nullPrt=delegate void(char[]s){};
     nullPrt=sout.call;
     SingleRTest.defaultTestController=new TextController("",TextController.OnFailure.StopTest,

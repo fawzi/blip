@@ -206,7 +206,11 @@ class ReadHandler(T):Reader!(T){
     }
     /// shutdown the input source (also closes the input)
     void shutdownInput(){
-        buf.close();
+        if (buf!is null){
+            buf.close();
+        } else if (arr!is null) {
+            arr.close();
+        }
     }
 }
 
