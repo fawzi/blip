@@ -189,7 +189,7 @@ class PriQTaskScheduler:TaskSchedulerI {
     /// (might not be a snapshot if other threads modify it while printing)
     /// non threadsafe
     void desc(void delegate(char[]) sink,bool shortVersion){
-        auto s=dumperP(sink);
+        auto s=dumper(sink);
         s("<PriQTaskScheduler@"); writeOut(sink,cast(void*)this);
         if (shortVersion) {
             s(" >");

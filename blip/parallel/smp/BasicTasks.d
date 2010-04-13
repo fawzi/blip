@@ -954,7 +954,7 @@ class Task:TaskI{
     }
     /// prints the fields (superclasses can override this an call it through super)
     void fieldsDesc(void delegate(char[]) sink){
-        auto s=dumperP(sink);
+        auto s=dumper(sink);
         s("  level=")(level)(",\n");
         s("  taskOp:");
         if (taskOp is null)

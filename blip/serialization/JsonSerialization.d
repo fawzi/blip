@@ -31,7 +31,7 @@ class JsonSerializer(T=char) : Serializer {
     /// constructor usin a sink delegate
     this(void delegate(T[])sink){
         super(new FormattedWriteHandlers!()(sink));
-        s=dumperP(handlers.charSink());
+        s=dumper(handlers.charSink());
         writeCount=0;
         atStart=true;
         compact=true;
@@ -496,7 +496,7 @@ class JsonUnserializer(T=char) : Unserializer {
             }
             while(1){
                 if(!stackTop.missingLabels.remove(stackTop.labelToRead)){
-                    serializationError(collectAppender(delegate void(CharSink sink){ auto s=dumperP(sink);
+                    serializationError(collectAppender(delegate void(CharSink sink){ auto s=dumper(sink);
                         s("unexpected extra object field '")(stackTop.labelToRead)("'");
                         if (field !is null){
                             if (field.name.length!=0)

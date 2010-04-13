@@ -172,7 +172,7 @@ struct BulkArray(T){
     in{
         if (this.ptr+i>=this.ptrEnd){
             assert(0,collectAppender(delegate void(CharSink sink){
-                dumperP(sink)("index of BulkArray out of bounds:")(i)(" for array of size ")(this.ptrEnd-this.ptr);
+                dumper(sink)("index of BulkArray out of bounds:")(i)(" for array of size ")(this.ptrEnd-this.ptr);
             }));
         }
     } body {

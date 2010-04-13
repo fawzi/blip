@@ -234,7 +234,7 @@ class ClassMetaInfo {
     }
     /// description (for debugging purposes)
     void desc(void delegate(char[]) sink){
-        auto s=dumperP(sink);
+        auto s=dumper(sink);
         s("<ClassMetaInfo@"); writeOut(sink,cast(void*)this); s("\n");
         s(" className:'")(className)("',\n");
         s(" kind:")(kind)(",\n");

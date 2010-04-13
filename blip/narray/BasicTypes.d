@@ -1043,7 +1043,7 @@ else {
                 return 0;
             }
             void desc(void delegate(char[]) sink){
-                auto s=dumperP(sink);
+                auto s=dumper(sink);
                 if (this is null){
                     s("<FlatIterator *null*>");
                     return;
@@ -1568,7 +1568,7 @@ else {
         /// description of the NArray wrapper, not of the contents, for debugging purposes...
         /// see printData for the content
         void desc(void delegate(char[]) sink){
-            auto s=dumperP(sink);
+            auto s=dumper(sink);
             if (this is null){
                 s("<NArray *null*>");
                 return;

@@ -369,7 +369,7 @@ class PriQScheduler:TaskSchedulerI {
     /// (might not be a snapshot if other threads modify it while printing)
     /// non threadsafe
     void desc(void delegate(char[]) sink,bool shortVersion){
-        auto s=dumperP(sink);
+        auto s=dumper(sink);
         s("<PriQScheduler@"); writeOut(sink,cast(void*)this);
         if (shortVersion) {
             s(" >");
@@ -731,7 +731,7 @@ class MultiSched:TaskSchedulerI {
     /// (might not be a snapshot if other threads modify it while printing)
     /// non threadsafe
     void desc(void delegate(char[]) sink,bool shortVersion){
-        auto s=dumperP(sink);
+        auto s=dumper(sink);
         s("<MultiSched@"); writeOut(sink,cast(void*)this);
         if (shortVersion) {
             s(" >");
@@ -790,7 +790,7 @@ class MultiSched:TaskSchedulerI {
     int nSimpleTasksWanted(){ return 4; }
     /// writes just the scheduling status in a way that looks good
     void writeStatus(CharSink sink,int indentL){
-        auto s=dumperP(sink);
+        auto s=dumper(sink);
         synchronized(queue){
             s("{ class:MultiSched, name:\"")(name)("\", scheds:\n");
             foreach(i,sched;queue){
@@ -841,7 +841,7 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
         void ind(int l){
             writeSpace(sink,indentL+l);
         }
-        auto s=dumperP(sink);
+        auto s=dumper(sink);
         auto maxScheds=topo.nNodes(schedLevel);
         auto schedsN=scheds;
         synchronized(this){
@@ -1178,7 +1178,7 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
     /// (might not be a snapshot if other threads modify it while printing)
     /// non threadsafe
     void desc(void delegate(char[]) sink,bool shortVersion){
-        auto s=dumperP(sink);
+        auto s=dumper(sink);
         s("<StarvationManager@"); writeOut(sink,cast(void*)this);
         if (shortVersion) {
             s(" >");
@@ -1329,7 +1329,7 @@ class MExecuter:ExecuterI{
             }
             char[128] buf;
             scope s=lGrowableArray!(char)(buf,0);
-            dumperP(&s)("Work thread ")(Thread.getThis().name)(" pinned to");
+            dumper(&s)("Work thread ")(Thread.getThis().name)(" pinned to");
             writeOut(&s.appendArr,exeNode);
             log.info(s.data);
             topo.bindToNode(n);
