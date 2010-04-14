@@ -803,7 +803,7 @@ version(noHwloc){} else {
             while(obj!is null){
                 switch (obj.type){
                     case HWLOC_OBJ.SYSTEM,HWLOC_OBJ.MACHINE,HWLOC_OBJ.NODE,
-                         HWLOC_OBJ.CORE,HWLOC_OBJ.PU :
+			HWLOC_OBJ.CORE,HWLOC_OBJ.PU,HWLOC_OBJ.GROUP :
                     ++nLevels;
                     break;
                     default:
@@ -821,7 +821,7 @@ version(noHwloc){} else {
             while(obj!is null){
                 switch (obj.type){
                     case HWLOC_OBJ.SYSTEM,HWLOC_OBJ.MACHINE,HWLOC_OBJ.NODE,
-                         HWLOC_OBJ.CORE,HWLOC_OBJ.PU :
+			HWLOC_OBJ.CORE,HWLOC_OBJ.PU,HWLOC_OBJ.GROUP :
                         ++nLevels;
                         levelMapping[nLevels-1].depth=obj.depth;
                         levelMapping[nLevels-1].partition=true;

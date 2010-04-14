@@ -87,22 +87,22 @@ enum HWLOC_OBJ {
     * Objects of this kind are always reported and can
     * thus be used as fallback when others are not.
     */
-  OBJ_GROUP,     /**< \brief Group objects.
-                   * Objects which do not fit in the above but are
-                   * detected by hwloc and are useful to take into
-                   * account for affinity. For instance, some OSes
-                   * expose their arbitrary processors aggregation this
-                   * way.
-                   * way.  And hwloc may insert such objects to group
-                   * NUMA nodes according to their distances.
-                   *
-                   * These objects are ignored when they do not bring
-                   * any structure.
-                   */
+  GROUP,     /**< \brief Group objects.
+    * Objects which do not fit in the above but are
+    * detected by hwloc and are useful to take into
+    * account for affinity. For instance, some OSes
+    * expose their arbitrary processors aggregation this
+    * way.
+    * way.  And hwloc may insert such objects to group
+    * NUMA nodes according to their distances.
+    *
+    * These objects are ignored when they do not bring
+    * any structure.
+    */
   MISC,   /**< \brief Miscellaneous objects.
-            * Objects without particular meaning, that can e.g. be
-            * added by the application for its own use.
-            */
+    * Objects without particular meaning, that can e.g. be
+    * added by the application for its own use.
+    */
 }
 alias HWLOC_OBJ hwloc_obj_type_t;
 
