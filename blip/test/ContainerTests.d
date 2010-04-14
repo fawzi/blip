@@ -39,11 +39,11 @@ void testLoop(T)(T[] arr1,SizeLikeNumber!(3,1) s){
         }
         if (arr1.length>0){
             barr[]=arr1[0];
-            foreach(i,v;barr.pLoop(s.val)){
+            foreach(i,ref v;barr.pLoop(s.val)){
                 v=v+arr1[i];
             }
             foreach(i,v;arr1){
-                assert(barr[i]==v+v,"BulkArray indexing test");
+                assert(barr[i]==v+arr1[0],"BulkArray indexing test");
             }
         }
     }

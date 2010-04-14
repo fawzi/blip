@@ -119,11 +119,11 @@ case `uname` in
   extra_libs_os="${linkFlag}-lhwloc ${linkFlag}-framework ${linkFlag}Accelerate ${linkFlag}-lz ${linkFlag}-lbz2"
   ;;
   Linux)
-    if [ -n "$MKL_ROOT" ] ; then
-      extra_libs_os="${linkFlag}-lhwloc  ${linkFlag}-L$MKL_ROOT/lib/em64t ${linkFlag}-lmkl_lapack ${linkFlag}--start-group ${linkFlag}-lmkl_intel_lp64 ${linkFlag}-lmkl_core ${linkFlag}-lmkl_sequential ${linkFlag}--end-group ${linkFlag}-ldl ${linkFlag}-lz ${linkFlag}-lbz2 ${linkFlag}-lg2c"
+    if [ -n "$MKLROOT" ] ; then
+      extra_libs_os="${linkFlag}-lhwloc  ${linkFlag}-L$MKLROOT/lib/em64t ${linkFlag}-lmkl_lapack ${linkFlag}--start-group ${linkFlag}-lmkl_intel_lp64 ${linkFlag}-lmkl_core ${linkFlag}-lmkl_sequential ${linkFlag}--end-group ${linkFlag}-ldl ${linkFlag}-lz ${linkFlag}-lbz2 ${linkFlag}-lg2c"
     else
       extra_libs_os="${linkFlag}-lhwloc ${linkFlag}-lgoto2 ${linkFlag}-ldl ${linkFlag}-lz ${linkFlag}-lbz2 ${linkFlag}-lg2c"
-  fi
+    fi
   ;;
   *)
   die "unknown platform, you need to set extra_libs_os"
