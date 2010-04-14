@@ -140,8 +140,8 @@ esac
 makeFlags="$silent TANGO_HOME=$TANGO_HOME $build_dir"
 if [ -n "$clean" ]; then
     $make $makeFlags distclean
+    rm -f libs/libblip-*
 fi
-rm -f libs/libblip-*
 if [ -z "$noopt" ]; then
     $make $makeFlags EXTRA_LIBS="$extra_libs_opt" VERSION=opt lib || die "error building the opt version"
 fi
@@ -151,6 +151,8 @@ if [ -n "$tests" ] ; then
 fi
 installDir=`dirname $compiler`/../lib
 for l in libs/libblip-* ; do
-    echo "$l -> $installDir"
-    cp $l $installDir
+    if [ -e "$l" ] ; then
+      echo "$l -> $installDir"
+      cp $l $installDir
+    fi
 done

@@ -5,6 +5,7 @@ import blip.test.narray.NArraySupport;
 import tango.math.random.Random;
 import blip.container.GrowableArray;
 import blip.container.BulkArray;
+import blip.sync.Atomic;
 
 void testLoop(T)(T[] arr1,SizeLikeNumber!(3,1) s){
     BulkArray!(T) barr;
@@ -27,9 +28,13 @@ void testLoop(T)(T[] arr1,SizeLikeNumber!(3,1) s){
         assert(arr1[i]==v,"BulkArray parallel index loop");
     }
     static if(is(typeof(T.init+T.init))){
+        size_t count=0;
         foreach(ref v;barr.pLoop(s.val)){
             v=v+v;
+            atomicAdd!(size_t)(count,1);
         }
+        /+volatile+/ readBarrier();
+        assert(count==arr1.length,"no index loop has wrong length");
         foreach(i,v;barr.pLoop(s.val)){
             assert(arr1[i]+arr1[i]==v,"BulkArray parallel no index loop update");
         }

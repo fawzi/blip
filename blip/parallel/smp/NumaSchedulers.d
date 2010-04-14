@@ -110,8 +110,14 @@ class PriQScheduler:TaskSchedulerI {
         log=Log.lookup(loggerPath);
         _rootTask=new RootTask(this,0,name~"RootTask");
         runLevel=SchedulerRunLevel.Running;
-        raiseRunlevel(superScheduler.runLevel);
         waitingSince=Time.max;
+        auto newLev=superScheduler.runLevel;
+        if (runLevel < cast(int)newLev){
+            runLevel=newLev;
+            if (runLevel==SchedulerRunLevel.Stopped){
+                serr("queue creation in stopped scheduler, dropping it\n");
+            }
+        }
     }
     void reset(char[] name,MultiSched superScheduler){
         this.name=name;
@@ -246,8 +252,20 @@ class PriQScheduler:TaskSchedulerI {
         if (!queue.popBack(t,delegate bool(TaskI task){ return task.stealLevel>=stealLevel; })){
             return false;
         }
+        version(TrackQueues){
+            log.info(collectAppender(delegate void(CharSink sink){
+                                     sink("stolen task ");
+                                     writeOut(sink,cast(void*)t);
+                                     sink(" from scheduler ");
+                                     writeOut(sink,this,true);
+                                     sink(" for scheduler ");
+                                     writeOut(sink,targetScheduler,true);
+                                     sink("\n");
+                                 }));
+        }
         t.scheduler=targetScheduler;
         targetScheduler.addTask0(t);
+        // steal more
         auto scheduler2=t.scheduler;
         if(scheduler2 is null) scheduler2=targetScheduler;
         while (true){
@@ -257,6 +275,17 @@ class PriQScheduler:TaskSchedulerI {
                 return true;
             }
             t2.scheduler=scheduler2;
+            version(TrackQueues){
+                log.info(collectAppender(delegate void(CharSink sink){
+                                         sink("stolen task ");
+                                         writeOut(sink,cast(void*)t);
+                                         sink(" from scheduler ");
+                                         writeOut(sink,this,true);
+                                         sink(" for scheduler ");
+                                         writeOut(sink,scheduler2,true);
+                                         sink("\n");
+                                     }));
+            }
             scheduler2.addTask0(t2);
         }
     }

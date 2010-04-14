@@ -58,13 +58,13 @@ struct SmpSemaphore{
     }
     /// waits to be notified (counter)
     void wait(){
-        auto oldV=atomicAdd(counter,1);
+        auto oldV=atomicAdd!(size_t)(*cast(size_t*)counter,1);
         if (oldV>=0){
             auto tAtt=taskAtt.val;
             auto tt=new TaskISlist;
             if (tAtt!is null && tAtt.mightYield()){
                 tt.el=tAtt;
-                tAtt.delay({
+                tAtt.delay(delegate void(){
                     insertAt(waiting,tt);
                 });
             } else {

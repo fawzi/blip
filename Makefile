@@ -106,12 +106,14 @@ tests:
 
 _genDeps: $(MODULES:%=%.dep)
 
-_lib:$(LIB)
+_lib:$(LIB) $(BLIP_HOME)/libs/$(INSTALL_LIB)
 
 $(LIB):  $(OBJS)
 	rm -f $@
 	$(mkLib) $@ $(OBJS)
 	$(ranlib) $@
+
+$(BLIP_HOME)/libs/$(INSTALL_LIB): $(LIB)
 	mkdir -p $(BLIP_HOME)/libs
 	cp $(OBJDIR)/$(LIB) $(BLIP_HOME)/libs/$(INSTALL_LIB)
 
@@ -159,6 +161,7 @@ clean-all:
 distclean:
 	rm -rf $(OBJDIRBASE)/blipBuild/objs-*
 	rm -rf $(EXE_DIR)
+	rm -rf $(BASE_DIR)/libs
 
 ifeq ($(shell if [ -e "$(OBJDIR)/intermediate.rule" ]; then echo 1; fi;),1)
 include $(OBJDIR)/intermediate.rule
