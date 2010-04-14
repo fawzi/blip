@@ -54,8 +54,8 @@ class TextParser(T) : InputFilter
     
     /// position of the parsed token
     void parserPos(void delegate(char[]) s){
-        dumperP(s)("line:")(oldLine)(" col:")(oldCol)(" token:\"")(convertToString!(char)(escape(slice)))("\"\n");
-        dumperP(s)("nextText:<<")(convertToString!(char)(cast(T[])source.slice))(">>\n");
+        dumper(s)("line:")(oldLine)(" col:")(oldCol)(" token:\"")(convertToString!(char)(escape(slice)))("\"\n");
+        dumper(s)("nextText:<<")(convertToString!(char)(cast(T[])source.slice))(">>\n");
     }
     /// exception during parsing (adds parser position info)
     static class ParsingException:Exception{

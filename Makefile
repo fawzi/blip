@@ -1,4 +1,4 @@
-# Makefile that builds the tango-user library
+# Makefile that builds the blip library
 #
 # * Targets
 # all:       (the default) builds lib
@@ -81,7 +81,7 @@ EXCLUDE_DEP_ALL=$(EXCLUDE_DEP_COMP) object.di ^tango.*
 
 OBJS=$(MODULES:%=%.$(OBJ_EXT))
 
-TESTS=testTextParsing testRTest testSerial testNArrayPerf testNuma testHwloc testSmp testNArray testBlip
+TESTS=testTextParsing testRTest testSerial testNArrayPerf testNuma testHwloc testSmp testBlip testNArray
 .PHONY: _genDeps newFiles build clean distclean _tests tests lib $(TESTS)
 
 lib: $(OBJDIR)/MODULES.inc $(OBJDIR)/intermediate.rule

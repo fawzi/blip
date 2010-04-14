@@ -7,7 +7,8 @@
     A framework to quickly write tests that check property/functions using randomly
     generated data or all combinations of some values.
 
-    I wrote this framework inspired by Haskell's Quickcheck, but the result is quite different.
+    I wrote this framework inspired by Haskell's Quickcheck, but the result is a rather 
+    different (but still shares the main philosophy).
 
     At the moment it is only tango based.
 
@@ -29,15 +30,15 @@
     {{{
         import blip.rtest.RTest;
 
-        private mixin testInit!() autoInitTst; 
+        // private mixin testInit!() autoInitTst; // this is now exported by the RTest module
 
         void myTests(){
             // define a collection for my tests
             TestCollection myTests=new TestCollection("myTests",__LINE__,__FILE__);
 
-            // define a test
-            autoInitTst.testTrue("testName",functionToTest,__LINE__,__FILE__,myTests);
-            // for example
+            // define a test with a test function (note the F in the name)
+            autoInitTst.testTrueF("testName",functionToTest,__LINE__,__FILE__,myTests);
+            // an explicit case using a delegate (no final F)
             autoInitTst.testTrue("(2*x)%2==0",(int x){ return ((2*x)%2==0);},__LINE__,__FILE__,myTests);
 
             // run the tests
@@ -195,11 +196,12 @@ int mainTestFun(char[][] argStr,SingleRTest testSuite){
     args.bind("--","counter",delegate(char[] arg){ counter=parseIArray(arg[1..$]); });
     args.bind("--","test",delegate void(char[] arg){ test=arg[1..$].dup; });
     args.bind("--","on-failure",delegate void(char[] arg){
+        if (arg.length==0) throw new Exception("expected an argument after --on-failure");
         if (arg[0]=='=') arg=arg[1..$];
         switch(arg){
             case "Continue","continue" : onFailure=TextController.OnFailure.Continue; break;
             case "StopTest","stoptest","stop-test": onFailure=TextController.OnFailure.StopTest; break;
-            case "StopAllTests","StopAll","stopall","stopalltests","stop-all-tests":
+            case "stop-all","StopAllTests","StopAll","stopall","stopalltests","stop-all-tests":
             onFailure=TextController.OnFailure.StopAllTests; break;
             case "Throw","throw": onFailure=TextController.OnFailure.Throw; break;
             default:
@@ -231,7 +233,7 @@ int mainTestFun(char[][] argStr,SingleRTest testSuite){
         return 0;
     }
     
-    SingleRTest.defaultTestController=new TextController(
+    SingleRTest.defaultTestController=new TextController(argStr[0],
         onFailure, printLevel,sout.call,sout.call,1,trace);
     if (test.length==0){
         // testSuite.runTests(runs,seed,counter);
@@ -261,7 +263,7 @@ debug(UnitTest){
     unittest{
         CharSink nullPrt=delegate void(char[]){};
         // nullPrt=sout;
-        SingleRTest.defaultTestController=new TextController(TextController.OnFailure.StopTest,
+        SingleRTest.defaultTestController=new TextController("",TextController.OnFailure.StopTest,
             TextController.PrintLevel.AllShort,nullPrt,nullPrt);
         TestCollection failTests=new TestCollection("failTests",__LINE__,__FILE__);
 

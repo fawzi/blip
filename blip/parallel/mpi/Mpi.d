@@ -323,7 +323,7 @@ version(mpi)
         alias sr3.sendrecv sendrecv;
         
         void desc(void delegate(char[]) sink){
-            auto s=dumperP(sink);
+            auto s=dumper(sink);
             s("{<MpiChannel@")(cast(void*)this)(">\n");
             s("  otherRank:")(this.otherRank)(",\n");
             s("  comm:MpiLinearComm@")(cast(void*)this.comm)(">\n");
@@ -425,7 +425,7 @@ version(mpi)
                     }
                 } catch (Exception e){
                     serr(collectAppender(delegate void(CharSink s){
-                        dumperP(s)("Error in mpi handler for comm ")(comm.name)(" tag:")(tag)("\n");
+                        dumper(s)("Error in mpi handler for comm ")(comm.name)(" tag:")(tag)("\n");
                         e.writeOut(serr.call);
                     }));
                 }
@@ -786,7 +786,7 @@ version(mpi)
             desc(sink,true);
         }
         void desc(void delegate(char[]) sink,bool shortDesc){
-            auto s=dumperP(sink);
+            auto s=dumper(sink);
             s("{<MpiLinearComm@")(cast(void*)this)(">\n");
             s("  name:")(this.name)(",\n");
             s("  myRank:")(this._myRank)(",\n");

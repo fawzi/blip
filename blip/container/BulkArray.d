@@ -14,6 +14,7 @@ import blip.container.AtomicSLink;
 import blip.parallel.smp.WorkManager;
 import blip.io.BasicIO;
 import blip.container.GrowableArray;
+import cstdlib = tango.stdc.stdlib : free, malloc;
 
 /// guard object to deallocate large arrays that contain inner pointers
 class Guard{
@@ -31,7 +32,8 @@ class Guard{
         assert(refCount!=0);
         --refCount;
         if (refCount==0){
-            GC.free(data.ptr);
+            //GC.free(data.ptr);
+            cstdlib.free(data.ptr);
             data=null;
         }
     }
@@ -39,13 +41,15 @@ class Guard{
         GC.BlkAttr attr;
         if (!scanPtr)
             attr=GC.BlkAttr.NO_SCAN;
-        ubyte* mData2=cast(ubyte*)GC.malloc(size);
+        //ubyte* mData2=cast(ubyte*)GC.malloc(size);
+        ubyte* mData2=cast(ubyte*)cstdlib.malloc(size);
         if(mData2 is null) throw new Exception("malloc failed");
         data=mData2[0..size];
         refCount=1;
     }
     ~this(){
-        GC.free(data.ptr);
+        //GC.free(data.ptr);
+        cstdlib.free(data.ptr);
     }
 }
 
@@ -114,9 +118,11 @@ struct BulkArray(T){
         this.guard=new Guard(dArray);
     }
     
+    mixin printOut!();
+    
     /// data as array
     T[] data(){
-        return this.ptr[0..(this.ptrEnd-this.ptr)];
+        return ((this.ptr is null)?null:(this.ptr[0..(this.ptrEnd-this.ptr)]));
     }
     void data(T[] newData){
         this.ptr=newData.ptr;
@@ -166,7 +172,7 @@ struct BulkArray(T){
     in{
         if (this.ptr+i>=this.ptrEnd){
             assert(0,collectAppender(delegate void(CharSink sink){
-                dumperP(sink)("index of BulkArray out of bounds:")(i)(" for array of size ")(this.ptrEnd-this.ptr);
+                dumper(sink)("index of BulkArray out of bounds:")(i)(" for array of size ")(this.ptrEnd-this.ptr);
             }));
         }
     } body {
@@ -209,7 +215,7 @@ struct BulkArray(T){
     /// gets a slice of the array as normal array (this will get invalid when dis array is collected)
     T[] getSlice(size_t i,size_t j){
         assert(i<=j,"slicing with i>j"); // allow???
-        assert(i>0&&j<=this.length,"slicing index out of bounds");
+        assert(i>=0&&j<=this.length,"slicing index out of bounds");
         return this.data[i..j];
     }
     void opIndexAssign(BulkArray val,size_t i,size_t j){
@@ -315,7 +321,7 @@ struct BulkArray(T){
             void exec(){
                 try{
                     if (context.res!=0) return;
-                    if(end-start>context.optimalBlockSize){
+                    if(end-start>context.optimalBlockSize*3/2){
                         auto newChunk=popFrom(context.freeList1);
                         if (newChunk is null){
                             newChunk=new Slice1;
@@ -367,7 +373,7 @@ struct BulkArray(T){
             void exec(){
                 try{
                     if (context.res!=0) return;
-                    if (end-start>context.optimalBlockSize){
+                    if (end-start>context.optimalBlockSize*3/2){
                         auto newChunk=popFrom(context.freeList2);
                         if (newChunk is null){
                             newChunk=new Slice2;
@@ -432,10 +438,18 @@ struct BulkArray(T){
                 newChunk.context=this;
                 newChunk.start=start;
                 newChunk.end=end;
-                Task("BulkArrayPLoop0",&newChunk.exec).executeNow();
+                Task("BulkArrayPLoop0",&newChunk.exec).autorelease.executeNow();
                 if (e!is null){
                     throw new Exception("Exception in BulkArray PLoop",__FILE__,__LINE__,e);
                 }
+                auto cnk=freeList1;
+                while (cnk !is null){
+                    auto nextC=cnk.next;
+                    cnk.next=null;
+                    delete cnk;
+                    cnk=nextC;
+                }
+                freeList1=null;
                 return res;
             } else {
                 for (T*aPtr=start;aPtr!=end;++aPtr){
@@ -453,10 +467,18 @@ struct BulkArray(T){
                 newChunk.start=start;
                 newChunk.end=end;
                 newChunk.index=index;
-                Task("BulkArrayPLoop1",&newChunk.exec).executeNow();
+                Task("BulkArrayPLoop1",&newChunk.exec).autorelease.executeNow();
                 if (e!is null){
                     throw new Exception("Exception in BulkArray PLoop",__FILE__,__LINE__,e);
                 }
+                auto cnk=freeList2;
+                while (cnk !is null){
+                    auto nextC=cnk.next;
+                    cnk.next=null;
+                    delete cnk;
+                    cnk=nextC;
+                }
+                freeList2=null;
                 return res;
             } else {
                 size_t len=end-start;

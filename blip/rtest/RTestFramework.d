@@ -137,7 +137,7 @@ char[] printArgs(int nargs,char[] printC="sout.call",char[] indent="    "){
         res~=indent~"    }\n";
     }
     res~=indent~"}catch (Exception e) {\n";
-    res~=indent~"    sout.call(collectAppender(delegate void(void delegate(char[])s){ s(\"could not print arguments due to exception\"); writeOut(sout.call,e.toString); sout(\"\\n\");}));\n";
+    res~=indent~"    sout.call(collectAppender(delegate void(void delegate(char[])s){ s(\"\\nError: could not print arguments due to exception \"); writeOut(s,e); s(\"\\n\");}));\n";
     res~=indent~"}\n";
     return res;
 }
@@ -157,6 +157,7 @@ class TextController: TestControllerI{
     enum PrintLevel:int{ Error, Skip, AllShort, AllVerbose}
     PrintLevel printLevel;
     Rand r;
+    char[] exeName="";
     
     Mutex writeLock(){ return _writeLock; }
     /// what to do upon failure
@@ -168,9 +169,10 @@ class TextController: TestControllerI{
     }
     OnFailure onFailure; /// what to do upon failure
     int testFactor; /// increase for a more throughly testing
-    this(OnFailure onFailure=OnFailure.Throw,PrintLevel printLevel=PrintLevel.Skip,
+    this(char[] exeName="",OnFailure onFailure=OnFailure.Throw,PrintLevel printLevel=PrintLevel.Skip,
         CharSink progressLog=sout.call,CharSink errorLog=sout.call,int testFactor=1,
         bool trace=false,Rand r=null){
+        this.exeName=exeName;
         this._writeLock=new Mutex();
         this.progressLog=progressLog;
         this.errorLog=errorLog;
@@ -286,32 +288,33 @@ class TextController: TestControllerI{
             auto arr=lGrowableArray!(char)(buf,0,GASharing.GlobalNoFree);
             progressLog("\n");
             progressLog("To reproduce:\n");
-            progressLog(" testCollection\n");
-            arr(" .findTest(`");
-            arr(test.testName);
-            arr("`)\n");
-            arr(" .runTests(1,`");
-            writeOut(&arr.appendArr,test.initialState); arr("`,[");
-            foreach (i,c;test.counter){
-                if (i!=0) arr(", ");
-                writeOut(&arr.appendArr,c);
+            if (exeName.length==0){
+                progressLog(" testCollection\n");
+                arr(" .findTest(`");
+                arr(test.testName);
+                arr("`)\n");
+                arr(" .runTests(1,`");
+                writeOut(&arr.appendArr,test.initialState); arr("`,[");
+                foreach (i,c;test.counter){
+                    if (i!=0) arr(", ");
+                    writeOut(&arr.appendArr,c);
+                }
+                arr("]);\n");
+                progressLog(arr.data);
+                arr.clearData;
+            } else {
+                dumper(&arr)(exeName)(" --test='")(test.testName)("'");
+                arr(" --counter='[");
+                foreach (i,c;test.counter){
+                    if (i!=0) arr(", ");
+                    writeOut(&arr.appendArr,c);
+                }
+                arr("]'");
+                dumper(&arr)(" --seed='")(test.initialState)("'\n");
+                progressLog(arr.data);
+                arr.clearData;
             }
-            arr("]);\n");
-            progressLog(arr.data);
-            arr.clearData;
-            progressLog("or\n");
-            dumperP(&arr)("./test --test='")(test.testName)("'");
-            arr(" --counter='[");
-            foreach (i,c;test.counter){
-                if (i!=0) arr(", ");
-                writeOut(&arr.appendArr,c);
-            }
-            arr("]'");
-            dumperP(&arr)(" --seed='")(test.initialState)("'\n");
-            progressLog(arr.data);
-            arr.clearData;
-            
-            dumperP(&arr.appendArr)("ERROR test `")(test.testName)("` from `")(test.sourceFile)(":")(test.sourceLine)("` FAILED!!");
+            dumper(&arr.appendArr)("ERROR test `")(test.testName)("` from `")(test.sourceFile)(":")(test.sourceLine)("` FAILED!!");
             progressLog(arr.data);
             arr.clearData;
             progressLog("-----------------------------------------------------------\n");
@@ -711,8 +714,8 @@ class TestCollection: SingleRTest, TestControllerI {
     bool testFailed(SingleRTest test){
         synchronized(testController.writeLock()){
             test.failureLog(collectAppender(delegate void(CharSink s){
-                dumperP(s)("test failed in collection`")(testName)("` created at `");
-                dumperP(s)(sourceFile)(":")(sourceLine)("`\n");
+                dumper(s)("test failed in collection`")(testName)("` created at `");
+                dumper(s)(sourceFile)(":")(sourceLine)("`\n");
             }));
         }
         return testController.testFailed(test);
@@ -775,18 +778,18 @@ template testInit(char[] checkInit="", char[] manualInit=""){
         mixin checkTestInitArgs!(S);
         TestResult doTest(SingleRTest test){
             S arg;
-            mixin(completeInitStr!(S)(checkInit,manualInit));
-            if (!doSetup(test)){
-                return TestResult.Skip;
-            }
             try{
+                mixin(completeInitStr!(S)(checkInit,manualInit));
+                if (!doSetup(test)){
+                    return TestResult.Skip;
+                }
                 test.baseDelegate.get!(void delegate(S))()(arg);
             } catch (SkipException s){
                 return TestResult.Skip;
             } catch (Exception e){
                 synchronized(test.testController.writeLock()){
                     test.failureLog(collectAppender(delegate void(void delegate(char[]) s){
-                            dumperP(s)("test`")(test.testName)("` failed with exception\n"); }));
+                            dumper(s)("test`")(test.testName)("` failed with exception\n"); }));
                     //test.failureLog.flush();
                     e.writeOut(test.failureLog);
                     //test.failureLog.flush();
@@ -834,7 +837,7 @@ template testInit(char[] checkInit="", char[] manualInit=""){
             synchronized(test.testController.writeLock){
                 char[256] buf;
                 auto arr=lGrowableArray!(char)(buf,0,GASharing.GlobalNoFree);
-                dumperP(&arr)("test`")(test.testName)("` failed (no exception thrown and one expected)\n");
+                dumper(&arr)("test`")(test.testName)("` failed (no exception thrown and one expected)\n");
                 test.failureLog(arr.takeData);
                 //test.failureLog.flush();
                 mixin(printArgs(nArgs!(S),"test.failureLog"));
@@ -877,7 +880,7 @@ template testInit(char[] checkInit="", char[] manualInit=""){
                     synchronized(test.testController.writeLock){
                         char[256] buf;
                         auto arr=lGrowableArray!(char)(buf,0,GASharing.GlobalNoFree);
-                        dumperP(&arr)("test`")(test.testName)("` failed (returned false instead of true)\n");
+                        dumper(&arr)("test`")(test.testName)("` failed (returned false instead of true)\n");
                         test.failureLog(arr.data);
                         mixin(printArgs(nArgs!(S),"test.failureLog"));
                     }
@@ -889,7 +892,7 @@ template testInit(char[] checkInit="", char[] manualInit=""){
                 synchronized(test.testController.writeLock){
                     char[256] buf;
                     auto arr=lGrowableArray!(char)(buf,0,GASharing.GlobalNoFree);
-                    test.failureLog(dumperP(&arr)("test`")(test.testName)("` failed with exception\n").call.data);
+                    test.failureLog(dumper(&arr)("test`")(test.testName)("` failed with exception\n").call.data);
                     //test.failureLog.flush();
                     e.writeOut(test.failureLog);
                     //test.failureLog.flush();
@@ -933,7 +936,7 @@ template testInit(char[] checkInit="", char[] manualInit=""){
                     synchronized(test.testController.writeLock){
                         char[256] buf;
                         auto arr=lGrowableArray!(char)(buf,0,GASharing.GlobalNoFree);
-                        dumperP(&arr)("test`")(test.testName)("` failed (returned true instead of false)\n");
+                        dumper(&arr)("test`")(test.testName)("` failed (returned true instead of false)\n");
                         test.failureLog(arr.data);
                         mixin(printArgs(nArgs!(S),"test.failureLog"));
                     }
@@ -948,7 +951,7 @@ template testInit(char[] checkInit="", char[] manualInit=""){
                     //test.failureLog.flush();
                     char[256] buf;
                     auto arr=lGrowableArray!(char)(buf,0,GASharing.GlobalNoFree);
-                    dumperP(&arr)("test`")(test.testName)("` unexpectedly failed with exception\n");
+                    dumper(&arr)("test`")(test.testName)("` unexpectedly failed with exception\n");
                     test.failureLog(arr.data);
                     //test.failureLog.flush();
                     e.writeOut(test.failureLog);

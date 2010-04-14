@@ -16,14 +16,23 @@ Dumper!(void delegate(char[])) serr;
 OutStreamI soutStream;
 /// stderr stream
 OutStreamI serrStream;
+/// in a parallel setting this is a log local to the current process
+Dumper!(void delegate(char[])) localLog;
+/// in a parallel setting this log is active only in the master process
+Dumper!(void delegate(char[])) globalLog;
+/// true is the global log is active
+bool hasGlobalLog;
 
 static this(){
     auto stdOut=new StreamStrWriter!(char)(Cout.output);
     auto stdErr=new StreamStrWriter!(char)(Cerr.output);
-    soutUnsafe=dumperP(&stdOut.writeStrFlushNl);
+    soutUnsafe=dumper(&stdOut.writeStrFlushNl);
     soutStream=new BasicStrStream!()(&stdOut.writeStrFlushNl,&stdOut.flush);
-    sout=dumperP(&stdOut.writeStrSyncFlushNl);
-    serr=dumperP(&stdErr.writeStrFlushNl);
+    sout=dumper(&stdOut.writeStrSyncFlushNl);
+    serr=dumper(&stdErr.writeStrFlushNl);
     serrStream=new BasicStrStream!()(&stdErr.writeStrFlushNl,&stdErr.flush);
+    localLog=sout;
+    globalLog=sout;
+    hasGlobalLog=true;
 }
 

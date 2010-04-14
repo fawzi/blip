@@ -27,7 +27,7 @@ class BasicSocket{
 
         sock=-1;
         auto a1=lGrowableArray(buf,0);
-        dumperP(&a1)(address)("\0")(service)("\0");
+        dumper(&a1)(address)("\0")(service)("\0");
         auto addr0=a1.data();
         nodeName=a1.ptr;
         serviceName=a1.ptr+address.length+1;
@@ -246,7 +246,7 @@ class SocketServer{
             } catch(BIOException e){
                 char[256]buf2;
                 auto a=lGrowableArray(buf2,0);
-                dumperP(&a)("error accepting ")(serviceName)(":");
+                dumper(&a)("error accepting ")(serviceName)(":");
                 e.writeOut(&a.appendArr);
                 Log.lookup("blip.io.Socket").warn(a.data);
             }
@@ -259,7 +259,7 @@ class SocketServer{
             } catch(Exception e){
                 char[256]buf2;
                 auto a=lGrowableArray(buf2,0);
-                dumperP(&a)("error handling accepted socket ")(serviceName)(" from ")(addr)(":");
+                dumper(&a)("error handling accepted socket ")(serviceName)(" from ")(addr)(":");
                 e.writeOut(&a.appendArr);
                 Log.lookup("blip.io.Socket").warn(a.data);
             }

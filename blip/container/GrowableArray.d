@@ -1,7 +1,7 @@
 /// a growable array that knows its capacity
 module blip.container.GrowableArray;
 import blip.util.Grow;
-import blip.io.BasicIO;
+import blip.io.BasicIO: dumper; // needed just for the desc method
 
 enum GASharing{
     Local, /// local, don't free
@@ -69,7 +69,8 @@ struct LocalGrowableArray(T){
     }
     
     void desc(void delegate(char[])sink){
-        auto s=dumperP(sink);
+        // this is the only dependency on BasicIO...
+        auto s=dumper(sink);
         s("<GrowableArray@")(cast(void*)this.dataPtr)(" len:")(this.dataLen);
         s(" capacity:")(capacity)(" sharing:")(cast(int)sharing)(">")("\n");
     }

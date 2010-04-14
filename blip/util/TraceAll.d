@@ -92,7 +92,7 @@ version(Posix){
                                             serr("invalid traceLevel on master reset\n");
                                             exit(1);
                                         }
-                                        readBarrier();
+                                        volatile readBarrier();
                                         trace.writeOut(serr.call);
                                     }
                                 }

@@ -7,6 +7,22 @@ module blip.container.Pool;
 import blip.t.core.Traits:ctfe_i2a;
 import blip.t.math.Math: max;
 
+/// describes a pool like object
+interface PoolI(T){
+    /// gets a new instance
+    T getObj();
+    static if (is(T U:U[])){
+        /// gets a new instance of dimension dim (if applicable)
+        T getObj(size_t dim);
+    }
+    /// returns an instance, so that it can be reused
+    void giveBack(T obj);
+    /// should discard all the cached objects (no guarantee)
+    void flush();
+    /// should not cache any objects from now on (no guarantee)
+    void stopCaching();
+}
+
 /// calls the allocator for the given type
 T allocT(T,A...)(A args) {
     static if(is(T==class)){
@@ -32,7 +48,8 @@ T allocT(T,A...)(A args) {
 
 /// a pool, tries to use little memory if not used, and grow gracefully
 /// keeping heap activity small
-class Pool(T,int batchSize=16){
+class Pool(T,int _batchSize=16):PoolI!(T){
+    enum :int{ batchSize=_batchSize }
     alias T ElType;
     static assert((batchSize & (batchSize-1))==0,"batchSize should be a power of 2 "~ctfe_i2a(batchSize));
     struct S{
@@ -45,6 +62,7 @@ class Pool(T,int batchSize=16){
     size_t maxEl;
     size_t bufferSpace;
     S* pool;
+    
     this(size_t bufferSpace=8*batchSize, size_t maxEl=16*batchSize){
         this.maxEl=max(batchSize,maxEl);
         this.bufferSpace=max(batchSize,bufferSpace);
@@ -130,6 +148,41 @@ class Pool(T,int batchSize=16){
         }
         return allocateNew();
     }
+    static if (is(T U:U[])){
+        /// getObj with size unsupported...
+        T getObj(size_t dim){
+            if (nEl>0){
+                T obj;
+                synchronized(this){
+                    if (nEl>0){
+                        --nEl;
+                        size_t pos=nEl & (batchSize-1);
+                        obj=pool.array[pos];
+                        if (obj.length==dim){
+                            pool.array[pos]=null;
+                            if (pos==0){
+                                pool=pool.prev;
+                            }
+                            if ((nCapacity-nEl)>bufferSpace){
+                                nCapacity-=batchSize;
+                                auto toRm=pool.prev;
+                                toRm.prev.next=toRm.next;
+                                toRm.next.prev=toRm.prev;
+                                delete toRm;
+                            }
+                        } else {
+                            ++nEl;
+                            obj=null;
+                        }
+                    }
+                }
+                if (obj !is null){
+                    return reset(obj);
+                }
+            }
+            return new T(dim);
+        }
+    }
     /// get rid of all cached values
     void flush(){
         synchronized(this){
@@ -154,6 +207,10 @@ class Pool(T,int batchSize=16){
                 nCapacity=cast(size_t)0;
             }
         }
+    }
+    void stopCaching(){
+        maxEl=0;
+        flush();
     }
     /// destructor
     ~this(){

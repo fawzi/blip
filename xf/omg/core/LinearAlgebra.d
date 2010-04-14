@@ -64,6 +64,31 @@ struct Vector(flt_, int dim_) {
 	void opIndexAssign(flt v,int i){
 	    cell[i]=v;
 	}
+	int opApply(int delegate(ref flt) loopBody){
+	    if (auto res=loopBody(cell[0])) return res;
+	    if (auto res=loopBody(cell[1])) return res;
+	    static if (dim>2) if (auto res=loopBody(cell[2])) return res;
+	    static if (dim>3) {
+	        if (auto res=loopBody(cell[3])) return res;
+	        static assert(dim==4,"dim should be at most 4");
+        }
+	}
+	int opApply(int delegate(ref size_t,ref flt) loopBody){
+	    static assert(dim>1,"dim should be at least 2");
+	    size_t i=0;
+	    if (auto res=loopBody(i,cell[0])) return res;
+	    ++i;
+	    if (auto res=loopBody(i,cell[1])) return res;
+	    static if (dim>2) {
+            ++i;
+            if (auto res=loopBody(i,cell[2])) return res;
+        }
+	    static if (dim>3) {
+	        i=3;
+	        if (auto res=loopBody(i,cell[3])) return res;
+	        static assert(dim==4,"dim should be at most 4");
+        }
+	}
 	static if (2 == dim) const static Vector zero = { x : cscalar!(flt, 0), y : cscalar!(flt, 0) };
 	static if (3 == dim) const static Vector zero = { x : cscalar!(flt, 0), y : cscalar!(flt, 0), z : cscalar!(flt, 0) };
 	static if (4 == dim) const static Vector zero = { x : cscalar!(flt, 0), y : cscalar!(flt, 0), z : cscalar!(flt, 0), w : cscalar!(flt, 0) };
@@ -601,6 +626,23 @@ struct Matrix(flt_, int rows_, int cols_) {
         }
     }
     
+    int opApply(int delegate(ref flt)loopBody){
+        foreach (c; Range!(cols)) {
+			foreach (r; Range!(rows)) {
+				mixin("if (auto res=loopBody(col[c].row[r])) return res;");
+			}
+		}
+		return 0;
+    }
+    int opApply(int delegate(ref size_t,ref flt)loopBody){
+        foreach (c; Range!(cols)) {
+			foreach (r; Range!(rows)) {
+				mixin("{ size_t i=c*r; if (auto res=loopBody(i,col[c].row[r])) return res; }");
+			}
+		}
+		return 0;
+    }
+    
 	static Matrix opCall(flt[] raw) {
 		Matrix res = void;
 		(&res.col[0].row[0])[0..rows*cols] = raw[0..rows*cols];
@@ -872,7 +914,6 @@ struct Matrix(flt_, int rows_, int cols_) {
 	static if (fieldOps) {
 		public alias opXAssign_!("/")	opDivAssign;
 	}
-
 
 	private Matrix opX_(char[] x)(flt rhs) {
 		Matrix res = *this;

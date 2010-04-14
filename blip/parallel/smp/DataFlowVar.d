@@ -115,7 +115,7 @@ struct WaitListPtr{
             case 1:
                 if (data.data !is newVal){
                     throw new Exception(collectAppender(delegate void(CharSink sink){
-                        auto s=dumperP(sink);
+                        auto s=dumper(sink);
                         s("invalid change of value from ")(data.data)(" to ")(newVal);
                     }),__FILE__,__LINE__);
                 }

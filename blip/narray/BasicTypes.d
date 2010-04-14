@@ -47,9 +47,11 @@ import blip.rtest.RTest;
 import blip.BasicModels;
 import blip.serialization.Serialization;
 import blip.container.GrowableArray;
+import blip.container.Pool;
 import blip.sync.Atomic;
 import blip.parallel.smp.WorkManager;
 import blip.io.BasicIO;
+import cstdlib = tango.stdc.stdlib : free, malloc;
 
 //version=RefCount;
 
@@ -146,6 +148,7 @@ class Guard{
     void *dataPtr;
     size_t dataDim; // just informative, remove?
     size_t refCount; // used to guarantee collection when used with scope objects
+    PoolI!(ubyte[]) pool;
     this(void[] data){
         this.dataPtr=cast(void*)data.ptr;
         this.dataDim=data.length;
@@ -154,7 +157,8 @@ class Guard{
         GC.BlkAttr attr;
         if (!scanPtr)
             attr=GC.BlkAttr.NO_SCAN;
-        dataPtr=cast(void*)GC.malloc(size,attr);
+        //dataPtr=cast(void*)GC.malloc(size,attr);
+        dataPtr=cstdlib.malloc(size);
         if(dataPtr is null && size!=0) throw new Exception("malloc failed");
         dataDim=size;
         refCount=1;
@@ -168,17 +172,26 @@ class Guard{
         void release(){
             assert(refCount>0,"refCount was 0 in release...");
             if (atomicAdd(refCount,-cast(size_t)1)==cast(size_t)1){
-                free();
+                free(true);
             }
         }
     }
     ~this(){
-        free();
+        free(false);
     }
-    void free(){
+    void dispose(){
+        free(true);
+    }
+    void free(bool deterministic){
         void *d=atomicSwap(dataPtr,null);
         if (d !is null) {
-            GC.free(dataPtr);
+            if (deterministic && pool!is null){
+                pool.giveBack((cast(ubyte*)d)[0..dataDim]);
+            } else {
+                // GC.free(d);
+                cstdlib.free(d);
+            }
+            dataDim=0;
         }
     }
 }
@@ -268,6 +281,7 @@ else {
                 contiguos=fortran=(shape[0]==0 || shape[0] == 1 || cast(index_type)V.sizeof == strides[0]);
                 bSize=shape[0]*cast(index_type)V.sizeof;
             } else {
+                fortran=true;
                 index_type sz=cast(index_type)V.sizeof;
                 for (int i=0;i<rank;i++){
                     if (strides[i]!=sz && shape[i]!=1)
@@ -311,8 +325,8 @@ else {
                 } else {
                     static if(rank==2){
                         if (posStrides[0]<=posStrides[1]){
-                            sortIdx[0]=1;
-                            sortIdx[1]=0;
+                            sortIdx[0]=0;
+                            sortIdx[1]=1;
                         } else {
                             sortIdx[0]=1;
                             sortIdx[1]=0;
@@ -320,7 +334,7 @@ else {
                     } else {
                         for (int i=0;i<rank;i++)
                             sortIdx[i]=i;
-                        sortIdx.sort((int x,int y){return strides[x]<posStrides[y];});
+                        sortIdx.sort((int x,int y){return posStrides[x]<posStrides[y];});
                     }
                     index_type sz2=cast(index_type)V.sizeof;
                     bool compact=true;
@@ -611,10 +625,40 @@ else {
                 }
                 *pos=val;
             } else {
-                auto subArr=opIndex(idx_tup);
+                scope subArr=opIndex(idx_tup);
                 subArr[]=val;
             }
             return val;
+        }
+
+        /// adress of the element i (if the array is non continuos and you are using a partial index
+        /// you might be surprised of where the "next" elements are)
+        ///
+        /// could be much faster for partial indexes if it would do opIndex work directly
+        V* ptrI(S...)(S idx_tup)
+        in{
+            static assert(rank>=nArgs!(S),"too many argumens in indexing operation");
+            static if (rank==reductionFactor!(S)){
+                foreach(i,TT;S){
+                    static if(is(TT==int)||is(TT==long)||is(TT==uint)||is(TT==ulong)){
+                        assert(0<=idx_tup[i] && idx_tup[i]<shape[i],"index "~ctfe_i2a(i)~" out of bounds");                        
+                    } else static assert(0,"unexpected type <"~TT.stringof~"> in opIndexAssign");
+                } // else check done in opIndex...
+            }
+        }
+        body{
+            static assert(rank>=nArgs!(S),"too many arguments in indexing operation");
+            static if (rank==reductionFactor!(S)){
+                V* pos=startPtrArray;
+                foreach(i,TT;S){
+                    static assert(is(TT==int)||is(TT==long)||is(TT==uint)||is(TT==ulong),"unexpected type <"~TT.stringof~"> in full indexing");
+                    pos=cast(V*)(cast(size_t)pos+cast(index_type)idx_tup[i]*bStrides[i]);
+                }
+                return pos;
+            } else {
+                scope subArr=opIndex(idx_tup);
+                return subArr.startPtrArray;
+            }
         }
                 
         /// static array indexing (separted from opIndex as potentially less efficient)
@@ -999,7 +1043,7 @@ else {
                 return 0;
             }
             void desc(void delegate(char[]) sink){
-                auto s=dumperP(sink);
+                auto s=dumper(sink);
                 if (this is null){
                     s("<FlatIterator *null*>");
                     return;
@@ -1312,6 +1356,24 @@ else {
             }            
         }
 
+        /// Add another array onto this one in place with scaling
+        void axpby(S,int rank2)(NArray!(S,rank2) o,S alpha=1,V beta=1)
+        in { assert(!(flags&Flags.ReadOnly),"ReadOnly array cannot be assigned"); }
+        body { 
+            static assert(rank==rank2,"axpby accepts only identically shaped arrays");
+            if (beta==1){
+                if (alpha==1){
+                    binaryOpStr!("*aPtr0 += cast("~V.stringof~")(*bPtr0);",rank,V,S)(this,o);
+                } else {
+                    mixin binaryOpStr!("*aPtr0 += cast("~V.stringof~")(alpha*(*bPtr0));",rank,V,S);
+                    binaryOpStr(this,o);
+                }
+            } else {
+                mixin binaryOpStr!("*aPtr0 = cast("~V.stringof~")(beta*(*aPtr0)+alpha*(*bPtr0));",rank,V,S);
+                binaryOpStr(this,o);
+            }
+        }
+
         /// Subtract this array and another one and return a new array.
         NArray!(typeof(V.init-S.init),rank) opSub(S,int rank2)(NArray!(S,rank2) o) { 
             static assert(rank2==rank,"suptraction only on equally shaped arrays");
@@ -1443,10 +1505,6 @@ else {
             assert(0, "Comparison of arrays not allowed");
         }
 
-        char[] toString(){
-            return collectAppender(delegate void(CharSink s){ this.printData(s); });
-        }
-        
         void printData(CharSink s,char[] formatEl=",10", index_type elPerLine=10,
             char[] indent=""){
             s("[");
@@ -1476,10 +1534,41 @@ else {
             }
             s("]");
         }
-            
+
+        struct Printer{
+            NArray arr;
+            char[] formatEl=",10";
+            index_type elPerLine=10;
+            char[] indent="";
+            void desc(CharSink s){
+                if (arr is null){
+                    s("*null*"); /// print an empty array instead???
+                } else {
+                    arr.printData(s,formatEl,elPerLine,indent);
+                }
+            }
+        }
+        
+        /// a struct that prints the contents of this array with the given format
+        Printer dataPrinter(char[] formatEl=",10", index_type elPerLine=10,
+            char[] indent="")
+        {
+            Printer res;
+            res.arr=this;
+            res.formatEl=formatEl;
+            res.elPerLine=elPerLine;
+            res.indent=indent;
+            return res;
+        }
+        
+        char[] toString(){
+            return collectAppender(delegate void(CharSink s){ this.printData(s); });
+        }
+
         /// description of the NArray wrapper, not of the contents, for debugging purposes...
+        /// see printData for the content
         void desc(void delegate(char[]) sink){
-            auto s=dumperP(sink);
+            auto s=dumper(sink);
             if (this is null){
                 s("<NArray *null*>");
                 return;
@@ -1529,6 +1618,10 @@ else {
                 res*=this.shape[i];
             }
             return res;
+        }
+        /// ditto
+        size_t length(){
+            return cast(size_t)size();
         }
         /// return the transposed view of the array
         NArray T(){

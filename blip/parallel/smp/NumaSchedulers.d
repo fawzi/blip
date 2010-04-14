@@ -108,16 +108,16 @@ class PriQScheduler:TaskSchedulerI {
         this._rand=new RandomSync();
         this.inSuperSched=0;
         log=Log.lookup(loggerPath);
-        _rootTask=new RootTask(this,0,name~"RootTask");
         runLevel=SchedulerRunLevel.Running;
-        waitingSince=Time.max;
         auto newLev=superScheduler.runLevel;
         if (runLevel < cast(int)newLev){
             runLevel=newLev;
             if (runLevel==SchedulerRunLevel.Stopped){
-                serr("queue creation in stopped scheduler, dropping it\n");
+		log.warn("adding task "~name~" to stopped scheduler...");
             }
         }
+        waitingSince=Time.max;
+        _rootTask=new RootTask(this,0,name~"RootTask");
     }
     void reset(char[] name,MultiSched superScheduler){
         this.name=name;
@@ -131,7 +131,13 @@ class PriQScheduler:TaskSchedulerI {
         stealLevel=int.max;
         inSuperSched=0;
         runLevel=SchedulerRunLevel.Running;
-        raiseRunlevel(superScheduler.runLevel);
+        auto levelN=this.superScheduler.runLevel;
+        if (runLevel < cast(int)levelN){
+            runLevel=levelN;
+            if (runLevel==SchedulerRunLevel.Stopped){
+                log.warn("adding task "~name~" to stopped scheduler...");
+            }
+        }
         waitingSince=Time.max;
     }
     void addTask0(TaskI t){
@@ -264,8 +270,19 @@ class PriQScheduler:TaskSchedulerI {
                                  }));
         }
         t.scheduler=targetScheduler;
+        version(TrackQueues){
+            log.info(collectAppender(delegate void(CharSink sink){
+                sink("stealing task "); writeOut(sink,t,true); sink(" from ");
+                writeOut(sink,this,true); sink(" to "); writeOut(sink,targetScheduler,true); sink("\n");
+            }));
+        }
         targetScheduler.addTask0(t);
         // steal more
+        /+  pippo to do
+        // in general this is dangerous, as the scheduler might get reused in the meantime...
+        // should be rewritten for example collecting first all tasks and adding them at once
+        // (adding a addTasks0 method)
+
         auto scheduler2=t.scheduler;
         if(scheduler2 is null) scheduler2=targetScheduler;
         while (true){
@@ -276,18 +293,13 @@ class PriQScheduler:TaskSchedulerI {
             }
             t2.scheduler=scheduler2;
             version(TrackQueues){
-                log.info(collectAppender(delegate void(CharSink sink){
-                                         sink("stolen task ");
-                                         writeOut(sink,cast(void*)t);
-                                         sink(" from scheduler ");
-                                         writeOut(sink,this,true);
-                                         sink(" for scheduler ");
-                                         writeOut(sink,scheduler2,true);
-                                         sink("\n");
-                                     }));
+		log.info(collectAppender(delegate void(CharSink sink){
+                    sink("stealing other task "); writeOut(sink,t2,true); sink(" from ");
+                    writeOut(sink,this,true); sink(" to "); writeOut(sink,scheduler2,true); sink("\n");
+                }));
             }
             scheduler2.addTask0(t2);
-        }
+        }+/
     }
     /// description (for debugging)
     /// non threadsafe
@@ -370,7 +382,7 @@ class PriQScheduler:TaskSchedulerI {
     /// (might not be a snapshot if other threads modify it while printing)
     /// non threadsafe
     void desc(void delegate(char[]) sink,bool shortVersion){
-        auto s=dumperP(sink);
+        auto s=dumper(sink);
         s("<PriQScheduler@"); writeOut(sink,cast(void*)this);
         if (shortVersion) {
             s(" >");
@@ -732,7 +744,7 @@ class MultiSched:TaskSchedulerI {
     /// (might not be a snapshot if other threads modify it while printing)
     /// non threadsafe
     void desc(void delegate(char[]) sink,bool shortVersion){
-        auto s=dumperP(sink);
+        auto s=dumper(sink);
         s("<MultiSched@"); writeOut(sink,cast(void*)this);
         if (shortVersion) {
             s(" >");
@@ -791,7 +803,7 @@ class MultiSched:TaskSchedulerI {
     int nSimpleTasksWanted(){ return 4; }
     /// writes just the scheduling status in a way that looks good
     void writeStatus(CharSink sink,int indentL){
-        auto s=dumperP(sink);
+        auto s=dumper(sink);
         synchronized(queue){
             s("{ class:MultiSched, name:\"")(name)("\", scheds:\n");
             foreach(i,sched;queue){
@@ -842,7 +854,7 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
         void ind(int l){
             writeSpace(sink,indentL+l);
         }
-        auto s=dumperP(sink);
+        auto s=dumper(sink);
         auto maxScheds=topo.nNodes(schedLevel);
         auto schedsN=scheds;
         synchronized(this){
@@ -994,11 +1006,11 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
     TaskI trySteal(MultiSched el,int stealLevel){
         version(TrackQueues){
             log.info(collectAppender(delegate void(CharSink s){
-                s("pre trySteal in "); s(name); s(":");writeStatus(s,4);
+                s("pre trySteal for "); s(el.name); s(" in "); s(name); s(":");writeStatus(s,4);
             }));
             scope(exit){
                 log.info(collectAppender(delegate void(CharSink s){
-                    s("post trySteal in "); s(name); s(":");writeStatus(s,4);
+                    s("post trySteal for "); s(el.name); s(" in "); s(name); s(":");writeStatus(s,4);
                 }));
             }
         }
@@ -1011,7 +1023,10 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
                 auto subP=numa2pos(subN);
                 if (subP<scheds.length && scheds[subP].stealTask(superN.level,el)){
                     auto t=el.nextTaskImmediate();
-                    if (t !is null) return t;
+                    if (t !is null) {
+                        rmStarvingSched(el);
+                        return t;
+                    }
                 }
             }
             oldSuper=superN;
@@ -1019,6 +1034,9 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
         auto t=el.nextTaskImmediate();
         if (t is null){
             onStarvingSched.queue.popFront(t);
+        }
+        if (t!is null){
+            rmStarvingSched(el);
         }
         return t;
     }
@@ -1057,8 +1075,8 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
     bool addIfNonExistent(size_t pos){
         assert(pos<topo.nNodes(schedLevel),"cannot add more schedulers than nodes");
         raiseRunlevel(SchedulerRunLevel.Running);
-        if (scheds.length<=pos){
-            synchronized(this){
+        synchronized(this){
+            if (scheds.length<=pos){
                 for(size_t pAtt=scheds.length;pAtt<=pos;++pAtt){
                     ++nRunningScheds;
                     auto nAtt=pos2numa(pAtt);
@@ -1074,8 +1092,8 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
                 if (scheds.length<topo.nNodes(schedLevel)&&runLevel!=SchedulerRunLevel.Stopped){
                     addStarvingSched(pos2numa(scheds.length));
                 }
+                return true;
             }
-            return true;
         }
         return false;
     }
@@ -1173,7 +1191,7 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
     /// (might not be a snapshot if other threads modify it while printing)
     /// non threadsafe
     void desc(void delegate(char[]) sink,bool shortVersion){
-        auto s=dumperP(sink);
+        auto s=dumper(sink);
         s("<StarvationManager@"); writeOut(sink,cast(void*)this);
         if (shortVersion) {
             s(" >");
@@ -1324,7 +1342,7 @@ class MExecuter:ExecuterI{
             }
             char[128] buf;
             scope s=lGrowableArray!(char)(buf,0);
-            dumperP(&s)("Work thread ")(Thread.getThis().name)(" pinned to");
+            dumper(&s)("Work thread ")(Thread.getThis().name)(" pinned to");
             writeOut(&s.appendArr,exeNode);
             log.info(s.data);
             topo.bindToNode(n);

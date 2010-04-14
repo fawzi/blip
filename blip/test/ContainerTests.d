@@ -33,10 +33,18 @@ void testLoop(T)(T[] arr1,SizeLikeNumber!(3,1) s){
             v=v+v;
             atomicAdd!(size_t)(count,1);
         }
-        /+volatile+/ readBarrier();
         assert(count==arr1.length,"no index loop has wrong length");
         foreach(i,v;barr.pLoop(s.val)){
             assert(arr1[i]+arr1[i]==v,"BulkArray parallel no index loop update");
+        }
+        if (arr1.length>0){
+            barr[]=arr1[0];
+            foreach(i,v;barr.pLoop(s.val)){
+                v=v+arr1[i];
+            }
+            foreach(i,v;arr1){
+                assert(barr[i]==v+v,"BulkArray indexing test");
+            }
         }
     }
     

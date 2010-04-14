@@ -392,9 +392,13 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
             v.desc(sink.call);
         } else static if(is(typeof(v.desc(sinkDlg)))){
             v.desc(sinkDlg);
+        } else static if(is(typeof(v.writeOut(sinkDlg)))){
+            v.writeOut(sinkDlg);
         } else static if (is(typeof(v.toString()))){
             sink(v.toString);
-        }else{
+        } else static if (is(T U==typedef)){
+            writeOut(sink1,cast(U)v,args);
+        } else{
             static assert(0,"unsupported type in writeOut "~T.stringof);
         }
     }
@@ -421,7 +425,7 @@ struct Dumper(T){
     }
 }
 /// ditto
-Dumper!(T) dumper(T)(T c){
+Dumper!(T) dumperNP(T)(T c){
     static if(is(typeof(c is null))){
         assert(!(c is null),"dumper cannot be null");
     }
@@ -430,7 +434,7 @@ Dumper!(T) dumper(T)(T c){
     return res;
 }
 /// helper to easily dump out data that controls that it receives a pointer like el
-Dumper!(T) dumperP(T)(T c){
+Dumper!(T) dumper(T)(T c){
     static if(is(typeof(c is null))){
         assert(!(c is null),"dumper cannot be null");
         Dumper!(T) res;

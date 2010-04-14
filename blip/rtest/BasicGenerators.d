@@ -162,7 +162,7 @@ NonStaticArray!(T) genRandom(T)(Rand r,int idx,ref int nEl, ref bool acceptable)
         return generateRandom!(T)(r,idx,nEl,acceptable);
     } else {
         static assert(0,"cannot generate random object for type "~T.stringof
-            ~" you should implement one of the static methods generateRandom, the RandGen interface or a specialization of generateRandom, unfortunately due to compiler limitations (or design choice) specializations external to this module are not picked up by this utility wrapper.");
+            ~" you should implement one of the static randomGenerate methods, the RandGen interface or a specialization of generateRandom, unfortunately due to compiler limitations (or design choice) specializations external to this module are not picked up by this utility wrapper.");
     }
 }
 NonStaticArray!(T) genRandom2(T)(Rand r,ref T t,int idx,ref int nEl, ref bool acceptable){
