@@ -458,12 +458,12 @@ class ExplicitTopology(NodeType): Topology!(NodeType){
     /// (thus can be used for load balancing purposes)
     SimpleIteratorI!(NodeType) subNodesRandom(NodeType node,NodeType skipSubnode=NodeType(-1,0)){
         assert(node.level!=0,"no subNodes at level 0"); // return an empty iterator?
-        int start=0;
+        uint start=0;
         auto subNs=levels[node.level].subNodes[node.pos];
         int mLevel=skipSubnode.level;
         if (mLevel>=levels.length) mLevel=-1;
         for (int i=1;i<10;++i){
-            start=rand.uniformR!(int)(subNs.length);
+            start=rand.uniformR!(uint)(subNs.length);
             auto subN=subNs[start];
             for (int iLevel=subN.level;iLevel<=mLevel;++iLevel){
                 subN=levels[iLevel].superNodes[subN.pos];
@@ -647,10 +647,29 @@ version(noHwloc){} else {
             int[] pos;
             int[] left;
             int lastStack;
-            int level; /// the minimum level of the childrens
+            int level; /// the maximum level of the childrens
             int depth2,maxDepth;
         
-            this(HwlocTopology topo,hwloc_obj_t[] childrens,int start,int level){
+            bool descend(){
+                if (left[lastStack]==0) return false;
+                auto cAtt=childrens[lastStack][pos[lastStack]];
+                if (cAtt.depth<depth2){
+                    ++(pos[lastStack]);
+                    if (pos[lastStack]==childrens[lastStack].length) {
+                        pos[lastStack]=0;
+                    }
+                    --(left[lastStack]);
+                    ++lastStack;
+                    pos[lastStack]=0;
+                    left[lastStack]=cAtt.arity;
+                    childrens[lastStack]=cAtt.children[0..cAtt.arity];
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+                    
+            this(HwlocTopology topo,hwloc_obj_t[] childrens,uint start,int level){
                 this.topo=topo;
                 this.level=level;
                 
@@ -662,8 +681,13 @@ version(noHwloc){} else {
                     lastStack=0;
                     pos.length =this.childrens.length;
                     left.length=this.childrens.length;
-                    pos[0]=start%(childrens.length);
                     left[0]=childrens.length;
+                    pos[0]=start%(childrens.length);
+                    start/=childrens.length;
+                    while(start!=0 && descend()){
+                        pos[lastStack]=start%left[lastStack];
+                        start/=left[lastStack];
+                    }
                 } else {
                     this.childrens=[[]];
                     lastStack=0;
@@ -694,6 +718,11 @@ version(noHwloc){} else {
                         obj=cAtt;
                         return true;
                     } else {
+                        // we went too deep without passing by the expected level
+                        // we try just to check if there are valid objects
+                        // that correspond to a Numa level in here...
+                        // unfortunately in the general case we have to check
+                        // all possible objects in here...
                         for (int ilevel=level;ilevel>=0;--ilevel){
                             if (cAtt.depth==levelMapping[ilevel].depth){
                                 res=NumaNode(ilevel,cAtt.logical_index);
@@ -905,11 +934,11 @@ version(noHwloc){} else {
                 obj=obj.first_child;
             }
             auto childrens=obj.children[0..obj.arity];
-            int start=0;
+            uint start=0;
             int mLevel=skipSubnode.level;
             if (mLevel>=levelMapping.length) mLevel=-1;
-            for (int i=1;i<10;++i){
-                start=rand.uniformR!(int)(childrens.length);
+            for (int i=1;i<5;++i){
+                start=rand.uniformR!(uint)(childrens.length);
                 if (mLevel==-1) break;
                 auto depthAtt=levelMapping[mLevel].depth;
                 auto subN=childrens[start];

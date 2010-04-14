@@ -47,7 +47,25 @@ int main(){
                 }
                 sout("\n}\n");
             });
+            sout("random childrens:\n");
+            numaLooper(rootN,topo,delegate void(NumaNode n){
+                sout("{\n node:")(n)("has subnodes:");
+                if (n.level>1){
+                    NumaNode nSkip;
+                    foreach(subN;randomSubnodesWithLevel(1,cast(Topology!(NumaNode))topo,n)){
+                        sout(subN)(",");
+                        nSkip=subN;
+                    }
+                    sout("skipping")(nSkip)(":");
+                    foreach(subN;randomSubnodesWithLevel(1,cast(Topology!(NumaNode))topo,n,nSkip)){
+                        sout(subN)(",");
+                        nSkip=n;
+                    }
+                }
+                sout("}\n");
+            });
         }
     }
+    sout("done\n");
     return 0;
 }
