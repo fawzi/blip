@@ -107,7 +107,7 @@ void arangeTests(){
 void test_iter()
 {
     alias NArray!(int,2) array;
-    array a=a2NA( [[1,2,3],[4,5,6]] );
+    array a=a2NAC( [[1,2,3],[4,5,6]] );
 
     auto ii = a.flatIter();
     assert(!ii.end);
@@ -156,7 +156,7 @@ void test_iter()
                      [5,6,7,8],
                      [9,10,11,12]];
 
-    a=a2NA(ainit);
+    a=a2NAC(ainit);
     int i=0;
     foreach(row; a) {
         checkeq(row, ainit[i]);
@@ -715,7 +715,7 @@ TestCollection narrayRTst1(T,int rank)(TestCollection superColl){
 }
 
 void doNArrayFixTests(){
-    NArray!(int,1) a1=a2NA([1,2,3,4,5,6]);
+    NArray!(int,1) a1=a2NAC([1,2,3,4,5,6]);
     NArray!(int,1) a2=NArray!(int,1).zeros([6]);
     auto a3=NArray!(int,2).zeros([5,6]);
     auto a4=NArray!(int,3).zeros([2,3,4]);

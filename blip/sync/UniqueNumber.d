@@ -39,12 +39,23 @@ static if (LockVersion){
             }
             return oldVal;
         }
+        /// grows the number to at least the given value
+        void ensure(T minVal){
+            synchronized(m){
+                if (minVal>_val) _val=minVal;
+            }
+        }
+        /// increases the stored number by the given number
+        void opAddAssign(T v){
+            synchronized(m){
+                _val+=v;
+            }
+        }
     }
 } else {
     /// fast unique number (that handles well the absence of atomic ops)
     struct UniqueNumber(T){
         T _val;
-        
         /// creates a unique number object with the given initial value
         static UniqueNumber opCall(T firstVal=cast(T)0){
             UniqueNumber res;
@@ -56,6 +67,13 @@ static if (LockVersion){
         T next(){
             return nextValue(_val);
         }
-        
+        /// grows the number to at least the given value
+        void ensure(T minVal){
+            atomicOp(_val,delegate T(T oV){ if (oV<minVal) return minVal; return oV; });
+        }
+        /// increases the stored number by the given number
+        void opAddAssign(T val){
+            atomicAdd(_val,val);
+        }
     }
 }

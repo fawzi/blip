@@ -1100,8 +1100,13 @@ class RootTask: Task{
         assert(0,"root task '"~taskName~"' should not be executed");
     }
     override void willSpawn(TaskI t){
-        if (warnSpawn)
-            log.warn("root task '"~taskName~"' spawned task "~t.taskName);
+        if (warnSpawn){
+            if (this is noTask){
+                log.warn("root task '"~taskName~"' spawned task "~t.taskName~" if you want to implicitly spawn from this thread without this warning you should do some thing like taskAtt.val=defaultTask; in it");
+            } else {
+                log.warn("root task '"~taskName~"' spawned task "~t.taskName);
+            }
+        }
         super.willSpawn(t);
     }
 }

@@ -674,12 +674,14 @@ T atomicOp(T)(ref T val, T delegate(T) f){
         oldV=nextV;
         newV=f(oldV);
         nextV=atomicCAS!(T)(val,newV,oldV);
+        if (newV==oldV) return oldV;
     } while((nextV !is oldV) && ++i<200)
     while (nextV !is oldV){
         thread_yield();
         volatile oldV=val;
         newV=f(oldV);
         nextV=atomicCAS!(T)(val,newV,oldV);
+        if (newV==oldV) return oldV;
     }
     return oldV;
 }

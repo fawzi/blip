@@ -271,7 +271,7 @@ void tst()
     res[]=0.0L;
     alias NArray!(double,3) NArr;
     NArr d1=NArr.ones([ndim,ndim,ndim]),d2=NArr.ones([1,ndim,ndim]);
-    auto resNArr=a2NA2(res);
+    auto resNArr=a2NA(res);
     timer.start();
     for (int irep=nrep;irep!=0;--irep){
         for (int i=0;i<ndim;i++)

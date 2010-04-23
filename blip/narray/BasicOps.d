@@ -259,7 +259,7 @@ NArray!(T,2)eye(T)(index_type dim){
 + The array has to be rectangular.
 + note: this put all the indexes of the array arr in the inner loop, not so efficient with many dimensions
 +/
-NArray!(BaseTypeOfArrays!(T),cast(int)rankOfArray!(T))a2NA(T)(T arr,bool fortran=false){
+NArray!(BaseTypeOfArrays!(T),cast(int)rankOfArray!(T))a2NAC(T)(T arr,bool fortran=false){
     return a2NAof!(BaseTypeOfArrays!(T))(arr,fortran);
 }
 /// converts the given array to an NArray of the given type copying
@@ -284,12 +284,69 @@ template a2NAof(V){
     }
 }
 /// acquires an array using it as NArray, without copying.
-/// if shouldFree=true it frees the array when destroyed
-NArray!(T,1)a2NA2(T)(T[] arr,bool shouldFree=false){
+/// reshape can be used to perform an immediate reshaping of the array (one -1 can be used for 
+/// an implicitly calculated size)
+/// if shouldFree=true it frees the array when destroyed (using stdc free)
+/// fortran if it should be in fortran order (in fortran order by default the inner shapes are 1, 
+/// by defult the outer ones)
+NArray!(T,dim)a2NA(T,U=int,int dim=1)(T[] arr,bool shouldFree=false,bool fortran=false,U[] reshape=null){
+    static assert(dim>0,"conversion for arrays of rank at least 1");
     uint flags=ArrayFlags.None;
     Guard guard;
     if (shouldFree) guard=new Guard(arr);
-    auto res=NArray!(T,1)([cast(index_type)T.sizeof],[cast(index_type)arr.length],0,arr,flags,guard);
+    auto totLen=arr.length;
+    index_type[dim] strides,shape;
+    if (reshape.length>0){
+        size_t restDim=totLen;
+        int posImplicit=-1;
+        for(int idim=0;idim<dim;++idim){
+            if(reshape[idim]<0){
+                if (posImplicit!=-1){
+                    throw new Exception("You can have only one implicit (<0) dimension in reshape",
+                        __FILE__,__LINE__);
+                }
+                posImplicit=idim;
+            } else {
+                shape[idim]=reshape[idim];
+                if (reshape[idim]!=0){
+                    restDim/=reshape[idim];
+                }
+            }
+        }
+        if (posImplicit!=-1){
+            shape[posImplicit]=cast(index_type)restDim;
+        }
+        restDim=1;
+        for(int idim=0;idim<dim;++idim){
+            restDim *= shape[idim];
+        }
+        if (restDim!=totLen){
+            throw new Exception("incompatible dimensions in reshape",
+                __FILE__,__LINE__);
+        }
+    } else {
+        shape[]=1;
+        if (!fortran){
+            shape[$-1]=cast(index_type)totLen;
+        } else {
+            shape[0]=cast(index_type)totLen;
+        }
+    }
+    if (!fortran){
+        auto stride=T.sizeof;
+        for(int idim=0;idim<dim;++idim){
+            strides[idim]=stride;
+            stride *= shape[idim];
+        }
+    } else {
+        auto stride=T.sizeof;
+        int idim=dim;
+        while (idim!=0){
+            strides[--idim]=stride;
+            stride *= shape[idim];
+        }
+    }
+    auto res=NArray!(T,dim)(strides,shape,0,arr,flags,guard);
     version(RefCount) if (shouldFree) guard.release;
     return res;
 }

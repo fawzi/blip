@@ -5,13 +5,13 @@ private {
 	import xf.omg.util.Meta;
 	import xf.omg.core.Misc : unitSqNormEpsilon, deg2rad, rad2deg, pi, invSqrt;
 	import tango.util.Convert : convTo = to;
-	import tango.math.Math : sqrt, abs, sin, cos, tan, acos, atan2, asin;
+	import tango.math.Math : sqrt, abs, sin, cos, tan, acos, atan2, asin,floor;
 	import tango.core.Traits : isFloatingPointType,ctfe_i2a;
 	import blip.serialization.Serialization;
 	import blip.serialization.SerializationMixins;
 }
 
-/// mixin to loop on vectors and mantrixes
+/// mixin to loop on vectors and matrixes
 char[] vectMLoopMixin(char[][] names,char[] op){
     char[] res=`
     {`;
@@ -20,7 +20,12 @@ char[] vectMLoopMixin(char[][] names,char[] op){
         auto `~n~`Ptr=&(`~n~`.cell[0]);`;
     }
     res~=`
-        foreach (i; Range!(T.dim)) {
+        static if (is(typeof(*`~names[0]~`))){
+            alias typeof(*`~names[0]~`) MyVectType;
+        } else {
+            alias typeof(`~names[0]~`) MyVectType;
+        }
+        foreach (i; Range!(MyVectType.dim)) {
             `~op;
     foreach(n;names){
         res~=`
@@ -38,7 +43,7 @@ char[] vectMLoopMixin(char[][] names,char[] op){
 
 struct Vector(flt_, int dim_) {
 	alias flt_ flt;
-	const static int dim = dim_;	
+	const static int dim = dim_;
 
 	static assert (dim >= 2 && dim <= 4);
 	static assert (isRingType!(flt));
@@ -110,7 +115,8 @@ struct Vector(flt_, int dim_) {
 
 	static if (4 == dim) const static Vector unitW = { x : cscalar!(flt, 0), y : cscalar!(flt, 0), z : cscalar!(flt, 0), w : cscalar!(flt, 1) };
 	
-    void axpby(V)(Vector!(V,dim)x,V a=cscalar!(V,1),flt b=cscalar!(flt,1)){
+    void axpby(V)(V x,flt a=cscalar!(flt,1),flt b=cscalar!(flt,1)){
+	    static assert(is(V==Vector!(V.flt,dim)),"axpby only between vectors with the same size, not "~V.stringof);
         if (b==cscalar!(flt,1)){
             mixin(vectMLoopMixin(["this","x"],"*thisPtr += a*(*xPtr);"));
         } else {
@@ -618,7 +624,8 @@ struct Matrix(flt_, int rows_, int cols_) {
 	
 	alias vectMLoopMixin simpleLoopMixin;
 	
-	void axpby(U,V)(U x,V a=cscalar!(V,1),flt b=cscalar!(flt,1)){
+	void axpby(U)(U x,flt a=cscalar!(flt,1),flt b=cscalar!(flt,1)){
+	    static assert(is(U==Matrix!(U.flt,rows,cols)),"axpby only between matrix with the same struct, not "~U.stringof);
         if (b==cscalar!(flt,1)){
             mixin(vectMLoopMixin(["this","x"],"*thisPtr += scalar!(flt)(a*(*xPtr));"));
         } else {
@@ -1483,6 +1490,24 @@ struct Quaternion(flt_) {
 		return Quaternion(axis.x * sinA, axis.y * sinA, axis.z * sinA, cosA);
 	}
 
+    Quaternion opAdd(ref Quaternion b){
+        Quaternion res=*this;
+        res+=b;
+        return res;
+    }
+    void opAddAssign(ref Quaternion b){
+        x+=b.x;
+        y+=b.y;
+        z+=b.z;
+        auto norm=sqrt(x*x+y*y+z*z);
+        flt fr=norm-2*floor(norm/2);
+        if (fr>1) fr=2-fr;
+        auto det=fr/norm;
+        x*=det;
+        y*=det;
+        z*=det;
+        w=1-fr*fr;
+    }
 
 	Matrix!(flt, rows, cols) toMatrix(int rows = 3, int cols = 3)() {
 		static assert (rows >= 3);
@@ -1575,19 +1600,25 @@ struct Quaternion(flt_) {
 		return res;
 	}
 	
-    void axpby(V)(Quaternion!(V)x,V a=cscalar!(V,1),flt b=cscalar!(flt,1)){
+    void axpby(V)(V v,flt a=cscalar!(flt,1),flt b=cscalar!(flt,1)){
+        static assert(is(U==Quaternion!(U.flt)),"axpby only between quaternions, not "~V.stringof);
         if (b==cscalar!(flt,1)){
-            xyzw.axpby(x,a,b);
-            flt det = magnitude();
-            if (det==cscalar!(flt,0)){
-                *this=identity;
-            } else {
-                x/=det;
-                y/=det;
-                z/=det;
-                w/=det;
-            }
+            x+=a*v.x;
+            y+=a*v.y;
+            z+=a*v.z;
+        } else {
+            x=b*x+a*v.x;
+            y=b*y+a*v.y;
+            z=b*z+a*v.z;
         }
+        auto norm=sqrt(x*x+y*y+z*z);
+        flt fr=norm-2*floor(norm/2);
+        if (fr>1) fr=2-fr;
+        auto det=fr/norm;
+        x*=det;
+        y*=det;
+        z*=det;
+        w=1-fr*fr;
     }
 	
 	static Quaternion slerp(Quaternion A, Quaternion B, real time) {

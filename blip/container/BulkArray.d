@@ -128,6 +128,18 @@ struct BulkArray(T){
         this.ptr=newData.ptr;
         this.ptrEnd=this.ptr+newData.length;
     }
+    static if(is(T.flt)){
+        static if((T.sizeof%T.flt.sizeof==0)){
+            T.flt[] basicData(){
+                return (cast(T.flt*)this.ptr)[0..(this.ptrEnd-this.ptr)*T.sizeof/T.flt.sizeof];
+            }
+        } else {
+            alias data basicData;
+        }
+    } else {
+        alias data basicData;
+    }
+    
     /// sets data ana guard to the one of the given guard
     void dataOfGuard(Guard g){
         this.guard=g;
@@ -303,6 +315,9 @@ struct BulkArray(T){
     }
     /// parallel foreach loop structure
     /// could be more aggressive in reusing the slice structs, but the difference should be only in the log_2(n) region
+    /// tries hard to give optimalBlockSize blocks, if the array size is a multiple of optimalBlockSize
+    /// you can safely expect to get only optimalBlockSize sizes, otherwise you can also expect that
+    /// all the blocks but the last two have optimalBlockSize
     struct PLoop{
         int res;
         Exception e;

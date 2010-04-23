@@ -506,7 +506,7 @@ else {
         NArray!(ComplexTypeOf!(T),2)leftEVect=nullNArray!(ComplexTypeOf!(T),2),
         NArray!(ComplexTypeOf!(T),2)rightEVect=nullNArray!(ComplexTypeOf!(T),2))
     in {
-        static assert(isBlasType!(T),"only blas types accepted");
+        static assert(isBlasType!(T),"only blas types accepted, not "~T.stringof);
         assert(a.shape[0]==a.shape[1],"matrix a has to be square");
         if (!isNullNArray(ev)) {
             assert(a.shape[0]==ev.shape[0],"ev has an incorrect size");
@@ -654,6 +654,7 @@ else {
         NArray!(T,2)u=nullNArray!(T,2),NArray!(S,1)s=nullNArray!(S,1),
         NArray!(T,2)vt=nullNArray!(T,2))
     in{
+        static assert(isBlasType!(T),"non blas type "~T.stringof~" not supported");
         static assert(is(RealTypeOf!(T)==S),"singular values are real");
         index_type mn=min(a.shape[0],a.shape[1]);
         if (!isNullNArray(u)){
