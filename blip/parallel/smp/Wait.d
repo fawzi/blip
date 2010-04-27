@@ -86,7 +86,7 @@ struct SmpSemaphore{
 /// now it wakes all waiting threads/tasks, change it in checking after each wake up? 
 /// then it could use an SMPSemaphore (probably not useful due to the delay between wake up and 
 /// execution)
-class WaitCondition{
+class WaitConditionT(bool oneAtTime=true){
     bool delegate() cnd;
     Semaphore sem;
     TaskI[]waiting; // using this rather than delegates because it is more self descriptive
@@ -94,14 +94,33 @@ class WaitCondition{
     this(bool delegate() cnd){
         this.cnd=cnd;
     }
-    /// notify that the condition was met
-    void notify(){
+    /// notify all waiters that the condition was met
+    void notifyAll(){
         synchronized(this){
             foreach(t;waiting){
                 t.resubmitDelayed();
             }
             waiting=null;
             if (sem!is null) sem.notify();
+        }
+    }
+    /// notify one waiter at a time that the condition was met
+    void notifyOne(){
+        synchronized(this){
+            if (waiting.length>0){
+                waiting[waiting.length-1].resubmitDelayed();
+                waiting.length=waiting.length-1;
+            }
+            waiting=null;
+            if (sem!is null) sem.notify();
+        }
+    }
+    /// notifies that the condition was met
+    void notify(){
+        if (oneAtTime){
+            notifyOne();
+        } else {
+            notifyAll();
         }
     }
     /// check if the condition was met
@@ -135,6 +154,8 @@ class WaitCondition{
                 }
                 sem.notify();
             }
+        } else {
+            checkCondition();
         }
     }
     /// checks periodically if the condition (up to at least maxT milliseconds)
@@ -156,6 +177,8 @@ class WaitCondition{
         }
     }
 }
+
+alias WaitConditionT!(true) WaitCondition;
 
 /// waits for an OS lock
 /// WARNING this might deadlock if alwaysLock and the task that aquires the lock might
