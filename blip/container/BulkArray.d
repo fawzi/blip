@@ -66,6 +66,15 @@ struct BulkArray(T){
     Flags flags=Flags.Dummy;
     static const BulkArray dummy={null,null,null,Flags.Dummy};
     alias T dtype;
+    static if(is(T.flt)){
+        static if((T.sizeof%T.flt.sizeof==0)){
+            alias T.flt basicDtype;
+        } else {
+            alias T basicDtype;
+        }
+    } else {
+        alias T basicDtype;
+    }
     
     // ---- Serialization ---
     static ClassMetaInfo metaI;
@@ -128,16 +137,9 @@ struct BulkArray(T){
         this.ptr=newData.ptr;
         this.ptrEnd=this.ptr+newData.length;
     }
-    static if(is(T.flt)){
-        static if((T.sizeof%T.flt.sizeof==0)){
-            T.flt[] basicData(){
-                return (cast(T.flt*)this.ptr)[0..(this.ptrEnd-this.ptr)*T.sizeof/T.flt.sizeof];
-            }
-        } else {
-            alias data basicData;
-        }
-    } else {
-        alias data basicData;
+    /// data as array of basicDtype
+    basicDtype[] basicData(){
+        return (cast(basicDtype*)this.ptr)[0..(this.ptrEnd-this.ptr)*T.sizeof/basicDtype.sizeof];
     }
     
     /// sets data ana guard to the one of the given guard
