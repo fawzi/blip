@@ -52,7 +52,7 @@ struct LocalGrowableArray(T){
                 newData.length=growLength(c,T.sizeof);
                 if (newData.ptr!is dataPtr){
                     // actively destroy old data, it is an error to use it
-                    //delete (dataPtr[0..capacity]);
+                    delete (dataPtr[0..capacity]);
                 }
                 dataPtr=newData.ptr;
                 capacity=newData.length;
