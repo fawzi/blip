@@ -143,7 +143,7 @@ struct BulkArray(T){
         return (cast(basicDtype*)this.ptr)[0..(this.ptrEnd-this.ptr)*T.sizeof/basicDtype.sizeof];
     }
     
-    /// sets data ana guard to the one of the given guard
+    /// sets data and guard to the one of the given guard
     void dataOfGuard(Guard g){
         this.guard=g;
         this.ptr=cast(T*)g.data.ptr;
@@ -286,9 +286,9 @@ struct BulkArray(T){
     BulkArray deepdup(){
         BulkArray n=BulkArray(length);
         static if (is(typeof(T.init.deepdup))){
-            baBinaryOpStr!("*bPtr0=cast(typeof(*bPtr0))aPtr0.deepdup;",T,T)(*this,n);
+            baBinaryOpStr!(`*bPtr0=aPtr0.deepdup;`,T,T)(*this,n);
         } else static if (is(typeof(T.init.dup()))) {
-            baBinaryOpStr!("*bPtr0=cast(typeof(*bPtr0))aPtr0.dup;",T,T)(*this,n);
+            baBinaryOpStr!("*bPtr0=aPtr0.dup;",T,T)(*this,n);
         } else {
             memcpy(n.data.ptr,data.ptr,length*T.sizeof);
         }
