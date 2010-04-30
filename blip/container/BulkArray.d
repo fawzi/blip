@@ -14,6 +14,7 @@ import blip.container.AtomicSLink;
 import blip.parallel.smp.WorkManager;
 import blip.io.BasicIO;
 import blip.container.GrowableArray;
+import blip.util.Convert;
 import cstdlib = tango.stdc.stdlib : free, malloc;
 
 /// guard object to deallocate large arrays that contain inner pointers
@@ -246,8 +247,10 @@ struct BulkArray(T){
             baBinaryOpStr!(`
             static if(is(typeof((*aPtr0)[]=(*bPtr0)))){
                 (*aPtr0)[]=(*bPtr0);
-            }else {
-                *aPtr0=cast(typeof(*aPtr0))*bPtr0;
+            } else static if(is(V:T)){
+                *aPtr0=cast(T)(*bPtr0);
+            } else {
+                *aPtr0=convertTo!(typeof(*aPtr0))(*bPtr0);
             }`,T,V)(*this,b);
         }
     }
@@ -267,8 +270,10 @@ struct BulkArray(T){
             baBinaryOpStr!(`
             static if(is(typeof((*aPtr0)[]=(*bPtr0)))){
                 (*aPtr0)[]=(*bPtr0);
-            }else {
-                *aPtr0=cast(typeof(*aPtr0))*bPtr0;
+            } else static if(is(V:T)){
+                *aPtr0=cast(T)(*bPtr0);
+            } else {
+                *aPtr0=convertTo!(typeof(*aPtr0))(*bPtr0);
             }`,V,T)(n,*this);
         }
         return n;
