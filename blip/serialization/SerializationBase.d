@@ -582,7 +582,11 @@ class Serializer {
     void unregisterObject(Object o){
         ptrToObjectId.remove(cast(void*)o);
     }
-    
+    /// allows the serilizer to treat some instances specially
+    /// if it returns true then it is assumed that ptr was serialized
+    bool specialInstance(void *ptr){
+        return false;
+    }
     /// writes out a custom field
     final void customField(FieldMetaInfo *fieldMeta, void delegate() realWrite){
         version(SerializationTrace) {
@@ -642,6 +646,7 @@ class Serializer {
                     writeNull(fieldMeta);
                     return;
                 }
+                if (specialInstance(ptr)) return;
                 if (removeCycles && (fieldMeta is null || fieldMeta.metaInfo is null
                     || fieldMeta.metaInfo.kind != TypeKind.CustomK)){
                     auto objIdPtr = ptr in ptrToObjectId;

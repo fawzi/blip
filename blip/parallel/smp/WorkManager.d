@@ -9,6 +9,34 @@ import blip.t.util.log.Log;
 import blip.parallel.smp.NumaSchedulers;
 import blip.parallel.smp.Numa;
 
+/// creates an action, i.e. a void delegate() called name, that captures the local
+/// variables locals, and executes the action action.
+/// lives in the heap, so it is safe
+char[] mkActionMixin(char[]name,char[]locals,char[]action){
+    char[] res= `
+    void delegate() `~name~`;
+    {
+        struct `~name~`Closure{`;
+    foreach(v;locals){
+        res~=`
+        typeof(`~v~`) `~v~`;`;
+    }
+    res~=`
+            void doIt(){
+                `~action~`
+            }
+        }
+        auto `~name~`Cl=new `~name~`Closure;`;
+    foreach(v;locals){
+        res~=`
+        `~name~`Cl.`~v~`=`~v~`;`;
+    }
+    res~=`
+        `~name~`=&`~name~`Cl.doIt;
+    }`;
+    return res;
+}
+
 /// size_t the default size for simple work
 /// this is used to calculate the default block size for splitting up parallel tasks
 /// (this should probably be at least comparable to the l1 cache per thread)

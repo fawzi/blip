@@ -337,6 +337,29 @@ version(LDC){
 }
 
 //---------------------
+// internal conversion template
+private T aCasT(T,V)(ref T val, T newval, T equalTo){
+    union UVConv{V v; T t;}
+    UVConv vNew,vOld,vAtt;
+    vNew.t=newval;
+    vOld.t=equalTo;
+    vAtt.v=atomicCAS(*valP,vNew.v,vOld.v);
+    return vAtt.t;
+}
+/// internal reduction 
+private T aCas(T,V)(ref T val, T newval, T equalTo){
+    static if (T.sizeof==1){
+        return aCasT!(T,ubyte)(val,newval,equalTo);
+    } else static if (T.sizeof==2){
+        return aCasT!(T,ushort)(val,newval,equalTo);
+    } else static if (T.sizeof==4){
+        return aCasT!(T,uint)(val,newval,equalTo);
+    } else static if (T.sizeof==8){ // unclear if it is always supported...
+        return aCasT!(T,ulong)(val,newval,equalTo);
+    } else {
+        static assert(0,"invalid type "~T.stringof);
+    }
+}
 /// atomic compare & exchange (can be used to implement everything else)
 /// stores newval into val if val==equalTo in one atomic operation
 /// barriers are not implied, just atomicity!
@@ -351,11 +374,13 @@ version(LDC){
         }
         else static if (is(T == bool)) // correct also if bol has different size?
         {
-            oldval = llvm_atomic_cmp_swap!(ubyte)(cast(ubyte*)&val, equalTo?1:0, newval?1:0)?0:1;
+            oldval = aCas(val,newval,equalTo); // assuming true is *always* 1 and not a non zero value...
         }
-        else
+        else static if (isIntegerType(T))
         {
             oldval = llvm_atomic_cmp_swap!(T)(&val, equalTo, newval);
+        } else {
+            oldval = aCas(val,newval,equalTo);
         }
         return oldval;
     }
@@ -400,9 +425,11 @@ version(LDC){
         else static if( T.sizeof == long.sizeof ) {
             // 8 Byte StoreIf on 32-Bit Processor
             version(darwin){
+                extern(C) ubyte OSAtomicCompareAndSwap64(long oldValue, long newValue,
+                         long *theValue); // assumes that in C sizeof(_Bool)==1
                 while(1){
                     if(OSAtomicCompareAndSwap64(cast(long)cast(ClassPtr!(T))equalTo,
-                        cast(long)cast(ClassPtr!(T))newval,  cast(long*)&val))
+                        cast(long)cast(ClassPtr!(T))newval,  cast(long*)&val)!=0)
                     {
                         return equalTo;
                     } else {
@@ -541,97 +568,105 @@ in {
 ///
 /// no barriers implied, only atomicity!
 version(LDC){
-    T atomicAdd(T)(ref T val, T inc){
+    T atomicAdd(T)(ref T val, T incV){
         static if (isPointerOrClass!(T))
         {
-            return cast(T)llvm_atomic_load_add!(size_t)(cast(size_t*)&val, inc);
+            return cast(T)llvm_atomic_load_add!(size_t)(cast(size_t*)&val, incV);
         }
-        else
+        else static if (isIntegerType!(T))
         {
             static assert( isIntegerType!(T), "invalid type "~T.stringof );
-            return llvm_atomic_load_add!(T)(&val, cast(T)inc);
+            return llvm_atomic_load_add!(T)(&val, cast(T)incV);
+        } else {
+            return atomicOp(val,delegate T(T a){ return a+incV; });
         }
     }
 } else version (D_InlineAsm_X86){
     T atomicAdd(T)(ref T val, T incV){
-        static assert( isIntegerType!(T)||isPointerOrClass!(T),"invalid type: "~T.stringof );
-        T* posVal=&val;
-        T res;
-        static if (T.sizeof==1){
-            volatile asm {
-                mov DL, incV;
-                mov ECX, posVal;
-                lock;
-                xadd byte ptr [ECX],DL;
-                mov byte ptr res[EBP],DL;
+        static if (isIntegerType!(T)||isPointerOrClass!(T)){
+            T* posVal=&val;
+            T res;
+            static if (T.sizeof==1){
+                volatile asm {
+                    mov DL, incV;
+                    mov ECX, posVal;
+                    lock;
+                    xadd byte ptr [ECX],DL;
+                    mov byte ptr res[EBP],DL;
+                }
+            } else static if (T.sizeof==2){
+                volatile asm {
+                    mov DX, incV;
+                    mov ECX, posVal;
+                    lock;
+                    xadd short ptr [ECX],DX;
+                    mov short ptr res[EBP],DX;
+                }
+            } else static if (T.sizeof==4){
+                volatile asm
+                {
+                    mov EDX, incV;
+                    mov ECX, posVal;
+                    lock;
+                    xadd int ptr [ECX],EDX;
+                    mov int ptr res[EBP],EDX;
+                }
+            } else static if (T.sizeof==8){
+                return atomicOp(val,delegate (T x){ return x+incV; });
+            } else {
+                static assert(0,"Unsupported type size");
             }
-        } else static if (T.sizeof==2){
-            volatile asm {
-                mov DX, incV;
-                mov ECX, posVal;
-                lock;
-                xadd short ptr [ECX],DX;
-                mov short ptr res[EBP],DX;
-            }
-        } else static if (T.sizeof==4){
-            volatile asm
-            {
-                mov EDX, incV;
-                mov ECX, posVal;
-                lock;
-                xadd int ptr [ECX],EDX;
-                mov int ptr res[EBP],EDX;
-            }
-        } else static if (T.sizeof==8){
-            return atomicOp(val,delegate (T x){ return x+inc; });
+            return res;
         } else {
-            static assert(0,"Unsupported type size");
+            return atomicOp(val,delegate T(T a){ return a+incV; });
         }
-        return res;
     }
 } else version (D_InlineAsm_X86_64){
     T atomicAdd(T)(ref T val, T incV){
-        static assert( isIntegerType!(T)||isPointerOrClass!(T),"invalid type: "~T.stringof );
-        T* posVal=&val;
-        T res;
-        static if (T.sizeof==1){
-            volatile asm {
-                mov DL, incV;
-                mov RCX, posVal;
-                lock;
-                xadd byte ptr [RCX],DL;
-                mov byte ptr res[EBP],DL;
+        static if (isIntegerType!(T)||isPointerOrClass!(T)){
+            T* posVal=&val;
+            T res;
+            static if (T.sizeof==1){
+                volatile asm {
+                    mov DL, incV;
+                    mov RCX, posVal;
+                    lock;
+                    xadd byte ptr [RCX],DL;
+                    mov byte ptr res[EBP],DL;
+                }
+            } else static if (T.sizeof==2){
+                volatile asm {
+                    mov DX, incV;
+                    mov RCX, posVal;
+                    lock;
+                    xadd short ptr [RCX],DX;
+                    mov short ptr res[EBP],DX;
+                }
+            } else static if (T.sizeof==4){
+                volatile asm
+                {
+                    mov EDX, incV;
+                    mov RCX, posVal;
+                    lock;
+                    xadd int ptr [RCX],EDX;
+                    mov int ptr res[EBP],EDX;
+                }
+            } else static if (T.sizeof==8){
+                volatile asm
+                {
+                    mov RAX, val;
+                    mov RDX, incV;
+                    lock; // lock always needed to make this op atomic
+                    xadd qword ptr [RAX],RDX;
+                    mov res[EBP],RDX;
+                }
+            } else {
+                static assert(0,"Unsupported type size for type:"~T.stringof);
             }
-        } else static if (T.sizeof==2){
-            volatile asm {
-                mov DX, incV;
-                mov RCX, posVal;
-                lock;
-                xadd short ptr [RCX],DX;
-                mov short ptr res[EBP],DX;
-            }
-        } else static if (T.sizeof==4){
-            volatile asm
-            {
-                mov EDX, incV;
-                mov RCX, posVal;
-                lock;
-                xadd int ptr [RCX],EDX;
-                mov int ptr res[EBP],EDX;
-            }
-        } else static if (T.sizeof==8){
-            volatile asm
-            {
-                mov RAX, val;
-                mov RDX, incV;
-                lock; // lock always needed to make this op atomic
-                xadd qword ptr [RAX],RDX;
-                mov res[EBP],RDX;
-            }
+            return res;
         } else {
-            static assert(0,"Unsupported type size for type:"~T.stringof);
+            return atomicOp(val,delegate T(T a){ return a+incV; });
         }
-        return res;
     }
 } else {
     static if (LockVersion){
@@ -666,7 +701,6 @@ version(LDC){
 /// and no "fair" share is applied between fast function (more likely to succeed) and
 /// the others (i.e. do not use this in case of high contention)
 T atomicOp(T)(ref T val, T delegate(T) f){
-    static assert(isIntegerType!(T) || isPointerOrClass!(T),"invalid type "~T.stringof);
     T oldV,newV,nextV;
     int i=0;
     volatile nextV=val;
