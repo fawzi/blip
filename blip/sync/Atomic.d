@@ -385,6 +385,10 @@ version(LDC){
         return oldval;
     }
 } else version(D_InlineAsm_X86) {
+    version(darwin){
+        extern(C) ubyte OSAtomicCompareAndSwap64(long oldValue, long newValue,
+                 long *theValue); // assumes that in C sizeof(_Bool)==1
+    }
     T atomicCAS( T )( inout T val, T newval, T equalTo )
     in {
         // NOTE: 32 bit x86 systems support 8 byte CAS, which only requires
@@ -425,8 +429,6 @@ version(LDC){
         else static if( T.sizeof == long.sizeof ) {
             // 8 Byte StoreIf on 32-Bit Processor
             version(darwin){
-                extern(C) ubyte OSAtomicCompareAndSwap64(long oldValue, long newValue,
-                         long *theValue); // assumes that in C sizeof(_Bool)==1
                 while(1){
                     if(OSAtomicCompareAndSwap64(cast(long)cast(ClassPtr!(T))equalTo,
                         cast(long)cast(ClassPtr!(T))newval,  cast(long*)&val)!=0)

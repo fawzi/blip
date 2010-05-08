@@ -326,6 +326,24 @@ body {
     return c;
 }
 
+/// dot of the flattened version of two arrays (works for any equally shaped arrays)
+S dotAll(T,int rank1,U,int rank2,S=typeof(T.init*U.init))(NArray!(T,rank1)a, NArray!(U,rank2)b){
+    static assert(rank1==rank2,"dotAll needs the array to have the same shape");
+    assert(a.shape==b.shape,"dotAll needs the array to have the same shape");
+    static if (rank1==0){
+        return a*b;
+    } else static if (rank1==1){
+        return dot(a,b);
+    } else {
+        S res=0; // could be smater about the sequence of dimensions...
+        foreach(i,v;a){
+            scope v2=b[i];
+            res+=dotAll(v,v2);
+        }
+        return res;
+    }
+}
+
 /// outer product between tensors (reduces a single axis)
 NArray!(typeof(T.init*U.init),rank1+rank2)outer(T,int rank1,U,int rank2)
     (NArray!(T,rank1)a,NArray!(U,rank2)b)
