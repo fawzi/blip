@@ -11,7 +11,7 @@ class FiberPoolT(int batchSize=16):Pool!(Fiber,batchSize){
     
     this(size_t stackSize=defaultFiberSize,size_t bufferSpace=8*batchSize,
         size_t maxEl=8*batchSize){
-        super(bufferSpace,maxEl);
+        super(null,bufferSpace,maxEl);
         this.stackSize=stackSize;
     }
     

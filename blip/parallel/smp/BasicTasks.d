@@ -40,7 +40,7 @@ enum TaskFlags:uint{
 
 class TaskPoolT(int batchSize=16):Pool!(Task,batchSize){
     this(size_t bufferSpace=8*batchSize, size_t maxEl=16*batchSize){
-        super(bufferSpace,maxEl);
+        super(null,bufferSpace,maxEl);
     }
     Task getObj(char[] name, void delegate() taskOp,TaskFlags f=TaskFlags.None){
         auto res=super.getObj();

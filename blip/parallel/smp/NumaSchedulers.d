@@ -47,9 +47,9 @@ import blip.sync.Atomic;
 /// integrate PriQueue in this? it would be slighly more efficient, and already now
 /// depends on its implementation details, or they should be better separated
 class PriQScheduler:TaskSchedulerI {
-    static Cached!(PriQueue!(TaskI).PriQPool) pQLevelPool;
+    static CachedT!(PriQueue!(TaskI).PriQPool) pQLevelPool;
     static this(){
-        pQLevelPool=new Cached!(PriQueue!(TaskI).PriQPool)(delegate PriQueue!(TaskI).PriQPool(){
+        pQLevelPool=new CachedT!(PriQueue!(TaskI).PriQPool)("PriQPool_",function PriQueue!(TaskI).PriQPool(){
             auto res=new PriQueue!(TaskI).PriQPool();
             return res;
         });
@@ -463,9 +463,9 @@ class PriQScheduler:TaskSchedulerI {
 }
 
 class MultiSched:TaskSchedulerI {
-    static Cached!(PriQScheduler*) pQSchedPool;
+    static CachedT!(PriQScheduler*) pQSchedPool;
     static this(){
-        pQSchedPool=new Cached!(PriQScheduler*)(delegate PriQScheduler*(){
+        pQSchedPool=new CachedT!(PriQScheduler*)("PriQScheduler_",function PriQScheduler*(){
             auto res=cast(PriQScheduler*)cast(void*)new size_t;
             return res;
         });
@@ -1277,6 +1277,12 @@ class MExecuter:ExecuterI{
         log.info("Work thread "~Thread.getThis().name~" started");
         scope(exit){
             log.info("Work thread "~Thread.getThis().name~" stopped");
+        }
+        try{
+            setDefaultCache(_scheduler.nnCache());
+        } catch(Exception e){
+            log.error("setDefaultCache failed, continuing...");
+            log.error(collectAppender(&e.writeOut));
         }
         try{
             pin(_scheduler.starvationManager.pinLevel);

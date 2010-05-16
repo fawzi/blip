@@ -1,375 +1,211 @@
-/**
- * This module contains a packed bit array implementation in the style of D's
- * built-in dynamic arrays.
- *
- * Copyright: Copyright (C) 2005-2006 Digital Mars, www.digitalmars.com.
- *            All rights reserved.
- * License:   BSD style: $(LICENSE)
- * Authors:   Walter Bright, Sean Kelly, modified by fawzi (minor changes to better match BitVector)
- */
+/// array of bits that behave like D slices + some autmatic allocation
+/// this is a full rewrite and has different semantics than tango/phobos BitArray.
+///
+/// author: fawzi
 module blip.container.BitArray;
 private import tango.core.BitManip;
 
-
-/**
- * This struct represents an array of boolean values, each of which occupy one
- * bit of memory for storage.  Thus an array of 32 bits would occupy the same
- * space as one integer value.  The typical array operations--such as indexing
- * and sorting--are supported, as well as bitwise operations such as and, or,
- * xor, and complement.
- */
-struct BitArray
-{
-    size_t  len;
-    uint*   ptr;
-
-
-    /**
-     * This initializes a BitArray of bits.length bits, where each bit value
-     * matches the corresponding boolean value in bits.
-     *
-     * Params:
-     *  bits = The initialization value.
-     *
-     * Returns:
-     *  A BitArray with the same number and sequence of elements as bits.
-     */
-    static BitArray opCall( bool[] bits )
+/// mixin that loops on a bit array.
+/// - opMask: operation on the bits selected by "mask" of ptr[iBlock]. valAtt contains the
+///   (not necessarily filtered) elements of the right hand side. ibit0 is the index of the first selected bit
+/// - opEl: operation on the element ptr[iBlock], valAtt contains the elements of the right side.
+///   ibit0 is the index of the first element of the element
+/// - opBit: operation on a single bit (as bool value), ibit is the the index to do the operation on
+char[] loopOpMixin(char[]opMask,char[] opEl, char[] opBit){
+    char[] res=`
     {
-        BitArray temp;
-
-        temp.length = bits.length;
-        foreach( pos, val; bits )
-            temp[pos] = val;
-        return temp;
-    }
-
-    /**
-     * Get the number of bits in this array.
-     *
-     * Returns:
-     *  The number of bits in this array.
-     */
-    size_t length()
-    {
-        return len;
-    }
-
-
-    /**
-     * Resizes this array to newlen bits.  If newlen is larger than the current
-     * length, the new bits will be initialized to zero.
-     *
-     * Params:
-     *  newlen = The number of bits this array should contain.
-     */
-    void length( size_t newlen )
-    {
-        if( newlen != len )
-        {
-            auto olddim = dim();
-            auto newdim = (newlen + 31) / 32;
-
-            if( newdim != olddim )
-            {
-                // Create a fake array so we can use D's realloc machinery
-                uint[] buf = ptr[0 .. olddim];
-
-                buf.length = newdim; // realloc
-                ptr = buf.ptr;
-                if( newdim & 31 )
-                {
-                    // Set any pad bits to 0
-                    ptr[newdim - 1] &= ~(~0 << (newdim & 31));
+        if (len<bitsPerEl){
+            if (start==rhs.start){
+                if (len+start>bitsPerEl){
+                    {
+                        auto ibit0=0;
+                        auto iBlock=0;
+                        auto mask=all1>>start;
+                        auto valAtt=rhs.ptr[0];
+                        `~opMask~`
+                    }
+                    {
+                        auto ibit0=bitsPerEl-start;
+                        auto iBlock=1;
+                        auto mask=(all1<<cast(int)(2*bitsPerEl-(len+start)));
+                        auto valAtt=rhs.ptr[1];
+                        `~opMask~`
+                    }
+                } else {
+                    auto ibit0=0;
+                    auto mask1=all1>>start;
+                    auto maskRest=(all1<<cast(int)(bitsPerEl-(len+start)));
+                    auto mask=(mask1&maskRest);
+                    auto iBlock=0;
+                    auto valAtt=rhs.ptr[0];
+                    `~opMask~`
+                }
+            } else {
+                for(size_t ibit=0;ibit<len;++ibit){
+                    `~opBit~`
                 }
             }
-            len = newlen;
+       } else {
+            if (start==rhs.start){
+                auto ibit0=0;
+                {
+                    auto iBlock=0;
+                    auto mask=all1>>start;
+                    auto valAtt=rhs.ptr[0];
+                    `~opMask~`
+                    ibit0+=bitsPerEl-start;
+                }
+                auto rBlock=1+(len-cast(ptrdiff_t)start)/bitsPerEl;
+                for (size_t iBlock=1;iBlock!=rBlock;++iBlock){
+                    auto valAtt=rhs.ptr[iBlock];
+                    `~opEl~`
+                    ibit0+=bitsPerEl;
+                }
+                {
+                    auto rest=cast(int)((start+len)%bitsPerEl);
+                    auto mask=(all1<<(bitsPerEl-rest));
+                    auto iBlock=rBlock;
+                    auto valAtt=rhs.ptr[rBlock];
+                    `~opMask~`
+                }
+            } else {
+                size_t bitCp=0;
+                size_t iBlockStart=0;
+                size_t ibit0=0;
+                if (start!=0){
+                    bitCp=bitsPerEl-start;
+                    for (size_t ibit=0;ibit!=bitCp;++ibit){
+                        `~opBit~`
+                    }
+                    iBlockStart=1;
+                    ibit0+=bitCp;
+                }
+                auto rBlock=(len-bitCp)/bitsPerEl+iBlockStart;
+                size_t iRhs=0;
+                int posRhs=rhs.start+bitCp;
+                if (posRhs>bitsPerEl){
+                    iRhs=1;
+                    posRhs-=bitsPerEl;
+                }
+                auto posRest=bitsPerEl-posRhs;
+                auto valAtt=(ptr[iRhs]<<posRhs);
+                for (size_t iBlock=iBlockStart;iBlock!=rBlock;++iBlock){
+                    auto vNew=ptr[++iRhs];
+                    valAtt|=(vNew>>posRest);
+                    `~opEl~`
+                    valAtt=(vNew<<posRhs);
+                    ibit0+=bitsPerEl;
+                }
+                auto cpAll=bitCp+(rBlock-iBlockStart)*bitsPerEl;
+                for (size_t ibit=cpAll;ibit<len;++ibit){ // could be optimized...
+                    `~opBit~`
+                }
+            }
         }
+    }`;
+    return res;
+}
+
+/// An array or slice of boolean values, each of which occupy one bit of memory for storage.
+/// BitArray is a reference type in the sense that it refers to memory containing the bits
+/// but does not "own" it. BitVector in the other hand stores it in place and owns it (and has compile 
+/// time size).
+/// BitArray occupies 128 bits (on 64-bit computers), so it makes sense for larger bit sequences
+/// or if you want to reference arbitrary bit slices within an array.
+struct BitArray
+{
+    alias size_t el_t;
+    enum { bitsPerEl=size_t.sizeof*8 }
+    static if(el_t.sizeof==4){
+        enum {bitsShift=5}
+    } else static if (el_t.sizeof==8){
+        enum {bitsShift=6}
+    } else {
+        static assert(0,"not implemented el_t sizeof");
     }
+    enum :size_t {bitsShiftMask=((cast(size_t)1)<<bitsShift+1)-1}
+    enum :el_t { all0=0, all1=(~all0) }
+    // if uint is too small as length one could use an ulong, and store start in some bits of it
+    int  start; // should be in 0..bitsPerEl
+    uint  len;
+    el_t* ptr;
 
-
-    /**
-     * Gets the length of a uint array large enough to hold all stored bits.
-     *
-     * Returns:
-     *  The size a uint array would have to be to store this array.
-     */
-    size_t dim()
-    {
-        return (len + 31) / 32;
+    /// initializes a new array with the given bits
+    static BitArray opCall( bool[] bits ){
+        BitArray res;
+        auto storage=new el_t[]((bits.length+bitsPerEl-1)/bitsPerEl);
+        res.ptr=storage.ptr;
+        res.len=cast(uint)bits.length;
+        foreach( pos, val; bits )
+            res[pos] = val;
+        return res;
     }
-
-
-    /**
-     * Duplicates this array, much like the dup property for built-in arrays.
-     *
-     * Returns:
-     *  A duplicate of this array.
-     */
-    BitArray dup()
-    {
-        BitArray ba;
-
-        uint[] buf = ptr[0 .. dim].dup;
-        ba.len = len;
-        ba.ptr = buf.ptr;
-        return ba;
-    }
-
-
-    debug( UnitTest )
-    {
-      unittest
-      {
-        BitArray a;
-        BitArray b;
-
-        a.length = 3;
-        a[0] = 1; a[1] = 0; a[2] = 1;
-        b = a.dup;
-        assert( b.length == 3 );
-        for( int i = 0; i < 3; ++i )
-        {
-            assert( b[i] == (((i ^ 1) & 1) ? true : false) );
+    /// reinterprets the memory given as BitArray, this access bits a little before/after storage
+    /// as it works with el_t units
+    static BitArray opCall( void[] storage ){
+        BitArray res;
+        size_t p=cast(size_t)storage.ptr;
+        auto rest=p%el_t.alignof;
+        if (rest!=0){
+            res.start=(el_t.sizeof-rest)*8;
+            res.ptr=cast(el_t*)(p+el_t.sizeof-rest);
+        } else {
+            res.ptr=cast(el_t*)p;
         }
-      }
+        res.len=cast(uint)storage.length*8;
+        return res;
     }
-
-
-    /**
-     * Resets the length of this array to bits.length and then initializes this
-     *
-     * Resizes this array to hold bits.length bits and initializes each bit
-     * value to match the corresponding boolean value in bits.
-     *
-     * Params:
-     *  bits = The initialization value.
-     */
-    void opAssign( bool[] bits )
-    {
-        length = bits.length;
+    /// an array of zeros of the given length
+    static BitArray zeros(size_t l){
+        BitArray res;
+        auto storage=new el_t[]((l+bitsPerEl-1)/bitsPerEl);
+        // storage[]=all0; // should not be needed
+        res.ptr=storage.ptr;
+        return res;
+    }
+    /// an array of ones of the given length
+    static BitArray ones(size_t l){
+        BitArray res;
+        auto storage=new el_t[]((l+bitsPerEl-1)/bitsPerEl);
+        storage[]=all1;
+        res.ptr=storage.ptr;
+        return res;
+    }
+    /// number of bits
+    size_t length(){
+        return len;
+    }
+    /// number of el_t used
+    size_t dim(){
+        return (start+len + bitsPerEl-1) / bitsPerEl;
+    }
+    /// copy
+    BitArray dup(){
+        BitArray res;
+        el_t[] buf = ptr[0 .. dim].dup;
+        res.len=len;
+        res.ptr=buf.ptr;
+        res.start=start;
+        return res;
+    }
+    /// sets the bits of this slice
+    void opSliceAssign( bool[] bits ){
+        assert(length == bits.length);
         foreach( i, b; bits )
         {
             (*this)[i] = b;
         }
     }
-
-    /**
-     * Copy the bits from one array into this array.  This is not a shallow
-     * copy.
-     *
-     * Params:
-     *  rhs = A BitArray with at least the same number of bits as this bit
-     *  array.
-     *
-     * Returns:
-     *  A shallow copy of this array.
-     *
-     *  --------------------
-     *  BitArray ba = [0,1,0,1,0];
-     *  BitArray ba2;
-     *  ba2.length = ba.length;
-     *  ba2[] = ba; // perform the copy
-     *  ba[0] = true;
-     *  assert(ba2[0] == false);
-     */
-     BitArray opSliceAssign(BitArray rhs)
-     in
-     {
-         assert(rhs.len == len);
-     }
-     body
-     {
-         size_t mDim=len/32;
-         ptr[0..mDim] = rhs.ptr[0..mDim];
-         int rest=cast(int)(len & cast(size_t)31u);
-         if (rest){
-             uint mask=(~0u)<<rest;
-             ptr[mDim]=(rhs.ptr[mDim] & (~mask))|(ptr[mDim] & mask);
-         }
-         return *this;
-     }
-
-
-    /**
-     * Map BitArray onto target, with numbits being the number of bits in the
-     * array. Does not copy the data.  This is the inverse of opCast.
-     *
-     * Params:
-     *  target  = The array to map.
-     *  numbits = The number of bits to map in target.
-     */
-    void init( void[] target, size_t numbits )
-    in
-    {
-        assert( numbits <= target.length * 8 );
-        assert( (target.length & 3) == 0 );
-    }
-    body
-    {
-        ptr = cast(uint*)target.ptr;
-        len = numbits;
-    }
-
-
-    debug( UnitTest )
-    {
-      unittest
-      {
-        BitArray a = [1,0,1,0,1];
-        BitArray b;
-        void[] buf;
-
-        buf = cast(void[])a;
-        b.init( buf, a.length );
-
-        assert( b[0] == 1 );
-        assert( b[1] == 0 );
-        assert( b[2] == 1 );
-        assert( b[3] == 0 );
-        assert( b[4] == 1 );
-
-        a[0] = 0;
-        assert( b[0] == 0 );
-
-        assert( a == b );
-
-        // test opSliceAssign
-        BitArray c;
-        c.length = a.length;
-        c[] = a;
-        assert( c == a );
-        a[0] = 1;
-        assert( c != a );
-      }
-    }
-
-
-    /**
-     * Reverses the contents of this array in place, much like the reverse
-     * property for built-in arrays.
-     *
-     * Returns:
-     *  A shallow copy of this array.
-     */
-    BitArray reverse()
-    out( result )
-    {
-        assert( result == *this );
-    }
-    body
-    {
-        if( len >= 2 )
-        {
-            bool t;
-            size_t lo, hi;
-
-            lo = 0;
-            hi = len - 1;
-            for( ; lo < hi; ++lo, --hi )
-            {
-                t = (*this)[lo];
-                (*this)[lo] = (*this)[hi];
-                (*this)[hi] = t;
-            }
-        }
+    /// sets the bits of this slice
+    BitArray opSliceAssign(BitArray rhs){
+        assert(rhs.len == len);
+        mixin(loopOpMixin(`ptr[iBlock]=(ptr[iBlock]&(~mask))|(valAtt&mask);`,
+            `ptr[iBlock]=valAtt;`,`(*this)[ibit]=rhs[ibit];`));
         return *this;
     }
-
-
-    debug( UnitTest )
-    {
-      unittest
-      {
-        static bool[5] data = [1,0,1,1,0];
-        BitArray b = data;
-        b.reverse;
-
-        for( size_t i = 0; i < data.length; ++i )
-        {
-            assert( b[i] == data[4 - i] );
-        }
-      }
-    }
-
-
-    /**
-     * Sorts this array in place, with zero entries sorting before one.  This
-     * is equivalent to the sort property for built-in arrays.
-     *
-     * Returns:
-     *  A shallow copy of this array.
-     */
-    BitArray sort()
-    out( result )
-    {
-        assert( result == *this );
-    }
-    body
-    {
-        if( len >= 2 )
-        {
-            size_t lo, hi;
-
-            lo = 0;
-            hi = len - 1;
-            while( true )
-            {
-                while( true )
-                {
-                    if( lo >= hi )
-                        goto Ldone;
-                    if( (*this)[lo] == true )
-                        break;
-                    ++lo;
-                }
-
-                while( true )
-                {
-                    if( lo >= hi )
-                        goto Ldone;
-                    if( (*this)[hi] == false )
-                        break;
-                    --hi;
-                }
-
-                (*this)[lo] = false;
-                (*this)[hi] = true;
-
-                ++lo;
-                --hi;
-            }
-            Ldone:
-            ;
-        }
-        return *this;
-    }
-
-
-    debug( UnitTest )
-    {
-      unittest
-      {
-        static uint x = 0b1100011000;
-        static BitArray ba = { 10, &x };
-
-        ba.sort;
-        for( size_t i = 0; i < 6; ++i )
-            assert( ba[i] == false );
-        for( size_t i = 6; i < 10; ++i )
-            assert( ba[i] == true );
-      }
-    }
-
-
-    /**
-     * Operates on all bits in this array.
-     *
-     * Params:
-     *  dg = The supplied code as a delegate.
-     */
-    int opApply( int delegate(inout bool) dg )
-    {
+    /// loops on the slice
+    int opApply( int delegate(inout bool) dg ){
+        // to do: optimize with loopOpMixin
         int result;
 
         for( size_t i = 0; i < len; ++i )
@@ -382,11 +218,8 @@ struct BitArray
         }
         return result;
     }
-
-
-    /** ditto */
-    int opApply( int delegate(inout size_t, inout bool) dg )
-    {
+    /// ditto
+    int opApply( int delegate(inout size_t, inout bool) dg ){
         int result;
 
         for( size_t i = 0; i < len; ++i )
@@ -399,786 +232,87 @@ struct BitArray
         }
         return result;
     }
-
-
-    debug( UnitTest )
-    {
-      unittest
-      {
-        BitArray a = [1,0,1];
-
-        int i;
-        foreach( b; a )
-        {
-            switch( i )
-            {
-            case 0: assert( b == true );  break;
-            case 1: assert( b == false ); break;
-            case 2: assert( b == true );  break;
-            default: assert( false );
-            }
-            i++;
-        }
-
-        foreach( j, b; a )
-        {
-            switch( j )
-            {
-            case 0: assert( b == true );  break;
-            case 1: assert( b == false ); break;
-            case 2: assert( b == true );  break;
-            default: assert( false );
-            }
-        }
-      }
-    }
-
-
-    /**
-     * Compares this array to another for equality.  Two bit arrays are equal
-     * if they are the same size and contain the same series of bits.
-     *
-     * Params:
-     *  rhs = The array to compare against.
-     *
-     * Returns:
-     *  zero if not equal and non-zero otherwise.
-     */
-    int opEquals( BitArray rhs )
-    {
+    /// compares the contents of two slices
+    int opEquals( BitArray rhs ){
         if( this.length != rhs.length )
             return 0; // not equal
-        uint* p1 = this.ptr;
-        uint* p2 = rhs.ptr;
-        size_t n = this.length / 32;
-        size_t i;
-        for( i = 0; i < n; ++i )
-        {
-            if( p1[i] != p2[i] )
-            return 0; // not equal
-        }
-        int rest = cast(int)(this.length & cast(size_t)31u);
-        uint mask = ~((~0u)<<rest);
-        return (rest == 0) || (p1[i] & mask) == (p2[i] & mask);
+        mixin(loopOpMixin(`if ((ptr[iBlock]&mask)!=(valAtt&mask)) return 0;`,
+            `if (ptr[iBlock]!=valAtt) return 0;`,`if ((*this)[ibit]!=rhs[ibit]) return 0;`));
+        return 1;
     }
 
-    debug( UnitTest )
-    {
-      unittest
-      {
-        BitArray a = [1,0,1,0,1];
-        BitArray b = [1,0,1];
-        BitArray c = [1,0,1,0,1,0,1];
-        BitArray d = [1,0,1,1,1];
-        BitArray e = [1,0,1,0,1];
-
-        assert(a != b);
-        assert(a != c);
-        assert(a != d);
-        assert(a == e);
-      }
+    /// Performs a lexicographical comparison of this array to the supplied
+    /// array.
+    int opCmp( BitArray rhs ){
+        mixin(loopOpMixin(`if ((ptr[iBlock]&mask)!=(valAtt&mask)) return (((ptr[iBlock]&mask)<(valAtt&mask))?-1:1);`,
+            `if (ptr[iBlock]!=valAtt) return ((ptr[iBlock]<valAtt)?-1:1);`,`if ((*this)[ibit]!=rhs[ibit]) return (((*this)[ibit])?1:-1);`));
+        return 0;
     }
-
-
-    /**
-     * Performs a lexicographical comparison of this array to the supplied
-     * array.
-     *
-     * Params:
-     *  rhs = The array to compare against.
-     *
-     * Returns:
-     *  A value less than zero if this array sorts before the supplied array,
-     *  zero if the arrays are equavalent, and a value greater than zero if
-     *  this array sorts after the supplied array.
-     */
-    int opCmp( BitArray rhs )
-    {
-        auto len = this.length;
-        if( rhs.length < len )
-            len = rhs.length;
-        uint* p1 = this.ptr;
-        uint* p2 = rhs.ptr;
-        size_t n = len / 32;
-        size_t i;
-        for( i = 0; i < n; ++i )
-        {
-            if( p1[i] != p2[i] ){
-                return ((p1[i] < p2[i])?-1:1);
-            }
-        }
-        int rest=cast(int)(len & cast(size_t) 31u);
-        if (rest>0) {
-            uint mask=~((~0u)<<rest);
-            uint v1=p1[i] & mask;
-            uint v2=p2[i] & mask;
-            if (v1 != v2) return ((v1<v2)?-1:1);
-        }
-        return ((this.length<rhs.length)?-1:((this.length==rhs.length)?0:1));
-    }
-
-    debug( UnitTest )
-    {
-      unittest
-      {
-        BitArray a = [1,0,1,0,1];
-        BitArray b = [1,0,1];
-        BitArray c = [1,0,1,0,1,0,1];
-        BitArray d = [1,0,1,1,1];
-        BitArray e = [1,0,1,0,1];
-        BitArray f = [1,0,1,0];
-
-        assert( a >  b );
-        assert( a >= b );
-        assert( a <  c );
-        assert( a <= c );
-        assert( a <  d );
-        assert( a <= d );
-        assert( a == e );
-        assert( a <= e );
-        assert( a >= e );
-        assert( f >  b );
-      }
-    }
-
-
-    /**
-     * Convert this array to a void array.
-     *
-     * Returns:
-     *  This array represented as a void array.
-     */
-    void[] opCast()
-    {
-        return cast(void[])ptr[0 .. dim];
-    }
-
-
-    debug( UnitTest )
-    {
-      unittest
-      {
-        BitArray a = [1,0,1,0,1];
-        void[] v = cast(void[])a;
-
-        assert( v.length == a.dim * uint.sizeof );
-      }
-    }
-
-
-    /**
-     * Support for index operations, much like the behavior of built-in arrays.
-     *
-     * Params:
-     *  pos = The desired index position.
-     *
-     * In:
-     *  pos must be less than the length of this array.
-     *
-     * Returns:
-     *  The value of the bit at pos.
-     */
-    bool opIndex( size_t pos )
-    in
-    {
+    /// bit at index i
+    bool opIndex( size_t pos ){
         assert( pos < len );
+        auto p=(start+pos);
+        auto bIdx=(p>>bitsShift);
+        auto r=cast(int)(p&bitsShiftMask);
+        return cast(bool)(ptr[bIdx]&((cast(el_t)1)<<r));
     }
-    body
-    {
-        return cast(bool)bt( ptr, pos );
-    }
-
-
-    /**
-     * Generates a copy of this array with the unary complement operation
-     * applied.
-     *
-     * Returns:
-     *  A new array which is the complement of this array.
-     */
-    BitArray opCom()
-    {
-        auto dim = this.dim();
-
-        BitArray result;
-
-        result.length = len;
-        for( size_t i = 0; i < dim; ++i )
-            result.ptr[i] = ~this.ptr[i];
-        if( len & 31 )
-            result.ptr[dim - 1] &= ~(~0 << (len & 31));
-        return result;
-    }
-
-
-    debug( UnitTest )
-    {
-      unittest
-      {
-        BitArray a = [1,0,1,0,1];
-        BitArray b = ~a;
-
-        assert(b[0] == 0);
-        assert(b[1] == 1);
-        assert(b[2] == 0);
-        assert(b[3] == 1);
-        assert(b[4] == 0);
-      }
-    }
-
-
-    /**
-     * Generates a new array which is the result of a bitwise and operation
-     * between this array and the supplied array.
-     *
-     * Params:
-     *  rhs = The array with which to perform the bitwise and operation.
-     *
-     * In:
-     *  rhs.length must equal the length of this array.
-     *
-     * Returns:
-     *  A new array which is the result of a bitwise and with this array and
-     *  the supplied array.
-     */
-    BitArray opAnd( BitArray rhs )
-    in
-    {
-        assert( len == rhs.length );
-    }
-    body
-    {
-        auto dim = this.dim();
-
-        BitArray result;
-
-        result.length = len;
-        for( size_t i = 0; i < dim; ++i )
-            result.ptr[i] = this.ptr[i] & rhs.ptr[i];
-        return result;
-    }
-
-
-    debug( UnitTest )
-    {
-      unittest
-      {
-        BitArray a = [1,0,1,0,1];
-        BitArray b = [1,0,1,1,0];
-
-        BitArray c = a & b;
-
-        assert(c[0] == 1);
-        assert(c[1] == 0);
-        assert(c[2] == 1);
-        assert(c[3] == 0);
-        assert(c[4] == 0);
-      }
-    }
-
-
-    /**
-     * Generates a new array which is the result of a bitwise or operation
-     * between this array and the supplied array.
-     *
-     * Params:
-     *  rhs = The array with which to perform the bitwise or operation.
-     *
-     * In:
-     *  rhs.length must equal the length of this array.
-     *
-     * Returns:
-     *  A new array which is the result of a bitwise or with this array and
-     *  the supplied array.
-     */
-    BitArray opOr( BitArray rhs )
-    in
-    {
-        assert( len == rhs.length );
-    }
-    body
-    {
-        auto dim = this.dim();
-
-        BitArray result;
-
-        result.length = len;
-        for( size_t i = 0; i < dim; ++i )
-            result.ptr[i] = this.ptr[i] | rhs.ptr[i];
-        return result;
-    }
-
-
-    debug( UnitTest )
-    {
-      unittest
-      {
-        BitArray a = [1,0,1,0,1];
-        BitArray b = [1,0,1,1,0];
-
-        BitArray c = a | b;
-
-        assert(c[0] == 1);
-        assert(c[1] == 0);
-        assert(c[2] == 1);
-        assert(c[3] == 1);
-        assert(c[4] == 1);
-      }
-    }
-
-
-    /**
-     * Generates a new array which is the result of a bitwise xor operation
-     * between this array and the supplied array.
-     *
-     * Params:
-     *  rhs = The array with which to perform the bitwise xor operation.
-     *
-     * In:
-     *  rhs.length must equal the length of this array.
-     *
-     * Returns:
-     *  A new array which is the result of a bitwise xor with this array and
-     *  the supplied array.
-     */
-    BitArray opXor( BitArray rhs )
-    in
-    {
-        assert( len == rhs.length );
-    }
-    body
-    {
-        auto dim = this.dim();
-
-        BitArray result;
-
-        result.length = len;
-        for( size_t i = 0; i < dim; ++i )
-            result.ptr[i] = this.ptr[i] ^ rhs.ptr[i];
-        return result;
-    }
-
-
-    debug( UnitTest )
-    {
-      unittest
-      {
-        BitArray a = [1,0,1,0,1];
-        BitArray b = [1,0,1,1,0];
-
-        BitArray c = a ^ b;
-
-        assert(c[0] == 0);
-        assert(c[1] == 0);
-        assert(c[2] == 0);
-        assert(c[3] == 1);
-        assert(c[4] == 1);
-      }
-    }
-
-
-    /**
-     * Generates a new array which is the result of this array minus the
-     * supplied array.  $(I a - b) for BitArrays means the same thing as
-     * $(I a &amp; ~b).
-     *
-     * Params:
-     *  rhs = The array with which to perform the subtraction operation.
-     *
-     * In:
-     *  rhs.length must equal the length of this array.
-     *
-     * Returns:
-     *  A new array which is the result of this array minus the supplied array.
-     */
-    BitArray opSub( BitArray rhs )
-    in
-    {
-        assert( len == rhs.length );
-    }
-    body
-    {
-        auto dim = this.dim();
-
-        BitArray result;
-
-        result.length = len;
-        for( size_t i = 0; i < dim; ++i )
-            result.ptr[i] = this.ptr[i] & ~rhs.ptr[i];
-        return result;
-    }
-
-
-    debug( UnitTest )
-    {
-      unittest
-      {
-        BitArray a = [1,0,1,0,1];
-        BitArray b = [1,0,1,1,0];
-
-        BitArray c = a - b;
-
-        assert( c[0] == 0 );
-        assert( c[1] == 0 );
-        assert( c[2] == 0 );
-        assert( c[3] == 0 );
-        assert( c[4] == 1 );
-      }
-    }
-
-
-    /**
-     * Generates a new array which is the result of this array concatenated
-     * with the supplied array.
-     *
-     * Params:
-     *  rhs = The array with which to perform the concatenation operation.
-     *
-     * Returns:
-     *  A new array which is the result of this array concatenated with the
-     *  supplied array.
-     */
-    BitArray opCat( bool rhs )
-    {
-        BitArray result;
-
-        result = this.dup;
-        result.length = len + 1;
-        result[len] = rhs;
-        return result;
-    }
-
-
-    /** ditto */
-    BitArray opCat_r( bool lhs )
-    {
-        BitArray result;
-
-        result.length = len + 1;
-        result[0] = lhs;
-        for( size_t i = 0; i < len; ++i )
-            result[1 + i] = (*this)[i];
-        return result;
-    }
-
-
-    /** ditto */
-    BitArray opCat( BitArray rhs )
-    {
-        BitArray result;
-
-        result = this.dup();
-        result ~= rhs;
-        return result;
-    }
-
-
-    debug( UnitTest )
-    {
-      unittest
-      {
-        BitArray a = [1,0];
-        BitArray b = [0,1,0];
-        BitArray c;
-
-        c = (a ~ b);
-        assert( c.length == 5 );
-        assert( c[0] == 1 );
-        assert( c[1] == 0 );
-        assert( c[2] == 0 );
-        assert( c[3] == 1 );
-        assert( c[4] == 0 );
-
-        c = (a ~ true);
-        assert( c.length == 3 );
-        assert( c[0] == 1 );
-        assert( c[1] == 0 );
-        assert( c[2] == 1 );
-
-        c = (false ~ a);
-        assert( c.length == 3 );
-        assert( c[0] == 0 );
-        assert( c[1] == 1 );
-        assert( c[2] == 0 );
-      }
-    }
-
-
-    /**
-     * Support for index operations, much like the behavior of built-in arrays.
-     *
-     * Params:
-     *  b   = The new bit value to set.
-     *  pos = The desired index position.
-     *
-     * In:
-     *  pos must be less than the length of this array.
-     *
-     * Returns:
-     *  The new value of the bit at pos.
-     */
-    bool opIndexAssign( bool b, size_t pos )
-    in
-    {
+    /// sets bit at index i
+    void opIndexAssign( bool b, size_t pos ){
         assert( pos < len );
+        auto p=(start+pos);
+        auto bIdx=(p>>bitsShift);
+        auto r=cast(int)(p&bitsShiftMask);
+        el_t bitVal=((cast(el_t)1)<<r);
+        if (b){
+            ptr[bIdx]=(ptr[bIdx]|bitVal);
+        } else {
+            ptr[bIdx]=(ptr[bIdx]&(~bitVal));
+        }
     }
-    body
-    {
-        if( b )
-            bts( ptr, pos );
-        else
-            btr( ptr, pos );
-        return b;
-    }
-
-
-    /**
-     * Updates the contents of this array with the result of a bitwise and
-     * operation between this array and the supplied array.
-     *
-     * Params:
-     *  rhs = The array with which to perform the bitwise and operation.
-     *
-     * In:
-     *  rhs.length must equal the length of this array.
-     *
-     * Returns:
-     *  A shallow copy of this array.
-     */
-    BitArray opAndAssign( BitArray rhs )
-    in
-    {
-        assert( len == rhs.length );
-    }
-    body
-    {
-        auto dim = this.dim();
-
-        for( size_t i = 0; i < dim; ++i )
-            ptr[i] &= rhs.ptr[i];
-        return *this;
-    }
-
-
-    debug( UnitTest )
-    {
-      unittest
-      {
-        BitArray a = [1,0,1,0,1];
-        BitArray b = [1,0,1,1,0];
-
-        a &= b;
-        assert( a[0] == 1 );
-        assert( a[1] == 0 );
-        assert( a[2] == 1 );
-        assert( a[3] == 0 );
-        assert( a[4] == 0 );
-      }
-    }
-
-
-    /**
-     * Updates the contents of this array with the result of a bitwise or
-     * operation between this array and the supplied array.
-     *
-     * Params:
-     *  rhs = The array with which to perform the bitwise or operation.
-     *
-     * In:
-     *  rhs.length must equal the length of this array.
-     *
-     * Returns:
-     *  A shallow copy of this array.
-     */
-    BitArray opOrAssign( BitArray rhs )
-    in
-    {
-        assert( len == rhs.length );
-    }
-    body
-    {
-        auto dim = this.dim();
-
-        for( size_t i = 0; i < dim; ++i )
-            ptr[i] |= rhs.ptr[i];
-        return *this;
-    }
-
-
-    debug( UnitTest )
-    {
-      unittest
-      {
-        BitArray a = [1,0,1,0,1];
-        BitArray b = [1,0,1,1,0];
-
-        a |= b;
-        assert( a[0] == 1 );
-        assert( a[1] == 0 );
-        assert( a[2] == 1 );
-        assert( a[3] == 1 );
-        assert( a[4] == 1 );
-      }
-    }
-
-
-    /**
-     * Updates the contents of this array with the result of a bitwise xor
-     * operation between this array and the supplied array.
-     *
-     * Params:
-     *  rhs = The array with which to perform the bitwise xor operation.
-     *
-     * In:
-     *  rhs.length must equal the length of this array.
-     *
-     * Returns:
-     *  A shallow copy of this array.
-     */
-    BitArray opXorAssign( BitArray rhs )
-    in
-    {
-        assert( len == rhs.length );
-    }
-    body
-    {
-        auto dim = this.dim();
-
-        for( size_t i = 0; i < dim; ++i )
-            ptr[i] ^= rhs.ptr[i];
-        return *this;
-    }
-
-
-    debug( UnitTest )
-    {
-      unittest
-      {
-        BitArray a = [1,0,1,0,1];
-        BitArray b = [1,0,1,1,0];
-
-        a ^= b;
-        assert( a[0] == 0 );
-        assert( a[1] == 0 );
-        assert( a[2] == 0 );
-        assert( a[3] == 1 );
-        assert( a[4] == 1 );
-      }
-    }
-
-
-    /**
-     * Updates the contents of this array with the result of this array minus
-     * the supplied array.  $(I a - b) for BitArrays means the same thing as
-     * $(I a &amp; ~b).
-     *
-     * Params:
-     *  rhs = The array with which to perform the subtraction operation.
-     *
-     * In:
-     *  rhs.length must equal the length of this array.
-     *
-     * Returns:
-     *  A shallow copy of this array.
-     */
-    BitArray opSubAssign( BitArray rhs )
-    in
-    {
-        assert( len == rhs.length );
-    }
-    body
-    {
-        auto dim = this.dim();
-
-        for( size_t i = 0; i < dim; ++i )
-            ptr[i] &= ~rhs.ptr[i];
-        return *this;
-    }
-
-
-    debug( UnitTest )
-    {
-      unittest
-      {
-        BitArray a = [1,0,1,0,1];
-        BitArray b = [1,0,1,1,0];
-
-        a -= b;
-        assert( a[0] == 0 );
-        assert( a[1] == 0 );
-        assert( a[2] == 0 );
-        assert( a[3] == 0 );
-        assert( a[4] == 1 );
-      }
-    }
-
-
-    /**
-     * Updates the contents of this array with the result of this array
-     * concatenated with the supplied array.
-     *
-     * Params:
-     *  rhs = The array with which to perform the concatenation operation.
-     *
-     * Returns:
-     *  A shallow copy of this array.
-     */
-    BitArray opCatAssign( bool b )
-    {
-        length = len + 1;
-        (*this)[len - 1] = b;
-        return *this;
-    }
-
-
-    debug( UnitTest )
-    {
-      unittest
-      {
-        BitArray a = [1,0,1,0,1];
-        BitArray b;
-
-        b = (a ~= true);
-        assert( a[0] == 1 );
-        assert( a[1] == 0 );
-        assert( a[2] == 1 );
-        assert( a[3] == 0 );
-        assert( a[4] == 1 );
-        assert( a[5] == 1 );
-
-        assert( b == a );
-      }
-    }
-
-
-    /** ditto */
-    BitArray opCatAssign( BitArray rhs )
-    {
-        auto istart = len;
-        length = len + rhs.length;
-        for( auto i = istart; i < len; ++i )
-            (*this)[i] = rhs[i - istart];
-        return *this;
-    }
-
-
-    debug( UnitTest )
-    {
-      unittest
-      {
-        BitArray a = [1,0];
-        BitArray b = [0,1,0];
-        BitArray c;
-
-        c = (a ~= b);
-        assert( a.length == 5 );
-        assert( a[0] == 1 );
-        assert( a[1] == 0 );
-        assert( a[2] == 0 );
-        assert( a[3] == 1 );
-        assert( a[4] == 0 );
-
-        assert( c == a );
-      }
+    /// finds the index of the first occurence of 0 in both this and rhs
+    /// if no occurence is found length is returned
+    size_t findBoth0(BitArray rhs){
+        mixin(loopOpMixin(`
+            auto val=(ptr[iBlock]|(~mask)|valAtt);
+            if (val!=all1) {
+                int maskLow=0,maskUp=bitsPerEl;
+                while (maskLow<=maskUp){
+                    auto m=(maskUp+maskLow)/2;
+                    auto bVal=((cast(el_t)1)<<m);
+                    if ((mask & (bVal-1))==0){ // m<=lowestBit(mask)
+                        maskLow=m+1;
+                    } else{
+                        maskUp=m-1;
+                    }
+                }
+                // maskUp=lowestBit(mask)
+                auto v=~val;
+                int bitPosLow=maskUp,bitPosUp=bitsPerEl;
+                while (bitPosLow<=bitPosUp){
+                    auto m=(bitPosUp+bitPosLow)/2;
+                    auto bVal=((cast(el_t)1)<<m);
+                    if (((bVal-1)&v)==0){
+                        bitPosLow=m+1;
+                    } else{
+                        bitPosUp=m-1;
+                    }
+                }
+                return bitPosUp-maskUp+ibit0;
+            }`,
+            `if ((ptr[iBlock]|valAtt)!=all1) {
+                auto v= ~(ptr[iBlock]|valAtt);
+                int bitPosLow=0,bitPosUp=bitsPerEl;
+                while (bitPosLow<=bitPosUp){
+                    auto m=(bitPosUp+bitPosLow)/2;
+                    auto bVal=((cast(el_t)1)<<m);
+                    if (((bVal-1)&v)==0){
+                        bitPosLow=m+1;
+                    } else{
+                        bitPosUp=m-1;
+                    }
+                }
+                return bitPosUp+ibit0;
+            }`,`if (!((*this)[ibit]||rhs[ibit])) return ibit;`));
+        return len;
     }
 }

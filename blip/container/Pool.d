@@ -13,7 +13,7 @@ interface PoolI(T){
     T getObj();
     static if (is(T U:U[])){
         /// gets a new instance of dimension dim (if applicable)
-        T getObj(size_t dim);
+        U[] getObj(size_t dim);
     }
     /// returns an instance, so that it can be reused
     void giveBack(T obj);
@@ -29,7 +29,7 @@ T allocT(T,A...)(A args) {
         static if (is(typeof(new T(args)))){
             return new T(args);
         } else {
-            assert(false,"no empty constructor for "~T.stringof~" with "~A.stringof
+            static assert(false,"no empty constructor for "~T.stringof~" with "~A.stringof
                 ~" you need to override the allocation method");
         }
     } else static if (is(T==struct)){
@@ -39,7 +39,7 @@ T allocT(T,A...)(A args) {
         static if (is(typeof(new U(args)))){
             t=new U(args);
         } else {
-            assert(false,"no empty constructor for "~T.stringof~" with "~A.stringof
+            static assert(false,"no empty constructor for "~T.stringof~" with "~A.stringof
                 ~" you need to override the allocation method");
         }
         return t;
@@ -62,14 +62,53 @@ class Pool(T,int _batchSize=16):PoolI!(T){
     size_t maxEl;
     size_t bufferSpace;
     S* pool;
+    T delegate(PoolI!(T)) customAllocator;
     
-    this(size_t bufferSpace=8*batchSize, size_t maxEl=16*batchSize){
+    this(T delegate(PoolI!(T)) customAllocator,size_t bufferSpace=8*batchSize, size_t maxEl=16*batchSize){
         this.maxEl=max(batchSize,maxEl);
         this.bufferSpace=max(batchSize,bufferSpace);
+        this.customAllocator=customAllocator;
     }
+    
+    /// helper to have a pool generating delegate
+    struct PoolFactory(U){
+        U call;
+
+        /// internal method that creates a new object
+        T createNew(PoolI!(T)l){
+            static if (is(typeof(call(l))==T)){
+                return call(l);
+            } else static if (is(typeof(call())==T)){
+                return call();
+            } else {
+                static assert(0,"cannot convert "~U.stringof~" to a delegate for NFreeList("~T.stringof~")");
+            }
+        }
+
+        PoolI!(T)createPool(){
+            return new Pool(&createNew);
+        }
+    }
+    /// creates a pool generating delegate from most method to create T objects:
+    /// T function(), T function(PoolI!(T)), T delegate(), T delegate(PoolI!(T))
+    static PoolI!(T) delegate() poolFactory(U)(U cNew){
+        auto factory=new PoolFactory!(U);
+        factory.call=cNew;
+        return &factory.createPool;
+    }
+    
     /// allocates a new object of type T
     T allocateNew(){
-        return allocT!(T)();
+        if (customAllocator!=null){
+            customAllocator(this);
+        }
+        static if (is(typeof(allocT!(T)(this))==T)){
+            return allocT!(T)(this);
+        } else static if (is(typeof(allocT!(T)())==T)){
+            return allocT!(T)();
+        } else {
+            assert(0,"could not allocate automatically type "~T.stringof~" and no customAllocator given");
+        }
     }
     /// clears object T before adding it to pool storage
     T clear(T obj){
@@ -149,8 +188,8 @@ class Pool(T,int _batchSize=16):PoolI!(T){
         return allocateNew();
     }
     static if (is(T U:U[])){
-        /// getObj with size unsupported...
-        T getObj(size_t dim){
+        /// getObj with size
+        U[] getObj(size_t dim){
             if (nEl>0){
                 T obj;
                 synchronized(this){
@@ -180,7 +219,7 @@ class Pool(T,int _batchSize=16):PoolI!(T){
                     return reset(obj);
                 }
             }
-            return new T(dim);
+            return new U[](dim);
         }
     }
     /// get rid of all cached values
@@ -215,5 +254,102 @@ class Pool(T,int _batchSize=16):PoolI!(T){
     /// destructor
     ~this(){
         flush();
+    }
+}
+
+/// a next style unbounded freelist, can be used when T has a next attribute that builds a single linked list
+/// *no* heap activity, minimal atomic ops
+class PoolNext(T):PoolI!(T){
+    T first=null;
+    T delegate(PoolI!(T)) createNew;
+    bool cacheStopped=false;
+    
+    /// constructor
+    this(T delegate(PoolI!(T)) cNew){
+        createNew=cNew;
+    }
+    /// helper to have a pool generating delegate
+    struct PoolFactory(U){
+        U call;
+
+        /// internal method that creates a new object
+        T createNew(PoolI!(T)l){
+            static if (is(typeof(call(l))==T)){
+                return call(l);
+            } else static if (is(typeof(call())==T)){
+                return call();
+            } else {
+                static assert(0,"cannot convert "~U.stringof~" to a delegate for NFreeList("~T.stringof~")");
+            }
+        }
+        
+        PoolNext!(T)createPoolNext(){
+            return new NFreeList(&createNew);
+        }
+        
+        PoolI!(T)createPool(){
+            return new NFreeList(&createNew);
+        }
+    }
+    /// creates a pool generating delegate from most method to create T objects:
+    /// T function(), T function(PoolI!(T)), T delegate(), T delegate(PoolI!(T))
+    static PoolI!(T) delegate() poolFactory(U)(U cNew){
+        auto factory=new PoolFactory!(U);
+        factory.call=cNew;
+        return &factory.createPool;
+    }
+    
+    /// returns a new object if possible from the cached ones
+    T getObj(){
+        T res=popFrom(first);
+        if (res is null) {
+            if (createNew !is null) res=createNew();
+            else throw new Exception("no allocator",__FILE__,__LINE__);
+        }
+        return res;
+    }
+    
+    static if (is(T U:U[])){
+        /// gets a new instance of dimension dim (if applicable)
+        U[] getObj(size_t dim){
+            T res=popFrom(first);
+            if (res.length==dim){
+                return res;
+            }
+            giveBack(res);
+            return new U[](dim);
+        }
+    }
+    
+    /// removes the cached objects
+    void flush(){
+        T elAtt=popFrom(c.first);
+        while(elAtt!is null){
+            T oldV=elAtt;
+            elAtt=popFrom(c.first);
+            static if (is(typeof(oldV.deallocData()))){
+                oldV.deallocData();
+            }
+            delete oldV;
+        }
+    }
+    /// stop caching
+    void stopCaching(){
+        c.cacheStopped=true;
+        writeBarrier();
+        flush();
+    }
+    /// returns an object to the free list to be reused
+    void giveBack(T el){
+        if (el!is null){
+            if (!cacheStopped){
+                insertAt(first,el);
+            } else {
+                static if(is(typeof(el.deallocData()))){
+                    el.deallocData();
+                }
+                delete el;
+            }
+        }
     }
 }

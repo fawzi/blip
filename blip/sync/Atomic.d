@@ -213,6 +213,10 @@ void writeBarrier(){
 void readBarrier(){
     memoryBarrier!(true,strictFences,false,false)();
 }
+/// utility function for a full barrier (disallow reorderig)
+void fullBarrier(){
+    memoryBarrier!(true,true,true,true)();
+}
 
 /// atomic swap
 /// val and newval in one atomic operation

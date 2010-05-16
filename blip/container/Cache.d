@@ -1,5 +1,9 @@
 /// basic support for a cache of various kinds of objects
 /// the cached object provides some nicer support to use the cache
+///
+/// for memory reuse you probably want to use defaultCache() togheter with a CachedPool!(T) object
+/// the pool factory you probably get either with blip.container.Pool.Pool!(T).poolFactory or
+/// blip.container.Pool.PoolNext!(T).poolFactory
 module blip.container.Cache;
 import blip.t.time.Time;
 import blip.t.core.Variant;
@@ -8,28 +12,44 @@ import blip.sync.UniqueNumber;
 import blip.sync.Atomic;
 import blip.container.GrowableArray;
 import blip.io.BasicIO;
+import blip.parallel.smp.Tls;
+
+enum EntryFlags{
+    Keep=0, /// will never be purged
+    Purge=1 /// might be purged when unused
+}
+
+alias size_t CKey; // use ulong in all cases???
+
+UniqueNumber!(CKey) cacheKey;
+
+static this(){
+    cacheKey=UniqueNumber!(size_t)(1); // skip init and begin at 0?
+}
+
+/// an object that can create cache entries
+interface CacheElFactory{
+    Variant createEl();
+    void deleteEl(Variant);
+    EntryFlags flags();
+    char[] name();
+    CKey key();// this should be constant!!!
+}
 
 class Cache{
-    enum EntryFlags{
-        Keep=0, /// will never be purged
-        Purge=1 /// might be purged when unused
-    }
     static struct CacheEntry{
-        char[] name;
-        char[] kind;
         Variant entry;
+        CacheElFactory factory;
         Time lastUsed; // avoid storing??
-        EntryFlags flags;
-        CacheEntry *next;
-        CacheEntry *prev;
+        size_t idNr; // used to detect looping wrapping
     }
-    
-    CacheEntry*[char[]] entries;
-    CacheEntry*last;
+    UniqueNumber!(size_t) lastIdNr;
+    CacheEntry*[CKey] entries;
     Cache nextCache; // loops on all caches that are "togheter", should be a circular loop
     
     /// creates a new cache in the group of the cache given as argument
     this(Cache addTo=null){
+        lastIdNr=UniqueNumber!(size_t)(1);
         if (addTo is null){
             nextCache=this;
         } else {
@@ -41,123 +61,109 @@ class Cache{
         }
     }
     // internal, should be called from a synchronized method
+    // to reduce the cost of this (and have a higher purge cost) the links are not updated anymore
+    // this assumes that lastUsed is updated atomically (or at least without creating much smaller partial values)
     void updateAccess(CacheEntry* el){
         assert(el !is null);
-        synchronized(this){
-            if (el !is last){
-                auto p1=el.prev;
-                auto p2=el.next;
-                p1.next=p2;
-                p2.prev=p1;
-                el.next=last;
-                el.prev=last.prev;
-                last.prev=el;
-                last=el;
-            }
-            el.lastUsed=Clock.now;
-        }
+        el.lastUsed=Clock.now;
     }
     /// returns a cache entry if stored
-    bool getIfCached(char[]name,ref CacheEntry el){
+    bool getIfCached(CacheElFactory factory,ref CacheEntry el){
         synchronized(this){
-            auto e=name in entries;
+            auto e=factory.key() in entries;
             if (e is null) return false;
             el= **e;
-            el.next=null;
-            el.prev=null;
             updateAccess(*e);
         }
         return true;
     }
     /// clears a cache entry, returns true if it was present
-    bool clear(char[]name){
+    bool clear(CKey key){
+        Variant entry;
+        CacheElFactory factory;
         synchronized(this){
-            auto e=name in entries;
+            auto e=key in entries;
             if (e is null) return false;
             auto el= *e;
-            auto t1=el.prev;
-            auto t2=el.next;
-            t1.next=t2;
-            t2.prev=t1;
-            if (el is last){
-                if (el is t2){
-                    last=null;
-                } else {
-                    last=t2;
-                }
+            if (el.factory!is null){
+                entry=el.entry;
+                factory=el.factory;
             }
-            entries.remove(name);
+            entries.remove(key);
+        }
+        if (factory!is null){
+            factory.deleteEl(entry);
         }
         return true;
     }
-    
+    /// clears a cache entry, returns true if it was present
+    bool clear(CacheElFactory factory){
+        return clear(factory.key);
+    }
     /// performs an operation on a cache entry (creating it if needed)
-    void cacheOp(char[] name, Variant delegate()create,EntryFlags flags,char[] kind,void delegate(ref CacheEntry) op){
+    void cacheOp(CacheElFactory factory,void delegate(ref CacheEntry) op){
         CacheEntry c;
         synchronized(this){
-            auto e=name in entries;
+            auto key=factory.key();
+            auto e=key in entries;
             if (e !is null) {
                 updateAccess(*e);
                 op(**e);
             } else {
                 CacheEntry *newE=new CacheEntry;
-                newE.entry=create();
-                newE.name=name;
-                newE.kind=kind;
-                newE.flags=flags;
+                newE.entry=factory.createEl();
+                newE.factory=factory;
                 newE.lastUsed=Clock.now;
-                if (last is null){
-                    newE.next=newE;
-                    newE.prev=newE;
-                    last=newE;
-                } else {
-                    newE.prev=last.prev;
-                    newE.next=last;
-                    last.prev=newE;
-                    last=newE;
-                }
-                entries[name]=newE;
+                newE.idNr=lastIdNr.next(); // synchronized(this)+ atomic op ensure strict monotonicity within one cache
+                if (newE.idNr==0) throw new Exception("idNr wrapped",__FILE__,__LINE__);
+                entries[key]=newE;
                 op(*newE);
             }
         }
     }
+    /// performs an operation on a cache entry if present (without creating it)
+    void cacheOpIf(CacheElFactory factory,void delegate(ref CacheEntry) op){
+        CacheEntry c;
+        synchronized(this){
+            auto e=factory.key() in entries;
+            if (e !is null) {
+                updateAccess(*e);
+                op(**e);
+            }
+        }
+    }
     /// gets a value (if possible from the cache)
-    T get(T)(char[] name, Variant delegate()create,EntryFlags flags,char[] kind){
+    T get(T)(CacheElFactory factory){
         T res;
-        cacheOp(name,create,flags,kind,delegate void(ref CacheEntry c){
+        cacheOp(factory,delegate void(ref CacheEntry c){
             res=c.entry.get!(T)(); });
         return res;
     }
-    /// sets a value in the cache
-    void set(T)(char[] name, Variant delegate()create,EntryFlags flags,char[] kind,T newVal){
-        cacheOp(name,create,flags,kind,delegate void(ref CacheEntry c){
-            c.entry=Variant(newVal); });
+    /// sets a value in the cache (and returns the old value as variant)
+    Variant set(T)(CacheElFactory factory,T newVal){
+        Variant res;
+        cacheOp(factory,delegate void(ref CacheEntry c){
+            res=c.entry;
+            static if (is(T==Variant)){
+                c.entry=newVal;
+            } else {
+                c.entry=Variant(newVal);
+            }
+        });
+        return res;
     }
     
-    /// remove old cached objects that satisfy the filter
-    void purgeOld(Time time,bool delegate(ref CacheEntry) filter){
+    /// removecached objects that satisfy the filter
+    void purge(bool delegate(ref CacheEntry) filter){
+        CKey[128] buf;
+        auto toRm=lGrowableArray(buf,0);
         synchronized(this){
-            if (last !is null){
-                auto pos=last.prev;
-                while(pos.lastUsed<time){
-                    if ((pos.flags & 1)==0 && filter(*pos)){
-                        auto t1=pos.prev;
-                        auto t2=pos.next;
-                        t1.next=t2;
-                        t2.prev=t1;
-                        entries.remove(pos.name);
-                        if (pos is last){
-                            if (t1 is last){
-                                last=null;
-                            } else {
-                                last=t1;
-                            }
-                            return;
-                        }
-                    }
-                    if (pos is last) return;
-                }
+            foreach (k,v;entries){
+                if (filter(*v)) toRm(k);
             }
+        }
+        foreach (k;toRm.data){
+            clear(k);
         }
     }
     static struct AllCaches{
@@ -197,77 +203,189 @@ class Cache{
 }
 
 /// base class for object that are cached (make the use of the cache easier)
-/// if the name ends with "_" or is empty a unique string is generated
-/// if needed override the create method
-class Cached(T){
-    static UniqueNumber!(size_t) cacheId;
-    static this(){
-        cacheId=UniqueNumber!(size_t)(1);
-    }
+class Cached:CacheElFactory{
+    CKey _key;
+    char[] _name;
+    EntryFlags _flags;
     
-    T val0;
-    T delegate() createOp;
-    char[]name;
-    char[]kind;
-    Cache.EntryFlags flags;
-    
-    this(T val0, char[] kind="Cached",char[] name="",
-        Cache.EntryFlags flags=Cache.EntryFlags.Purge,
-        T delegate()c=null){
+    this(char[] name="", EntryFlags flags=EntryFlags.Purge){
+        this._key=cacheKey.next();
         if (name.length==0){
-            this.name=collectAppender(delegate void(CharSink sink){
-                sink(T.stringof);
-                sink("_");
-                writeOut(sink,cacheId.next());
+            this._name=collectAppender(delegate void(CharSink sink){
+                sink("Cache_");
+                writeOut(sink,key);
             });
         } else if (name[$-1]=='_') {
-            this.name=collectAppender(delegate void(CharSink s){
+            this._name=collectAppender(delegate void(CharSink s){
                 s(name);
-                writeOut(s,cacheId.next());
+                writeOut(s,key);
             });
         } else {
-            this.name=name;
+            this._name=name;
         }
-        this.flags=flags;
-        this.val0=val0;
-        this.kind=kind;
-        this.createOp=c;
+        this._flags=flags;
     }
-    this(T delegate()createOp, char[] kind="Cached",char[] name="",
-        Cache.EntryFlags flags=Cache.EntryFlags.Purge){
-        this(T.init,kind,name,flags,createOp);
+    Variant createEl(){
+        return Variant.init;
     }
-    Variant create(){
-        static if (is(T==Variant)){
-            if (createOp !is null) {
-                return createOp();
-            }
-            return val0;
-        } else {
-            if (createOp !is null) {
-                return Variant(createOp());
-            }
-            return Variant(val0);
-        }
+    void deleteEl(Variant x){}
+    
+    EntryFlags flags(){
+        return _flags;
     }
-    final T getFromCache(Cache cache){
-        return cache.get!(T)(name,&create,flags,kind);
+    char[] name(){
+        return _name;
     }
-    final void setInCache(Cache cache,T newVal){
-        cache.set!(T)(name,&create,flags,kind,newVal);
-    }
-    final T opCall(Cache cache){
-        return getFromCache(cache);
-    }
-    final void opCall(Cache cache,T newVal){
-        setInCache(cache,newVal);
+    final CKey key(){
+        return _key;
     }
     void clearLocal(Cache cache){
-        cache.clear(name);
+        cache.clear(this);
     }
     void clearAll(Cache cache){
         foreach(cAtt;cache.allCaches){
-            cAtt.clear(name);
+            cAtt.clear(this);
         }
     }
+}
+
+/// cache for objects of type T
+/// if the name ends with "_" or is empty a unique string is generated
+/// if needed override the create method
+/// should allow also delegates for creation/destruction? until now not needed
+final class CachedT(T):Cached{
+    T function() createOp;
+    void function(T) freeOp;
+    
+    EntryFlags _flags;
+    /// creates a new cached value with c as creation function, freeing if d is not given defaults
+    /// to call stopCaching if available, doing nothing otherwise
+    this(char[] name,T function()c,void function(T)d=null,EntryFlags flags=EntryFlags.Purge)
+    {
+        super(((name.length==0)?"cache_"~T.stringof~"_":name),flags);
+        this.createOp=c;
+        this.freeOp=d;
+    }
+    Variant createEl(){
+        static if (is(T==Variant)){
+            return createOp();
+        } else {
+            return Variant(createOp());
+        }
+    }
+    void deleteEl(Variant e){
+        static if (is(T==Variant)){
+            if (freeOp !is null) {
+                freeOp(e);
+            }
+        } else {
+            if (freeOp !is null) {
+                freeOp(e.get!(T)());
+            } else {
+                static if (is(typeof(T.init.stopCaching()))){
+                    T el=e.get!(T)();
+                    static if(is(typeof(el !is null))){
+                        if (el !is null) el.stopCaching();
+                    } else {
+                        el.stopCaching();
+                    }
+                }
+            }
+        }
+    }
+    T getFromCache(Cache cache){
+        return cache.get!(T)(this);
+    }
+    T setInCache(Cache cache,T newVal){
+        auto res=cache.set!(T)(this,newVal);
+        return res.get!(T)();
+    }
+    T opCall(Cache cache){
+        return getFromCache(cache);
+    }
+    void opCall(Cache cache,T newVal){
+        setInCache(cache,newVal);
+    }
+}
+
+/// cache for pool of objects of type T
+class CachedPool(T):Cached{
+    PoolI!(T) function() poolCreatorF;
+    PoolI!(T) delegate() poolCreatorD;
+    bool cacheStopped=false;
+    
+    /// creates a pool
+    PoolI!(T) poolCreator(){
+        if (poolCreatorF!is null) return poolCreatorF;
+        if (poolCreatorD!is null) return poolCreatorD;
+        throw new Exception("no pool creator",__FILE__,__LINE__);
+    }
+    /// returns a new object
+    T getObj(Cache cache){
+        cache.get!(PoolI!(T))(this).getObj();
+    }
+    /// returns an instance, so that it can be reused (this returns it to the current cache if it is
+    /// possible that you call this from a different thread than the one that called getObj then it is 
+    /// better to cache the NFreeList in the object and returns to it)
+    void giveBack(Cache cache,T obj){
+        assert(obj!is null,"cannot give back null objects");
+        if (!cacheStopped){
+            cache.get!(PoolI!(T))(this).giveBack(obj);
+        } else {
+            static if (is(typeof(obj.deallocData()))){
+                obj.deallocData();
+            }
+            delete obj;
+        }
+    }
+    /// internal method, creates a new NFreeList for the cache
+    Variant createEl(){
+        auto res=new PoolI!(T)(createNewD());
+        if (cacheStopped) res.stopCaching();
+        return Variant(res);
+    }
+    /// deletes the NFreeList from the cache
+    void deleteEl(Variant el){
+        auto c=el.get!(PoolI!(T))();
+        if (c!is null){
+            c.stopCaching();
+        }
+        // don't delete c itself as it could be dangerous...
+    }
+    /// discards all the cached objects from all the caches
+    void flush(Cache cache){
+        foreach(cAtt;cache.allCaches){
+            cacheOpIf(this,delegate void(CacheEntry *c){ c.entry.get!(PoolI!(T))().flush(); });
+        }
+    }
+    /// stops caching and discards all cached objects
+    void stopCaching(Cache cache){
+        cacheStopped=true;
+        clearAll();
+    }
+}
+
+/// global (one per process) cache
+Cache gCache;
+static this(){
+    gCache=new Cache();
+}
+
+mixin(tlsMixin("Cache","_defaultCache"));
+
+/// the "best" cache, this might be gCache or more local cache (as created by NumaSchedulers)
+Cache defaultCache(){
+    auto res=_defaultCache();
+    if (res !is null){
+        return res;
+    }
+    return gCache;
+}
+
+/// set the local cache of the current thread.
+/// It is assumed that caches are associated with a thread group,
+/// and you can purge them all (with clearAll) from any of the threads in the group, so when setting 
+/// the cache you should keep that into account.
+void setDefaultCache(Cache c){
+    _defaultCache(c);
 }
