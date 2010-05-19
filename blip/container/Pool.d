@@ -73,7 +73,9 @@ class Pool(T,int _batchSize=16):PoolI!(T){
     /// helper to have a pool generating delegate
     struct PoolFactory(U){
         U call;
-
+        size_t bufferSpace=8*batchSize;
+        size_t maxEl=16*batchSize;
+        
         /// internal method that creates a new object
         T createNew(PoolI!(T)l){
             static if (is(typeof(call(l))==T)){
@@ -86,14 +88,17 @@ class Pool(T,int _batchSize=16):PoolI!(T){
         }
 
         PoolI!(T)createPool(){
-            return new Pool(&createNew);
+            return new Pool(&createNew,bufferSpace,maxEl);
         }
     }
     /// creates a pool generating delegate from most method to create T objects:
     /// T function(), T function(PoolI!(T)), T delegate(), T delegate(PoolI!(T))
-    static PoolI!(T) delegate() poolFactory(U)(U cNew){
+    static PoolI!(T) delegate() poolFactory(U)(U cNew,size_t bufferSpace=8*batchSize,
+        size_t maxEl=16*batchSize){
         auto factory=new PoolFactory!(U);
         factory.call=cNew;
+        factory.bufferSpace=bufferSpace;
+        factory.maxEl=maxEl;
         return &factory.createPool;
     }
     

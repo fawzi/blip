@@ -1,9 +1,10 @@
 /// basic support for a cache of various kinds of objects
 /// the cached object provides some nicer support to use the cache
 ///
-/// for memory reuse you probably want to use defaultCache() togheter with a CachedPool!(T) object
-/// the pool factory you probably get either with blip.container.Pool.Pool!(T).poolFactory or
-/// blip.container.Pool.PoolNext!(T).poolFactory
+/// for memory reuse you probably want to use the defaultCache(), and the utility methods
+/// cachedPoolNext and cachedPool...
+///
+/// author: fawzi
 module blip.container.Cache;
 import blip.t.time.Time;
 import blip.t.core.Variant;
@@ -314,6 +315,13 @@ class CachedPool(T):Cached{
     PoolI!(T) delegate() poolCreatorD;
     bool cacheStopped=false;
     
+    this(PoolI!(T) function() poolCreatorF){
+        this.poolCreatorF=poolCreatorF;
+    }
+    this(PoolI!(T) delegate() poolCreatorD){
+        this.poolCreatorD=poolCreatorD;
+    }
+    
     /// creates a pool
     PoolI!(T) poolCreator(){
         if (poolCreatorF!is null) return poolCreatorF;
@@ -363,6 +371,25 @@ class CachedPool(T):Cached{
         cacheStopped=true;
         clearAll();
     }
+}
+
+/// utility method that creates a cached pool given a creation operation that creates an object.
+///
+/// the pool is a blip.container.Pool.PoolNext, an unbounded pool that uses a free list built
+/// using the next attribute of the object (that must exist).
+CachedPool!(ReturnTypeOf!(U)) cachedPoolNext(U)(U createOp){
+    alias ReturnTypeOf!(U) T;
+    return new CachedPool!(T)(new PoolNext!(T).poolFactory(createOp));
+}
+
+/// utility method that creates a cached pool given a creation operation that creates an object.
+///
+/// the pool is a blip.container.Pool.Pool, batchSize, bufferSpace and maxEl of the pool can be set
+CachedPool!(ReturnTypeOf!(U)) cachedPool(U,int batchSize=16)(U createOp,size_t bufferSpace=8*batchSize,
+    size_t maxEl=16*batchSize)
+{
+    alias ReturnTypeOf!(U) T;
+    return new CachedPool!(T)(new Pool!(T,batchSize).poolFactory(createOp,bufferSpace,maxEl));
 }
 
 /// global (one per process) cache
