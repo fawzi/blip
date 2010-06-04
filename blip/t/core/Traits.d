@@ -63,6 +63,7 @@ int getHash(T,U)(T t,U hash){
     }
 }
 
+/// representation of a string so that evaluating ctfe_rep(s) generates the string s
 char[] ctfe_rep(char[] s){
     bool needsDquoteEscape=false;
     bool needsSQuoteEscape=false;
