@@ -222,3 +222,14 @@ T[] collectAppender(T)(void delegate(void delegate(T[])) appender,char[] buf=nul
     arr(appender);
     return arr.takeData();
 }
+
+/// collects what is appended by the appender and adds it at once to the given sink
+void sinkTogether(U,T)(U sink,void delegate(void delegate(T[])) appender,char[] buf=null){
+    T[512/T.sizeof] buf2;
+    if (buf.length==0) buf=buf2;
+    auto arr=lGrowableArray(buf,0,((buf.ptr is buf2.ptr)?GASharing.Local:GASharing.GlobalNoFree));
+    arr(appender);
+    sink(arr.data());
+    arr.deallocData();
+}
+

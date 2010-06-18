@@ -1,5 +1,5 @@
-# script to quickly build d code that uses dchem, blip, tango, lapack (through NArray) and mpi
 #!/bin/bash
+# script to quickly build d code that uses dchem, blip, tango, lapack (through NArray) and mpi
 
 die() {
     echo "$1"
@@ -181,7 +181,7 @@ if [ -n "$remote" ] ; then
   MAIN_DIR=`pwd`
 fi
 
-cmd="xfbuild +c$compiler $compFlags +xtango +xblip +xstd +xldc +xgobo +Ddeps_${out_name} +Oobjs_${out_name} $verbose +o_$out_name $MAIN_DIR/$main_d -I$MAIN_DIR -I$TANGO_HOME/user -I$BLIP_HOME -I$DCHEM_HOME $flags $extra_libs $*"
+cmd="xfbuild +c$compiler $compFlags +xtango +xblip +xstd +xldc +xgobo +xxf.omg +Ddeps_${out_name} +Oobjs_${out_name} $verbose +o_$out_name $MAIN_DIR/$main_d -I$MAIN_DIR -I$TANGO_HOME/user -I$BLIP_HOME -I$DCHEM_HOME $flags $extra_libs $*"
 
 if [ -n "$verbose" ] ; then
     echo "$cmd"

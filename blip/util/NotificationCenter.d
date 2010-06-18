@@ -15,7 +15,7 @@ struct Callback{
         None=0,
         Resubmit=1, /// resubmit
         ReceiveWhenInProcess=2, /// receive when a notification happens while processing the first one (callback has to be threadsafe)
-        ReceiveAll=4 /// receive all notification (even if you are still waiting for the first to start executing, the callback should be threadsafe)
+        ReceiveAll=4, /// receive all notification (even if you are still waiting for the first to start executing, the callback should be threadsafe)
     }
     void delegate(char[],Callback*,Variant) callback;
     Callback *next;
@@ -52,10 +52,11 @@ struct CallbackList{
 class NotificationCenter{
     CallbackList*[char[]] notificationLists;
     this(){}
-    bool registerCallback()(char[]name,void delegate(char[],Callback*,Variant) callback,Flags flags=Flags.None){
+    bool registerCallback(char[]name,void delegate(char[],Callback*,Variant) callback,
+        Callback.Flags flags=Callback.Flags.None){
         return registerCallback(name,Callback.newCallback(callback,flags));
     }
-    bool registerCallback()(char[]name,Callback *callback){
+    bool registerCallback(char[]name,Callback *callback){
         CallbackList*res;
         synchronized(this){
             auto res2=name in notificationLists;
@@ -66,10 +67,12 @@ class NotificationCenter{
                 res=*res2;
             }
         }
-        if (flags & Flags.ReceiveAll){
-            return insertAt(notificationLists.catchAll,callback);
+        if ((callback.flags & Callback.Flags.ReceiveAll)!=0){
+            insertAt(res.catchAll,callback);
+            return true;
         } else {
-            return insertAt(notificationLists.dynCallbacks,callback);
+            insertAt(res.dynCallbacks,callback);
+            return true;
         }
     }
     void notify(char[]name,Variant args){
@@ -90,17 +93,18 @@ class NotificationCenter{
             }
             pos=atomicSwap(res.dynCallbacks,cast(Callback *)null);
             while (pos !is null){
+                auto pNext=pos.next;
                 auto didResub=false;
-                if (pos.flags&Callback.Flags.Resubmit &&
-                    pos.flags&Callback.Flags.ReceiveWhenInProcess){
+                if ((pos.flags&Callback.Flags.Resubmit)!=0 &&
+                    (pos.flags&Callback.Flags.ReceiveWhenInProcess)!=0){
                     didResub=true;
                     insertAt(res.dynCallbacks,pos);
                 }
                 pos.callback(name,pos,args);
-                if (pos.flags&Callback.Flags.Resubmit && !didResub){
+                if ((pos.flags&Callback.Flags.Resubmit)!=0 && !didResub){
                     insertAt(res.dynCallbacks,pos);
                 }
-                pos=pos.next;
+                pos=pNext;
             }
         }
     }

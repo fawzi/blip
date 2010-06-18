@@ -176,7 +176,6 @@ interface TaskI:SubtaskNotificationsI{
     /// returns the fiber pool used
     FiberPool fiberPool(bool canBeNull=false);
     /// if possible gives back the task for later reuse (makes the task invalid)
-    void reuseOrRelease();
     
     // methods to submit a task, merged them here due to http://d.puremagic.com/issues/show_bug.cgi?id=3706
     // interface SubmittingI:BasicObjectI {

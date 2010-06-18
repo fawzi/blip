@@ -19,7 +19,8 @@ import blip.sync.Atomic;
 import blip.container.FiberPool;
 import blip.container.Deque;
 import tango.core.Memory:GC;
-version(TrackQueues) import blip.io.Console;
+version(TrackTasks) import blip.io.Console;
+version(TrackFibers) import blip.io.Console;
 
 enum TaskFlags:uint{
     None=0,         /// no flags
@@ -46,12 +47,14 @@ class TaskPoolT(int batchSize=16):Pool!(Task,batchSize){
         auto res=super.getObj();
         res.reset(name,taskOp,cast(Fiber)null,cast(bool delegate())null,
             cast(TaskI delegate())null, f);
+        res.tPool=this;
         return res;
     }
     /// constructor with a possibly yieldable call
     Task getObj(char[] name, YieldableCall c){
         auto res=super.getObj();
         res.reset(name,c);
+        res.tPool=this;
         return res;
     }
     /// constructor (with fiber)
@@ -59,6 +62,7 @@ class TaskPoolT(int batchSize=16):Pool!(Task,batchSize){
         auto res=super.getObj();
         res.reset(name,&res.runFiber,fiber,cast(bool delegate())null,
             cast(TaskI delegate())null, f);
+        res.tPool=this;
         return res;
     }
     /// constructor (with generator)
@@ -66,6 +70,7 @@ class TaskPoolT(int batchSize=16):Pool!(Task,batchSize){
         auto res=super.getObj();
         res.reset(name,&res.runGenerator,cast(Fiber)null,generator,
             cast(TaskI delegate())null, f);
+        res.tPool=this;
         return res;
     }
     /// constructor (with generator)
@@ -73,6 +78,7 @@ class TaskPoolT(int batchSize=16):Pool!(Task,batchSize){
         auto res=super.getObj();
         res.reset(name,&res.runGenerator2,cast(Fiber)null,cast(bool delegate())null,
         generator2, f);
+        res.tPool=this;
         return res;
     }
     /// general constructor
@@ -80,12 +86,22 @@ class TaskPoolT(int batchSize=16):Pool!(Task,batchSize){
         bool delegate() generator,TaskI delegate() generator2, TaskFlags f=TaskFlags.None, FiberPool fPool=null){
         auto res=super.getObj();
         res.reset(name,taskOp,fiber,generator,generator2,f,fPool);
+        res.tPool=this;
         return res;
+    }
+    
+    override void giveBack(Task obj){
+        if (obj.status!=TaskStatus.Finished && obj.status>=TaskStatus.Started){
+            throw new Exception(collectAppender(delegate void(CharSink s){
+                dumper(s)("unexpected status ")(obj.status)(" in given back task ")(obj)("\n");
+            }),__FILE__,__LINE__);
+        }
+        super.giveBack(obj);
     }
 }
 
 alias TaskPoolT!(16) TaskPool;
-// to do: this should be solved with a number of pools limited by the number of cpus or even sockets
+// to do: this should be migrate to a blip.container.Cache solution...
 class SchedulerPools{
     FiberPool fiberPool;
     TaskPool taskPool;
@@ -142,7 +158,8 @@ struct YieldableCall{
     }
     /// returns a new fiber that performs the call
     Fiber fiber(){
-        return defaultFiberPool(fPool).getObj(this.dlg);
+        auto fib=defaultFiberPool(fPool).getObj(this.dlg); // should track this???
+        return fib;
     }
 }
 
@@ -174,6 +191,7 @@ class Task:TaskI{
     
     Fiber fiber; /// fiber to run
     FiberPool fPool; /// if non null allocates a fiber executing taskOp with the given stack (unless Sequential)
+    TaskPool tPool; /// pool for the task (used just to give this back to the correct pool)
     
     LinkedList!(void delegate()) onFinish; /// actions to execute sequentially at the end of the task
     void delegate() onFinish0;// placeholder to have onFinish tasks without allocation
@@ -383,6 +401,11 @@ class Task:TaskI{
             if (fiber is null && (! sequential) && (mightSpawn || fPool)) {
                 fPool=defaultFiberPool(fPool);
                 fiber=fPool.getObj(taskOp);
+                debug(TrackFibers){
+                    sinkTogether(localLog,delegate void(CharSink s){
+                        dumper(s)("task ")(this)(" is using Fiber@")(cast(void*)fiber)("\n");
+                    });
+                }
                 taskOp=&runFiber;
             }
             version(NoTaskLock){
@@ -451,6 +474,11 @@ class Task:TaskI{
                 }
             }
         }
+        // tries to already give back the fiber if possible (agressively reuse fibers, as they are expensive)
+        if (fiber !is null && fPool!is null){
+            fPool.giveBack(fiber);
+            fiber=null;
+        }
         if (callOnFinish){
             finishTask();
         }
@@ -492,30 +520,44 @@ class Task:TaskI{
         if (superTask !is null){
             superTask.subtaskEnded(this);
         }
-        reuseOrRelease();
+        release();
     }
     /// tries to give back the task for later reuse
-    bool tryReuse(){
-        version(NoReuse){ } else {
-            volatile auto refCountAtt=refCount;
-            if (refCountAtt==1){
-                version(TrackQueues) sout("will reuse task "~taskName~"\n");
-                if (this.classinfo == Task.classinfo){
-                    auto tPool=defaultSchedulerPools().taskPool;
-                    tPool.giveBack(this); // already returns the fiber
-                } else if (fiber !is null && fPool!is null){
-                    fPool.giveBack(fiber);
-                    fiber=null;
-                }
-                return true;
-            }
+    void release(){
+        auto oldRefC=atomicAdd(refCount,-1);
+        assert(oldRefC>0,"invalid refCount in release");
+        if (oldRefC==1){
+            giveBack();
+        } else {
+            version(TrackTasks) sinkTogether(localLog,delegate void(CharSink s){
+                dumper(s)("could not yet reuse Task@")(cast(void*)this)(" in release as refCount was ")(oldRefC)("\n"); // do this because this could be released before printing...
+            });
         }
-        return false;
     }
-    /// common operation: either reuse the task or release it
-    void reuseOrRelease(){
-        if (!tryReuse()){
-            release();
+    /// gives back the task (called automatically when you release the last time)
+    void giveBack(){
+        version(NoReuse){ } else {
+            version(TrackTasks) sinkTogether(localLog,delegate void(CharSink s){
+                dumper(s)("giving back task ")(this)("\n");
+            });
+            if (fiber !is null && fPool!is null){
+                fPool.giveBack(fiber); /// at least gives back the fiber...
+                fiber=null;
+            }
+            if (tPool!is null){
+                tPool.giveBack(this.retain);
+            } else {
+                if (fiber!is null){
+                    version(TrackTasks) sinkTogether(localLog,delegate void(CharSink s){
+                        dumper(s)("could not reuse fiber@")(cast(void*)fiber)(" of task ")(taskName)("@")(cast(void*)this)(", destroying\n");
+                    });
+                    delete fiber;
+                }
+                version(TrackTasks) sinkTogether(localLog,delegate void(CharSink s){
+                    dumper(s)("could not reuse task ")(this)(", destroying\n");
+                });
+                delete this;
+            }
         }
     }
     /// called when a subtasks has finished
@@ -566,7 +608,9 @@ class Task:TaskI{
         version(NoTaskLock){
             assert(false,"unimplemented");
         } else {
-            version(TrackQueues) sout("will resubmit task "~taskName~"\n");
+            version(TrackTasks) sinkTogether(localLog,delegate void(CharSink s){
+                dumper(s)("will resubmit task ")(this)("\n");
+            });
             bool resub=false;
             synchronized(taskLock){
                 switch(cast(TaskFlags)(flags & TaskFlags.Delay)){
@@ -705,7 +749,7 @@ class Task:TaskI{
             this.spawnTask(task);
             if (task.status!=TaskStatus.Finished)
                 task.wait();
-            task.reuseOrRelease();
+            task.release();
         } else {
             (cast(Task)task).appendOnFinish(&tAtt.resubmitDelayed);
             tAtt.delay(delegate void(){
@@ -864,6 +908,7 @@ class Task:TaskI{
     /// submits the current task and yields the current one
     /// needs a Fiber or Yieldable task
     Task submitYield(TaskI superTask=null){
+        retain();
         submit(superTask);
         auto tAtt=taskAtt.val;
         if (tAtt.mightYield)
@@ -873,6 +918,7 @@ class Task:TaskI{
                 ~" submitYield called with non yieldable executing task ("~tAtt.taskName~")",
                 __FILE__,__LINE__); // allow?
         }
+        release();
         return this;
     }
     /// yields until the subtasks have finished (or waits if Yielding is not possible),
@@ -1013,10 +1059,18 @@ class Task:TaskI{
     /// waits for the task to finish
     void wait()
     in{
-        assert(refCount>0,"waiting on released tasks is dangerous");
+        if (refCount<=0){
+            throw new Exception(collectAppender(delegate void(CharSink s){
+                dumper(s)("waiting on released task ")(this)(" is dangerous (and you should have retained it before starting it)");
+            }),__FILE__,__LINE__);
+        }
     }
     out{
-        assert(refCount>0,"waiting on released tasks is dangerous");
+        if (refCount<=0){
+            throw new Exception(collectAppender(delegate void(CharSink s){
+                dumper(s)("waiting on released task ")(this)(" (after wait) is dangerous (and you should have retained it before starting it)");
+            }),__FILE__,__LINE__);
+        }
     }
     body{
         Semaphore wSem;
@@ -1056,20 +1110,13 @@ class Task:TaskI{
     }
     
     typeof(this) autorelease(){
-        assert(refCount>0,"invalid refCount in autorelease");
         auto oldRefC=atomicAdd(refCount,-1);
+        assert(oldRefC>0,"invalid refCount in autorelease");
         return this;
     }
-    void release(){
-        assert(refCount>0,"invalid refCount in release");
-        auto oldRefC=atomicAdd(refCount,-1);
-        /+if (oldRefC==0){
-            // does nothing (leave the work to the gc, as it might be too late to avoid collection)
-        }+/
-    }
     typeof(this) retain(){
-        assert(refCount>=0,"invalid refCount in retain");
         auto oldRefC=atomicAdd(refCount,1);
+        assert(oldRefC>=0,"invalid refCount in retain"); // it can be 0 due to autorelease, ugly but works
         return this;
     }
 }
@@ -1164,7 +1211,7 @@ class SequentialTask:RootTask{
             this.spawnTask(task);
             if (task.status!=TaskStatus.Finished)
                 task.wait();
-            task.reuseOrRelease();
+            task.release();
         } else {
             (cast(Task)task).appendOnFinish(&tAtt.resubmitDelayed);
             tAtt.delay({

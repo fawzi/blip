@@ -648,6 +648,7 @@ class MultiSched:TaskSchedulerI {
     /// returns nextTask (blocks, returns null only when stopped)
     TaskI nextTask(){
         TaskI t;
+        bool activated=false;
         while(t is null){
             if (runLevel>=SchedulerRunLevel.StopNoTasks){
                 if (queue.length==0){
@@ -665,6 +666,7 @@ class MultiSched:TaskSchedulerI {
                 }
                 if (acceptLevel>numaNode.level && t is null){
                     t=starvationManager.trySteal(this,acceptLevel);
+                    if (t!is null) activated=true;
                 }
                 if (runLevel==SchedulerRunLevel.Stopped)
                     return null;
@@ -674,6 +676,7 @@ class MultiSched:TaskSchedulerI {
                 // better close the gap in which added tasks are not redirected...
                 // remove this? imperfect redirection just leads to inefficency, not errors
                 t=starvationManager.trySteal(this,acceptLevel);
+                if (t!is null) activated=true;
             }
             if (t is null) {
                 zeroSem.wait();
@@ -684,7 +687,8 @@ class MultiSched:TaskSchedulerI {
                 }
             }
         }
-        subtaskActivated(t);
+        if (!activated) 
+            subtaskActivated(t);
         return t;
     }
     /// description (for debugging)
@@ -713,7 +717,7 @@ class MultiSched:TaskSchedulerI {
                 activeTasks.remove(st);
             }
         }
-        st.reuseOrRelease();
+        st.release();
     }
     /// returns wether the current task should be added (check for starvation)
     bool shouldAddTask(TaskI t){
@@ -1034,6 +1038,10 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
         auto t=el.nextTaskImmediate();
         if (t is null){
             onStarvingSched.queue.popFront(t);
+            if (t!is null) {
+                el.addTask0(t);
+                t=el.nextTaskImmediate();
+            }
         }
         if (t!is null){
             rmStarvingSched(el);
@@ -1297,10 +1305,13 @@ class MExecuter:ExecuterI{
                     (t is null?"*NULL*":t.taskName));
                 if (t is null) return;
                 auto schedAtt=t.scheduler; // the task scheduler can change just after execution, but before subtaskDeactivated is called...
+                auto tPos=cast(void*)cast(Object)t;
                 t.execute(false);
                 auto tName=t.taskName;
                 schedAtt.subtaskDeactivated(t);
-                log.info("Work thread "~Thread.getThis().name~" finished task "~tName);
+                sinkTogether(delegate void(char[]s){ log.info(s); },delegate void(CharSink s){
+                    dumper(s)("Work thread ")(Thread.getThis().name)(" finished task ")(tName)("@")(tPos);
+                });
             }
             catch(Exception e) {
                 log.error("exception in working thread ");

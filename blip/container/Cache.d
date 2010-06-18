@@ -14,6 +14,8 @@ import blip.sync.Atomic;
 import blip.container.GrowableArray;
 import blip.io.BasicIO;
 import blip.parallel.smp.Tls;
+import blip.container.Pool;
+import blip.t.core.Traits;
 
 enum EntryFlags{
     Keep=0, /// will never be purged
@@ -203,6 +205,31 @@ class Cache{
     }
 }
 
+/// global (one per process) cache
+Cache gCache;
+static this(){
+    gCache=new Cache();
+}
+
+mixin(tlsMixin("Cache","_defaultCache"));
+
+/// the "best" cache, this might be gCache or more local cache (as created by NumaSchedulers)
+Cache defaultCache(){
+    auto res=_defaultCache();
+    if (res !is null){
+        return res;
+    }
+    return gCache;
+}
+
+/// set the local cache of the current thread.
+/// It is assumed that caches are associated with a thread group,
+/// and you can purge them all (with clearAll) from any of the threads in the group, so when setting 
+/// the cache you should keep that into account.
+void setDefaultCache(Cache c){
+    _defaultCache(c);
+}
+
 /// base class for object that are cached (make the use of the cache easier)
 class Cached:CacheElFactory{
     CKey _key;
@@ -310,7 +337,7 @@ final class CachedT(T):Cached{
 }
 
 /// cache for pool of objects of type T
-class CachedPool(T):Cached{
+class CachedPool(T):Cached,PoolI!(T){
     PoolI!(T) function() poolCreatorF;
     PoolI!(T) delegate() poolCreatorD;
     bool cacheStopped=false;
@@ -324,13 +351,17 @@ class CachedPool(T):Cached{
     
     /// creates a pool
     PoolI!(T) poolCreator(){
-        if (poolCreatorF!is null) return poolCreatorF;
-        if (poolCreatorD!is null) return poolCreatorD;
+        if (poolCreatorF!is null) return poolCreatorF();
+        if (poolCreatorD!is null) return poolCreatorD();
         throw new Exception("no pool creator",__FILE__,__LINE__);
     }
     /// returns a new object
     T getObj(Cache cache){
-        cache.get!(PoolI!(T))(this).getObj();
+        return cache.get!(PoolI!(T))(this).getObj();
+    }
+    /// returns a new object from the default cache
+    T getObj(){
+        return defaultCache().get!(PoolI!(T))(this).getObj();
     }
     /// returns an instance, so that it can be reused (this returns it to the current cache if it is
     /// possible that you call this from a different thread than the one that called getObj then it is 
@@ -346,9 +377,12 @@ class CachedPool(T):Cached{
             delete obj;
         }
     }
-    /// internal method, creates a new NFreeList for the cache
+    void giveBack(T obj){
+        giveBack(defaultCache(),obj);
+    }
+    /// internal method, creates a new Pool for the cache
     Variant createEl(){
-        auto res=new PoolI!(T)(createNewD());
+        auto res=poolCreator();
         if (cacheStopped) res.stopCaching();
         return Variant(res);
     }
@@ -363,13 +397,21 @@ class CachedPool(T):Cached{
     /// discards all the cached objects from all the caches
     void flush(Cache cache){
         foreach(cAtt;cache.allCaches){
-            cacheOpIf(this,delegate void(CacheEntry *c){ c.entry.get!(PoolI!(T))().flush(); });
+            cAtt.cacheOpIf(this,delegate void(ref Cache.CacheEntry c){ c.entry.get!(PoolI!(T))().flush(); });
         }
+    }
+    /// ditto
+    void flush(){
+        flush(defaultCache());
     }
     /// stops caching and discards all cached objects
     void stopCaching(Cache cache){
         cacheStopped=true;
-        clearAll();
+        clearAll(cache);
+    }
+    /// ditto
+    void stopCaching(){
+        stopCaching(defaultCache());
     }
 }
 
@@ -379,7 +421,7 @@ class CachedPool(T):Cached{
 /// using the next attribute of the object (that must exist).
 CachedPool!(ReturnTypeOf!(U)) cachedPoolNext(U)(U createOp){
     alias ReturnTypeOf!(U) T;
-    return new CachedPool!(T)(new PoolNext!(T).poolFactory(createOp));
+    return new CachedPool!(T)(PoolNext!(T).poolFactory(createOp));
 }
 
 /// utility method that creates a cached pool given a creation operation that creates an object.
@@ -392,27 +434,3 @@ CachedPool!(ReturnTypeOf!(U)) cachedPool(U,int batchSize=16)(U createOp,size_t b
     return new CachedPool!(T)(new Pool!(T,batchSize).poolFactory(createOp,bufferSpace,maxEl));
 }
 
-/// global (one per process) cache
-Cache gCache;
-static this(){
-    gCache=new Cache();
-}
-
-mixin(tlsMixin("Cache","_defaultCache"));
-
-/// the "best" cache, this might be gCache or more local cache (as created by NumaSchedulers)
-Cache defaultCache(){
-    auto res=_defaultCache();
-    if (res !is null){
-        return res;
-    }
-    return gCache;
-}
-
-/// set the local cache of the current thread.
-/// It is assumed that caches are associated with a thread group,
-/// and you can purge them all (with clearAll) from any of the threads in the group, so when setting 
-/// the cache you should keep that into account.
-void setDefaultCache(Cache c){
-    _defaultCache(c);
-}

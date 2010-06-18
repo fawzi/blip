@@ -2,10 +2,20 @@
         copyright:      Copyright (c) 2009. Fawzi Mohamed
         license:        Apache 2.0
         author:         Fawzi Mohamed
+        
+        you might wanto to use these together with a cache, more specifically
+        with cachedPoolNext and cachedPool of blip.container.Cache
 *******************************************************************************/
 module blip.container.Pool;
 import blip.t.core.Traits:ctfe_i2a;
 import blip.t.math.Math: max;
+import blip.container.AtomicSLink;
+
+debug(TrackPools) {
+    import blip.io.BasicIO;
+    import blip.io.Console;
+    import blip.container.GrowableArray;
+}
 
 /// describes a pool like object
 interface PoolI(T){
@@ -83,7 +93,7 @@ class Pool(T,int _batchSize=16):PoolI!(T){
             } else static if (is(typeof(call())==T)){
                 return call();
             } else {
-                static assert(0,"cannot convert "~U.stringof~" to a delegate for NFreeList("~T.stringof~")");
+                static assert(0,"cannot convert "~U.stringof~" to a PoolI!("~T.stringof~"), expected a delegate that creates "~T.stringof);
             }
         }
 
@@ -104,8 +114,13 @@ class Pool(T,int _batchSize=16):PoolI!(T){
     
     /// allocates a new object of type T
     T allocateNew(){
-        if (customAllocator!=null){
-            customAllocator(this);
+        debug(TrackPools){
+            sinkTogether(sout,delegate void(CharSink s){
+                dumper(s)("pool @")(cast(void*)this)(" will create new ")(T.stringof)("\n");
+            });
+        }
+        if (customAllocator!is null){
+            return customAllocator(this);
         }
         static if (is(typeof(allocT!(T)(this))==T)){
             return allocT!(T)(this);
@@ -131,6 +146,11 @@ class Pool(T,int _batchSize=16):PoolI!(T){
     }
     /// returns an object to the pool
     void giveBack(T obj){
+        debug(TrackPools){
+            sinkTogether(sout,delegate void(CharSink s){
+                dumper(s)("pool @")(cast(void*)this)(" given back ")(T.stringof)("@")(cast(void*)obj)("=")(obj)("\n");
+            });
+        }
         if (obj is null) return;
         obj=clear(obj);
         if (obj is null) return;
@@ -161,6 +181,11 @@ class Pool(T,int _batchSize=16):PoolI!(T){
                 pool.array[pos]=obj;
                 ++nEl;
             }
+            debug(TrackPools){
+                if (!deleteObj) sinkTogether(sout,delegate void(CharSink s){
+                    dumper(s)("pool @")(cast(void*)this)(" added ")(T.stringof)("@")(cast(void*)obj)(" to pool, nEl=")(nEl)(" nCapacity=")(nCapacity)("\n");
+                });
+            }
         }
         if (deleteObj) delete obj;
     }
@@ -175,7 +200,7 @@ class Pool(T,int _batchSize=16):PoolI!(T){
                     obj=pool.array[pos];
                     pool.array[pos]=null;
                     if (pos==0){
-                        pool=pool.prev;
+                        pool=pool.next;
                     }
                     if ((nCapacity-nEl)>bufferSpace){
                         nCapacity-=batchSize;
@@ -183,6 +208,11 @@ class Pool(T,int _batchSize=16):PoolI!(T){
                         toRm.prev.next=toRm.next;
                         toRm.next.prev=toRm.prev;
                         delete toRm;
+                    }
+                    debug(TrackPools){
+                        sinkTogether(sout,delegate void(CharSink s){
+                            dumper(s)("pool @")(cast(void*)this)(" got object from pool ")(T.stringof)("@")(cast(void*)obj)(", nEl=")(nEl)(" nCapacity=")(nCapacity)("\n");
+                        });
                     }
                 }
             }
@@ -229,12 +259,22 @@ class Pool(T,int _batchSize=16):PoolI!(T){
     }
     /// get rid of all cached values
     void flush(){
+        debug(TrackPools){
+            sinkTogether(sout,delegate void(CharSink s){
+                dumper(s)("pool @")(cast(void*)this)(" deleting cached objects nEl=")(nEl)(" nCapacity=")(nCapacity)("\n");
+            });
+        }
         synchronized(this){
             if (pool !is null){
                 S* p=pool,pNext=pool.next;
                 while (nEl!=0){
                     --nEl;
                     size_t pos=nEl&(batchSize-1);
+                    debug(TrackPools){
+                        sinkTogether(sout,delegate void(CharSink s){
+                            dumper(s)("pool @")(cast(void*)this)(" deleting obj ")(T.stringof)("@")(cast(void*)(p.array[pos]))("\n");
+                        });
+                    }
                     delete p.array[pos];
                     if (pos==0){
                         delete p;
@@ -288,12 +328,12 @@ class PoolNext(T):PoolI!(T){
             }
         }
         
-        PoolNext!(T)createPoolNext(){
-            return new NFreeList(&createNew);
+        PoolNext createPoolNext(){
+            return new PoolNext(&createNew);
         }
         
         PoolI!(T)createPool(){
-            return new NFreeList(&createNew);
+            return new PoolNext(&createNew);
         }
     }
     /// creates a pool generating delegate from most method to create T objects:
@@ -308,8 +348,19 @@ class PoolNext(T):PoolI!(T){
     T getObj(){
         T res=popFrom(first);
         if (res is null) {
-            if (createNew !is null) res=createNew();
+            debug(TrackPools){
+                sinkTogether(sout,delegate void(CharSink s){
+                    dumper(s)("PoolNext!(")(T.stringof)(")@")(cast(void*)this)(" allocating new object\n");
+                });
+            }
+            if (createNew !is null) res=createNew(this);
             else throw new Exception("no allocator",__FILE__,__LINE__);
+        } else {
+            debug(TrackPools){
+                sinkTogether(sout,delegate void(CharSink s){
+                    dumper(s)("PoolNext!(")(T.stringof)(")@")(cast(void*)this)(" reusing pool object\n");
+                });
+            }
         }
         return res;
     }
@@ -328,10 +379,20 @@ class PoolNext(T):PoolI!(T){
     
     /// removes the cached objects
     void flush(){
-        T elAtt=popFrom(c.first);
+        debug(TrackPools){
+            sinkTogether(sout,delegate void(CharSink s){
+                dumper(s)("PoolNext!(")(T.stringof)(")@")(cast(void*)this)(" removing cached objects\n");
+            });
+        }
+        T elAtt=popFrom(first);
         while(elAtt!is null){
             T oldV=elAtt;
-            elAtt=popFrom(c.first);
+            elAtt=popFrom(first);
+            debug(TrackPools){
+                sinkTogether(sout,delegate void(CharSink s){
+                    dumper(s)("PoolNext!(")(T.stringof)(")@")(cast(void*)this)(" deallocating object@")(cast(void*)oldV)("\n");
+                });
+            }
             static if (is(typeof(oldV.deallocData()))){
                 oldV.deallocData();
             }
@@ -340,16 +401,25 @@ class PoolNext(T):PoolI!(T){
     }
     /// stop caching
     void stopCaching(){
-        c.cacheStopped=true;
-        writeBarrier();
+        cacheStopped=true;
         flush();
     }
     /// returns an object to the free list to be reused
     void giveBack(T el){
         if (el!is null){
             if (!cacheStopped){
+                debug(TrackPools){
+                    sinkTogether(sout,delegate void(CharSink s){
+                        dumper(s)("PoolNext!(")(T.stringof)(")@")(cast(void*)this)(" adding object@")(cast(void*)el)(" to the cache\n");
+                    });
+                }
                 insertAt(first,el);
             } else {
+                debug(TrackPools){
+                    sinkTogether(sout,delegate void(CharSink s){
+                        dumper(s)("PoolNext!(")(T.stringof)(")@")(cast(void*)this)(" deleting non reusable object@")(cast(void*)el)("\n");
+                    });
+                }
                 static if(is(typeof(el.deallocData()))){
                     el.deallocData();
                 }

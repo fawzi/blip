@@ -8,6 +8,8 @@ silent="-s"
 tests=1
 build_dir=
 noopt=
+nodbg=
+BLIP_HOME=$PWD
 
 die() {
     echo "$1"
@@ -37,8 +39,10 @@ do
             echo "  --verbose       verbose building"
             echo "  --d-home x      uses x as d home (default $D_HOME )"
             echo "  --tango-home x  uses x as tango home"
+            echo "  --blip-home x   uses x as blip home (defaults to $PWD )"
             echo "  --no-tests      does not compile the tests"
-            echo "  --no-opt      does not compile the opt version"
+            echo "  --no-opt        does not compile the opt version"
+            echo "  --no-dbg        does not compile the dbg version"
             echo "  --build-dir X   uses X as build dir (you *really* want to use a local"
             echo "                  filesystem like /tmp/$USER/build for building if possible)"
             echo ""
@@ -72,8 +76,15 @@ do
             shift
             TANGO_HOME=$1
             ;;
+        --blip-home)
+            shift
+            BLIP_HOME=$1
+            ;;
         --no-tests)
             tests=0
+            ;;
+        --no-dbg)
+            nodbg=1
             ;;
         --no-opt)
             noopt=1
@@ -94,9 +105,9 @@ if [ -z "$build_dir" ] ; then
     fi
 fi
 if [ -z "$compiler" ]; then
-    compiler=`$TANGO_HOME/build/tools/guessCompiler.sh --path $DC`
+    compiler=`$BLIP_HOME/build/tools/guessCompiler.sh --path $DC`
 fi
-compShort=`$TANGO_HOME/build/tools/guessCompiler.sh $compiler`
+compShort=`$BLIP_HOME/build/tools/guessCompiler.sh $compiler`
 if [ "$version" == "opt" ]; then
     libExt=
 else
@@ -149,7 +160,9 @@ fi
 if [ -z "$noopt" ]; then
     $make $makeFlags EXTRA_LIBS="$extra_libs_opt" VERSION=opt lib || die "error building the opt version"
 fi
-$make $makeFlags EXTRA_LIBS="$extra_libs_dbg" VERSION=dbg lib || die "error building the dbg version"
+if [ -z "$nodbg" ]; then
+    $make $makeFlags EXTRA_LIBS="$extra_libs_dbg" VERSION=dbg lib || die "error building the dbg version"
+fi
 if [ -n "$tests" ] ; then
     $make $makeFlags EXTRA_LIBS="$extra_libs" VERSION=$version || die "error building the tests"
 fi

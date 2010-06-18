@@ -130,7 +130,7 @@ private size_t parseInt(T)(T[]s,ref int i){
 }
 /// writes out the given amount of space
 void writeSpace(S)(S s,int amount){
-    char[] tt="                ";
+    const char[] tt="                ";
     int l=cast(int)tt.length;
     while(amount>l){
         s(tt);
@@ -186,10 +186,10 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
             void delegate(Char[]) sinkDlg=delegate void(Char[]s){ sink1(s); };
         }
     }
-    static if (is(T S:S[])){
-        static if(is(S==Char)){
+    static if (is(T U:U[])){
+        static if(is(U==Char)){
             sink(v);
-        } else static if(is(S==char)||is(S==wchar)||is(S==dchar)){
+        } else static if(is(U==char)||is(U==wchar)||is(U==dchar)){
             char[] s;
             if (t.length<128){
                 Char[256] buf;
@@ -198,7 +198,7 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
                 s=convertToString!(Char)(t);
             }
             sink(s);
-        } else static if(is(S==void)||is(S==ubyte)){
+        } else static if(is(U==void)||is(U==ubyte)){
             auto digits=[cast(Char)'0',cast(Char)'1',cast(Char)'2',cast(Char)'3',cast(Char)'4',
             cast(Char)'5',cast(Char)'6',cast(Char)'7',cast(Char)'8',cast(Char)'9',
             cast(Char)'a',cast(Char)'b',cast(Char)'c',cast(Char)'d',cast(Char)'e',cast(Char)'f'];
@@ -243,8 +243,7 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
         is(T==int)||is(T==uint)||is(T==long)||is(T==ulong))
     {
         bool sign=true;
-        static if (is(S[0]==char[])){
-            
+        static if (is(S[0]:Char[])){
             if (args[0].length>0){
                 switch (args[0][0]){
                 case 'x':
@@ -252,43 +251,49 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
                     cast(Char)'5',cast(Char)'6',cast(Char)'7',cast(Char)'8',cast(Char)'9',
                     cast(Char)'a',cast(Char)'b',cast(Char)'c',cast(Char)'d',cast(Char)'e',cast(Char)'f'];
                     Char[T.sizeof*2] str;
-                    for(int i=0;i<T.sizeof/4;++i){
-                        auto d=(0xF & v);
+                    auto val=v;
+                    for(int i=1;i<=T.sizeof*2;++i){
+                        auto d=(0xF & val);
                         str[str.length-i]=digits[d];
+                        val>>=4;
                     }
                     sink(str);
                     return;
                 case 'X':
-                    const digits=[cast(Char)'0',cast(Char)'1',cast(Char)'2',cast(Char)'3',cast(Char)'4',
+                    const digitsU=[cast(Char)'0',cast(Char)'1',cast(Char)'2',cast(Char)'3',cast(Char)'4',
                     cast(Char)'5',cast(Char)'6',cast(Char)'7',cast(Char)'8',cast(Char)'9',
                     cast(Char)'A',cast(Char)'B',cast(Char)'C',cast(Char)'D',cast(Char)'E',cast(Char)'F'];
-                    Char[T.sizeof*2] str;
-                    for(int i=0;i<T.sizeof/4;++i){
-                        auto d=(0xF & v);
-                        str[str.length-i]=digits[d];
+                    Char[T.sizeof*2] strU;
+                    auto valU=v;
+                    for(int i=1;i<=T.sizeof*2;++i){
+                        auto dU=(0xF & valU);
+                        strU[strU.length-i]=digitsU[dU];
+                        valU>>=4;
                     }
-                    sink(str);
+                    sink(strU);
                     return;
                 case 'd','D':
-                    if (args[0].length>1 && args[0][1]>='0' && args[0][1]<='9'){
-                        int w1=cast(int)(args[0][1]-'0');
-                        for (size_t ii=2;ii<args[0].length && args[0][ii]>='0' && args[0][ii]<='9';++ii)
-                        {
-                            w1=10*w1+cast(int)(args[0][ii]-'0');
-                        }
-                        auto v2=v;
-                        int w2=0;
-                        if (v2<0) ++w2;
-                        while (v2!=0){
-                            v2/=10;
-                            ++w2;
-                        }
-                        if (w2<w1 && v<0){
-                            sink("-");
-                            sign=false;
-                        }
-                        for(int ii=w2;ii<w1;++ii){
-                            sink("0");
+                    static if(is(typeof(delegate(){ auto x=args[0][1];}))){
+                        if (args[0].length>1 && args[0][1]>='0' && args[0][1]<='9'){
+                            int w1=cast(int)(args[0][1]-'0');
+                            for (size_t ii=2;ii<args[0].length && args[0][ii]>='0' && args[0][ii]<='9';++ii)
+                            {
+                                w1=10*w1+cast(int)(args[0][ii]-'0');
+                            }
+                            auto v2=v;
+                            int w2=0;
+                            if (v2<0) ++w2;
+                            while (v2!=0){
+                                v2/=10;
+                                ++w2;
+                            }
+                            if (w2<w1 && v<0){
+                                sink("-");
+                                sign=false;
+                            }
+                            for(int ii=w2;ii<w1;++ii){
+                                sink("0");
+                            }
                         }
                     }
                 default:
@@ -407,23 +412,24 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
 /// helper to easily dump out data
 struct Dumper(T){
     T call;
-    Dumper opCall(U)(U u){
+    Dumper opCall(U...)(U u){
         static if(is(U==void delegate(T))){
             u(call);
         } else static if (is(typeof(call(u)))){
             call(u);
         } else static if (is(typeof((*call)(u)))){
             (*call)(u);
-        } else static if (is(typeof(writeOut(call,u)))){ 
-            writeOut(call,u);
-        } else static if (is(typeof(writeOut(*call,u)))){ 
-            writeOut(*call,u);
+        } else static if (is(typeof(writeOut!(T,U)(call,u)))){ 
+            writeOut!(T,U)(call,u);
+        } else static if (is(typeof(writeOut!(typeof(*call),U)(*call,u)))){ 
+            writeOut!(typeof(*call),U)(*call,u);
         } else {
             static assert(0,"Dumper!("~T.stringof~") cannot handle "~U.stringof);
         }
         return *this;
     }
 }
+
 /// ditto
 Dumper!(T) dumperNP(T)(T c){
     static if(is(typeof(c is null))){

@@ -343,7 +343,7 @@ struct BulkArray(T){
             void exec(){
                 try{
                     if (context.res!=0) return;
-                    if(end-start>context.optimalBlockSize*3/2){
+                    if(start+context.optimalBlockSize*3/2<end){
                         auto newChunk=popFrom(context.freeList1);
                         if (newChunk is null){
                             newChunk=new Slice1;
@@ -364,7 +364,7 @@ struct BulkArray(T){
                         newChunk.end=start;
                         newChunk2.start=start;
                         newChunk2.end=end;
-                        Task("BulkArrayPLoop0sub",&newChunk.exec).appendOnFinish(&newChunk.giveBack).autorelease.submit();
+                        Task("BulkArrayPLoop0sub",&newChunk.exec).appendOnFinish(&newChunk.giveBack).autorelease.submitYield();
                         Task("BulkArrayPLoop0sub2",&newChunk2.exec).appendOnFinish(&newChunk2.giveBack).autorelease.submit();
                     } else {
                         for (T*tPtr=start;tPtr!=end;++tPtr){
@@ -419,7 +419,7 @@ struct BulkArray(T){
                         newChunk2.start=start;
                         newChunk2.end=end;
                         newChunk2.index=index;
-                        Task("BulkArrayPLoop0sub",&newChunk.exec).appendOnFinish(&newChunk.giveBack).autorelease.submit();
+                        Task("BulkArrayPLoop0sub",&newChunk.exec).appendOnFinish(&newChunk.giveBack).autorelease.submitYield();
                         Task("BulkArrayPLoop0sub2",&newChunk2.exec).appendOnFinish(&newChunk2.giveBack).autorelease.submit();
                     } else {
                         auto idx=index;

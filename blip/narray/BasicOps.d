@@ -1011,7 +1011,7 @@ int minFeqrel(T,int rank)(NArray!(T,rank) a,T b=cast(T)0){
 }
 
 /// return the square of the 2 norm of the array
-S norm2(T,int rank, S=T)(NArray!(T,rank)a){
+S norm22(T,int rank, S=T)(NArray!(T,rank)a){
     static if(is(T==cfloat)||is(T==cdouble)||is(T==creal)){
         S res=reduceAllGen!((ref S x,T y){ x+=cast(S)y.re * cast(S)y.re + cast(S)y.im * cast(S)y.im; },
             (ref S x,S y){ x+=y; }, (S x){return x;},T,rank,S)(a,cast(S)0);
@@ -1019,7 +1019,12 @@ S norm2(T,int rank, S=T)(NArray!(T,rank)a){
         S res=reduceAllGen!((ref S x,T y){ x+=cast(S)y*cast(S)y; },(ref S x,S y){ x+=y; }, (S x){return x;},
             T,rank,S)(a,cast(S)0);
     }
-    return cast(S)sqrt(res);
+    return res;
+}
+
+/// return the 2 norm of the array
+S norm2(T,int rank, S=T)(NArray!(T,rank)a){
+    return cast(S)sqrt(norm22!(T,rank,S)(a));
 }
 
 /// makes the array hermitish (a==a.H) should use a recursive algorithm
