@@ -29,8 +29,8 @@ version(SerializationTrace){
 /// basic exception for serialization errors
 class SerializationException: Exception{
     char[] pos;
-    this(char[]msg,char[] pos,char[]file,long line){
-        super(msg,file,line);
+    this(char[]msg,char[] pos,char[]file,long line,Exception next=null){
+        super(msg,file,line,next);
         this.pos=pos;
     }
     void writeOutMsg(void delegate(char[]s)sink){
@@ -1006,8 +1006,8 @@ class Serializer {
     /// utility method that throws an exception
     /// override this to give more info on parser position,...
     /// this method *has* to throw
-    void serializationError(char[]msg,char[]filename,long line){
-        throw new SerializationException(msg,"",filename,line);
+    void serializationError(char[]msg,char[]filename,long line,Exception e=null){
+        throw new SerializationException(msg,"",filename,line,e);
     }
 }
 
@@ -1661,7 +1661,7 @@ class Unserializer {
     /// utility method that throws an exception
     /// override this to give more info on parser position,...
     /// this method *has* to throw
-    void serializationError(char[]msg,char[]filename,long line){
-        throw new SerializationException(msg,collectAppender(&handlers.parserPos),filename,line);
+    void serializationError(char[]msg,char[]filename,long line,Exception next=null){
+        throw new SerializationException(msg,collectAppender(&handlers.parserPos),filename,line,next);
     }
 }

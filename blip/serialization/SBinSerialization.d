@@ -396,8 +396,8 @@ class SBinUnserializer: Unserializer {
     /// utility method that throws an exception
     /// override this to give more info on parser position,...
     /// this method *has* to throw
-    override void serializationError(char[]msg,char[]filename,long line){
-        throw new SerializationException(msg,collectAppender(&reader.parserPos),filename,line);
+    override void serializationError(char[]msg,char[]filename,long line,Exception e=null){
+        throw new SerializationException(msg,collectAppender(&reader.parserPos),filename,line,e);
     }
     /// returns true if this is the SBIN protocol, otherwise throws
     override bool readProtocolVersion(){

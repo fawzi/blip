@@ -190,14 +190,14 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
         static if(is(U==Char)){
             sink(v);
         } else static if(is(U==char)||is(U==wchar)||is(U==dchar)){
-            char[] s;
-            if (t.length<128){
+            if (v.length<128){
                 Char[256] buf;
-                s=convertToString!(Char)(t,buf);
+                auto s=convertToString!(Char)(v,buf);
+                sink(s);
             } else {
-                s=convertToString!(Char)(t);
+                auto s=convertToString!(Char)(v);
+                sink(s);
             }
-            sink(s);
         } else static if(is(U==void)||is(U==ubyte)){
             auto digits=[cast(Char)'0',cast(Char)'1',cast(Char)'2',cast(Char)'3',cast(Char)'4',
             cast(Char)'5',cast(Char)'6',cast(Char)'7',cast(Char)'8',cast(Char)'9',

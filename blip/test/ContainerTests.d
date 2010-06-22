@@ -133,14 +133,15 @@ void testPoolNext(){
             }),__FILE__,__LINE__);
         } else if (i==1|| i==2){
             auto el2=el;
-            iPool.giveBack(el);
+            iPool.giveBack(el2);
             auto el3=iPool.getObj();
-            if (el3!is el2){
+            if (el3!is el){
                 throw new Exception(collectAppender(delegate void(CharSink s){
                     dumper(s)("unexpected value when adding and getting back:")(el2.i)(" vs ")(el3.i);
                 }),__FILE__,__LINE__);
             }
         }
+        delete el;
     }
     {
         auto el=iPool.getObj();
@@ -149,6 +150,7 @@ void testPoolNext(){
                 dumper(s)("unexpected value in pool 2:")(el.i)(" vs ")(-2);
             }),__FILE__,__LINE__);
         }
+        delete el;
     }
 }
 

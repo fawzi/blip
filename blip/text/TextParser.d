@@ -10,7 +10,6 @@ import tango.io.stream.Buffered;
 import Integer=tango.text.convert.Integer;
 import Float=tango.text.convert.Float;
 protected import tango.io.device.Conduit : InputFilter, InputBuffer, InputStream;
-import Utf=tango.text.convert.Utf;
 import tango.text.json.JsonEscape: unescape,escape;
 import blip.t.core.Traits: RealTypeOf, ImaginaryTypeOf, ElementTypeOfArray;
 import blip.t.math.Math;
@@ -55,12 +54,15 @@ class TextParser(T) : InputFilter
     /// position of the parsed token
     void parserPos(void delegate(char[]) s){
         dumper(s)("line:")(oldLine)(" col:")(oldCol)(" token:\"")(convertToString!(char)(escape(slice)))("\"\n");
-        dumper(s)("nextText:<<")(convertToString!(char)(cast(T[])source.slice))(">>\n");
+        auto txt=cast(T[])source.slice;
+        if (txt.length>250) txt=txt[0..250];
+        txt=cropRight(txt);
+        dumper(s)("next text:...<<")(convertToString!(char)(txt))(">>...\n");
     }
     /// exception during parsing (adds parser position info)
     static class ParsingException:Exception{
-        this(TextParser p,char[]desc,char[]filename,long line){
-            super(collectAppender(delegate void(CharSink s){ s(desc); s(" parsing "); p.parserPos(s); }),filename,line);
+        this(TextParser p,char[]desc,char[]filename,long line,Exception next=null){
+            super(collectAppender(delegate void(CharSink s){ s(desc); s(" parsing "); p.parserPos(s); }),filename,line,next);
         }
     }
     /// exception for when the cached part is too small
@@ -76,8 +78,8 @@ class TextParser(T) : InputFilter
         }
     }
     /// raises a parse exception
-    void parseError(char[]desc,char[]filename,long line){
-        throw new ParsingException(this,desc,filename,line);
+    void parseError(char[]desc,char[]filename,long line,Exception next=null){
+        throw new ParsingException(this,desc,filename,line,next);
     }
     /// raises a SmallCacheException
     void smallCacheError(char[]desc,char[]filename,long line){
@@ -115,7 +117,7 @@ class TextParser(T) : InputFilter
         bool matchSuccess=false;
         while (source.reader(delegate size_t(void[] rawData)
                 {
-                    T[] data=Utf.cropRight((cast(T*)rawData.ptr)[0..rawData.length/T.sizeof]);
+                    T[] data=cropRight((cast(T*)rawData.ptr)[0..rawData.length/T.sizeof]);
                     auto res=scan(data,sliceE);
                     if (res != Eof){
                         if (setSlice) slice=data[0..res];
@@ -628,26 +630,22 @@ class TextParser(T) : InputFilter
                     __FILE__,__LINE__);
             }
         } else static if(is(U==T[])) {
-            if (!next(&scanString)) parseError("error scanning string",__FILE__,__LINE__);
-            if (slice.length>0 && slice[0]=='"'){
-                t=unescape(slice[1..$-1]);
+            if (next(&scanString)) {
+                if (slice.length>0 && slice[0]=='"'){
+                    t=unescape(slice[1..$-1]);
+                } else {
+                    t=slice;
+                }
+                if(longLived) t=t.dup;
             } else {
-                t=slice;
+                t=[];
+                //parseError("error scanning string",__FILE__,__LINE__);
             }
-            if(longLived) t=t.dup;
         } else static if(is(U==char[])||is(U==wchar[])||is(U==dchar[])) {
             alias ElementTypeOfArray!(U) S;
             T[] str;
             readValue(str,false);
-            static if (is(S==char)){
-                t=Utf.toString(str,t);
-            } else static if (is(S==wchar)){
-                t=Utf.toString16(str,t);
-            } else static if (is(S==dchar)){
-                t=Utf.toString32(str,t);
-            } else {
-                static assert(0,"unsupported str type "~S.stringof);
-            }
+            t=convertToString!(S)(str,t);
         } else {
             T.triggerError;
             static assert(0,"unsupported type "~U.stringof);

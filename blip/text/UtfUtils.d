@@ -21,7 +21,7 @@ size_t nCodePoints(T)(T[] str){
                 if ((*p)&0x80){
                     switch ((*p)&0xF0){
                     case 0xF0:
-                        if ((*p)&0x08!=0 || ++p==pEnd || (*p & 0xC0)!=0x80) return true; 
+                        if (((*p)&0x08)!=0 || ++p==pEnd || (*p & 0xC0)!=0x80) return true; 
                     case 0xE0:
                         if (++p==pEnd || (*p & 0xC0)!=0x80) return true; 
                     case 0xC0,0xD0:
@@ -41,7 +41,7 @@ size_t nCodePoints(T)(T[] str){
                 if ((*p)&0x80){
                     switch ((*p)&0xF0){
                     case 0xF0:
-                        if ((*p)&0x08!=0 || ++p==pEnd || (*p & 0xC0)!=0x80) return true; 
+                        if (((*p)&0x08)!=0 || ++p==pEnd || (*p & 0xC0)!=0x80) return true; 
                     case 0xE0:
                         if (++p==pEnd || (*p & 0xC0)!=0x80) return true; 
                     case 0xC0,0xD0:
@@ -63,7 +63,7 @@ size_t nCodePoints(T)(T[] str){
             T* pEnd=cast(T*)((cast(size_t)(str.ptr+l))&(~cast(size_t)7));
             if (charLoop2(pEnd)) throw new Exception("invalid UTF-8",__FILE__,__LINE__);
             while (p<pEnd){
-                if ((*(cast(int*)p))&0x80808080 ==0){
+                if (((*(cast(int*)p))&0x80808080) ==0){
                     p+=4;
                     n+=4;
                 } else {
@@ -78,7 +78,7 @@ size_t nCodePoints(T)(T[] str){
         size_t n=0;
         bool charLoop(T*pEnd){
             while(p<pEnd){
-                if ((*p)&0xF800==0xD800){
+                if (((*p)&0xF800)==0xD800){
                     if ((*p)&0x0400) return true;
                     if (++p==pEnd || ((*p)&0xFC00)!=0xDC00) return true;
                 }
@@ -89,7 +89,7 @@ size_t nCodePoints(T)(T[] str){
         }
         bool charLoop2(T*pEnd){
             while(p<pEnd){
-                if ((*p)&0xF800==0xD800){
+                if (((*p)&0xF800)==0xD800){
                     if ((*p)&0x0400) return true;
                     if (++p==pEnd || ((*p)&0xFC00)!=0xDC00) return true;
                 }
@@ -179,7 +179,7 @@ size_t scanCodePoints(T)(T[] str,size_t nn){
                 if ((*p)&0x80){ // use the stride table instead?
                     switch ((*p)&0xF0){
                     case 0xF0:
-                        if ((*p)&0x08!=0) invalidUtfError(line);
+                        if (((*p)&0x08)!=0) invalidUtfError(line);
                         if (++p==pEnd) return true;
                         if ((*p & 0xC0)!=0x80) invalidUtfError(line);
                     case 0xE0:
@@ -204,7 +204,7 @@ size_t scanCodePoints(T)(T[] str,size_t nn){
                 if ((*p)&0x80){
                     switch ((*p)&0xF0){
                     case 0xF0:
-                        if ((*p)&0x08!=0) invalidUtfError(line);
+                        if (((*p)&0x08)!=0) invalidUtfError(line);
                         if (++p==pEnd) return true;
                         if ((*p & 0xC0)!=0x80) invalidUtfError(line);
                     case 0xE0:
@@ -231,7 +231,7 @@ size_t scanCodePoints(T)(T[] str,size_t nn){
             nn-=3;
             if (charLoop2(pEnd,__LINE__)) return IOStream.Eof;
             while (p<pEnd && n<nn){
-                if ((*(cast(int*)p))&0x80808080 ==0){
+                if (((*(cast(int*)p))&0x80808080) ==0){
                     p+=4;
                     n+=4;
                 } else {
@@ -252,7 +252,7 @@ size_t scanCodePoints(T)(T[] str,size_t nn){
         }
         bool charLoop(T*pEnd,long line){
             while(p<pEnd && n<nn){
-                if ((*p)&0xF800==0xD800){
+                if (((*p)&0xF800)==0xD800){
                     if ((*p)&0x0400) invalidUtfError(line);
                     if (++p==pEnd) return true;
                     if (((*p)&0xFC00)!=0xDC00) invalidUtfError(line);
@@ -264,7 +264,7 @@ size_t scanCodePoints(T)(T[] str,size_t nn){
         }
         bool charLoop2(T*pEnd,long line){
             while(p<pEnd && n<nn){
-                if ((*p)&0xF800==0xD800){
+                if (((*p)&0xF800)==0xD800){
                     if ((*p)&0x0400) invalidUtfError(line);
                     if (++p==pEnd) return true;
                     if (((*p)&0xFC00)!=0xDC00) invalidUtfError(line);

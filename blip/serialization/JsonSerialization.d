@@ -277,11 +277,11 @@ class JsonUnserializer(T=char) : Unserializer {
             if (field !is null && (!field.pseudo)){
                 reader.skipString(cast(S)",",false);
                 if (!reader.skipString2(cast(S)field.name,false)){
-                    char[] fieldRead;
-                    reader(fieldRead);
-                    if (fieldRead.length>0)
+                    char[] fieldReadName;
+                    reader(fieldReadName);
+                    if (fieldReadName.length>0)
                         reader.skipString(cast(S)":");
-                    throw new FieldMismatchException(field,fieldRead,
+                    throw new FieldMismatchException(field,fieldReadName,
                         "unexpected field",__FILE__,__LINE__);
                 }
                 reader.skipString(cast(S)":");
@@ -507,7 +507,7 @@ class JsonUnserializer(T=char) : Unserializer {
                                 s(" of type ")(field.metaInfo.className);
                             }
                         }
-                        s(", known fields:");
+                        s(", known fields of ")(metaInfo.className)(":");
                         bool first=true;
                         foreach (f;metaInfo){
                             if (!f.pseudo){
@@ -551,8 +551,8 @@ class JsonUnserializer(T=char) : Unserializer {
     /// utility method that throws an exception
     /// override this to give more info on parser position,...
     /// this method *has* to throw
-    override void serializationError(char[]msg,char[]filename,long line){
-        reader.parseError(msg,filename,line);
+    override void serializationError(char[]msg,char[]filename,long line,Exception next=null){
+        reader.parseError(msg,filename,line,next);
     }
     
     override bool readProtocolVersion(){

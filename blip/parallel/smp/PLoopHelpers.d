@@ -1,5 +1,7 @@
 /// helper for parallel loops using arrays and iterators
 ///
+/// You probably want pLoopArray and pLoopIter
+///
 /// Notes: the current version uses a class as base type, and allocates all delegates on the heap.
 /// the initial version did use only structs, and allocated the initial iteration on the stack.
 /// That is faster (especially for short loops), but is more sensible to (incorrect) compiler optimizations
@@ -209,6 +211,7 @@ class PLoopArray(T){
 
 
 /// returns a structure that does a parallel loop on the given array trying to do optimalBlockSize loops in each task
+/// loop on elements and loop with index are supported
 PLoopArray!(T) pLoopArray(T)(T arr,size_t optimalBlockSize=1){
     assert(optimalBlockSize>0,"optimalBlockSize must be lareger than 0");
     PLoopArray!(T) res=new PLoopArray!(T)(arr,optimalBlockSize);
@@ -361,6 +364,7 @@ class PLoopIter(T){
 }
 
 /// returns a structure that does a parallel loop on the given iterator
+/// loop on elements and loop with index are supported
 PLoopIter!(T) pLoopIter(T)(bool delegate(ref T) iter){
     assert(iter!is null,"iter has to be valid");
     PLoopIter!(T) res=new PLoopIter!(T)(iter);
