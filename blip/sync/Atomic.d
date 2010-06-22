@@ -380,7 +380,7 @@ version(LDC){
         {
             oldval = aCas(val,newval,equalTo); // assuming true is *always* 1 and not a non zero value...
         }
-        else static if (isIntegerType(T))
+        else static if (isIntegerType!(T))
         {
             oldval = llvm_atomic_cmp_swap!(T)(&val, equalTo, newval);
         } else {
