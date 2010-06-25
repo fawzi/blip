@@ -367,7 +367,8 @@ private T aCas(T,V)(ref T val, T newval, T equalTo){
 /// atomic compare & exchange (can be used to implement everything else)
 /// stores newval into val if val==equalTo in one atomic operation
 /// barriers are not implied, just atomicity!
-/// returns the old value (i.e. an exchange was performed if result==equalTo)
+/// returns the value that is checked against equalTo (i.e. an exchange was performed 
+/// if result==equalTo, otherwise one can use the result as the current value)
 version(LDC){
     T atomicCAS( T )( ref T val, T newval, T equalTo )
     {
