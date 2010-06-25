@@ -86,5 +86,8 @@ static this(){
     } else {
         Log.lookup("blip.parallel.smp").level(Logger.Level.Warn,true);
     }
+    
+    // allow implicit submission form the main thread
+    taskAtt.val=defaultTask;
 }
 

@@ -82,7 +82,7 @@ char[] loopCtxMixin(char[]ctxName,char[]ctxExtra,char[] startLoop,char[]loopOp,c
                 newChunk.end=midP;
                 newChunk2.start=midP;
                 newChunk2.end=end;
-                Task("PLoopArraysub",&newChunk.exec).appendOnFinish(&newChunk.giveBack).autorelease.submitYield();
+                Task("PLoopArraysub",&newChunk.exec).appendOnFinish(&newChunk.giveBack).autorelease.submit();
                 Task("PLoopArraysub2",&newChunk2.exec).appendOnFinish(&newChunk2.giveBack).autorelease.submit();
             } else {
                 for (size_t idx=start;idx<end;++idx){

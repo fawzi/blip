@@ -19,8 +19,8 @@ import blip.sync.Atomic;
 import blip.container.FiberPool;
 import blip.container.Deque;
 import tango.core.Memory:GC;
-version(TrackTasks) import blip.io.Console;
-version(TrackFibers) import blip.io.Console;
+debug(TrackTasks) import blip.io.Console;
+debug(TrackFibers) import blip.io.Console;
 
 enum TaskFlags:uint{
     None=0,         /// no flags
@@ -211,6 +211,29 @@ class Task:TaskI{
     TaskSchedulerI _scheduler; /// scheduler of the current task
     Semaphore waitSem; /// lock to wait for task end
 
+    /// yields the current task (which must be yieldable)
+    static void yield(){
+        auto tAtt=taskAtt.val;
+        if (tAtt is null || !tAtt.mightYield()){
+            throw new Exception(collectAppender(delegate void(CharSink s){
+                dumper(s)("asked to yield task ")(tAtt)(" which cannot be yielded");
+            }),__FILE__,__LINE__);
+        }
+        tAtt.scheduler.yield();
+    }
+    /// might Yield the current task (which must be yieldable)
+    /// root tasks are ignored (and no yielding is performed) to make the use of maybeYield simpler.
+    /// should ignore all non yieldable tasks???
+    static void maybeYield(){
+        auto tAtt=taskAtt.val;
+        if (tAtt is null || !tAtt.mightYield()){
+            if (tAtt !is null || cast(RootTask)tAtt !is null) return;
+            throw new Exception(collectAppender(delegate void(CharSink s){
+                dumper(s)("asked to yield task ")(tAtt)(" which cannot be yielded");
+            }),__FILE__,__LINE__);
+        }
+        tAtt.scheduler.maybeYield();
+    }
     /// the task should be resubmitted
     bool resubmit(){
         return (flags & TaskFlags.Resubmit)!=0;
@@ -529,7 +552,7 @@ class Task:TaskI{
         if (oldRefC==1){
             giveBack();
         } else {
-            version(TrackTasks) sinkTogether(localLog,delegate void(CharSink s){
+            debug(TrackTasks) sinkTogether(localLog,delegate void(CharSink s){
                 dumper(s)("could not yet reuse Task@")(cast(void*)this)(" in release as refCount was ")(oldRefC)("\n"); // do this because this could be released before printing...
             });
         }
@@ -537,7 +560,7 @@ class Task:TaskI{
     /// gives back the task (called automatically when you release the last time)
     void giveBack(){
         version(NoReuse){ } else {
-            version(TrackTasks) sinkTogether(localLog,delegate void(CharSink s){
+            debug(TrackTasks) sinkTogether(localLog,delegate void(CharSink s){
                 dumper(s)("giving back task ")(this)("\n");
             });
             if (fiber !is null && fPool!is null){
@@ -548,12 +571,12 @@ class Task:TaskI{
                 tPool.giveBack(this.retain);
             } else {
                 if (fiber!is null){
-                    version(TrackTasks) sinkTogether(localLog,delegate void(CharSink s){
+                    debug(TrackTasks) sinkTogether(localLog,delegate void(CharSink s){
                         dumper(s)("could not reuse fiber@")(cast(void*)fiber)(" of task ")(taskName)("@")(cast(void*)this)(", destroying\n");
                     });
                     delete fiber;
                 }
-                version(TrackTasks) sinkTogether(localLog,delegate void(CharSink s){
+                debug(TrackTasks) sinkTogether(localLog,delegate void(CharSink s){
                     dumper(s)("could not reuse task ")(this)(", destroying\n");
                 });
                 delete this;
@@ -608,7 +631,7 @@ class Task:TaskI{
         version(NoTaskLock){
             assert(false,"unimplemented");
         } else {
-            version(TrackTasks) sinkTogether(localLog,delegate void(CharSink s){
+            debug(TrackTasks) sinkTogether(localLog,delegate void(CharSink s){
                 dumper(s)("will resubmit task ")(this)("\n");
             });
             bool resub=false;

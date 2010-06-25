@@ -364,7 +364,7 @@ struct BulkArray(T){
                         newChunk.end=start;
                         newChunk2.start=start;
                         newChunk2.end=end;
-                        Task("BulkArrayPLoop0sub",&newChunk.exec).appendOnFinish(&newChunk.giveBack).autorelease.submitYield();
+                        Task("BulkArrayPLoop0sub",&newChunk.exec).appendOnFinish(&newChunk.giveBack).autorelease.submit();
                         Task("BulkArrayPLoop0sub2",&newChunk2.exec).appendOnFinish(&newChunk2.giveBack).autorelease.submit();
                     } else {
                         for (T*tPtr=start;tPtr!=end;++tPtr){
@@ -419,7 +419,7 @@ struct BulkArray(T){
                         newChunk2.start=start;
                         newChunk2.end=end;
                         newChunk2.index=index;
-                        Task("BulkArrayPLoop0sub",&newChunk.exec).appendOnFinish(&newChunk.giveBack).autorelease.submitYield();
+                        Task("BulkArrayPLoop0sub",&newChunk.exec).appendOnFinish(&newChunk.giveBack).autorelease.submit();
                         Task("BulkArrayPLoop0sub2",&newChunk2.exec).appendOnFinish(&newChunk2.giveBack).autorelease.submit();
                     } else {
                         auto idx=index;

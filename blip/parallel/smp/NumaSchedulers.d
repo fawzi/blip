@@ -143,7 +143,7 @@ class PriQScheduler:TaskSchedulerI {
     void addTask0(TaskI t){
         assert(t.status==TaskStatus.NonStarted ||
             t.status==TaskStatus.Started,"initial");
-        version(TrackQueues){
+        debug(TrackQueues){
             log.info(collectAppender(delegate void(CharSink s){
                 s("pre PriQScheduler "); s(name); s(".addTask0:");writeStatus(s,4);
             }));
@@ -181,7 +181,7 @@ class PriQScheduler:TaskSchedulerI {
     void addTask(TaskI t){
         assert(t.status==TaskStatus.NonStarted ||
             t.status==TaskStatus.Started,"initial");
-        version(TrackQueues) log.info("task "~t.taskName~" might be added to queue "~name);
+        debug(TrackQueues) log.info("task "~t.taskName~" might be added to queue "~name);
         if (shouldAddTask(t)){
             addTask0(t);
         }
@@ -258,7 +258,7 @@ class PriQScheduler:TaskSchedulerI {
         if (!queue.popBack(t,delegate bool(TaskI task){ return task.stealLevel>=stealLevel; })){
             return false;
         }
-        version(TrackQueues){
+        debug(TrackQueues){
             log.info(collectAppender(delegate void(CharSink sink){
                                      sink("stolen task ");
                                      writeOut(sink,cast(void*)t);
@@ -270,7 +270,7 @@ class PriQScheduler:TaskSchedulerI {
                                  }));
         }
         t.scheduler=targetScheduler;
-        version(TrackQueues){
+        debug(TrackQueues){
             log.info(collectAppender(delegate void(CharSink sink){
                 sink("stealing task "); writeOut(sink,t,true); sink(" from ");
                 writeOut(sink,this,true); sink(" to "); writeOut(sink,targetScheduler,true); sink("\n");
@@ -292,7 +292,7 @@ class PriQScheduler:TaskSchedulerI {
                 return true;
             }
             t2.scheduler=scheduler2;
-            version(TrackQueues){
+            debug(TrackQueues){
 		log.info(collectAppender(delegate void(CharSink sink){
                     sink("stealing other task "); writeOut(sink,t2,true); sink(" from ");
                     writeOut(sink,this,true); sink(" to "); writeOut(sink,scheduler2,true); sink("\n");
@@ -534,7 +534,7 @@ class MultiSched:TaskSchedulerI {
     void addTask0(TaskI t){
         assert(t.status==TaskStatus.NonStarted ||
             t.status==TaskStatus.Started,"initial");
-        version(TrackQueues){
+        debug(TrackQueues){
             log.info(collectAppender(delegate void(CharSink s){
                 s("pre MultiSched ");s(name);s(".addTask0:");writeStatus(s,4);
             }));
@@ -564,7 +564,7 @@ class MultiSched:TaskSchedulerI {
     void addTask(TaskI t){
         assert(t.status==TaskStatus.NonStarted ||
             t.status==TaskStatus.Started,"initial");
-        version(TrackQueues) log.info("task "~t.taskName~" might be added to a newly created queue in "~name);
+        debug(TrackQueues) log.info("task "~t.taskName~" might be added to a newly created queue in "~name);
         if (shouldAddTask(t)){
             addTask0(t);
         }
@@ -623,7 +623,7 @@ class MultiSched:TaskSchedulerI {
     }
     /// queue stop
     void queueStopped(PriQScheduler q){
-        version(TrackQueues){
+        debug(TrackQueues){
             log.info(collectAppender(delegate void(CharSink s){
                 s("scheduler "); s(q.name); s(" finished");
             }));
@@ -635,7 +635,7 @@ class MultiSched:TaskSchedulerI {
     void addSched(PriQScheduler sched){
         synchronized(queue){
             if (queue.appendL(sched)==0){
-                version(TrackQueues) {
+                debug(TrackQueues) {
                     log.info(collectAppender(delegate void(CharSink s){
                         s("MultiSched "); s(name); s(" added sched@"); writeOut(s,cast(void*)sched);
                     }));
@@ -792,7 +792,7 @@ class MultiSched:TaskSchedulerI {
     }
     /// actions executed on stop (tells the starvationManager)
     void onStop(){
-        version(TrackQueues){
+        debug(TrackQueues){
             log.info(collectAppender(delegate void(CharSink s){
                 s("MultiSched "); s(name); s(" stopped");
             }));
@@ -1008,7 +1008,7 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
     }
     /// tries to steal a task, might redistribute the tasks
     TaskI trySteal(MultiSched el,int stealLevel){
-        version(TrackQueues){
+        debug(TrackQueues){
             log.info(collectAppender(delegate void(CharSink s){
                 s("pre trySteal for "); s(el.name); s(" in "); s(name); s(":");writeStatus(s,4);
             }));
