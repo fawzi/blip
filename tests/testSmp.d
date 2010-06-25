@@ -52,7 +52,9 @@ class STask{
     }
     void submit3(){
         Task(name~"_sub1",&((new STask(name~"_sub1")).writeOutSN)).submit();
+        Task.yield();
         Task(name~"_sub2",&((new STask(name~"_sub2",0.5,&submit1)).writeOutSN)).submit();
+        Task.maybeYield();
         Task(name~"_sub3",&((new STask(name~"_sub3",0.5)).writeOutSN)).submit();
     }
     void immediateWakeUp(){
