@@ -1,0 +1,329 @@
+= Blip Quick Start =
+
+Here is a quick overview of some of the features of Blip.
+The idea is to give you enough information to know what is available, if you want more
+information the best thing is to look at the code, or to ask.
+
+== Formatted and debug output ==
+
+Tango and phobos have quite different i/o approaches, and io is something that you will
+use in some place in any program, so blip took the obvious approach:
+
+it introduces a third approach ;-)
+
+Things are not so bad though, because it introduces a very light weight approach that can
+be wrapped around other approaches, or used "natively".
+
+ * based on CharSink, i.e. a void delegate(char[])
+    * easy to define new sinks and wrap around things
+    * can be used also a low level without introducing dependencies
+ * writeOut(sink,obj,args) is a template that tries to write out obj to sink, formatting it using args.
+  to make an object work with writeOut you should define void desc(CharSink,args) in it.
+  Basic types are already supported.
+ * there is a Dumper struct that wraps CharSink and similar objects (with very low overhead) and makes them nicer to use (wisper style calling, automatic use of writeOut).
+   The dumper struct can be easily be created with the dumper(sink) function
+ * blip.io.Console defines some dumpers: sout (standard out, thread safe) serr (standard error, thread safe), and also unsafe versions
+ * blip.container.GrowableArray defines a structure to collects several additions
+   (lGrowableArray can be used to create a local version of it).
+   With it it offers some useful helper functions:
+    * collectAppender(void delegate(CharSink) appender) collects all appends done by appender and returns them as array
+    * sinkTogether(sink,void delegate(CharSink) appender) sinks all appends done by appender at once into the given sink
+ * A formatting function like tango's format is not present.
+   This mainly because one should decide if a template (easier but more bloat) or a
+   variadic function should be used. Still it should be easy to add:
+   using {} to signal arguments, if one uses the following format
+   "[argNr]:formattingOptions[,width]" in the curly braces, then "formattingOptions[,width]"
+   can be forwarded to writeOut...
+
+For example:
+{{{
+import blip.io.BasicIO; // CharSink,writeOut,dumper...
+import blip.io.Console; // sout,serr
+import blip.container.GrowableArray; // sinkTogether, ...
+
+class A{
+    this (){}
+    void desc(CharSink s){
+        s("<class A@")(cast(void*)this)(">");
+    }
+}
+
+void main(){
+    for (int i=0;i<3;++i){
+        sout("Hello world ")(i)("\n");
+    }
+    A a=new A(),nullA;
+    sinkTogether(sout,delegate void(CharSink s){
+        dumper(s)("All this text with a:")(a)(" and nullA:")(nullA)(" is guaranteed to be outputted together\n");
+    });
+    char[128] buf;
+    auto collector=lGrowableArray(buf,0);
+    collector("bla");
+    collector(" and bla ");
+    collector(&a.desc);
+    writeOut(&collector.appendArr,nullA);
+    char[] heapAllocStr=collector.takeData;
+    sout(heapAllocStr)("\n");
+    char[] heapAllocStr2=collectAppender(delegate void(CharSink sink){
+        dumper(sink)("An easier way to collect data:")([1,2,4])(" in a heap allocated string (for example to generate an exception message)\n");
+    });
+    sout(heapAllocStr2);
+}
+}}}
+will output something like
+{{{
+Hello world 0
+Hello world 1
+Hello world 2
+All this text with a:<class A@2109344> and nullA:<A *NULL*> is guaranteed to be outputted together
+bla and bla <class A@2109344><A *NULL*>
+An easier way to collect data:[1,2,4] in a heap allocated string (for example to generate an exception message)
+}}}
+
+== Parallel smp execution ==
+
+At smp level blip uses a parallelization strategy based on tasks
+Blip uses a parallelization scheme that is described more in details in ParallelizationConcepts .
+To use smp parallelization the easiest thing is to just import blip.parallel.smp.WorkManager.
+The basic Parallel unity is a Task, for example to create a task that will execute the delegate &obj.myOp you can:
+{{{
+auto t=Task("myOpTask",&obj.myOp);
+}}}
+It is important to note that the delegate and all the memory it accesses have to remain valid for the whole execution of the task. Thus it is dangerous to use stack allocated delegates/objects unless you are sure they will remain valid. The simplest solution to be on the safe side is to always use a method of an objet (or heap allocated struct).
+
+Now you can attach operations to be executed at the end of the task
+{{{
+t.appendOnFinish(&obj.cleanup).appendOnFinish(&submitNewTask);
+}}}
+If you don't want to use the task after submission you can tell it that it is ok to
+immediately reuse the task
+{{{
+t.autorelease;
+}}}
+And finally you can submit it and wait for it to complete
+{{{
+t.executeNow();
+}}}
+or you can submit it an immediately go on executing the rest of the current function
+{{{
+t.submit();
+}}}
+to avoid submitting too many tasks at once you might want to "pause" the current task
+so that it will be resumed when more tasks are requested:
+{{{
+Task.yield();
+}}}
+you might also insert a possible pause, which might be done or not with
+{{{
+Task.maybeYield();
+}}}
+As it is common to do a pause just after submitting, you can submit a task with
+{{{
+t.submitYield();
+}}}
+which is equivalent to
+{{{
+t.submit(); Task.maybeYield();
+}}}
+
+The current task can be suspended as follows
+{{{
+auto tAtt=taskAtt.val; // get the current task
+tAtt.delay(delegate void(){
+    waitForSomeEvent(tAtt);
+})
+}}}
+where waitForSomeEvent should call tAtt.resubmitDelayed() when the task can be restarted.
+This allows to remove tasks that wait (for example) for i/o events from the active tasks
+and keep the processor busy executing tasks that are available in the meantime.
+
+A tasks is considered finished only when all its subtasks have finished executing.
+You can wait for the end of a task t with
+{{{
+t.wait();
+}}}
+It is important that the task is either not yet started, or retained (i.e. do not wait on an autoreleased task, that will give you an error).
+
+Submitting a task as we did before starts the task as subtask of the currently executing
+task. If you want to schedule it differently you can start it by giving it and explicit
+superTask
+{{{
+t.submit(superTask);
+}}}
+In particular the defaultTask will start the task as an independent task, and one can
+define other tasks that have different scheduling, for example sequentialTask enforces
+a sequential execution of its subtasks.
+
+Tasks give a lot of power and freedom to define the parallel workflow of an algorithm,
+but sometime they are a bit too much to simply perform a parallel loop.
+For this there are some helpers, for example
+{{{
+int[] myBeautifulArray=...;
+foreach(i,ref el;pLoopArray(myBeautifulArray,30)){
+    el+=i;
+}
+}}}
+makes a parallel loop on myBeautifulArray, trying to do 30 elements in a task.
+whereas
+{{{
+int i=0;
+auto iterator=bool(ref int el){
+    if (i<10){
+        el=i;
+        ++i;
+        return true;
+    }
+    return false;
+}
+foreach(i;pLoopIter(iterator)){
+    sinkTogether(sout,delegate void(CharSink s){
+        dumper(s)("did ")(i)("\n");
+    });
+}
+}}}
+does a parallel loop on an iterator that goes over the first 10 elements (this is less
+efficient than the previous, because an iterator serializes things).
+
+Clearly in both cases it is the programmer responsibility to make sure that the body
+of the loop can be executed in parallel without problems.
+
+== NArray ==
+
+Blip has n-dimensional arrays that work very well with large amount of data.
+Most operations that you expect from an N dimensional array are there.
+{{{
+import blip.narray.NArray;
+
+auto a=zeros!(real)([3,4,12]); // a 3x4x12 array of reals filled with zeros
+auto b=a[2]; // the last 4x12 slice of a
+b[3,4]=1.5; // changes both a and b
+c=dot(a,b.T); // 3x4x4 obtained multiplying a b transposed
+auto a2=ones!(real)([3,3]); // a 3x3 array of reals filled with ones
+c[Range(0,-1),Range(1,4),4]=a2; // using python notation this means c[:,1:,4]=a2
+auto a3=empty!(real)(4); // an unitialized 4-vector of reals
+foreach(i,v;b){
+    index_type start=i%2;
+    scope d=a3[Range(start,start-2)];
+    d+=v;
+}
+a3[]=1.4;
+a3[2]=a3[2]+1.1; // unfortunately due to limitations of D1 += and indexing does not work
+sout(a3.dataPrinter(":6")); // prints data using 6 digits of precision
+}}}
+If you have some data in an array you can have a NArray that uses that memory with
+{{{
+int[] myData=...;
+auto nArr=a2NA(myData);
+}}}
+There are way too many features in NArray to present them all here, I will just say that 
+it has several operations that use Lapack:
+inv (Inverse of a square matrix),
+solve (Solve a linear system of equations),
+det (Determinant of a square matrix),
+eig (Eigenvalues and vectors of a square matrix),
+eigh (Eigenvalues and eigenvectors of a Hermitian matrix),
+svd (Singular value decomposition of a matrix),
+filtering operations, folding, convolution,...
+
+== Random testing ==
+
+It is important to be sure that the correct results of an algorithm are produced,
+unfortunately bugs are unavoidable, to ensure the correctness of the program testing
+is needed. Test can contain bugs, and can make changes in the interface more difficult.
+Thus it is a good idea to make tests as easy as possible to write.
+Blip has a random testing framework, the idea is to write a function that perform the tests.
+The arguments of this function with be generated randomly (using a user defined function
+that can use a random generator).
+{{{
+import blip.rtest.RTest;
+
+class A{
+    static A randomGenerate(Rand r){
+        // generate an instance and returns it
+    }
+}
+class B{
+    static B randomGenerate(Rand r){
+        // generate an instance and returns it
+    }
+    void push(A a){ /+ add a on the stack +/ }
+    A pop(){ /+ gives back the top instance +/ }
+}
+
+struct SpecialAB{
+    A a;
+    B b;
+    static SpecialAB randomGenerate(Rand r){
+        // generate special a,b pair
+    }
+}
+
+void testBStack(B b,A[] as){
+    foreach(a;as) b.push(a);
+    foreach_reverse(a;as){
+        assert(a==b.pop());
+    }
+}
+
+void testSpecial(SpecialAB sAb){
+    // test sAb.a and sAb.b...
+}
+
+
+// this can be a template if you want to avoid allocation when not needed...
+TestCollection containerTests(TestCollection superColl=null){
+    TestCollection coll=new TestCollection("ABTests",__LINE__,__FILE__,superColl);
+    autoInitTst.testNoFailF("testBStack",&testBStack,__LINE__,__FILE__,coll);
+    autoInitTst.testNoFailF("testSpecial",&testSpecial,__LINE__,__FILE__,coll);
+}
+
+void main(char[][] args){
+    sout(rand.toString()); sout("\n");
+    mainTestFun(args,containerTests());
+}
+}}}
+Shows how to make a program that creates an executable that will perform the tests.
+The program lets you re-execute a test, or execute only a subset of the tests, and always
+gives you enough information to reproduce the test runs.
+
+== Serialization ==
+
+Serialization is somewhat connected to output, but has another goal, it tries to save 
+some in memory objects to a stream, or to generate in memory objects reading a stream.
+
+There are various ways and formats to encode the information in a stream.
+Blip tries to separate the concerns as much as possible, thus the serialization functions
+in an object are independent on the actual format used to output them to a stream.
+The format is chosen by the serializer. There is a serializer that writes out json
+format, and another that writes a binary format. Other formats can be added.
+To allow efficient binary serialization an object has to give a description of its content
+separately from the function actually doing the serialization.
+
+This can be done by hand (see testSerial), but it is easier just using the serializeSome mixin:
+{{{
+import blip.serialization.Serialization;
+
+class A{
+ int x;
+ int _y;
+ int y(){ return _y; }
+ void y(int v){ _y=v; }
+ 
+ mixin(serializeSome("A",`
+ x: coordinates x in pixels
+ y: coordinate y in pixels`));
+ 
+ mixin printOut!();
+}
+
+struct B{
+ int z;
+ A a;
+ 
+ mixin(serializeSome("",`z|a`));
+ mixin printOut!();
+}
+}}}
+the printOut mixin adds a description method desc that writes out the object using the
+json format, and a toString method, so that by defining serialization one has also easily
+a description.

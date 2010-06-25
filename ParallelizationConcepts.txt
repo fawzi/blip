@@ -92,6 +92,24 @@ should be scheduled on an equal footing independently on how "deep" each one is.
 With this we have the core of the idea behind blip.parallel.smp : efficiently
 evaluate several recursive tasks.
 
+This also indirectly explains why threads are not the ideal parallelization
+primitive: disregarding technical problems (like wired memory,...) threads have
+an implicit "fairness" in them that means that all threads have more or less
+the same chance of executing (depending on the priority), and should not be
+ignored for long times.
+This is correct for external tasks, between different recursive task, but
+within a recursive task it forces tasks up in the hierarchy to be executed,
+and gives a breath first execution that will allocate too many tasks.
+
+The execution characteristics within a recursive task or between different tasks
+is very different, and it is the programmer job to choose between them,
+Recursive tasks *might* be parallel and should be executed in parallel
+if free hardware resources are available, whereas independent tasks *should*
+be executed in parallel with some kind of fairness.
+Recursive tasks cope well with data parallel workloads, thread-like parallelization
+copes well with webserver-like load.
+Making some automatic scheduler choose between them is not going to work well.
+
 Now lets look at the ugly details a little bit more.
 
 In general it is better to always try to keep all computation resources busy
@@ -120,7 +138,7 @@ increase the chance of good work distribution.
 Using this approach one can have a simple model and a simple conceptual model to
 describe concurrent programs.
 
-One has tasks that execute a given function and:
+One has tasks (see blip.parallel.smp.BasicTasks) that execute a given function and:
 
 - can be created and spawn
 
@@ -135,10 +153,12 @@ it is possible to:
 - wait for the completion of some task
 
 - delay the executing task and then resubmit it later (useful when the task
-  executes one of those operations that stall the cpu)
+  executes one of those operations that stall the cpu, see Taks.delay and
+  Task.resubmitDelayed)
 
 - you can ask the current task for a cache that is common to the current numa
-  node (this is useful for pools, and delete lists in general).
+  node (this is useful for pools, and delete lists in general, see cachedPool,
+  cachedPoolNext in blip.container.Cache).
 
 Some languages try have special syntax for some of these operations, but
 normally the program does not have so many of them to make any special syntax
@@ -161,3 +181,5 @@ With this you should understand the main ideas behind parallelization in Blip,
 what is left are the "boring" optimizations, and implementation details that
 really make a difference when using the library, but should not be important to
 simply understand it.
+
+Go to QuickStart to see some examples

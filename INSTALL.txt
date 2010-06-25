@@ -1,5 +1,5 @@
 Blip is undergoing a reorganization, so building might be a little more complex than it should:
-* you need a specific version of tango, this is given as a tar.gz in the blip site or from http://files.me.com/fmohamed/3jk7r3 the next release of tango will be supported
+* you need a specific version of tango, see http://github.com/fawzi/oldTango , the next release of tango will be supported
 * 
 Git repositories is available at
     http://github.com/fawzi/
