@@ -937,7 +937,6 @@ struct Matrix(flt_, int rows_, int cols_) {
 	}
 
     void set(V,int rows, int cols)(ref Matrix!(V,rows,cols) o){
-        assert (ok);
 		assert (o.ok);
 		
 		foreach (c; Range!(cols)) {
