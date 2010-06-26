@@ -4,9 +4,9 @@ private {
 	import xf.omg.core.Fixed;
 	import xf.omg.util.Meta;
 	import xf.omg.core.Misc : unitSqNormEpsilon, deg2rad, rad2deg, pi, invSqrt;
-	import tango.util.Convert : convTo = to;
-	import tango.math.Math : sqrt, abs, sin, cos, tan, acos, atan2, asin,floor;
-	import tango.core.Traits : isFloatingPointType,ctfe_i2a;
+	import blip.util.TangoConvert : convTo = to;
+	import blip.math.Math : sqrt, abs, sin, cos, tan, acos, atan2, asin,floor;
+	import blip.core.Traits : isFloatingPointType,ctfe_i2a;
 	import blip.serialization.Serialization;
 	import blip.serialization.SerializationMixins;
 }

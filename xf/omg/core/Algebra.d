@@ -1,7 +1,7 @@
 module xf.omg.core.Algebra;
 
 private {
-	import tango.core.Traits;
+	import blip.core.Traits;
 }
 
 

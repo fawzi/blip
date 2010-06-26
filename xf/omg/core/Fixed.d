@@ -1,12 +1,12 @@
 module xf.omg.core.Fixed;
 
 private {
-	import tango.util.Convert : convTo = to;
-	import tango.math.Math : rndint;
-	import tango.math.IEEE : RoundingMode, getIeeeRounding;
+	import blip.util.TangoConvert : convTo = to;
+	import blip.math.Math : rndint;
+	import blip.math.IEEE : RoundingMode, getIeeeRounding;
 	import blip.serialization.Serialization;
 	import blip.serialization.SerializationMixins;
-	import tango.core.Traits;
+	import blip.core.Traits;
 }
 
 

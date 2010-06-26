@@ -4,10 +4,25 @@
 /// serializations.
 /// The serialization can remove cycles. Support for serialization can be added either by hand
 /// or via xpose
+/// author: fawzi
+//
+// Copyright 2008-2010 the blip developer group
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 module blip.serialization.SerializationBase;
 import blip.serialization.Handlers;
 import tango.core.Tuple;
-import blip.t.core.Variant;
+import blip.core.Variant;
 import blip.io.Console;
 import blip.io.BasicIO;
 import blip.BasicModels;
@@ -16,7 +31,7 @@ import tango.text.Util;
 import blip.util.TemplateFu;
 import tango.text.Regex;
 import blip.container.GrowableArray;
-public import blip.t.core.Traits;
+public import blip.core.Traits;
 
 version(SerializationTrace){
     version=STrace;

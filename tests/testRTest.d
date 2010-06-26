@@ -1,15 +1,30 @@
-/// quick test file
+/// quick test of the RTest facilities
+/// author: fawzi
+//
+// Copyright 2008-2010 the blip developer group
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 module testRTest;
 import blip.io.Console;
 import blip.rtest.RTest;
 import blip.io.NullStream;
 import blip.util.TemplateFu;
 import blip.parallel.smp.WorkManager;
-import tango.util.log.Config;
-import blip.t.util.log.Log;
+import blip.util.TangoLogConfig;
+import blip.util.TangoLog;
 import blip.io.BasicIO;
 import blip.io.Console;
-version(Trace){ import tango.core.stacktrace.TraceExceptions; }
+version(Trace){ import blip.core.stacktrace.TraceExceptions; }
 
 private int[4] specialNrs=[0,2,5,8];
 

@@ -1,21 +1,30 @@
-/*******************************************************************************
-    A module to perform random tests
-        copyright:      Copyright (c) 2008. Fawzi Mohamed
-        license:        BSD style: $(LICENSE)
-        version:        Initial release: July 2008
-        author:         Fawzi Mohamed
-*******************************************************************************/
+/// the basic module to perform random tests
+/// author: fawzi
+//
+// Copyright 2008-2010 the blip developer group
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 module blip.rtest.RTestFramework;
-import blip.t.math.random.Random: Random;
+import blip.math.random.Random: Random;
 public import blip.util.TemplateFu: nArgs,ctfe_i2a,ctfe_hasToken, ctfe_replaceToken;
-public import blip.t.core.Traits:isStaticArrayType;
+public import blip.core.Traits:isStaticArrayType;
 import blip.io.BasicIO;
 public import blip.io.Console;
-public import blip.t.core.Variant:Variant;
-import blip.t.core.Array: find,remove;
-import blip.t.core.sync.Mutex: Mutex;
+public import blip.core.Variant:Variant;
+import blip.core.Array: find,remove;
+import blip.core.sync.Mutex: Mutex;
 import blip.parallel.smp.WorkManager;
-import blip.t.core.Thread;
+import blip.core.Thread;
 public import blip.container.GrowableArray;
 
 /// exception that causes a test to skip
@@ -149,6 +158,19 @@ enum TestResult : int{
 }
 
 /// a test controller that writes out text to the given CharSink
+///
+/// the default printer does not write successes.
+/// You can change the default controller as follows:
+/// {{{
+///     SingleRTest.defaultTestController=new TextController(
+///         TextController.OnFailure.StopTest,
+///         TextController.PrintLevel.AllShort,sout.call);
+/// }}}
+/// and then it should write out something like
+/// {{{
+///     test`testName`          failures-passes/totalTests(totalCombinatorialRuns)
+/// }}}
+/// as mainTestFun does
 class TextController: TestControllerI{
     Mutex _writeLock;
     CharSink progressLog;

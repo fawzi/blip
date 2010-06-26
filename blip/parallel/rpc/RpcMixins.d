@@ -1,9 +1,23 @@
 /// mixins to vend (publish/export) and aquire an object
 /// have to be mixed in in the class
+/// author: fawzi
+//
+// Copyright 2008-2010 the blip developer group
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 module blip.parallel.rpc.RpcMixins;
 import blip.serialization.SerializationMixins:extractFieldsAndDocs;
-public import blip.t.util.log.Log;
-
+public import blip.util.TangoLog;
 /// main mixin, creates proxies (local and remote)
 char[] rpcMixin(char[] name,char[] extraProxyInterfaces,char[]functions,bool localProxy=true){
     assert(name.length>0,"name cannot be empty");

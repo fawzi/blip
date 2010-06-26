@@ -2,12 +2,27 @@
 /// You might want to add the notify requests to a single thread, but it is not needed.
 /// The callbacks that can be called when in process must be threadsafe.
 /// The calling order of the callbacks is not defined (and changes from notification to notification)
+/// The interface might seem ugly (for example no simple way to remove a notification), but
+/// it ensures thread safety, try to respect it.
 ///
 /// author: Fawzi
-/// license: Apache 2.0
+//
+// Copyright 2008-2010 the blip developer group
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 module blip.util.NotificationCenter;
 import blip.sync.Atomic;
-import blip.t.core.Variant;
+import blip.core.Variant;
 import blip.container.AtomicSLink;
 
 struct Callback{

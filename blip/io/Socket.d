@@ -1,15 +1,29 @@
 /// socket implementation, non buffered, probably you want to wrap them
-/// into 
+/// into a buffered stream
+/// author: fawzi
+//
+// Copyright 2008-2010 the blip developer group
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 module blip.io.Socket;
 import blip.io.BasicIO;
 import blip.io.BasicStreams;
 import blip.io.BasicStreams;
 import blip.container.GrowableArray;
-import blip.t.stdc.socket;
-import blip.t.stdc.string: memset,strlen,memcpy;
-import blip.t.stdc.errno;
-import blip.t.util.log.Log;
-
+import blip.stdc.socket;
+import blip.stdc.string: memset,strlen,memcpy;
+import blip.stdc.errno;
+import blip.util.TangoLog;
 class BasicSocket{
     socket_t sock;
     
@@ -189,7 +203,7 @@ class SocketServer{
                     if (FD_ISSET(socks[iSockAtt],&readSock)){
                         sockaddr address;
                         socklen_t addrLen=cast(socklen_t)address.sizeof;
-                        newSock=blip.t.stdc.socket.accept(socks[iSockAtt],&address,&addrLen);
+                        newSock=blip.stdc.socket.accept(socks[iSockAtt],&address,&addrLen);
                         if (newSock<=0){ // ignore lost connections???
                             char[128] buf;
                             auto errMsg=strerror_d(errno,buf);

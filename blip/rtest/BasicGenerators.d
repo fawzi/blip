@@ -1,48 +1,94 @@
-/*******************************************************************************
-    Some generators for the basic types and other useful things to generate
-    random objects
-    
-    Both classes and structs can simply implement one of the following static
-    methods
-        static typeof(this)randomGenerate(Rand r,int idx, ref int nEl, ref bool acceptable)
-        static typeof(this)randomGenerate(Rand r, ref bool acceptable)
-        static typeof(this)randomGenerate(Rand r)
-    these methods
-    should generate a value of type T and return it.
-    The generation can use the random number generator r, but also the non random
-    number idx. Idx is positive and scans all possible values
-    sequentially, but it can be bigger than what you expect, you are supposed to
-    take the modulo of it.
-    nEl can be set, and if set, it should be a constant value for that generator.
-    abs(nEl) gives the number of values of idx that are scanned.
-    if nEl>=0 then the values are assumed to be non random, otherwise a random
-    component is assumed.
-    acceptable can be set to false if the current value should be skipped.
-    
-    It is possible to add a generator also by specializing
-        T generateRandom(T:int)   (Rand r,int idx,ref int nEl, ref bool acceptable)
-    But beware of compiler bugs like 2246.
-        
-    Using a generator (if needed defining an ad-hoc structure/class/typedef)
-    is considered better style (because reusing is easier, and clearer)
-    than defining a mixin of testInit with string mixins, and is exactly as powerful.
-    
-    If a type implements more than one method the following sequence is choosen:
-    static randomGenerate (from the most complete to the least complete),
-    generateRandom template specialization.
-    
-    The main method then is the genRandom template (and simpleRandom)
-    
-        copyright:      Copyright (c) 2008. Fawzi Mohamed
-        license:        BSD style: $(LICENSE)
-        version:        Initial release: July 2008
-        author:         Fawzi Mohamed
-*******************************************************************************/
+/// Some generators for the basic types and other useful things to generate
+/// random objects
+/// 
+/// Both classes and structs can simply implement one of the following static
+/// methods
+///     static typeof(this)randomGenerate(Rand r,int idx, ref int nEl, ref bool acceptable)
+///     static typeof(this)randomGenerate(Rand r, ref bool acceptable)
+///     static typeof(this)randomGenerate(Rand r)
+/// these methods
+/// should generate a value of type T and return it.
+/// The generation can use the random number generator r, but also the non random
+/// number idx. Idx is positive and scans all possible values
+/// sequentially, but it can be bigger than what you expect, you are supposed to
+/// take the modulo of it.
+/// nEl can be set, and if set, it should be a constant value for that generator.
+/// abs(nEl) gives the number of values of idx that are scanned.
+/// if nEl>=0 then the values are assumed to be non random, otherwise a random
+/// component is assumed.
+/// acceptable can be set to false if the current value should be skipped.
+/// 
+/// It is possible to add a generator also by specializing
+///     T generateRandom(T:int)   (Rand r,int idx,ref int nEl, ref bool acceptable)
+/// But beware of compiler bugs like 2246.
+///     
+/// Using a generator (if needed defining an ad-hoc structure/class/typedef)
+/// is considered better style (because reusing is easier, and clearer)
+/// than defining a mixin of testInit with string mixins, and is exactly as powerful.
+/// 
+/// If a type implements more than one method the following sequence is choosen:
+/// static randomGenerate (from the most complete to the least complete),
+/// generateRandom template specialization.
+/// 
+/// The main method then is the genRandom template (and simpleRandom)
+///
+/// There is another way to use different generators, but it is less flexible and thus
+/// it is better to use a custom object as explained previously.
+/// Still if wanted a custom generator can be defined like this:
+/// {{{
+///     private mixin testInit!(checkInit,manualInit) customTst;
+/// }}}
+/// in manualInit you have the following variables:
+///   arg0,arg1,... : variable of the first,second,... argument that you can initialize
+///     (if you use it you are supposed to initialize it)
+///   arg0_i,arg1_i,... : index variable for combinatorial (extensive) coverage.
+///     if you use it you probably want to initialize the next variable
+///   arg0_nEl, arg1_nEl,...: variable that can be initialized to an int and defaults to -1 
+///     abs(argI_nEl) gives the number of elements of argI_i, if argI_nEl>=0 then a purely
+///     combinatorial generation is assumed, and does not set test.hasRandom to true for
+///     this variable whereas if argI_nEl<0 a random component in the generation is assumed
+/// If the argument argI is not used in manualInit the default generation procedure
+/// {{{
+///     Rand r=...;
+///     argI=generateRandom!(typeof(argI))(r,argI_i,argI_nEl,acceptable);
+/// }}}
+/// is used.
+/// checkInit can be used if the generation of the random configurations is mostly good,
+/// but might contain some configurations that should be skipped. In checkInit one
+/// should set the boolean variable "acceptable" to false if the configuration
+/// should be skipped.
+///
+/// For example:
+/// {{{
+///     private mixin testInit!("acceptable=(arg0%3!=0);","arg0=r.uniformR(10);") smallIntTst;
+/// }}}
+/// then gets used as follow:
+/// {{{
+///     smallIntTst.testTrue("x*x<100",(int x){ return (x*x<100);},__LINE__,__FILE__).runTests();
+/// }}}
+/// by the way this is also a faster way to perform a test, as you can see you don't
+/// need to define a collection (but probably it is a good idea to define one)
+///
+/// author: fawzi
+//
+// Copyright 2008-2010 the blip developer group
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 module blip.rtest.BasicGenerators;
-import blip.t.core.Traits;
+import blip.core.Traits;
 import blip.util.TemplateFu;
-import blip.t.math.Math;
-import blip.t.math.random.Random: Rand=Random;
+import blip.math.Math;
+import blip.math.random.Random: Rand=Random;
 import blip.io.BasicIO;
 
 /// returns a positive number, most likely mean+hardMin, in [hardMin,hardMax]

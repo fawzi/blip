@@ -1,20 +1,30 @@
-/**
- * The Atomic module is intended to provide some basic support for the so called lock-free
- * concurrent programming.
- * The current design replaces the previous Atomic module by Sean and is inspired
- * partly by the llvm atomic operations
- *
- * If no atomic ops are available an (inefficent) fallback solution is provided
- * For classes atomic access means atomic access to their *address* not their content
- *
- * If you want unique counters or flags to communicate in multithreading settings
- * look at tango.core.sync.Counter that provides them in a better way and handles
- * better the absence of atomic ops
- *
- * Copyright: Copyright (C) 2009. Fawzi Mohamed All rights reserved.
- * License:   apache 2.0
- * Authors:   Fawzi Mohamed
- */
+/// The Atomic module is intended to provide some basic support for the so called lock-free
+/// concurrent programming.
+/// The current design replaces the previous Atomic module by Sean and is inspired
+/// partly by the llvm atomic operations, and Sean's version
+/// 
+/// If no atomic ops are available an (inefficent) fallback solution is provided
+/// For classes atomic access means atomic access to their *address* not their content
+/// 
+/// If you want unique counters or flags to communicate in multithreading settings
+/// look at tango.core.sync.Counter that provides them in a better way and handles
+/// better the absence of atomic ops
+/// 
+/// author: fawzi
+//
+// Copyright 2008-2010 the blip developer group
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 module blip.sync.Atomic;
 
 version( LDC )

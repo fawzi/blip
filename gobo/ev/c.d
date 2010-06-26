@@ -534,8 +534,8 @@ version (UnitTest):
 version (Tango){} else { // to do: convert
 extern (D):
 import blip.io.Console;
-import stdlib = blip.t.stdc.stdlib;
-import str = blip.t.stdc.string;
+import stdlib = blip.stdc.stdlib;
+import str = blip.stdc.string;
 import unix = std.c.unix.unix;
 import proc = std.c.process;
 enum { SIGINT = 2 }

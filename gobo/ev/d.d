@@ -13,7 +13,7 @@ module gobo.ev.d;
 
 import gobo.ev.c;
 import blip.io.Console;
-import blip.t.stdc.stringz;
+import blip.stdc.stringz;
 private alias char[] string;
 
 enum EV: uint

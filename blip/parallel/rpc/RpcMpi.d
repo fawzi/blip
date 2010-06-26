@@ -1,13 +1,27 @@
+/// rpc using mpi
+//
+// Copyright 2008-2010 the blip developer group
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 module blip.parallel.rpc.RpcMpi;
 import blip.parallel.rpc.RpcBase;
 import blip.parallel.mpi.Mpi;
 import blip.serialization.Serialization;
 import blip.container.GrowableArray;
 import blip.BasicModels;
-import blip.t.util.Convert;
-import blip.t.core.Array;
-import blip.t.util.log.Log;
-import blip.sync.UniqueNumber;
+import blip.util.TangoConvert;
+import blip.core.Array;
+import blip.util.TangoLog;import blip.sync.UniqueNumber;
 import blip.io.IOArray;
 import blip.parallel.smp.WorkManager;
 import blip.io.BasicIO;

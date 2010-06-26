@@ -1,3 +1,24 @@
+/// methods that handle the i/o of the basic types.
+/// Serializers/unserializers are built on the top of these.
+/// at the moment they are quite ugly, and their realization
+/// does suffer from a series of bugs in using interfaces, templates and aliases
+/// should be rewritten once the compiler improves
+///
+/// author: fawzi 
+//
+// Copyright 2008-2010 the blip developer group
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 module blip.serialization.Handlers;
 import tango.core.Tuple;
 import blip.io.BasicIO;
@@ -8,10 +29,10 @@ version(NewTango){
 } else {
   import tango.io.encode.Base64: encode,decode,allocateEncodeSize;
 }
-import blip.t.core.Variant;
+import blip.core.Variant;
 import tango.core.ByteSwap;
-import blip.t.core.Traits: RealTypeOf,ctfe_i2a, ElementTypeOfArray;
-import blip.t.math.Math:min;
+import blip.core.Traits: RealTypeOf,ctfe_i2a, ElementTypeOfArray;
+import blip.math.Math:min;
 import tango.core.Exception: IOException;
 import blip.text.TextParser;
 import blip.text.UtfUtils;

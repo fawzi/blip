@@ -1,13 +1,25 @@
-/*******************************************************************************
-        copyright:      Copyright (c) 2009. Fawzi Mohamed
-        license:        Apache 2.0
-        author:         Fawzi Mohamed
-*******************************************************************************/
+/// An array that uses non gc memory and a small guar object for large allocations
+///
+/// author: fawzi
+//
+// Copyright 2009-2010 the blip developer group
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 module blip.container.BulkArray;
 import tango.core.Memory;
 import blip.BasicModels;
-import blip.t.stdc.string;
-import blip.t.core.Traits;
+import blip.stdc.string;
+import blip.core.Traits;
 import blip.serialization.Serialization;
 import blip.serialization.SerializationMixins;
 import blip.container.AtomicSLink;
@@ -16,6 +28,7 @@ import blip.io.BasicIO;
 import blip.container.GrowableArray;
 import blip.util.Convert;
 import cstdlib = tango.stdc.stdlib : free, malloc;
+import blip.util.Grow:growLength;
 
 /// guard object to deallocate large arrays that contain inner pointers
 class Guard{
@@ -39,9 +52,9 @@ class Guard{
         }
     }
     this(size_t size,bool scanPtr=false){
-        GC.BlkAttr attr;
-        if (!scanPtr)
-            attr=GC.BlkAttr.NO_SCAN;
+        //GC.BlkAttr attr;
+        //if (!scanPtr)
+        //    attr=GC.BlkAttr.NO_SCAN;
         //ubyte* mData2=cast(ubyte*)GC.malloc(size);
         ubyte* mData2=cast(ubyte*)cstdlib.malloc(size);
         if(mData2 is null) throw new Exception("malloc failed");
@@ -117,7 +130,7 @@ struct BulkArray(T){
         while(s.readArrayEl(ac,
             {
                 if (pos==dArray.length){
-                    dArray.length=GC.growLength(dArray.length+1,T.sizeof);
+                    dArray.length=growLength(dArray.length+1,T.sizeof);
                 }
                 s.field(&elMetaInfo, dArray[pos]);
                 ++pos;

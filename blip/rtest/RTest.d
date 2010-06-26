@@ -1,145 +1,163 @@
-/*******************************************************************************
-    A module to perform random tests (the text that follows should be copied to the README.txt file)
-
-    = RTest
-    == RTest a random testing framework
-
-    A framework to quickly write tests that check property/functions using randomly
-    generated data or all combinations of some values.
-
-    I wrote this framework inspired by Haskell's Quickcheck, but the result is a rather 
-    different (but still shares the main philosophy).
-
-    At the moment it is only tango based.
-
-    The idea is to be able to write tests as quickly and as painlessly as possible.
-    Typical use would be for example:
-    You have a function that solves linear systems of equations, and you want to test it.
-    The matrix should be square, and the b vector should have the same size as the matrix dimension.
-    So either you define  an ad-hoc structure, or you write a custom generator for it
-    (it is quite unlikely that the constraint are satisfied just by chance and you would
-    spend all your time waiting for a valid test case).
-    Then (if detA>0) you can check that the solution really solves the system of equations 
-    with a small residual error.
-    Your test can fail in many ways also due to the internal checks of the equation solver,
-    and you want to  always have a nice report that lets you reproduce the problem.
-    Another typical use case is when you have a slow reference implementation for something
-    and a fast one, and you want to be sure they are the same.
-
-    For simplicity here we use really simple tests, in this case a possible use is:
-    {{{
-        import blip.rtest.RTest;
-
-        // private mixin testInit!() autoInitTst; // this is now exported by the RTest module
-
-        void myTests(){
-            // define a collection for my tests
-            TestCollection myTests=new TestCollection("myTests",__LINE__,__FILE__);
-
-            // define a test with a test function (note the F in the name)
-            autoInitTst.testTrueF("testName",functionToTest,__LINE__,__FILE__,myTests);
-            // an explicit case using a delegate (no final F)
-            autoInitTst.testTrue("(2*x)%2==0",(int x){ return ((2*x)%2==0);},__LINE__,__FILE__,myTests);
-
-            // run the tests
-            myTests.runTests();
-        }
-    }}}
-    If everything goes well not much should happen, because by default the printer does
-    not write successes.
-    You can change the default controller as follows:
-    {{{
-        SingleRTest.defaultTestController=new TextController(
-            TextController.OnFailure.StopTest,
-            TextController.PrintLevel.AllShort,sout.call);
-    }}}
-    and it should write out something like
-    {{{
-        test`testName`          failures-passes/totalTests(totalCombinatorialRuns)
-    }}}
-    i.e.:
-    {{{
-        test`assert(x*x<100)`                 0-100/100(100)
-        test`assert(x*x<100)`                 0- 56/100(100)
-    }}}
-    If one wants to run three times as many tests:
-    {{{
-        myTests.runTests(3);
-    }}}
-    If a test fails then it will print out something like this
-    {{{
-        test`(2*x)%4==0 || (2*x)%4==2 (should fail)` failed (returned false instead of true)
-        arg0: 1248569295
-
-        To reproduce:
-         testCollection
-         .findTest(`(2*x)%4==0 || (2*x)%4==2 (should fail)`)
-         .runTests(1,`CMWC+KISS99000000003ade6df6_00000020_a91947fc_98e147e1_0920f523_b24a6556_d27946eb_3167881a_6f64d7be_f4a73276_56cf2c68_f017ad3d_f0063e91_b0319228_33e95107_ebe9dc38_4b8eeb7f_b8664e53_aa7fe5ab_50ed0f52_5c0b272e_5f6454a2_ee8acc8c_684bfa86_465ab401_09ce51d2_de0e8ec9_5658281b_e6fdbaca_3c1664b0_9617b38f_b84bedc4_2e2b65d2_64d3959c_00000001_0c385e86_00000000_00000000_7c46393b_3209df2a_4b2a993a_109b26fd`,[0]);
-        ERROR test `(2*x)%4==0 || (2*x)%4==2 (should fail)` from `test.d:37` FAILED!!
-        -----------------------------------------------------------
-        test`(2*x)%4==0 || (2*x)%4==2 (should fail)`              1-  2/  3(  3)
-    }}}
-    from it you should see the arguments that made the test fail.
-    If you want to re-run it you can add .runTests(1,seed,counter) to it, i.e.:
-    {{{
-    autoInitTst.testTrue("(2*x)%4==0 || (2*x)%4==2 (should fail)",(int x){ return ((2*x)%4==0 || (2*x)%4==2);},
-        __LINE__,__FILE__).runTests(1,"CMWC000000003ade6df6_00000020_595a6207_2a7a7b53_e59a5471_492be655_75b9b464_f45bb6b8_c5af6b1d_1eb47eb9_ff49627d_fe4cecb1_fa196181_ab208cf5_cc398818_d75acbbc_92212c68_ceaff756_c47bf07b_c11af291_c1b66dc4_ac48aabe_462ec397_21bf4b7a_803338ab_c214db41_dc162ebe_41a762a8_7b914689_ba74dba0_d0e7fa35_7fb2df5a_3beb71fb_6dcee941_0000001f_2a9f30df_00000000_00000000",[0])
-    }}}
-
-    If the default generator is not good enough you can create tests that use a custom generator like this:
-    {{{
-        private mixin testInit!(checkInit,manualInit) customTst;
-    }}}
-    in manualInit you have the following variables:
-      arg0,arg1,... : variable of the first,second,... argument that you can initialize
-        (if you use it you are supposed to initialize it)
-      arg0_i,arg1_i,... : index variable for combinatorial (extensive) coverage.
-        if you use it you probably want to initialize the next variable
-      arg0_nEl, arg1_nEl,...: variable that can be initialized to an int and defaults to -1 
-        abs(argI_nEl) gives the number of elements of argI_i, if argI_nEl>=0 then a purely
-        combinatorial generation is assumed, and does not set test.hasRandom to true for
-        this variable whereas if argI_nEl<0 a random component in the generation is assumed
-    If the argument argI is not used in manualInit the default generation procedure
-    {{{
-        Rand r=...;
-        argI=generateRandom!(typeof(argI))(r,argI_i,argI_nEl,acceptable);
-    }}}
-    is used.
-    checkInit can be used if the generation of the random configurations is mostly good,
-      but might contain some configurations that should be skipped. In checkInit one
-      should set the boolean variable "acceptable" to false if the configuration
-      should be skipped.
-
-    For example:
-    {{{
-        private mixin testInit!("acceptable=(arg0%3!=0);","arg0=r.uniformR(10);") smallIntTst;
-    }}}
-    then gets used as follow:
-    {{{
-        smallIntTst.testTrue("x*x<100",(int x){ return (x*x<100);},__LINE__,__FILE__).runTests();
-    }}}
-    by the way this is also a faster way to perform a test, as you can see you don't
-    need to define a collection (but probably it is a good idea to define one)
-
-    If you end up using custom generators much probably you should define a 
-    struct/class/typedef, and use that as input to your testing function and define
-    one of the 
-    randomGenerate(Rand r,int idx,ref int nEl, ref bool acceptable),
-    randomGenerate(Rand r, ref bool acceptable),  randomGenerate(Rand r) static generators
-    or a specialization of
-    T generateRandom(T:YourType)(Rand r,int idx,ref int nEl, ref bool acceptable)
-    so that you can use the default automatic generation.
-    For a description of generateRandom and RandGen see the module blip.rtest.BasicGenerators.
-
-    enjoy
-
-    Fawzi Mohamed
-
-        copyright:      Copyright (c) 2008. Fawzi Mohamed
-        license:        BSD style: $(LICENSE)
-        version:        Initial release: July 2008
-        author:         Fawzi Mohamed
-*******************************************************************************/
+/// A module to perform random tests (the text that follows should be copied to the README.txt file)
+///
+/// = RTest =
+/// == Quick Overview: RTest a random testing framework (from blip.rtest.RTest) ==
+///
+/// A framework to quickly write tests that check property/functions using randomly
+/// generated data or all combinations of some values.
+///
+/// I wrote this framework inspired by Haskell's Quickcheck, but the result is a rather 
+/// different (but still shares the main philosophy).
+///
+/// The idea is to be able to write tests as quickly and as painlessly as possible.
+/// Typical use would be for example:
+/// You have a function that solves linear systems of equations, and you want to test it.
+/// The matrix should be square, and the b vector should have the same size as the matrix dimension.
+/// So either you define  an ad-hoc structure, or you write a custom generator for it
+/// (it is quite unlikely that the constraint are satisfied just by chance and you would
+/// spend all your time waiting for a valid test case).
+/// Then (if detA>0) you can check that the solution really solves the system of equations 
+/// with a small residual error.
+/// Your test can fail in many ways also due to the internal checks of the equation solver,
+/// and you want to  always have a nice report that lets you reproduce the problem.
+/// Another typical use case is when you have a slow reference implementation for something
+/// and a fast one, and you want to be sure they are the same.
+///
+/// For simplicity here we use really simple tests, in this case a possible use is:
+/// {{{
+///     module tstMod;
+///     import blip.rtest.RTest;
+///     import blip.io.Console;
+///     import blip.math.random.Random;
+///     
+///     bool functionToTest() {return true;}
+///     
+///     TestCollection myTests(TestCollection superColl=null){
+///         // define a collection for my tests
+///         TestCollection myTests=new TestCollection("myTests",__LINE__,__FILE__,superColl);
+///     
+///         // define a test with a test function (note the F in the name)
+///         autoInitTst.testTrueF("testName",&functionToTest,__LINE__,__FILE__,myTests);
+///         // an explicit case using a delegate (no final F)
+///         autoInitTst.testTrue("(2*x)%2==0",delegate bool(int x){ return ((2*x)%2==0);},__LINE__,__FILE__,myTests);
+///     
+///         return myTests;
+///     }
+///     
+///     class A{
+///         static A randomGenerate(Rand r){
+///             // generate an instance and returns it
+///             return new A;
+///         }
+///     }
+///     class B{
+///         static B randomGenerate(Rand r){
+///             // generate an instance and returns it
+///             return new B;
+///         }
+///         void push(A a){ /+ add a on the stack +/ }
+///         A pop(){ /+ gives back the top instance +/ return new A; }
+///     }
+///     
+///     struct SpecialAB{
+///         A a;
+///         B b;
+///         static SpecialAB randomGenerate(Rand r){
+///             SpecialAB res;
+///             // generate special a,b pair
+///             return res;
+///         }
+///     }
+///     
+///     void testBStack(B b,A[] as){
+///         foreach(a;as) b.push(a);
+///         foreach_reverse(a;as){
+///             assert(a==b.pop());
+///         }
+///     }
+///     
+///     void testSpecial(SpecialAB sAb){
+///         // test sAb.a and sAb.b...
+///     }
+///     
+///     // a normal non random test
+///     void normalTest(){ }
+///     
+///     // this can be a template if you want to avoid allocation when not needed...
+///     TestCollection abTests(TestCollection superColl=null){
+///         TestCollection coll=new TestCollection("ABTests",__LINE__,__FILE__,superColl);
+///         autoInitTst.testNoFailF("testBStack",&testBStack,__LINE__,__FILE__,coll);
+///         autoInitTst.testNoFailF("testSpecial",&testSpecial,__LINE__,__FILE__,coll);
+///         autoInitTst.testNoFailF("normalTest",&normalTest,__LINE__,__FILE__,coll);
+///         return coll;
+///     }
+///     
+///     /// myModule tests
+///     TestCollection allTests(TestCollection superColl=null){
+///         TestCollection coll=new TestCollection("myModule",__LINE__,__FILE__,superColl);
+///         abTests(coll);
+///         myTests(coll);
+///         return coll;
+///     }
+///     
+///     void main(char[][] args){
+///         sout(rand.toString()); sout("\n");
+///         auto tests=allTests();
+///         // it would be possible to simply call
+///         // tests.runTests();
+///         // but it is nicer to use mainTestFun that creates a command line utility that can
+///         // re-run a test, or run a subset of the tests
+///         mainTestFun(args,tests);
+///     }
+/// }}}
+/// The main function shows how to make a program that creates an executable that will perform the tests.
+/// The program lets you re-execute a test, or execute only a subset of the tests, and always
+/// gives you enough information to reproduce the test runs.
+/// If everything goes well the output will be something like
+/// {{{
+///     SyncCMWC+KISS99000000003ade6df6_00000020_9e1eea7c_315c04d6_983cb309_4f0a27b2_70796712_30441827_5789bc75_1799db5b_5cbebbd8_fc540d2d_3a50f6a6_56f3d5e1_bf450e7a_734e21d3_47a47ad2_ac7ffd34_52ff8217_0bf3fb03_27c70b1c_3c25d4e7_81283378_8073186e_2f9b1eea_40f7a829_a6d75629_8d990330_8c74c5c4_ddd5e44b_ef0f3c04_c476864e_3cc5af5e_ad8e39e7_0000000e_373679ad_00000000_00000000_40e05b40_2a100202_9bbe625f_12b8d071
+///     test`myModule/myTests/(2*x)%2==0`                        0-100/100-100
+///     test`myModule/ABTests/testBStack`                        0-100/100-100
+///     test`myModule/ABTests/testSpecial`                       0-100/100-100
+///     test`myModule/myTests/testName`                          0-1/1-1
+///     test`myModule/myTests`                                   0-2/2-1
+///     test`myModule/ABTests/normalTest`                        0-1/1-1
+///     test`myModule/ABTests`                                   0-3/3-1
+///     test`myModule`                                           0-7/7-1
+///     
+/// }}}
+/// whereas if a test fails then it will print out something like this
+/// {{{
+///    test`myModule/ABTests/testBStack` failed with exception
+///    tango.core.Exception.AssertException@tstMod(48): Assertion failure
+///    ----------------
+///    arg0: tstMod.B
+///    arg1: [tstMod.A,tstMod.A,tstMod.A,tstMod.A,tstMod.A,tstMod.A,tstMod.A,tstMod.A,tstMod.A,tstMod.A,tstMod.A,tstMod.A,tstMod.A,tstMod.A]
+///    test failed in collection`myModule/ABTests` created at `/Users/fawzi/d/blip/tstMod.d:61`
+///    test failed in collection`myModule` created at `/Users/fawzi/d/blip/tstMod.d:70`
+///
+///    To reproduce:
+///    ./tstMod.dbg --test='myModule/ABTests/testBStack' --counter='[0, 0]' --seed='CMWC+KISS99000000003ade6df6_00000020_21fbefdb_098b076c_7141f7c9_efcd27ac_f263306f_7ae1fd7b_a951d311_44a69d9e_32924c00_69ca7851_b475cfca_b147313a_88ee5415_00c7f4f7_5cc041eb_be68dd44_f715251b_649d63ba_46ba01bb_6497e1de_07277ba2_61ef65da_5825166c_53db8c1f_321c6da0_18b9f7e1_ca2d2ef5_a3d26eed_d319fbd7_48eecaf4_94d223cf_9f6a8ed6_0000001f_34c58f50_00000000_00000000_243c0339_476217a0_09c29624_15095711'
+///    ERROR test `myModule/ABTests/testBStack` from `/Users/fawzi/d/blip/tstMod.d:62` FAILED!!-----------------------------------------------------------
+///    test`myModule/ABTests/testBStack`                        1-0/1-1
+/// }}}
+/// from it you should see the arguments that made the test fail, and you can re-run it.
+///
+/// author: fawzi
+//
+// Copyright 2008-2010 the blip developer group
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 module blip.rtest.RTest;
 public import blip.rtest.BasicGenerators;
 public import blip.rtest.RTestFramework;
@@ -148,7 +166,7 @@ import tango.util.ArgParser;
 import tango.text.Util;
 import blip.io.Console;
 import blip.io.BasicIO;
-import blip.t.stdc.stdlib: exit;
+import blip.stdc.stdlib: exit;
 import blip.parallel.smp.WorkManager;
 
 mixin testInit!() autoInitTst; 

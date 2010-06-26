@@ -4,10 +4,102 @@
 /// so even using wchar or dchar as native types should not be too difficult.
 /// It might be a good idea to rename char[] string, so that one could switch
 /// the choosen type more easily later.
+///
+/// == Blip overview: Formatted and debug output (from blip.io.BasicIO) ==
+/// 
+/// Tango and phobos have quite different i/o approaches, and io is something that you will
+/// use in some place in any program, so blip took the obvious approach:
+/// 
+/// it introduces a third approach ;-)
+/// 
+/// Things are not so bad though, because it introduces a very light weight approach that can
+/// be wrapped around other approaches, or used "natively".
+/// 
+///  * based on CharSink, i.e. a void delegate(char[])
+///     * easy to define new sinks and wrap around things
+///     * can be used also a low level without introducing dependencies
+///  * writeOut(sink,obj,args) is a template that tries to write out obj to sink, formatting it using args.
+///   to make an object work with writeOut you should define void desc(CharSink,args) in it.
+///   Basic types are already supported.
+///  * there is a Dumper struct that wraps CharSink and similar objects (with very low overhead) and makes them nicer to use (wisper style calling, automatic use of writeOut).
+///    The dumper struct can be easily be created with the dumper(sink) function
+///  * blip.io.Console defines some dumpers: sout (standard out, thread safe) serr (standard error, thread safe), and also unsafe versions
+///  * blip.container.GrowableArray defines a structure to collects several additions
+///    (lGrowableArray can be used to create a local version of it).
+///    With it it offers some useful helper functions:
+///     * collectAppender(void delegate(CharSink) appender) collects all appends done by appender and returns them as array
+///     * sinkTogether(sink,void delegate(CharSink) appender) sinks all appends done by appender at once into the given sink
+///  * A formatting function like tango's format is not present.
+///    This mainly because one should decide if a template (easier but more bloat) or a
+///    variadic function should be used. Still it should be easy to add:
+///    using {} to signal arguments, if one uses the following format
+///    "[argNr]:formattingOptions[,width]" in the curly braces, then "formattingOptions[,width]"
+///    can be forwarded to writeOut...
+/// 
+/// For example:
+/// {{{
+/// import blip.io.BasicIO; // CharSink,writeOut,dumper...
+/// import blip.io.Console; // sout,serr
+/// import blip.container.GrowableArray; // sinkTogether, ...
+/// 
+/// class A{
+///     this (){}
+///     void desc(CharSink s){
+///         s("<class A@")(cast(void*)this)(">");
+///     }
+/// }
+/// 
+/// void main(){
+///     for (int i=0;i<3;++i){
+///         sout("Hello world ")(i)("\n");
+///     }
+///     A a=new A(),nullA;
+///     sinkTogether(sout,delegate void(CharSink s){
+///         dumper(s)("All this text with a:")(a)(" and nullA:")(nullA)(" is guaranteed to be outputted together\n");
+///     });
+///     char[128] buf;
+///     auto collector=lGrowableArray(buf,0);
+///     collector("bla");
+///     collector(" and bla ");
+///     collector(&a.desc);
+///     writeOut(&collector.appendArr,nullA);
+///     char[] heapAllocStr=collector.takeData;
+///     sout(heapAllocStr)("\n");
+///     char[] heapAllocStr2=collectAppender(delegate void(CharSink sink){
+///         dumper(sink)("An easier way to collect data:")([1,2,4])(" in a heap allocated string (for example to generate an exception message)\n");
+///     });
+///     sout(heapAllocStr2);
+/// }
+/// }}}
+/// will output something like
+/// {{{
+/// Hello world 0
+/// Hello world 1
+/// Hello world 2
+/// All this text with a:<class A@2109344> and nullA:<A *NULL*> is guaranteed to be outputted together
+/// bla and bla <class A@2109344><A *NULL*>
+/// An easier way to collect data:[1,2,4] in a heap allocated string (for example to generate an exception message)
+/// }}}
+/// 
+/// author: fawzi
+//
+// Copyright 2008-2010 the blip developer group
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 module blip.io.BasicIO;
-import blip.t.util.Convert: formatFloat;
-import blip.t.core.Array: find;
-import blip.t.core.Traits: isStaticArrayType;
+import blip.util.TangoConvert: formatFloat;
+import blip.core.Array: find;
+import blip.core.Traits: isStaticArrayType;
 import blip.text.UtfUtils: convertToString;
 
 /// extent of a slice of a buffer

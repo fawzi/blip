@@ -1,13 +1,22 @@
-/**
- * This module contains a packed bit array of fixed size, stack allocated arrays
- *
- * Copyright: Copyright (C) 2005-2006 Digital Mars, www.digitalmars.com.
- *            All rights reserved.
- * License:   BSD style: $(LICENSE)
- * Authors:   Fawzi Mohamed, derived from BitArray
- */
+/// This module contains a packed bit array of fixed size, stack allocated arrays
+///
+/// part of this was derived from BitArray written by Walter Bright
+///
+// Copyright (C) 2005-2006 Digital Mars, www.digitalmars.com, the blip developer group
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 module blip.container.BitVector;
-private import tango.core.BitManip;
+private import blip.core.BitManip;
 alias uint internal_t; // at the moment there are places where this is hardcoded (bitsize=32)
 
 struct BitVector(size_t len){

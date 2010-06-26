@@ -1,6 +1,6 @@
 /*******************************************************************************
 
-        Tango compatibility (to be removed).
+        Tango compatibility +ninor changes by fawzi (to be removed).
 
         copyright:      Copyright (c) 2004 Kris Bell. All rights reserved
 

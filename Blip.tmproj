@@ -33,6 +33,8 @@
 			<string>blip</string>
 		</dict>
 		<dict>
+			<key>expanded</key>
+			<true/>
 			<key>name</key>
 			<string>SimpleBinaryProtocol</string>
 			<key>regexFolderFilter</key>
@@ -41,10 +43,20 @@
 			<string>SimpleBinaryProtocol</string>
 		</dict>
 		<dict>
+			<key>expanded</key>
+			<true/>
+			<key>name</key>
+			<string>tests</string>
+			<key>regexFolderFilter</key>
+			<string>!.*/(\.[^/]*|CVS|_darcs|_MTN|\{arch\}|blib|.*~\.nib|.*\.(framework|app|pbproj|pbxproj|xcode(proj)?|bundle))$</string>
+			<key>sourceDirectory</key>
+			<string>tests</string>
+		</dict>
+		<dict>
 			<key>filename</key>
 			<string>build.sh</string>
 			<key>lastUsed</key>
-			<date>2010-03-21T16:28:00Z</date>
+			<date>2010-06-26T17:09:03Z</date>
 		</dict>
 		<dict>
 			<key>filename</key>
@@ -56,45 +68,28 @@
 			<key>filename</key>
 			<string>README.txt</string>
 			<key>lastUsed</key>
-			<date>2010-03-21T16:28:00Z</date>
+			<date>2010-06-25T09:30:40Z</date>
 		</dict>
 		<dict>
 			<key>filename</key>
 			<string>Makefile</string>
 			<key>lastUsed</key>
-			<date>2010-03-21T16:28:01Z</date>
-			<key>selected</key>
-			<true/>
+			<date>2010-06-24T12:48:21Z</date>
 		</dict>
 		<dict>
 			<key>filename</key>
 			<string>INSTALL.txt</string>
 			<key>lastUsed</key>
-			<date>2009-12-10T21:57:31Z</date>
+			<date>2010-06-24T12:48:20Z</date>
 		</dict>
 	</array>
 	<key>fileHierarchyDrawerWidth</key>
-	<integer>185</integer>
+	<integer>210</integer>
 	<key>metaData</key>
-	<dict>
-		<key>blip/sync/Flag.d</key>
-		<dict>
-			<key>caret</key>
-			<dict>
-				<key>column</key>
-				<integer>80</integer>
-				<key>line</key>
-				<integer>1</integer>
-			</dict>
-			<key>firstVisibleColumn</key>
-			<integer>0</integer>
-			<key>firstVisibleLine</key>
-			<integer>0</integer>
-		</dict>
-	</dict>
+	<dict/>
 	<key>showFileHierarchyDrawer</key>
 	<true/>
 	<key>windowFrame</key>
-	<string>{{9, 0}, {944, 778}}</string>
+	<string>{{382, 14}, {829, 660}}</string>
 </dict>
 </plist>
