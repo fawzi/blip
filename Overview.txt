@@ -4,7 +4,7 @@ Here is a quick overview of some of the features of Blip.
 The idea is to give you enough information to know what is available, if you want more
 information the best thing is to look at the code, or to ask.
 
-/// == Blip overview: Formatted and debug output (from blip.io.BasicIO) ==
+== Blip overview: Formatted and debug output (from blip.io.BasicIO) ==
 
 Tango and phobos have quite different i/o approaches, and io is something that you will
 use in some place in any program, so blip took the obvious approach:
