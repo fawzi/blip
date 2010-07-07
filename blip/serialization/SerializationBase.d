@@ -638,12 +638,9 @@ class Serializer {
             version(SerializationTrace) sout("X coreType\n");
             writeCoreType(fieldMeta, { handlers.handle(t); },&t);
         } else static if (is(T == interface) && !is(T==Serializable)) {
-            version(SerializationTrace) sout("X interface->Serializable\n");
+            static assert(is(T:Serializable),"serializing an interface "~T.stringof~" non derived from Serializable");
+            version(SerializationTrace) sout("X interface->"~T.stringof~"(Serializable)\n");
             auto o=cast(Serializable)t;
-            if (o is null){
-                serializationError("serializing an interface non derived from Serializable",
-                    __FILE__,__LINE__);
-            }
             field!(Serializable)(fieldMeta,o);
         } else {
             static if(is(T==class)||is(T==Serializable)||(isPointerType!(T) && is(typeof(*T.init)==struct))){
