@@ -74,8 +74,8 @@ char[] loopCtxMixin(char[]ctxName,char[]ctxExtra,char[] startLoop,char[]loopOp,c
         }
         `~ctxName~` *createNew(){
             assert(gPool!is null,"invalid gPool (forgot addGPool call?)");
-            //auto res=gPool.getObj();
-            auto res=new `~ctxName~`; // pippo
+            auto res=gPool.getObj();
+            //auto res=new `~ctxName~`; // pippo
             auto p=res.pool;
             *res=*this;
             res.pool=p;
@@ -85,7 +85,6 @@ char[] loopCtxMixin(char[]ctxName,char[]ctxExtra,char[] startLoop,char[]loopOp,c
             size_t blockSize=1;
             `~startLoop~`
             if (end>start+blockSize+blockSize/2){
-                gPoolSync(); // probably not really needed, depends on the details of the scheduling...
                 auto newChunk=createNew();
                 auto newChunk2=createNew();
                 auto mid=(end-start)/2;
@@ -150,12 +149,12 @@ class PLoopArray(T){
     blockSize=context.optimalBlockSize;
     if (context.res!=0||context.exception!is null) return;
     try{`,`
-    static if (is(t:ElT[])){
+    static if (is(T:ElT[])){
         auto r=context.loopBody2(idx,context.arr[idx]);
     } else {
         auto el=context.arr[idx];
         auto r=context.loopBody2(idx,el);
-        static if(is(typeof(function void(){context.arr[idx]=el;}))){
+        static if(is(typeof(delegate void(){context.arr[idx]=el;}))){
             context.arr[idx]=el;
         }
     }
@@ -172,53 +171,61 @@ class PLoopArray(T){
         this.optimalBlockSize=optimalBlockSize;
     }
     int opApply(int delegate(ref ElT) loopBody){
-        this.loopBody1=loopBody;
-        if (arr.length>optimalBlockSize+optimalBlockSize/2){
-            LoopBlock1.addGPool();
-            scope(exit) LoopBlock1.rmGPool();
-            LoopBlock1 *looper=new LoopBlock1;
-            looper.context=this;
-            looper.start=0;
-            looper.end=arr.length;
-            Task("PLoopArrayMain",&looper.exec).autorelease.executeNow();
-            if (exception!is null)
-                throw new Exception("exception in PLoopArray",__FILE__,__LINE__,exception);
-            return res;
-        } else {
+        version(NoPLoop){} else {
+            this.loopBody1=loopBody;
+            if (arr.length>optimalBlockSize+optimalBlockSize/2){
+                LoopBlock1.addGPool();
+                scope(exit) LoopBlock1.rmGPool();
+                LoopBlock1 *looper=new LoopBlock1;
+                looper.context=this;
+                looper.start=0;
+                looper.end=arr.length;
+                Task("PLoopArrayMain",&looper.exec).autorelease.executeNow();
+                if (exception!is null)
+                    throw new Exception("exception in PLoopArray",__FILE__,__LINE__,exception);
+                return res;
+            }
+        }
+        Task("PLoopArrayMainSeq",delegate void(){
             size_t end=arr.length;
             for (size_t idx=0;idx<end;++idx){
                 auto r=loopBody(arr[idx]);
                 if (r!=0){
-                    return r;
+                    res=r;
+                    return;
                 }
             }
-            return 0;
-        }
+        }).autorelease.executeNow();
+        return res;
     }
 
     int opApply(int delegate(ref size_t,ref ElT) loopBody){
-        this.loopBody2=loopBody;
-        if (arr.length>optimalBlockSize+optimalBlockSize/2){
-            LoopBlock2.addGPool();
-            scope(exit) LoopBlock2.rmGPool();
-            LoopBlock2 *looper=new LoopBlock2;
-            looper.context=this;
-            looper.start=0;
-            looper.end=arr.length;
-            Task("PLoopArrayMain",&looper.exec).autorelease.executeNow();
-            if (exception!is null)
-                throw new Exception("exception in PLoopArray",__FILE__,__LINE__,exception);
-            return res;
-        } else {
+        version(NoPLoop){} else {
+            this.loopBody2=loopBody;
+            if (arr.length>optimalBlockSize+optimalBlockSize/2){
+                LoopBlock2.addGPool();
+                scope(exit) LoopBlock2.rmGPool();
+                LoopBlock2 *looper=new LoopBlock2;
+                looper.context=this;
+                looper.start=0;
+                looper.end=arr.length;
+                Task("PLoopArrayMain",&looper.exec).autorelease.executeNow();
+                if (exception!is null)
+                    throw new Exception("exception in PLoopArray",__FILE__,__LINE__,exception);
+                return res;
+            }
+        }
+        Task("PLoopArrayMainSeq",delegate void(){
             size_t end=arr.length;
             for (size_t idx=0;idx<end;++idx){
                 auto r=loopBody(idx,arr[idx]);
                 if (r!=0){
-                    return r;
+                    res=r;
+                    return;
                 }
             }
-            return 0;
-        }
+        }).autorelease.executeNow();
+        return res;
     }
     
 }
@@ -342,7 +349,7 @@ class PLoopIter(T){
             LoopEl *op=LoopEl();
             op.el=el;
             op.context=this;
-            Task("PLoopIterTask",&op.exec1).autorelease.appendOnFinish(&op.giveBack).submitYield();
+            Task("PLoopIterTask",&op.exec1).appendOnFinish(&op.giveBack).autorelease.submitYield();
         }
     }
     void doLoop2(){
@@ -361,19 +368,43 @@ class PLoopIter(T){
     }
     
     int opApply(int delegate(ref ElT) loopBody){
-        this.loopBody1=loopBody;
-        Task("PLoopIterMain",&this.doLoop1).autorelease.executeNow();
-        if (exception!is null)
-            throw new Exception("exception in PLoopIter",__FILE__,__LINE__,exception);
-        return res;
+        version(NoPLoop){
+            Task("PLoopArrayMainSeq",delegate void(){
+                ElT el;
+                while (iter(el)){
+                    auto r=loopBody(el);
+                    if (r!=0) { res=r; return; }
+                }
+            }).autorelease.executeNow();
+            return res;
+        } else {
+            this.loopBody1=loopBody;
+            Task("PLoopIterMain",&this.doLoop1).autorelease.executeNow();
+            if (exception!is null)
+                throw new Exception("exception in PLoopIter",__FILE__,__LINE__,exception);
+            return res;
+        }
     }
 
     int opApply(int delegate(ref size_t,ref ElT) loopBody){
-        this.loopBody2=loopBody;
-        Task("PLoopIterMain",&this.doLoop2).autorelease.executeNow();
-        if (exception!is null)
-            throw new Exception("exception in PLoopIter2",__FILE__,__LINE__,exception);
-        return res;
+        version(NoPLoop){
+            Task("PLoopArrayMainSeq",delegate void(){
+                ElT el;
+                size_t i=0;
+                while (iter(el)){
+                    auto r=loopBody(i,el);
+                    if (r!=0) { res=r; return; }
+                
+                }
+            }).autorelease.executeNow();
+            return res;
+        } else {
+            this.loopBody2=loopBody;
+            Task("PLoopIterRMain",&this.doLoop2).autorelease.executeNow();
+            if (exception!is null)
+                throw new Exception("exception in PLoopIter2",__FILE__,__LINE__,exception);
+            return res;
+        }
     }
 }
 
