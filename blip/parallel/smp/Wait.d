@@ -26,6 +26,9 @@ import blip.core.Thread;
 import blip.core.sync.Semaphore;
 import blip.sync.Atomic;
 import blip.container.AtomicSLink;
+import blip.container.Deque;
+import blip.container.GrowableArray;
+import blip.io.BasicIO;
 
 /// an smp parallelization friendly semaphore
 /// uses a LIFO queue, change to FIFO (slighlty more costly)?
@@ -234,5 +237,217 @@ class WaitLock(T){
     }
     void unlock(){
         lockObj.unlock();
+    }
+}
+
+/// a recursive lock (detection of recursion is a bit expensive)
+/// locking by all subtasks succeeds immediately
+/// this can be used as a drop in replacement for a Mutex
+class RLock:Object.Monitor{
+    TaskI locking;
+    Deque!(TaskI) waiting;
+    uint lockLevel;
+    
+    this(){}
+    /// description of this lock (for debugging purposes)
+    /// threadSafe only if locked...
+    void desc(CharSink s){
+        dumper(s)("<RLock@")(cast(void*)this)(", locking:")(locking)
+            (", lockLevel:")(lockLevel)(", waiting:")(waiting)(">");
+    }
+    /// to string
+    char[] toString(){
+        return collectAppender(&desc);
+    }
+    /// locks the recursive lock
+    void lock(){
+        auto newTask=taskAtt.val;
+        if (newTask is null || cast(RootTask)newTask !is null){
+            throw new Exception(collectAppender(delegate void(CharSink s){
+                dumper(s)("warning dangerous locking in task ")(newTask);
+            }),__FILE__,__LINE__); // allow aquiring a real lock??? can deadlock...
+        }
+        bool delayThis=false;
+        { // quick path
+            TaskI[128] unlockBuf;
+            auto toUnlock=lGrowableArray(unlockBuf,0);
+            synchronized(this){
+                if (locking is null){
+                    assert(lockLevel==0,"unexpected lockLevel with null locking");
+                    if (waiting!is null && waiting.popFront(locking)){
+                        waiting.filterInPlace(delegate bool(TaskI task){
+                            auto t=task;
+                            while (t!is null){
+                                if (t is locking){
+                                    toUnlock(t);
+                                    ++lockLevel;
+                                    return false;
+                                }
+                                if (t is t.superTask) break;
+                                t=t.superTask;
+                            }
+                            return true;
+                        });
+                        toUnlock(locking);
+                        ++lockLevel;
+                        auto t=newTask;
+                        delayThis=true;
+                        while (t!is null){
+                            if (t is locking){
+                                ++lockLevel;
+                                delayThis=false;
+                                break;
+                            }
+                            if (t is t.superTask) break;
+                            t=t.superTask;
+                        }
+                    } else {
+                        locking=newTask;
+                        ++lockLevel;
+                        delayThis=false;
+                    }
+                } else {
+                    auto t=newTask;
+                    while (t!is null){
+                        if (t is locking){
+                            ++lockLevel;
+                            return;
+                        }
+                        if (t is t.superTask) break;
+                        t=t.superTask;
+                    }
+                    delayThis=true;
+                }
+            }
+            foreach(t;toUnlock.data){
+                t.resubmitDelayed();
+            }
+            toUnlock.deallocData();
+        }
+        if (delayThis){
+            newTask.delay(delegate void(){
+                TaskI[128] unlockBuf;
+                auto toUnlock=lGrowableArray(unlockBuf,0);
+                synchronized(this){
+                    if (locking is null){
+                        assert(lockLevel==0,"unexpected lockLevel with null locking");
+                        if (waiting!is null && waiting.popFront(locking)){
+                            waiting.append(newTask);
+                            waiting.filterInPlace(delegate bool(TaskI task){
+                                auto t=task;
+                                while (t!is null){
+                                    if (t is locking){
+                                        toUnlock(t);
+                                        ++lockLevel;
+                                        return false;
+                                    }
+                                    if (t is t.superTask) break;
+                                    t=t.superTask;
+                                }
+                                return true;
+                            });
+                        }
+                        toUnlock(locking);
+                        ++lockLevel;
+                    } else {
+                        auto t=newTask;
+                        while (t!is null){
+                            if (t is locking){
+                                ++lockLevel;
+                                toUnlock(newTask);
+                                break;
+                            }
+                            if (t is t.superTask) break;
+                            t=t.superTask;
+                        }
+                        if (toUnlock.length==0){
+                            if (waiting is null) waiting=new Deque!(TaskI)();
+                            waiting.append(newTask);
+                        }
+                    }
+                }
+                foreach(t;toUnlock.data){
+                    t.resubmitDelayed();
+                }
+                toUnlock.deallocData();
+            });
+        }
+    }
+    
+    void unlock()
+    in{
+        auto t=taskAtt.val;
+        synchronized(this){
+            while (t!is null){
+                if (t is locking){
+                    return;
+                }
+                if (t is t.superTask) break;
+                t=t.superTask;
+            }
+        }
+        assert(0,"unlock called when not locked by this task");
+    }body{
+        TaskI[128] unlockBuf;
+        auto toUnlock=lGrowableArray(unlockBuf,0);
+        synchronized(this){
+            if (lockLevel==0) throw new Exception("mismatched unlock",__FILE__,__LINE__);
+            --lockLevel;
+            if (lockLevel==0){
+                locking=null;
+                if (waiting!is null && waiting.popFront(locking)){
+                    waiting.filterInPlace(delegate bool(TaskI task){
+                        auto t=task;
+                        while (t!is null){
+                            if (t is locking){
+                                toUnlock(t);
+                                ++lockLevel;
+                                return false;
+                            }
+                            if (t is t.superTask) break;
+                            t=t.superTask;
+                        }
+                        return true;
+                    });
+                }
+            }
+        }
+        foreach(t;toUnlock.data){
+            t.resubmitDelayed();
+        }
+        toUnlock.deallocData();
+    }
+}
+
+/// a refining recursive lock
+/// locking by a subtask refines the lock to it (i.e other subtask at the same level have to wait)
+/// I thought it could be useful, but I haven't needed it yet
+/// this can be used as a drop in replacement for a Mutex
+class RRLock:Object.Monitor{
+    TaskI[] lockingStack;
+    uint[] lockLevelStack;
+    Deque!(TaskI) waiting;
+    uint lastStack;
+    
+    this(){
+    }
+    /// description of this lock (for debugging purposes)
+    /// threadSafe only if locked...
+    void desc(CharSink s){
+        dumper(s)("<RRLock@")(cast(void*)this)(", lockingStack:")(lockingStack)
+            (", lockLevelStack:")(lockLevelStack)(", waiting:")(waiting)(", lastStack:")(lastStack)(">");
+    }
+    /// to string
+    char[] toString(){
+        return collectAppender(&desc);
+    }
+    /// locks the recursive lock
+    void lock(){
+        assert(0,"to do");
+    }
+    
+    void unlock()
+    {
+        assert(0,"to do");
     }
 }
