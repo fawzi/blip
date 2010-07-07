@@ -304,6 +304,51 @@ class Deque(T):CopiableObjectI{
         return 0;
     }
     
+    /// removes all elements that do not match the given predicate
+    void filterInPlace(U)(U filter){
+        synchronized(this){
+            size_t to1=start+nEl;
+            size_t writePos=to1;
+            if (to1>baseArr.length){
+                auto to2=baseArr.length;
+                for (size_t i=start;i<to2;++i){
+                    if (filter(baseArr[i])){
+                        baseArr[writePos]=baseArr[i];
+                        ++writePos;
+                    }
+                }
+                if (writePos==baseArr.length) writePos=0;
+                to1-=baseArr.length;
+                for (size_t i=0;i<to1;++i){
+                    if (filter(baseArr[i])){
+                        baseArr[writePos]=baseArr[i];
+                        ++writePos;
+                        if (writePos==baseArr.length) writePos=0;
+                    }
+                }
+                if (writePos>to1){
+                    for(size_t i=writePos;i<baseArr.length;++i){
+                        baseArr[i]=T.init;
+                    }
+                    writePos=0;
+                }
+                for (size_t i=writePos;i<to1;++i){
+                    baseArr[i]=T.init;
+                }
+            } else {
+                for (size_t i=start;i<to1;++i){
+                    if (filter(baseArr[i])){
+                        baseArr[writePos]=baseArr[i];
+                        ++writePos;
+                    }
+                }
+                for (size_t i=writePos;i<to1;++i){
+                    baseArr[i]=T.init;
+                }
+            }
+        }
+    }
+    
     static if (is(typeof(T.serialize(Serializer.init)))){
         static ClassMetaInfo metaI;
         static this(){
