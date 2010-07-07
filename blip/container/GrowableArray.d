@@ -174,6 +174,9 @@ struct LocalGrowableArray(T){
         capacity=0;
         dataLen=0;
     }
+    size_t length(){
+        return dataLen;
+    }
     /// returns element at index i
     T opIndex(size_t i){
         assert(i<dataLen,"index out of bounds");
