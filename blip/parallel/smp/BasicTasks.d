@@ -498,7 +498,6 @@ class Task:TaskI{
     /// the subtasks..
     void startWaiting(){
         assert(status==TaskStatus.Started);
-        status=TaskStatus.WaitingEnd;
         bool callOnFinish=false;
         version(NoTaskLock){
             if (0==flagGet(spawnTasks)){
@@ -507,17 +506,27 @@ class Task:TaskI{
                 }
             }
         } else {
+            // tries to already give back the fiber if possible (agressively reuse fibers, as they are expensive)
+            if (fiber !is null && fPool!is null){
+                /+if (fiber.state!=Fiber.State.TERM){
+                    sinkTogether(sout,delegate void(CharSink s){
+                        dumper(s)("pippo unexpected status fiber@")(cast(void*)fiber)(" in Task.startWaiting:")(fiber.state)(" exce ")(fiber.m_unhandled)("\n");
+                    });
+                } else {
+                    sinkTogether(sout,delegate void(CharSink s){
+                        dumper(s)("pippo Task.startWaiting giving back fiber@")(cast(void*)fiber)("\n");
+                    });
+                }+/
+                fPool.giveBack(fiber);
+                fiber=null;
+            }
             synchronized(taskLock){
-                if (status==TaskStatus.WaitingEnd && spawnTasks==0){
+                status=TaskStatus.WaitingEnd;
+                if (spawnTasks==0){
                     status=TaskStatus.PostExec;
                     callOnFinish=true;
                 }
             }
-        }
-        // tries to already give back the fiber if possible (agressively reuse fibers, as they are expensive)
-        if (fiber !is null && fPool!is null){
-            fPool.giveBack(fiber);
-            fiber=null;
         }
         if (callOnFinish){
             finishTask();
