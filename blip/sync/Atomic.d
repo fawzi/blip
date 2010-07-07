@@ -354,14 +354,17 @@ version(LDC){
 // internal conversion template
 private T aCasT(T,V)(ref T val, T newval, T equalTo){
     union UVConv{V v; T t;}
+    union UVPtrConv{V *v; T *t;}
     UVConv vNew,vOld,vAtt;
+    UVPtrConv valPtr;
     vNew.t=newval;
     vOld.t=equalTo;
-    vAtt.v=atomicCAS(*valP,vNew.v,vOld.v);
+    valPtr.t=&val;
+    vAtt.v=atomicCAS(*valPtr.v,vNew.v,vOld.v);
     return vAtt.t;
 }
 /// internal reduction 
-private T aCas(T,V)(ref T val, T newval, T equalTo){
+private T aCas(T)(ref T val, T newval, T equalTo){
     static if (T.sizeof==1){
         return aCasT!(T,ubyte)(val,newval,equalTo);
     } else static if (T.sizeof==2){
@@ -402,9 +405,9 @@ version(LDC){
 } else version(D_InlineAsm_X86) {
     version(darwin){
         extern(C) ubyte OSAtomicCompareAndSwap64(long oldValue, long newValue,
-                 long *theValue); // assumes that in C sizeof(_Bool)==1
+                 long *theValue); // assumes that in C sizeof(_Bool)==1 (as given in osx IA-32 ABI)
     }
-    T atomicCAS( T )( inout T val, T newval, T equalTo )
+    T atomicCAS( T )( ref T val, T newval, T equalTo )
     in {
         // NOTE: 32 bit x86 systems support 8 byte CAS, which only requires
         //       4 byte alignment, so use size_t as the align type here.
@@ -444,14 +447,22 @@ version(LDC){
         else static if( T.sizeof == long.sizeof ) {
             // 8 Byte StoreIf on 32-Bit Processor
             version(darwin){
+                union UVConv{long v; T t;}
+                union UVPtrConv{long *v; T *t;}
+                UVConv vEqual,vNew;
+                UVPtrConv valPtr;
+                vEqual.t=equalTo;
+                vNew.t=newval;
+                valPtr.t=&val;
                 while(1){
-                    if(OSAtomicCompareAndSwap64(cast(long)cast(ClassPtr!(T))equalTo,
-                        cast(long)cast(ClassPtr!(T))newval,  cast(long*)&val)!=0)
+                    if(OSAtomicCompareAndSwap64(vEqual.v, vNew.v, valPtr.v)!=0)
                     {
                         return equalTo;
                     } else {
-                        volatile T res=val;
-                        if (res!=equalTo) return res;
+                        volatile {
+                            T res=val;
+                            if (res!is equalTo) return res;
+                        }
                     }
                 }
             } else {
@@ -484,7 +495,7 @@ version(LDC){
         }
     }
 } else version (D_InlineAsm_X86_64){
-    T atomicCAS( T )( inout T val, T newval, T equalTo )
+    T atomicCAS( T )( ref T val, T newval, T equalTo )
     in {
         assert( atomicValueIsProperlyAligned!(T)( cast(size_t) &val ) );
     } body {
@@ -531,7 +542,7 @@ version(LDC){
         }
     }
 } else {
-    T atomicCAS( T )( inout T val, T newval, T equalTo )
+    T atomicCAS( T )( ref T val, T newval, T equalTo )
     in {
         assert( atomicValueIsProperlyAligned!(T)( cast(size_t) &val ) );
     } body {
@@ -720,21 +731,20 @@ version(LDC){
 T atomicOp(T)(ref T val, T delegate(T) f){
     T oldV,newV,nextV;
     int i=0;
-    volatile nextV=val;
-    do{
+    nextV=val;
+    do {
         oldV=nextV;
         newV=f(oldV);
-        nextV=atomicCAS!(T)(val,newV,oldV);
-        if (newV is oldV) return oldV;
-    } while((nextV !is oldV) && ++i<200)
-    while (nextV !is oldV){
+        nextV=aCas!(T)(val,newV,oldV);
+        if (nextV is oldV || newV is oldV) return oldV;
+    } while(++i<200)
+    while (true){
         thread_yield();
         volatile oldV=val;
         newV=f(oldV);
-        nextV=atomicCAS!(T)(val,newV,oldV);
-        if (newV is oldV) return oldV;
+        nextV=aCas!(T)(val,newV,oldV);
+        if (nextV is oldV || newV is oldV) return oldV;
     }
-    return oldV;
 }
 
 /// reads a flag (ensuring that other accesses can not happen before you read it)
