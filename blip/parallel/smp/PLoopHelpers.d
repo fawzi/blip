@@ -29,6 +29,12 @@ import blip.container.Cache;
 import blip.core.sync.Mutex;
 import blip.parallel.smp.WorkManager;
 
+version(NoPLoop){
+    version=NoPLoopIter;
+}
+// ploop iter has/exposes a subtle bug that I did not fix yet, deactivating it
+version=NoPLoopIter;
+
 /// creates a context for a loop.
 /// ctxExtra should define a ctxName createNew() method, startLoop can define blockSize>0
 /// no exception handlers are set up, you can set them up with startLoop and endLoop
@@ -187,15 +193,21 @@ class PLoopArray(T){
             }
         }
         Task("PLoopArrayMainSeq",delegate void(){
-            size_t end=arr.length;
-            for (size_t idx=0;idx<end;++idx){
-                auto r=loopBody(arr[idx]);
-                if (r!=0){
-                    res=r;
-                    return;
+            try{
+                size_t end=arr.length;
+                for (size_t idx=0;idx<end;++idx){
+                    auto r=loopBody(arr[idx]);
+                    if (r!=0){
+                        res=r;
+                        return;
+                    }
                 }
+            } catch (Exception e) {
+                exception=e;
             }
         }).autorelease.executeNow();
+        if (exception!is null)
+            throw new Exception("exception in PLoopArray",__FILE__,__LINE__,exception);
         return res;
     }
 
@@ -217,14 +229,20 @@ class PLoopArray(T){
         }
         Task("PLoopArrayMainSeq",delegate void(){
             size_t end=arr.length;
-            for (size_t idx=0;idx<end;++idx){
-                auto r=loopBody(idx,arr[idx]);
-                if (r!=0){
-                    res=r;
-                    return;
+            try{
+                for (size_t idx=0;idx<end;++idx){
+                    auto r=loopBody(idx,arr[idx]);
+                    if (r!=0){
+                        res=r;
+                        return;
+                    }
                 }
+            } catch (Exception e) {
+                exception=e;
             }
         }).autorelease.executeNow();
+        if (exception!is null)
+            throw new Exception("exception in PLoopArray",__FILE__,__LINE__,exception);
         return res;
     }
     
@@ -307,6 +325,7 @@ class PLoopIter(T){
                     static if (is(T==ElT)){
                         auto r=context.loopBody1(el);
                     } else {
+                        assert(el!is null,"iterator returning a null pointer");
                         auto r=context.loopBody1(*el);
                     }
                     if (r!=0){
@@ -324,6 +343,7 @@ class PLoopIter(T){
                     static if (is(T==ElT)){
                         auto r=context.loopBody2(idx,el);
                     } else {
+                        assert(el!is null,"iterator returning a null pointer");
                         auto r=context.loopBody2(idx,*el);
                     }
                     if (r!=0){
@@ -337,13 +357,11 @@ class PLoopIter(T){
         }
         void giveBack(){
             if (pool) pool.giveBack(this);
-            else delete this;
+            //else delete this;
         }
     }
     
     void doLoop1(){
-        LoopEl.addGPool();
-        scope(exit) LoopEl.rmGPool();
         T el;
         while(iter(el)){
             LoopEl *op=LoopEl();
@@ -353,8 +371,6 @@ class PLoopIter(T){
         }
     }
     void doLoop2(){
-        LoopEl.addGPool();
-        scope(exit) LoopEl.rmGPool();
         T el;
         size_t idx=0;
         while(iter(el)){
@@ -362,54 +378,75 @@ class PLoopIter(T){
             op.el=el;
             op.context=this;
             op.idx=idx;
-            Task("PLoopIterTask",&op.exec2).autorelease.appendOnFinish(&op.giveBack).submitYield();
+            Task("PLoopIterTask",&op.exec2).appendOnFinish(&op.giveBack).autorelease.submitYield();
             ++idx;
         }
     }
     
     int opApply(int delegate(ref ElT) loopBody){
-        version(NoPLoop){
+        version(NoPLoopIter){
             Task("PLoopArrayMainSeq",delegate void(){
-                ElT el;
-                while (iter(el)){
-                    auto r=loopBody(el);
-                    if (r!=0) { res=r; return; }
+                T el;
+                try{
+                    while (iter(el)){
+                        static if (is(T==ElT)){
+                            auto r=loopBody(el);
+                        } else {
+                            assert(el!is null,"iterator returning a null pointer");
+                            auto r=loopBody(*el);
+                        }
+                        if (r!=0) { res=r; return; }
+                    }
+                } catch (Exception e){
+                    exception=e;
                 }
             }).autorelease.executeNow();
-            return res;
         } else {
+            LoopEl.addGPool();
+            scope(exit) LoopEl.rmGPool();
             this.loopBody1=loopBody;
             Task("PLoopIterMain",&this.doLoop1).autorelease.executeNow();
-            if (exception!is null)
-                throw new Exception("exception in PLoopIter",__FILE__,__LINE__,exception);
-            return res;
         }
+        if (exception!is null)
+            throw new Exception("exception in PLoopIter",__FILE__,__LINE__,exception);
+        return res;
     }
 
     int opApply(int delegate(ref size_t,ref ElT) loopBody){
-        version(NoPLoop){
+        version(NoPLoopIter){
             Task("PLoopArrayMainSeq",delegate void(){
-                ElT el;
+                T el;
                 size_t i=0;
-                while (iter(el)){
-                    auto r=loopBody(i,el);
-                    if (r!=0) { res=r; return; }
-                
+                try{
+                    while (iter(el)){
+                        static if (is(T==ElT)){
+                            auto r=loopBody(i,el);
+                        } else {
+                            assert(el!is null,"iterator returning a null pointer");
+                            auto r=loopBody(i,*el);
+                        }
+                        if (r!=0) { res=r; return; }
+                        ++i;
+                    }
+                } catch (Exception e){
+                    exception=e;
                 }
             }).autorelease.executeNow();
-            return res;
         } else {
+            LoopEl.addGPool();
+            scope(exit) LoopEl.rmGPool();
             this.loopBody2=loopBody;
             Task("PLoopIterRMain",&this.doLoop2).autorelease.executeNow();
-            if (exception!is null)
-                throw new Exception("exception in PLoopIter2",__FILE__,__LINE__,exception);
-            return res;
         }
+        if (exception!is null)
+            throw new Exception("exception in PLoopIter2",__FILE__,__LINE__,exception);
+        return res;
     }
 }
 
 /// returns a structure that does a parallel loop on the given iterator
 /// loop on elements and loop with index are supported
+/// if the iterator returns a pointer it is assumed that it is not null
 PLoopIter!(T) pLoopIter(T)(bool delegate(ref T) iter){
     assert(iter!is null,"iter has to be valid");
     PLoopIter!(T) res=new PLoopIter!(T)(iter);
