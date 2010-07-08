@@ -295,10 +295,11 @@ class Pool(T,int _batchSize=16):PoolI!(T){
                         assert(p!is pool || nEl==0,"nEl pool size mismatch");
                     }
                 }
-                while (p!is pool){
+                while (p!is pool && p!is null){
                     delete p;
                     p=pNext;
                     pNext=pNext.next;
+                    p.next=null;
                 }
                 nCapacity=cast(size_t)0;
             }
