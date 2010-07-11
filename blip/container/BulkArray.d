@@ -29,41 +29,90 @@ import blip.container.GrowableArray;
 import blip.util.Convert;
 import cstdlib = tango.stdc.stdlib : free, malloc;
 import blip.util.Grow:growLength;
+import blip.container.Pool;
+import blip.sync.Atomic;
 
 /// guard object to deallocate large arrays that contain inner pointers
-class Guard{
-    ubyte[] data;
-    uint refCount;
-    this(void[] data){
-        this.data=cast(ubyte[])data;
+/// offers reference counting, and assumes that the underlying chunk of memory is not resized
+class ChunkGuard{
+    void *dataPtr; /// start of the chunk
+    size_t dataLen; /// not really needed, just informative
+    PoolI!(ChunkGuard) pool; /// pool of equally sized chunks
+    uint refCount; /// reference count
+    enum Flags:uint{
+        None,
+        Scan // added to the GC as block contains pointers
+    }
+    Flags flags; /// flags for the block of memory
+    
+    this(void[] data,Flags flags=Flags.None){
+        this.dataPtr=data.ptr;
+        this.dataLen=data.length;
+        flags=flags;
         refCount=1;
     }
-    void retain(){
-        assert(refCount!=0);
-        ++refCount;
-    }
-    void release(){
-        assert(refCount!=0);
-        --refCount;
-        if (refCount==0){
-            //GC.free(data.ptr);
-            cstdlib.free(data.ptr);
-            data=null;
-        }
-    }
-    this(size_t size,bool scanPtr=false){
+    this(size_t size,bool scanPtr=false,PoolI!(ChunkGuard)pool=null){
         //GC.BlkAttr attr;
         //if (!scanPtr)
         //    attr=GC.BlkAttr.NO_SCAN;
         //ubyte* mData2=cast(ubyte*)GC.malloc(size);
-        ubyte* mData2=cast(ubyte*)cstdlib.malloc(size);
-        if(mData2 is null) throw new Exception("malloc failed");
-        data=mData2[0..size];
+        dataPtr=cstdlib.malloc(size);
+        if(dataPtr is null) throw new Exception("malloc failed",__FILE__,__LINE__);
+        dataLen=size;
+        if (scanPtr) {
+            flags=Flags.Scan;
+            GC.addRange(dataPtr,dataLen);
+        }
         refCount=1;
+        this.pool=pool;
+    }
+    this(size_t size,size_t alignBytes,bool scanPtr=false,PoolI!(ChunkGuard)pool=null){
+        this(size,scanPtr,pool);
+        if (alignBytes!=0 && ((cast(size_t)dataPtr)%alignBytes)!=0){
+            throw new Exception("ChunkGuard alloc did not satisfy the alignment requests",__FILE__,__LINE__);
+        }
     }
     ~this(){
-        //GC.free(data.ptr);
-        cstdlib.free(data.ptr);
+        if (dataPtr !is null) {
+            // GC.free(d);
+            if (flags==Flags.Scan){
+                GC.removeRange(dataPtr);
+            }
+            cstdlib.free(dataPtr);
+            dataPtr=null;
+        }
+    }
+    ChunkGuard emptyCopy(){
+        if (pool!is null){
+            auto res=pool.getObj();
+            assert(res.dataLen==dataLen,"unexpected length from pool in ChunkGuard");
+            return res;
+        }
+        return new ChunkGuard(dataLen,flags==Flags.Scan);
+    }
+    ChunkGuard dup(){
+        auto res=emptyCopy();
+        memcpy(res.dataPtr,dataPtr,dataLen);
+        return res;
+    }
+    void retain(){
+        if (atomicAdd(refCount,cast(typeof(refCount))1)==0){
+            throw new Exception("retain with refCount==0",__FILE__,__LINE__);
+        }
+    }
+    void release(){
+        auto oldVal=atomicAdd(refCount,-cast(size_t)1);
+        if (oldVal==0){
+            throw new Exception("retain with refCount==0",__FILE__,__LINE__);
+        }
+        if (oldVal==1){
+            if (pool!is null){
+                atomicAdd(refCount,cast(typeof(refCount))1);
+                pool.giveBack(this);
+            } else {
+                delete this;
+            }
+        }
     }
 }
 
@@ -76,7 +125,7 @@ struct BulkArray(T){
     static size_t defaultOptimalBlockSize=100*1024/T.sizeof;
     static const BulkArrayCallocSize=100*1024;
     T* ptr, ptrEnd;
-    Guard guard;
+    ChunkGuard guard;
     Flags flags=Flags.Dummy;
     static const BulkArray dummy={null,null,null,Flags.Dummy};
     alias T dtype;
@@ -138,7 +187,7 @@ struct BulkArray(T){
         dArray.length=pos;
         this.ptr=dArray.ptr;
         this.ptrEnd=this.ptr+dArray.length;
-        this.guard=new Guard(dArray);
+        this.guard=new ChunkGuard(dArray);
     }
     
     mixin printOut!();
@@ -157,10 +206,11 @@ struct BulkArray(T){
     }
     
     /// sets data and guard to the one of the given guard
-    void dataOfGuard(Guard g){
+    void dataOfGuard(ChunkGuard g){
         this.guard=g;
-        this.ptr=cast(T*)g.data.ptr;
-        this.ptrEnd=this.ptr+g.data.length/T.sizeof;
+        this.ptr=cast(T*)g.dataPtr;
+        this.ptrEnd=this.ptr+g.dataLen/T.sizeof;
+        this.flags=Flags.None;
     }
     
     static BulkArray opCall(){
@@ -170,8 +220,8 @@ struct BulkArray(T){
     static BulkArray opCall(size_t size,bool scanPtr=false){
         BulkArray res;
         if (size*T.sizeof>BulkArrayCallocSize){
-            res.guard=new Guard(size*T.sizeof,(typeid(T).flags & 2)!=0);
-            res.ptr=cast(T*)res.guard.data.ptr;
+            res.guard=new ChunkGuard(size*T.sizeof,typeHasPointers!(T)());
+            res.ptr=cast(T*)res.guard.dataPtr;
             res.ptrEnd=res.ptr+size;
         } else {
             res.data=new T[size];
@@ -179,14 +229,14 @@ struct BulkArray(T){
         res.flags=Flags.None;
         return res;
     }
-    static BulkArray opCall(T[] data,Guard guard=null){
+    static BulkArray opCall(T[] data,ChunkGuard guard=null){
         BulkArray res;
         res.data=data;
         res.guard=guard;
         res.flags=Flags.None;
         return res;
     }
-    static BulkArray opCall(T*ptr,T*ptrEnd,Guard guard=null){
+    static BulkArray opCall(T*ptr,T*ptrEnd,ChunkGuard guard=null){
         BulkArray res;
         res.ptr=ptr;
         res.ptrEnd=ptrEnd;
@@ -194,6 +244,10 @@ struct BulkArray(T){
         res.guard=guard;
         res.flags=Flags.None;
         return res;
+    }
+    /// bulk array of the basic type
+    BulkArray!(basicDtype) basicBulkArray(){
+        return BulkArray!(basicDtype)(basicData,guard);
     }
     /// returns the adress of element i
     T* ptrI(size_t i)

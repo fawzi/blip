@@ -111,3 +111,7 @@ char[] ctfe_rep(char[] s){
         return "`"~s~"`";
     }
 }
+
+bool typeHasPointers(T)(){
+    return (typeid(T).flags & 1)!=0;
+}

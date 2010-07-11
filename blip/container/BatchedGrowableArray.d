@@ -21,6 +21,7 @@ module blip.container.BatchedGrowableArray;
 import blip.util.Grow;
 import blip.io.BasicIO: dumper; // needed just for the desc method
 import blip.parallel.smp.WorkManager;
+import blip.core.Traits;
 
 enum GASharing{
     Local, /// local, don't free
@@ -470,7 +471,7 @@ class BatchedGrowableArray(T,int batchSize=((2048/T.sizeof>128)?2048/T.sizeof:12
                 auto batchStart=cast(T*)malloc(toAlloc*batchSize*T.sizeof);
                 if (batchStart is null) throw new Exception("allocation failed",__FILE__,__LINE__);
                 auto newBatches=batchStart[0..toAlloc*batchSize];
-                if ((typeid(T).flags&1)!=0){
+                if (typeHasPointers!(T)()){
                     GC.addRange(newBatches.ptr,toAlloc*batchSize);
                 }
                 newBatches[0..a.length-rest]=a[rest..a.length];
@@ -498,7 +499,7 @@ class BatchedGrowableArray(T,int batchSize=((2048/T.sizeof>128)?2048/T.sizeof:12
                     }
                     auto batchStart=(cast(T*)malloc(toAlloc*batchSize*T.sizeof));
                     if (batchStart is null) throw new Exception("allocation failed",__FILE__,__LINE__);
-                    if ((typeid(T).flags&1)!=0){
+                    if (typeHasPointers!(T)()){
                         GC.addRange(batchStart,toAlloc*batchSize);
                     }
                     for(size_t iBatch=0;iBatch<toAlloc;++iBatch){
@@ -567,7 +568,7 @@ class BatchedGrowableArray(T,int batchSize=((2048/T.sizeof>128)?2048/T.sizeof:12
             lastBatch=data.length/batchSize;
             foreach(b;data.batches[0..lastBatch]){
                 if (b!is null) {
-                    removeRange(b);
+                    if (typeHasPointers!(T)()) GC.removeRange(b);
                     free(b);
                 }
             }
