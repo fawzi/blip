@@ -322,7 +322,18 @@ ClassMetaInfo getSerializationInfoForType(T)(){
     } else static if (is(typeof(*T))){
         return getSerializationInfoForType!(typeof(*T))();
     } else {
-        return SerializationRegistry().getMetaInfo(typeid(T));
+        auto res=SerializationRegistry().getMetaInfo(typeid(T));
+        static if (is(T U==typedef)){
+            if (res is null){
+                return getSerializationInfoForType!(U)();
+            }
+        }
+        static if (is(T U==enum)){
+            if (res is null){
+                return getSerializationInfoForType!(U)();
+            }
+        }
+        return res;
     }
 }
 /// returns the serialization for the given variable
@@ -905,14 +916,14 @@ class Serializer {
                     static if (is(typeof(*t))){
                         if (recursePtr){
                             // it is not guaranteed that reading in will recover the same situation that was dumped...
-                            sout("X recursing pointer\n");
+                            version(SerializationTrace) sout("X recursing pointer\n");
                             this.field!(typeof(*t))(fieldMeta, *t);
                         } else {
-                            sout("X debug pointer\n");
+                            version(SerializationTrace) sout("X debug pointer\n");
                             writeDebugPtr(fieldMeta,cast(void*)t);
                         }
                     } else {
-                        sout("X debug pointer\n");
+                        version(SerializationTrace) sout("X debug pointer\n");
                         writeDebugPtr(fieldMeta,cast(void*)t);
                     }
                 }
@@ -923,8 +934,19 @@ class Serializer {
             } else {
                 /// try to get meta info
                 auto metaInfo=getSerializationInfoForType!(T)();
-                if (metaInfo is null || metaInfo.externalHandlers is null){
+                if (metaInfo is null){
                     serializationError("Error: no meta info and external handlers for field of type "~T.stringof,__FILE__,__LINE__);
+                } else if (metaInfo.externalHandlers is null){
+                    // this might be a typedef/enum
+                    static if (is(T U==typedef)){
+                        version(SerializationTrace) sout("X recursing typedef "~T.stringof~"\n");
+                        field!(U)(fieldMeta,*cast(U*)&t);
+                    } else static if (is(T U==enum)){
+                        version(SerializationTrace) sout("X recursing enum "~T.stringof~"\n");
+                        field!(U)(fieldMeta,*cast(U*)&t);
+                    } else {
+                        serializationError("Error: no meta info and external handlers for field of type "~T.stringof,__FILE__,__LINE__);
+                    }
                 } else {
                     version(SerializationTrace) sout("X using external handlers\n");
                     ExternalSerializationHandlers *h=metaInfo.externalHandlers;

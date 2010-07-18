@@ -22,6 +22,7 @@ module blip.container.Pool;
 import blip.core.Traits:ctfe_i2a;
 import blip.math.Math: max;
 import blip.container.AtomicSLink;
+import blip.sync.Atomic;
 
 debug(TrackPools) {
     import blip.io.BasicIO;
@@ -43,6 +44,10 @@ interface PoolI(T){
     void flush();
     /// should not cache any objects from now on (no guarantee)
     void stopCaching();
+    /// add an active user
+    void addUser();
+    /// removes an active user (if there are 0 active users stopCaching is called)
+    void rmUser();
 }
 
 /// calls the allocator for the given type
@@ -84,12 +89,14 @@ class Pool(T,int _batchSize=16):PoolI!(T){
     size_t maxEl;
     size_t bufferSpace;
     S* pool;
+    size_t activeUsers=1;
     T delegate(PoolI!(T)) customAllocator;
     
     this(T delegate(PoolI!(T)) customAllocator,size_t bufferSpace=8*batchSize, size_t maxEl=16*batchSize){
         this.maxEl=max(batchSize,maxEl);
         this.bufferSpace=max(batchSize,bufferSpace);
         this.customAllocator=customAllocator;
+        this.activeUsers=1;
     }
     
     /// helper to have a pool generating delegate
@@ -309,6 +316,22 @@ class Pool(T,int _batchSize=16):PoolI!(T){
         maxEl=0;
         flush();
     }
+    /// add an active user (when created one active user is automatically added)
+    void addUser(){
+        if (atomicAdd(activeUsers,cast(size_t)1)==0){
+            throw new Exception("addUser called on non used pool",__FILE__,__LINE__);
+        }
+    }
+    /// removes an active user (if there are 0 active users stopCaching is called)
+    void rmUser(){
+        auto oldUsers=atomicAdd(activeUsers,-cast(size_t)1);
+        if (oldUsers==0){
+            throw new Exception("rmUser called on non used pool",__FILE__,__LINE__);
+        }
+        if (oldUsers==1){
+            stopCaching();
+        }
+    }
     /// destructor
     ~this(){
         flush();
@@ -320,11 +343,13 @@ class Pool(T,int _batchSize=16):PoolI!(T){
 class PoolNext(T):PoolI!(T){
     T first=null;
     T delegate(PoolI!(T)) createNew;
+    size_t activeUsers=1;
     bool cacheStopped=false;
     
     /// constructor
     this(T delegate(PoolI!(T)) cNew){
         createNew=cNew;
+        activeUsers=1;
     }
     /// helper to have a pool generating delegate
     struct PoolFactory(U){
@@ -416,6 +441,22 @@ class PoolNext(T):PoolI!(T){
     void stopCaching(){
         cacheStopped=true;
         flush();
+    }
+    /// add an active user (when created one active user is automatically added)
+    void addUser(){
+        if (atomicAdd(activeUsers,cast(size_t)1)==0){
+            throw new Exception("addUser called on non used pool",__FILE__,__LINE__);
+        }
+    }
+    /// removes an active user (if there are 0 active users stopCaching is called)
+    void rmUser(){
+        auto oldUsers=atomicAdd(activeUsers,-cast(size_t)1);
+        if (oldUsers==0){
+            throw new Exception("rmUser called on non used pool",__FILE__,__LINE__);
+        }
+        if (oldUsers==1){
+            stopCaching();
+        }
     }
     /// returns an object to the free list to be reused
     void giveBack(T el){

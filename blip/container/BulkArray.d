@@ -27,7 +27,7 @@ import blip.parallel.smp.WorkManager;
 import blip.io.BasicIO;
 import blip.container.GrowableArray;
 import blip.util.Convert;
-import cstdlib = tango.stdc.stdlib : free, malloc;
+import cstdlib = tango.stdc.stdlib : free, malloc,realloc;
 import blip.util.Grow:growLength;
 import blip.container.Pool;
 import blip.sync.Atomic;
@@ -44,7 +44,7 @@ class ChunkGuard{
         Scan // added to the GC as block contains pointers
     }
     Flags flags; /// flags for the block of memory
-    
+    this(){}
     this(void[] data,Flags flags=Flags.None){
         this.dataPtr=data.ptr;
         this.dataLen=data.length;
@@ -95,10 +95,11 @@ class ChunkGuard{
         memcpy(res.dataPtr,dataPtr,dataLen);
         return res;
     }
-    void retain(){
+    ChunkGuard retain(){
         if (atomicAdd(refCount,cast(typeof(refCount))1)==0){
             throw new Exception("retain with refCount==0",__FILE__,__LINE__);
         }
+        return this;
     }
     void release(){
         auto oldVal=atomicAdd(refCount,-cast(size_t)1);
@@ -113,6 +114,12 @@ class ChunkGuard{
                 delete this;
             }
         }
+    }
+    // maybe it would be better not to implement serialization for this, as it cannot be unserialized...
+    mixin(serializeSome("blip.ChunkGuard",`dataPtr|dataLen|refCount|flags`));
+    void desc(CharSink s){
+        dumper(s)("{ class:blip.ChunkGuard, at:")(cast(void*)this)(", dataPtr:")(cast(void*)dataPtr)
+            (", dataLen:")(dataLen)(", refCount:")(refCount)(", flags:")(flags)(" }");
     }
 }
 
@@ -174,17 +181,19 @@ struct BulkArray(T){
             getSerializationInfoForType!(T)());
         elMetaInfo.pseudo=true;
         auto ac=s.readArrayStart(null);
-        dArray.length=cast(size_t)ac.sizeHint();
+        size_t lenStart=cast(size_t)ac.sizeHint();
         size_t pos=0;
+        dArray=(cast(T*)cstdlib.malloc(lenStart*T.sizeof))[0..lenStart];
         while(s.readArrayEl(ac,
             {
                 if (pos==dArray.length){
-                    dArray.length=growLength(dArray.length+1,T.sizeof);
+                    lenStart=growLength(lenStart+1,T.sizeof);
+                    dArray=(cast(T*)cstdlib.realloc(dArray.ptr,lenStart*T.sizeof))[0..lenStart];
                 }
                 s.field(&elMetaInfo, dArray[pos]);
                 ++pos;
             } )) {}
-        dArray.length=pos;
+        dArray=dArray.ptr[0..pos];
         this.ptr=dArray.ptr;
         this.ptrEnd=this.ptr+dArray.length;
         this.guard=new ChunkGuard(dArray);
@@ -662,3 +671,4 @@ void baTertiaryOpStr(char[] opStr,T,U,V)(ref BulkArray!(T) a,ref BulkArray!(U) b
     }
 }
 
+alias BulkArray!(double) BulkArrayR;

@@ -353,13 +353,16 @@ final class CachedT(T):Cached{
 class CachedPool(T):Cached,PoolI!(T){
     PoolI!(T) function() poolCreatorF;
     PoolI!(T) delegate() poolCreatorD;
+    size_t activeUsers=1;
     bool cacheStopped=false;
     
     this(PoolI!(T) function() poolCreatorF){
         this.poolCreatorF=poolCreatorF;
+        this.activeUsers=1;
     }
     this(PoolI!(T) delegate() poolCreatorD){
         this.poolCreatorD=poolCreatorD;
+        this.activeUsers=1;
     }
     
     /// creates a pool
@@ -426,6 +429,22 @@ class CachedPool(T):Cached,PoolI!(T){
     void stopCaching(){
         stopCaching(defaultCache());
     }
+    /// add an active user (when created one active user is automatically added)
+    void addUser(){
+        if (atomicAdd(activeUsers,cast(size_t)1)==0){
+            throw new Exception("addUser called on non used pool",__FILE__,__LINE__);
+        }
+    }
+    /// removes an active user (if there are 0 active users stopCaching is called)
+    void rmUser(){
+        auto oldUsers=atomicAdd(activeUsers,-cast(size_t)1);
+        if (oldUsers==0){
+            throw new Exception("rmUser called on non used pool",__FILE__,__LINE__);
+        }
+        if (oldUsers==1){
+            stopCaching();
+        }
+    }
 }
 
 /// utility method that creates a cached pool given a creation operation that creates an object.
@@ -444,6 +463,6 @@ CachedPool!(ReturnTypeOf!(U)) cachedPool(U,int batchSize=16)(U createOp,size_t b
     size_t maxEl=16*batchSize)
 {
     alias ReturnTypeOf!(U) T;
-    return new CachedPool!(T)(new Pool!(T,batchSize).poolFactory(createOp,bufferSpace,maxEl));
+    return new CachedPool!(T)(Pool!(T,batchSize).poolFactory(createOp,bufferSpace,maxEl));
 }
 
