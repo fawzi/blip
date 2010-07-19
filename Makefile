@@ -2,7 +2,7 @@
 #
 # * Targets
 # all:       (the default) builds lib
-# lib:       should build the optimized tango library
+# lib:       should build the optimized blip library
 # newFiles:  updates the module list when new d diles are added
 #            either this or clean-all or distclean have to be called to compile the new files
 # clean:     cleans the buildobjects
@@ -19,16 +19,16 @@
 # VERSION=dbg or VERSION=tst (for example) to the make invocation
 # 
 # * Architecture
-# The architecture is identified by what is returned by tango/lib/build/tools/archName.sh
+# The architecture is identified by what is returned by blip/build/tools/archName.sh
 # (which is os-machine) togheter with the compiler and version. This forms a quadruplet
 # os-machine-compiler-version that is called IDENT.
 # It is used to generate the object directory, and to get the architecture dependent flags
 # and rules.
-# This is done by reading the file tango/lib/build/arch/$(IDENT).mak
+# This is done by reading the file blip/build/arch/$(IDENT).mak
 # It is possible to override IDENT by passing IDENT=mySpecialIdent to the make invocation.
 # In this case the version flag is disregarded. 
 # For problems with the flags (or if you want to define a new special build setting)
-# normally you should edit the tango/lib/build/arch/$(IDENT).mak file.
+# normally you should edit the blip/build/arch/$(IDENT).mak file.
 #
 # * Other important variables
 #  DFLAGS_ADD: adds the given D flags
@@ -38,10 +38,9 @@
 #  EXTRA_LIBS: add the given link flags (to link tango user for example)
 #  MOD_OMG: set it to none to not compile xf.omg into the blip library
 #
-# tango & apache 2.0 license, © 2009 Fawzi Mohamed
+# apache 2.0 license, © 2009 Fawzi Mohamed
 
 BLIP_HOME=$(PWD)
-TANGO_HOME=$(HOME)/tango
 TOOLDIR=$(BLIP_HOME)/build/tools
 VERSION=opt
 DC=$(shell $(TOOLDIR)/guessCompiler.sh --path)

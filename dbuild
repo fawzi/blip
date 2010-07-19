@@ -1,5 +1,5 @@
 #!/bin/bash
-# script to quickly build d code that uses dchem, blip, tango, lapack (through NArray) and mpi
+# script to quickly build d code that uses dchem, blip, lapack (through NArray) and mpi
 
 die() {
     echo "$1"
@@ -24,18 +24,17 @@ do
     case $1 in
         --help)
             echo "usage: build [--version x] [--full] [--d-home d_home] [--dchem-home dchemHome]"
-            echo "           [--run] [--tango-home tangoHome] [--blip-home blipHome]"
+            echo "           [--run] [--blip-home blipHome]"
             echo "           [--out outName] [--verbose] [--mpi] mainDFile.d [compiler options]"
             echo ""
-            echo "  builds mainDFile.d linking tango, blip and all needed libs (lapack, bz2,...)"
+            echo "  builds mainDFile.d linking blip and all needed libs (lapack, bz2,...)"
             echo "  --version x     builds the version x (typically dbg or opt"
             echo "  --run           runs the executable if sucessfully created"
             echo "  --full          forces a clean before rebuilding"
             echo "  --mpi           builds an mpi executable"
             echo "  --verbose       verbose building"
             echo "  --d-home x      uses x as d home (default is $D_HOME )"
-            echo "  --dchem-home x  uses x as tango home (default is $D_HOME/dchem )"
-            echo "  --tango-home x  uses x as tango home (default is $D_HOME/tango )"
+            echo "  --dchem-home x  uses x as dchem home (default is $D_HOME/dchem )"
             echo "  --blip-home x   uses x as blip home (default is $D_HOME/blip )"
             exit 0
             ;;
@@ -63,10 +62,6 @@ do
             shift
             D_HOME=$1
             ;;
-        --tango-home)
-            shift
-            TANGO_HOME=$1
-            ;;
         --blip-home)
             shift
             BLIP_HOME=$1
@@ -88,9 +83,6 @@ do
     shift
 done
 
-if [ -z "$TANGO_HOME" ] ; then
-    TANGO_HOME="$D_HOME/tango"
-fi
 if [ -z "$BLIP_HOME" ] ; then
     BLIP_HOME="$D_HOME/blip"
 fi
@@ -147,7 +139,7 @@ case `uname` in
   *)
   die "unknown platform, you need to set extra_libs_os"
 esac
-extra_libs="${linkFlag}-L${D_HOME}/lib ${linkFlag}-lblip-${compShort}${mpiVersion}$libExt ${linkFlag}-ltango-user-${compShort}$libExt $mpiFlags $extra_libs_os"
+extra_libs="${linkFlag}-L${D_HOME}/lib ${linkFlag}-lblip-${compShort}${mpiVersion}$libExt $mpiFlags $extra_libs_os"
 
 case $version in
     opt)
@@ -181,7 +173,7 @@ if [ -n "$remote" ] ; then
   MAIN_DIR=`pwd`
 fi
 
-cmd="xfbuild +c$compiler $compFlags +xtango +xblip +xstd +xldc +xgobo +xxf.omg +Ddeps_${out_name} +Oobjs_${out_name} $verbose +o_$out_name $MAIN_DIR/$main_d -I$MAIN_DIR -I$TANGO_HOME/user -I$BLIP_HOME -I$DCHEM_HOME $flags $extra_libs $*"
+cmd="xfbuild +c$compiler $compFlags +xtango +xblip +xstd +xldc +xgobo +xxf.omg +Ddeps_${out_name} +Oobjs_${out_name} $verbose +o_$out_name $MAIN_DIR/$main_d -I$MAIN_DIR -I$BLIP_HOME -I$DCHEM_HOME $flags $extra_libs $*"
 
 if [ -n "$verbose" ] ; then
     echo "$cmd"
