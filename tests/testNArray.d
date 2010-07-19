@@ -21,7 +21,7 @@ import blip.io.Console;
 import blip.io.BasicIO;
 import tango.math.random.Random;
 import blip.rtest.RTest;
-version(NoTrace){} else { import tango.core.stacktrace.TraceExceptions; import blip.util.TraceAll; }
+version(NoTrace){} else { import blip.core.stacktrace.TraceExceptions; import blip.util.TraceAll; }
 
 void main(char[][] args){
     sout(rand.toString()); sout("\n");

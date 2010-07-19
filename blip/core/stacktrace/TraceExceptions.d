@@ -2,8 +2,10 @@
 ///
 /// wrapping of a tango module
 module blip.core.stacktrace.TraceExceptions;
-version(NewTango){
+import tango.core.Version;
+
+static if (Tango.Major==1){
   public import tango.core.tools.TraceExceptions;
 } else {
-  public import tango.core.stacktrace.TraceExceptions;
+  public import blip.core.stacktrace.TraceExceptions;
 }

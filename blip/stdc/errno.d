@@ -2,7 +2,12 @@
 /// mainly wrapping of a tango module
 module blip.stdc.errno;
 public import tango.stdc.errno: errno;
-public import tango.stdc.constants.errno;
+import tango.core.Version;
+static if (Tango.Major==1){
+    public import tango.sys.consts.errno;
+} else {
+    public import tango.stdc.constants.errno;
+}
 public import tango.stdc.string: strlen;
 
 version (Windows){

@@ -20,11 +20,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 module blip.serialization.Handlers;
+import tango.core.Version;
 import tango.core.Tuple;
 import blip.io.BasicIO;
 import tango.io.model.IConduit;
 import tango.text.json.JsonEscape: escape;
-version(NewTango){
+static if (Tango.Major==1){
   import tango.util.encode.Base64: encode,decode,allocateEncodeSize;
 } else {
   import tango.io.encode.Base64: encode,decode,allocateEncodeSize;

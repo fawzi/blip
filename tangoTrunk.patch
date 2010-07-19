@@ -1,0 +1,1442 @@
+Index: tango/core/Thread.d
+===================================================================
+--- tango/core/Thread.d	(revision 5503)
++++ tango/core/Thread.d	(working copy)
+@@ -1,15 +1,30 @@
+ /**
+  * The thread module provides support for thread creation and management.
+  *
+- * Copyright: Copyright (C) 2005-2006 Sean Kelly.  All rights reserved.
++ * If AtomicSuspendCount is used for speed reasons all signals are sent together.
++ * When debugging gdb funnels all signals through one single handler, and if
++ * the signals arrive quickly enough they will be coalesced in a single signal,
++ * (discarding the second) thus it is possible to loose signals, which blocks
++ * the program. Thus when debugging it is better to use the slower SuspendOneAtTime
++ * version.
++ *
++ * Copyright: Copyright (C) 2005-2006 Sean Kelly, Fawzi.  All rights reserved.
+  * License:   BSD style: $(LICENSE)
+- * Authors:   Sean Kelly
++ * Authors:   Sean Kelly, Fawzi Mohamed
+  */
+ module tango.core.Thread;
++import tango.core.sync.Atomic;
++import tango.stdc.stdio:printf;
+ 
+ 
+ // this should be true for most architectures
+ version = StackGrowsDown;
++version(darwin){
++    version=AtomicSuspendCount;
++}
++version(linux){
++    version=AtomicSuspendCount;
++}
+ 
+ public
+ {
+@@ -262,9 +277,8 @@
+         //
+         // used to track the number of suspended threads
+         //
+-        version(darwin){
+-            semaphore_t suspendCount;
+-            task_t rootMatchTask;
++        version(AtomicSuspendCount){
++            int suspendCount;
+         } else {
+             sem_t   suspendCount;
+         }
+@@ -363,13 +377,15 @@
+                 status = sigdelset( &sigres, SIGUSR2 );
+                 assert( status == 0 );
+ 
+-                version (darwin){
+-                    status=semaphore_signal( suspendCount );
++                version (AtomicSuspendCount){
++                    auto oldV=flagAdd(suspendCount,1);
+                 } else {
+                     status = sem_post( &suspendCount );
++                    assert( status == 0 );
+                 }
+-                assert( status == 0 );
+ 
++                // here one could do some work (like scan the current stack in this thread...)
++
+                 sigsuspend( &sigres );
+ 
+                 if( obj && !obj.m_lock )
+@@ -407,17 +423,31 @@
+         }
+         body
+         {
+-            version(Posix){
+-                int status;
+-                version (darwin){
+-                    status=semaphore_signal( suspendCount );
+-                } else {
+-                    status = sem_post( &suspendCount );
+-                }
+-                assert( status == 0 );
++            int status;
++            version (AtomicSuspendCount){
++                auto oldV=flagAdd(suspendCount,-1);
++            } else {
++                status = sem_post( &suspendCount );
+             }
++            assert( status == 0 );
+         }
+     }
++    
++    alias void function(int) sHandler;
++    sHandler _thread_abortHandler=null;
++    
++    extern (C) void thread_abortHandler( int sig ){
++        if (_thread_abortHandler!is null){
++            _thread_abortHandler(sig);
++        } else {
++            exit(-1);
++        }
++    }
++    
++    extern (C) void setthread_abortHandler(sHandler f){
++        _thread_abortHandler=f;
++    }
++
+ }
+ else
+ {
+@@ -1057,16 +1087,24 @@
+      */
+     static Thread[] getAll()
+     {
+-        synchronized( slock )
+-        {
+-            size_t   pos = 0;
+-            Thread[] buf = new Thread[sm_tlen];
+-
+-            foreach( Thread t; Thread )
++        Thread[] buf;
++        while(1){
++            if (buf) delete buf;
++            buf = new Thread[sm_tlen];
++            synchronized( slock )
+             {
+-                buf[pos++] = t;
++                size_t   pos = 0;
++                if (buf.length<sm_tlen) {
++                    continue;
++                } else {
++                    buf.length=sm_tlen;
++                }
++                foreach( Thread t; Thread )
++                {
++                    buf[pos++] = t;
++                }
++                return buf;
+             }
+-            return buf;
+         }
+     }
+ 
+@@ -1304,7 +1342,7 @@
+     {
+         HANDLE          m_hndl;
+     }
+-    ThreadAddr          m_addr;
++    public ThreadAddr          m_addr;
+     Call                m_call;
+     char[]              m_name;
+     union
+@@ -1318,7 +1356,7 @@
+         bool            m_isRunning;
+     }
+     bool                m_isDaemon;
+-    Object              m_unhandled;
++    public Object              m_unhandled;
+ 
+ 
+ private:
+@@ -1385,7 +1423,7 @@
+     }
+ 
+ 
+-    static struct Context
++    public static struct Context
+     {
+         void*           bstack,
+                         tstack;
+@@ -1622,11 +1660,13 @@
+         int         status;
+         sigaction_t sigusr1 = void;
+         sigaction_t sigusr2 = void;
++        sigaction_t sigabrt = void;
+ 
+         // This is a quick way to zero-initialize the structs without using
+         // memset or creating a link dependency on their static initializer.
+         (cast(byte*) &sigusr1)[0 .. sigaction_t.sizeof] = 0;
+         (cast(byte*) &sigusr2)[0 .. sigaction_t.sizeof] = 0;
++        (cast(byte*) &sigabrt)[0 .. sigaction_t.sizeof] = 0;
+ 
+         // NOTE: SA_RESTART indicates that system calls should restart if they
+         //       are interrupted by a signal, but this is not available on all
+@@ -1640,6 +1680,8 @@
+         //       sa_mask to indicate this.
+         status = sigfillset( &sigusr1.sa_mask );
+         assert( status == 0 );
++        status = sigdelset( &sigusr1.sa_mask , SIGABRT);
++        assert( status == 0 );
+ 
+         // NOTE: Since SIGUSR2 should only be issued for threads within the
+         //       suspend handler, we don't want this signal to trigger a
+@@ -1650,6 +1692,8 @@
+         //       sa_mask to indicate this.
+         status = sigfillset( &sigusr2.sa_mask );
+         assert( status == 0 );
++        status = sigdelset( &sigusr2.sa_mask , SIGABRT);
++        assert( status == 0 );
+ 
+         status = sigaction( SIGUSR1, &sigusr1, null );
+         assert( status == 0 );
+@@ -1657,12 +1701,24 @@
+         status = sigaction( SIGUSR2, &sigusr2, null );
+         assert( status == 0 );
+ 
+-        version(darwin){
+-            rootMatchTask=mach_task_self();
+-            status=semaphore_create(rootMatchTask,
+-                                   &suspendCount,
+-                                   MACH_SYNC_POLICY.SYNC_POLICY_FIFO,
+-                                   0);
++        // NOTE: SA_RESTART indicates that system calls should restart if they
++        //       are interrupted by a signal, but this is not available on all
++        //       Posix systems, even those that support multithreading.
++        static if( is( typeof( SA_RESTART ) ) )
++            sigabrt.sa_flags = SA_RESTART;
++        else
++            sigabrt.sa_flags   = 0;
++        sigabrt.sa_handler = &thread_abortHandler;
++        // NOTE: We want to ignore all signals while in this handler, so fill
++        //       sa_mask to indicate this.
++        status = sigfillset( &sigabrt.sa_mask );
++        assert( status == 0 );
++        
++        status = sigaction( SIGABRT, &sigabrt, null );
++        assert( status == 0 );
++
++        version(AtomicSuspendCount){
++            suspendCount=0;
+         } else {
+             status = sem_init( &suspendCount, 0, 0 );
+         }
+@@ -1805,6 +1861,7 @@
+  */
+ extern (C) void thread_suspendAll()
+ {
++    int suspendedCount=0;
+     /**
+      * Suspend the specified thread and load stack and register information for
+      * use by thread_scanAll.  If the supplied thread is the calling thread,
+@@ -1863,19 +1920,24 @@
+                     }
+                     throw new ThreadException( "Unable to suspend thread" );
+                 }
+-                // NOTE: It's really not ideal to wait for each thread to signal
+-                //       individually -- rather, it would be better to suspend
+-                //       them all and wait once at the end.  However, semaphores
+-                //       don't really work this way, and the obvious alternative
+-                //       (looping on an atomic suspend count) requires either
+-                //       the atomic module (which only works on x86) or other
+-                //       specialized functionality.  It would also be possible
+-                //       to simply loop on sem_wait at the end, but I'm not
+-                //       convinced that this would be much faster than the
+-                //       current approach.
+-                version (darwin){
+-                    auto status=semaphore_wait(suspendCount);
+-                    assert(status==0);
++                version (AtomicSuspendCount){
++                    ++suspendedCount;
++                    version(AtomicSuspendCount){
++                        version(SuspendOneAtTime){ // when debugging suspending all threads at once might give "lost" signals
++                            int icycle=0;
++                            suspendLoop: while (flagGet(suspendCount)!=suspendedCount){
++                                for (size_t i=1000;i!=0;--i){
++                                    if (flagGet(suspendCount)==suspendedCount) break suspendLoop;
++                                    if (++icycle==100_000){
++                                        printf("waited %d cycles for thread suspension,  suspendCount=%d, should be %d\nAtomic ops do not work?\nContinuing wait...\n",icycle,suspendCount,suspendedCount);
++                                    }
++                                    Thread.yield();
++                                }
++                                Thread.sleep(0.0001);
++                            }
++                        }
++                    }
++                    
+                 } else {
+                     sem_wait( &suspendCount );
+                     // shouldn't the return be checked and maybe a loop added for further interrupts
+@@ -1905,8 +1967,9 @@
+     //       expectation that the foreach loop will never be entered.
+     if( !multiThreadedFlag && Thread.sm_tbeg )
+     {
+-        if( ++suspendDepth == 1 )
++        if( ++suspendDepth == 1 ) {
+             suspend( Thread.getThis() );
++        }
+         return;
+     }
+     _d_monitorenter(Thread.slock);
+@@ -1922,16 +1985,27 @@
+         //       abort, and Bad Things to occur.
+         for( Thread t = Thread.sm_tbeg; t; t = t.next )
+         {
+-            if( t.isRunning )
++            if( t.isRunning ){
+                 suspend( t );
+-            else
++            } else
+                 Thread.remove( t );
+         }
+ 
+         version( Posix )
+         {
+-            // wait on semaphore -- see note in suspend for
+-            // why this is currently not implemented
++            version(AtomicSuspendCount){
++                int icycle=0;
++                suspendLoop2: while (flagGet(suspendCount)!=suspendedCount){
++                    for (size_t i=1000;i!=0;--i){
++                        if (flagGet(suspendCount)==suspendedCount) break suspendLoop2;
++                        if (++icycle==1000_000){
++                            printf("waited %d cycles for thread suspension,  suspendCount=%d, should be %d\nAtomic ops do not work?\nContinuing wait...\n",icycle,suspendCount,suspendedCount);
++                        }
++                        Thread.yield();
++                    }
++                    Thread.sleep(0.0001);
++                }
++            }
+         }
+     }
+ }
+@@ -1955,6 +2029,7 @@
+ }
+ body
+ {
++    version(AtomicSuspendCount) version(SuspendOneAtTime) auto suspendedCount=flagGet(suspendCount);
+     /**
+      * Resume the specified thread and unload stack and register information.
+      * If the supplied thread is the calling thread, stack and register
+@@ -2000,9 +2075,21 @@
+                     }
+                     throw new ThreadException( "Unable to resume thread" );
+                 }
+-                version (darwin){
+-                    auto status=semaphore_wait(suspendCount);
+-                    assert(status==0);
++                version (AtomicSuspendCount){
++                    version(SuspendOneAtTime){ // when debugging suspending all threads at once might give "lost" signals
++                        --suspendedCount;
++                        int icycle=0;
++                        recoverLoop: while(flagGet(suspendCount)>suspendedCount){
++                            for (size_t i=1000;i!=0;--i){
++                                if (flagGet(suspendCount)==suspendedCount) break recoverLoop;
++                                if (++icycle==100_000){
++                                    printf("waited %d cycles for thread recover,  suspendCount=%d, should be %d\nAtomic ops do not work?\nContinuing wait...\n",icycle,suspendCount,suspendedCount);
++                                }
++                                Thread.yield();
++                            }
++                            Thread.sleep(0.0001);
++                        }
++                    }
+                 } else {
+                     sem_wait( &suspendCount );
+                     // shouldn't the return be checked and maybe a loop added for further interrupts
+@@ -2034,6 +2121,19 @@
+             {
+                 resume( t );
+             }
++            version(AtomicSuspendCount){
++                int icycle=0;
++                recoverLoop2: while(flagGet(suspendCount)>0){
++                    for (size_t i=1000;i!=0;--i){
++                        Thread.yield();
++                        if (flagGet(suspendCount)==0) break recoverLoop2;
++                        if (++icycle==100_000){
++                            printf("waited %d cycles for thread recovery,  suspendCount=%d, should be %d\nAtomic ops do not work?\nContinuing wait...\n",icycle,suspendCount,0);
++                        }
++                    }
++                    Thread.sleep(0.0001);
++                }
++            }
+         }
+     }
+ }
+@@ -2580,9 +2680,13 @@
+                 sub RSP, 4;
+                 stmxcsr [RSP];
+                 sub RSP, 4;
+-                fnstcw [RSP];
+-                fnclex;
+-                fwait;
++                //version(SynchroFloatExcept){
++                    fstcw [RSP];
++                    fwait;
++                //} else {
++                //    fnstcw [RSP];
++                //    fnclex;
++                //}
+ 
+                 // store oldp again with more accurate address
+                 mov [RDI], RSP;
+@@ -2623,6 +2727,17 @@
+ // Fiber
+ ////////////////////////////////////////////////////////////////////////////////
+ 
++private char[] ptrToStr(size_t addr){
++    char[] digits="0123456789ABCDEF";
++    enum{ nDigits=size_t.sizeof*2 }
++    char[] res=new char[](nDigits);
++    size_t addrAtt=addr;
++    for (int i=nDigits;i!=0;--i){
++        res[i-1]=digits[addrAtt&0xF];
++        addrAtt>>=4;
++    }
++    return res;
++}
+ 
+ /**
+  * This class provides a cooperative concurrency mechanism integrated with the
+@@ -2733,6 +2848,20 @@
+     // Initialization
+     ////////////////////////////////////////////////////////////////////////////
+ 
++    /**
++     * Initializes an empty fiber object
++     *
++     * (useful to reset it)
++     */
++    this(size_t sz){
++        m_dg    = null;
++        m_fn    = null;
++        m_call  = Call.NO;
++        m_state = State.TERM;
++        m_unhandled = null;
++        
++        allocStack( sz );
++    }
+ 
+     /**
+      * Initializes a fiber object which is associated with a static
+@@ -2969,6 +3098,12 @@
+     }
+     body
+     {
++        if (m_state != State.TERM){
++            throw new Exception("Fiber@"~ptrToStr(cast(size_t)cast(void*)this)~" in unexpected state "~ptrToStr(m_state),__FILE__,__LINE__);
++        }
++        if (m_ctxt.tstack != m_ctxt.bstack){
++            throw new Exception("Fiber@"~ptrToStr(cast(size_t)cast(void*)this)~" bstack="~ptrToStr(cast(size_t)cast(void*)m_ctxt.bstack)~" != tstack="~ptrToStr(cast(size_t)cast(void*)m_ctxt.tstack),__FILE__,__LINE__);
++        }
+         m_dg    = null;
+         m_fn    = null;
+         m_call  = Call.NO;
+@@ -3007,6 +3142,10 @@
+     {
+         return m_state;
+     }
++    
++    size_t stackSize(){
++        return m_size;
++    }
+ 
+ 
+     ////////////////////////////////////////////////////////////////////////////
+@@ -3422,7 +3561,7 @@
+             push( 0x00000000_00000000 );                            // R13
+             push( 0x00000000_00000000 );                            // R14
+             push( 0x00000000_00000000 );                            // R15
+-            push( 0x00001f80_01df0000 );                            // MXCSR (32 bits), x87 control (16 bits), (unused)
++            push( 0x00001f80_0000037f );                            // MXCSR (32 bits), unused (16 bits) , x87 control (16 bits)
+         }
+         else version( AsmPPC_Posix )
+         {
+@@ -3466,8 +3605,8 @@
+     }
+ 
+ 
+-    Thread.Context* m_ctxt;
+-    size_t          m_size;
++    public Thread.Context* m_ctxt;
++    public size_t          m_size;
+     void*           m_pmem;
+ 
+     static if( is( ucontext_t ) )
+@@ -3585,4 +3724,4 @@
+     void thread_sleep(double period){
+         Thread.sleep(period);
+     }
+-}
+\ No newline at end of file
++}
+Index: tango/core/sync/Atomic.d
+===================================================================
+--- tango/core/sync/Atomic.d	(revision 0)
++++ tango/core/sync/Atomic.d	(revision 0)
+@@ -0,0 +1,784 @@
++/// The Atomic module is intended to provide some basic support for the so called lock-free
++/// concurrent programming.
++/// The current design replaces the previous Atomic module by Sean and is inspired
++/// partly by the llvm atomic operations, and Sean's version
++/// 
++/// If no atomic ops are available an (inefficent) fallback solution is provided
++/// For classes atomic access means atomic access to their *address* not their content
++/// 
++/// If you want unique counters or flags to communicate in multithreading settings
++/// look at tango.core.sync.Counter that provides them in a better way and handles
++/// better the absence of atomic ops
++/// 
++/// author: fawzi
++//
++// Copyright 2008-2010 the blip developer group
++// 
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++// 
++//     http://www.apache.org/licenses/LICENSE-2.0
++// 
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++module tango.core.sync.Atomic;
++
++version( LDC )
++{
++    import ldc.intrinsics;
++}
++
++private {
++    // from tango.core.traits:
++    /**
++     * Evaluates to true if T is a signed or unsigned integer type.
++     */
++    template isIntegerType( T )
++    {
++        const bool isIntegerType = isSignedIntegerType!(T) ||
++                                   isUnsignedIntegerType!(T);
++    }
++    /**
++     * Evaluates to true if T is a pointer type.
++     */
++    template isPointerOrClass(T)
++    {
++        const isPointerOrClass = is(T==class);
++    }
++
++    template isPointerOrClass(T : T*)
++    {
++            const isPointerOrClass = true;
++    }
++    /**
++     * Evaluates to true if T is a signed integer type.
++     */
++    template isSignedIntegerType( T )
++    {
++        const bool isSignedIntegerType = is( T == byte )  ||
++                                         is( T == short ) ||
++                                         is( T == int )   ||
++                                         is( T == long )/+||
++                                         is( T == cent  )+/;
++    }
++    /**
++     * Evaluates to true if T is an unsigned integer type.
++     */
++    template isUnsignedIntegerType( T )
++    {
++        const bool isUnsignedIntegerType = is( T == ubyte )  ||
++                                           is( T == ushort ) ||
++                                           is( T == uint )   ||
++                                           is( T == ulong )/+||
++                                           is( T == ucent  )+/;
++    }
++    
++    /// substitutes classes with void* 
++    template ClassPtr(T){
++        static if (is(T==class)){
++            alias void* ClassPtr;
++        } else {
++            alias T ClassPtr;
++        }
++    }
++}
++
++extern(C) void thread_yield();
++
++// NOTE: Strictly speaking, the x86 supports atomic operations on
++//       unaligned values.  However, this is far slower than the
++//       common case, so such behavior should be prohibited.
++template atomicValueIsProperlyAligned( T )
++{
++    bool atomicValueIsProperlyAligned( size_t addr )
++    {
++        return addr % ClassPtr!(T).sizeof == 0;
++    }
++}
++
++/// a barrier does not allow some kinds of intermixing and out of order execution
++/// and ensures that all operations of one kind are executed before the operations of the other type
++/// which kind of mixing are not allowed depends from the template arguments
++/// These are global barriers: the whole memory is synchronized (devices excluded if device is false)
++///
++/// the actual barrier eforced might be stronger than the requested one
++///
++/// if ll is true loads before the barrier are not allowed to mix with loads after the barrier
++/// if ls is true loads before the barrier are not allowed to mix with stores after the barrier
++/// if sl is true stores before the barrier are not allowed to mix with loads after the barrier
++/// if ss is true stores before the barrier are not allowed to mix with stores after the barrier
++/// if device is true als uncached and device memory is synchronized
++///
++/// barriers are typically paired
++/// 
++/// for example if you want to ensure that all writes
++/// are done before setting a flags that communicates that an objects is initialized you would
++/// need memoryBarrier(false,false,false,true) before setting the flag.
++/// To read that flag before reading the rest of the object you would need a
++/// memoryBarrier(true,false,false,false) after having read the flag
++///
++/// I believe that these two barriers are called acquire and release, but you find several
++/// incompatible definitions around (some obviously wrong), so some care migth be in order
++/// To be safer memoryBarrier(false,true,false,true) might be used for acquire, and
++/// memoryBarrier(true,false,true,false) for release which are slighlty stronger.
++/// 
++/// these barriers are also called write barrier and read barrier respectively.
++///
++/// A full memory fence is (true,true,true,true) and ensures that stores and loads before the
++/// barrier are done before stores and loads after it.
++/// Keep in mind even with a full barrier you still normally need two of them, to avoid that the
++/// other process reorders loads (for example) and still sees things in the wrong order.
++version( LDC )
++{
++    void memoryBarrier(bool ll, bool ls, bool sl,bool ss,bool device=false)(){
++        llvm_memory_barrier(ll,ls,sl,ss,device);
++    }
++} else version(D_InlineAsm_X86){
++    void memoryBarrier(bool ll, bool ls, bool sl,bool ss,bool device=false)(){
++        static if (device) {
++            if (ls || sl || ll || ss){
++                // cpid should sequence even more than mfence
++                volatile asm {
++                    push EBX;
++                    mov EAX, 0; // model, stepping
++                    cpuid;
++                    pop EBX;
++                }
++            }
++        } else static if (ls || sl || (ll && ss)){ // use a sequencing operation like cpuid or simply cmpxch instead?
++            volatile asm {
++                mfence;
++            }
++            // this is supposedly faster and correct, but let's play it safe and use the specific instruction
++            // push rax
++            // xchg rax
++            // pop rax
++        } else static if (ll){
++            volatile asm {
++                lfence;
++            }
++        } else static if( ss ){
++            volatile asm {
++                sfence;
++            }
++        }
++    }
++} else version(D_InlineAsm_X86_64){
++    void memoryBarrier(bool ll, bool ls, bool sl,bool ss,bool device=false)(){
++        static if (device) {
++            if (ls || sl || ll || ss){
++                // cpid should sequence even more than mfence
++                volatile asm {
++                    push RBX;
++                    mov RAX, 0; // model, stepping
++                    cpuid;
++                    pop RBX;
++                }
++            }
++        } else static if (ls || sl || (ll && ss)){ // use a sequencing operation like cpuid or simply cmpxch instead?
++            volatile asm {
++                mfence;
++            }
++            // this is supposedly faster and correct, but let's play it safe and use the specific instruction
++            // push rax
++            // xchg rax
++            // pop rax
++        } else static if (ll){
++            volatile asm {
++                lfence;
++            }
++        } else static if( ss ){
++            volatile asm {
++                sfence;
++            }
++        }
++    }
++} else {
++    pragma(msg,"WARNING: no atomic operations on this architecture");
++    pragma(msg,"WARNING: this is *slow* you probably want to change this!");
++    int dummy;
++    // acquires a lock... probably you will want to skip this
++    synchronized void memoryBarrier(bool ll, bool ls, bool sl,bool ss,bool device=false)(){
++        dummy=1;
++    }
++    enum{LockVersion=true}
++}
++
++static if (!is(typeof(LockVersion))) {
++    enum{LockVersion=false}
++}
++
++// use stricter fences
++enum{strictFences=false}
++
++/// utility function for a write barrier (disallow store and store reorderig)
++void writeBarrier(){
++    memoryBarrier!(false,false,strictFences,true)();
++}
++/// utility function for a read barrier (disallow load and load reorderig)
++void readBarrier(){
++    memoryBarrier!(true,strictFences,false,false)();
++}
++/// utility function for a full barrier (disallow reorderig)
++void fullBarrier(){
++    memoryBarrier!(true,true,true,true)();
++}
++
++/// atomic swap
++/// val and newval in one atomic operation
++/// barriers are not implied, just atomicity!
++version(LDC){
++    T atomicSwap( T )( ref T val, T newval )
++    {
++        T oldval = void;
++        static if (isPointerOrClass!(T))
++        {
++            oldval = cast(T)llvm_atomic_swap!(size_t)(cast(size_t*)&val, cast(size_t)newval);
++        }
++        else static if (is(T == bool))
++        {
++            oldval = llvm_atomic_swap!(ubyte)(cast(ubyte*)&val, newval?1:0)?0:1;
++        }
++        else
++        {
++            oldval = llvm_atomic_swap!(T)(&val, newval);
++        }
++        return oldval;
++    }
++} else version(D_InlineAsm_X86) {
++    T atomicSwap( T )( inout T val, T newval )
++    in {
++        // NOTE: 32 bit x86 systems support 8 byte CAS, which only requires
++        //       4 byte alignment, so use size_t as the align type here.
++        static if( T.sizeof > size_t.sizeof )
++            assert( atomicValueIsProperlyAligned!(size_t)( cast(size_t) &val ) );
++        else
++            assert( atomicValueIsProperlyAligned!(T)( cast(size_t) &val ) );
++    } body {
++        T*posVal=&val;
++        static if( T.sizeof == byte.sizeof ) {
++            volatile asm {
++                mov AL, newval;
++                mov ECX, posVal;
++                lock; // lock always needed to make this op atomic
++                xchg [ECX], AL;
++            }
++        }
++        else static if( T.sizeof == short.sizeof ) {
++            volatile asm {
++                mov AX, newval;
++                mov ECX, posVal;
++                lock; // lock always needed to make this op atomic
++                xchg [ECX], AX;
++            }
++        }
++        else static if( T.sizeof == int.sizeof ) {
++            volatile asm {
++                mov EAX, newval;
++                mov ECX, posVal;
++                lock; // lock always needed to make this op atomic
++                xchg [ECX], EAX;
++            }
++        }
++        else static if( T.sizeof == long.sizeof ) {
++            // 8 Byte swap on 32-Bit Processor, use CAS?
++            static assert( false, "Invalid template type specified, 8bytes in 32 bit mode: "~T.stringof );
++        }
++        else
++        {
++            static assert( false, "Invalid template type specified: "~T.stringof );
++        }
++    }
++} else version (D_InlineAsm_X86_64){
++    T atomicSwap( T )( inout T val, T newval )
++    in {
++        assert( atomicValueIsProperlyAligned!(T)( cast(size_t) &val ) );
++    } body {
++        T*posVal=&val;
++        static if( T.sizeof == byte.sizeof ) {
++            volatile asm {
++                mov AL, newval;
++                mov RCX, posVal;
++                lock; // lock always needed to make this op atomic
++                xchg [RCX], AL;
++            }
++        }
++        else static if( T.sizeof == short.sizeof ) {
++            volatile asm {
++                mov AX, newval;
++                mov RCX, posVal;
++                lock; // lock always needed to make this op atomic
++                xchg [RCX], AX;
++            }
++        }
++        else static if( T.sizeof == int.sizeof ) {
++            volatile asm {
++                mov EAX, newval;
++                mov RCX, posVal;
++                lock; // lock always needed to make this op atomic
++                xchg [RCX], EAX;
++            }
++        }
++        else static if( T.sizeof == long.sizeof ) {
++            volatile asm {
++                mov RAX, newval;
++                mov RCX, posVal;
++                lock; // lock always needed to make this op atomic
++                xchg [RCX], RAX;
++            }
++        }
++        else
++        {
++            static assert( false, "Invalid template type specified: "~T.stringof );
++        }
++    }
++} else {
++    T atomicSwap( T )( inout T val, T newval )
++    in {
++        assert( atomicValueIsProperlyAligned!(T)( cast(size_t) &val ) );
++    } body {
++        T oldVal;
++        synchronized(typeid(T)){
++            oldVal=val;
++            val=newval;
++        }
++        return oldVal;
++    }
++}
++
++//---------------------
++// internal conversion template
++private T aCasT(T,V)(ref T val, T newval, T equalTo){
++    union UVConv{V v; T t;}
++    union UVPtrConv{V *v; T *t;}
++    UVConv vNew,vOld,vAtt;
++    UVPtrConv valPtr;
++    vNew.t=newval;
++    vOld.t=equalTo;
++    valPtr.t=&val;
++    vAtt.v=atomicCAS(*valPtr.v,vNew.v,vOld.v);
++    return vAtt.t;
++}
++/// internal reduction 
++private T aCas(T)(ref T val, T newval, T equalTo){
++    static if (T.sizeof==1){
++        return aCasT!(T,ubyte)(val,newval,equalTo);
++    } else static if (T.sizeof==2){
++        return aCasT!(T,ushort)(val,newval,equalTo);
++    } else static if (T.sizeof==4){
++        return aCasT!(T,uint)(val,newval,equalTo);
++    } else static if (T.sizeof==8){ // unclear if it is always supported...
++        return aCasT!(T,ulong)(val,newval,equalTo);
++    } else {
++        static assert(0,"invalid type "~T.stringof);
++    }
++}
++/// atomic compare & exchange (can be used to implement everything else)
++/// stores newval into val if val==equalTo in one atomic operation
++/// barriers are not implied, just atomicity!
++/// returns the value that is checked against equalTo (i.e. an exchange was performed 
++/// if result==equalTo, otherwise one can use the result as the current value)
++version(LDC){
++    T atomicCAS( T )( ref T val, T newval, T equalTo )
++    {
++        T oldval = void;
++        static if (isPointerOrClass!(T))
++        {
++            oldval = cast(T)cast(void*)llvm_atomic_cmp_swap!(size_t)(cast(size_t*)cast(void*)&val, cast(size_t)cast(void*)equalTo, cast(size_t)cast(void*)newval);
++        }
++        else static if (is(T == bool)) // correct also if bol has different size?
++        {
++            oldval = aCas(val,newval,equalTo); // assuming true is *always* 1 and not a non zero value...
++        }
++        else static if (isIntegerType!(T))
++        {
++            oldval = llvm_atomic_cmp_swap!(T)(&val, equalTo, newval);
++        } else {
++            oldval = aCas(val,newval,equalTo);
++        }
++        return oldval;
++    }
++} else version(D_InlineAsm_X86) {
++    version(darwin){
++        extern(C) ubyte OSAtomicCompareAndSwap64(long oldValue, long newValue,
++                 long *theValue); // assumes that in C sizeof(_Bool)==1 (as given in osx IA-32 ABI)
++    }
++    T atomicCAS( T )( ref T val, T newval, T equalTo )
++    in {
++        // NOTE: 32 bit x86 systems support 8 byte CAS, which only requires
++        //       4 byte alignment, so use size_t as the align type here.
++        static if( ClassPtr!(T).sizeof > size_t.sizeof )
++            assert( atomicValueIsProperlyAligned!(size_t)( cast(size_t) &val ) );
++        else
++            assert( atomicValueIsProperlyAligned!(ClassPtr!(T))( cast(size_t) &val ) );
++    } body {
++        T*posVal=&val;
++        static if( T.sizeof == byte.sizeof ) {
++            volatile asm {
++                mov DL, newval;
++                mov AL, equalTo;
++                mov ECX, posVal;
++                lock; // lock always needed to make this op atomic
++                cmpxchg [ECX], DL;
++            }
++        }
++        else static if( T.sizeof == short.sizeof ) {
++            volatile asm {
++                mov DX, newval;
++                mov AX, equalTo;
++                mov ECX, posVal;
++                lock; // lock always needed to make this op atomic
++                cmpxchg [ECX], DX;
++            }
++        }
++        else static if( ClassPtr!(T).sizeof == int.sizeof ) {
++            volatile asm {
++                mov EDX, newval;
++                mov EAX, equalTo;
++                mov ECX, posVal;
++                lock; // lock always needed to make this op atomic
++                cmpxchg [ECX], EDX;
++            }
++        }
++        else static if( T.sizeof == long.sizeof ) {
++            // 8 Byte StoreIf on 32-Bit Processor
++            version(darwin){
++                union UVConv{long v; T t;}
++                union UVPtrConv{long *v; T *t;}
++                UVConv vEqual,vNew;
++                UVPtrConv valPtr;
++                vEqual.t=equalTo;
++                vNew.t=newval;
++                valPtr.t=&val;
++                while(1){
++                    if(OSAtomicCompareAndSwap64(vEqual.v, vNew.v, valPtr.v)!=0)
++                    {
++                        return equalTo;
++                    } else {
++                        volatile {
++                            T res=val;
++                            if (res!is equalTo) return res;
++                        }
++                    }
++                }
++            } else {
++                T res;
++                volatile asm
++                {
++                    push EDI;
++                    push EBX;
++                    lea EDI, newval;
++                    mov EBX, [EDI];
++                    mov ECX, 4[EDI];
++                    lea EDI, equalTo;
++                    mov EAX, [EDI];
++                    mov EDX, 4[EDI];
++                    mov EDI, val;
++                    lock; // lock always needed to make this op atomic
++                    cmpxch8b [EDI];
++                    lea EDI, res;
++                    mov [EDI], EAX;
++                    mov 4[EDI], EDX;
++                    pop EBX;
++                    pop EDI;
++                }
++                return res;
++            }
++        }
++        else
++        {
++            static assert( false, "Invalid template type specified: "~T.stringof );
++        }
++    }
++} else version (D_InlineAsm_X86_64){
++    T atomicCAS( T )( ref T val, T newval, T equalTo )
++    in {
++        assert( atomicValueIsProperlyAligned!(T)( cast(size_t) &val ) );
++    } body {
++        T*posVal=&val;
++        static if( T.sizeof == byte.sizeof ) {
++            volatile asm {
++                mov DL, newval;
++                mov AL, equalTo;
++                mov RCX, posVal;
++                lock; // lock always needed to make this op atomic
++                cmpxchg [RCX], DL;
++            }
++        }
++        else static if( T.sizeof == short.sizeof ) {
++            volatile asm {
++                mov DX, newval;
++                mov AX, equalTo;
++                mov RCX, posVal;
++                lock; // lock always needed to make this op atomic
++                cmpxchg [RCX], DX;
++            }
++        }
++        else static if( ClassPtr!(T).sizeof == int.sizeof ) {
++            volatile asm {
++                mov EDX, newval;
++                mov EAX, equalTo;
++                mov RCX, posVal;
++                lock; // lock always needed to make this op atomic
++                cmpxchg [RCX], EDX;
++            }
++        }
++        else static if( ClassPtr!(T).sizeof == long.sizeof ) {
++            volatile asm {
++                mov RDX, newval;
++                mov RAX, equalTo;
++                mov RCX, posVal;
++                lock; // lock always needed to make this op atomic
++                cmpxchg [RCX], RDX;
++            }
++        }
++        else
++        {
++            static assert( false, "Invalid template type specified: "~T.stringof );
++        }
++    }
++} else {
++    T atomicCAS( T )( ref T val, T newval, T equalTo )
++    in {
++        assert( atomicValueIsProperlyAligned!(T)( cast(size_t) &val ) );
++    } body {
++        T oldval;
++        synchronized(typeid(T)){
++            oldval=val;
++            if(oldval==equalTo) {
++                val=newval;
++            }
++        }
++        return oldval;
++    }
++}
++
++bool atomicCASB(T)( ref T val, T newval, T equalTo ){
++    return (equalTo is atomicCAS(val,newval,equalTo));
++}
++
++/// loads a value from memory
++///
++/// at the moment it is assumed that all aligned memory accesses are atomic
++/// in the sense that all bits are consistent with some store
++///
++/// remove this? I know no actual architecture where this would be different
++T atomicLoad(T)(ref T val)
++in {
++    assert( atomicValueIsProperlyAligned!(T)( cast(size_t) &val ) );
++    static assert(ClassPtr!(T).sizeof<=size_t.sizeof,"invalid size for "~T.stringof);
++} body {
++    volatile res=val;
++    return res;
++}
++
++/// stores a value the the memory
++///
++/// at the moment it is assumed that all aligned memory accesses are atomic
++/// in the sense that a load either sees the complete store or the previous value
++///
++/// remove this? I know no actual architecture where this would be different
++T atomicStore(T)(ref T val, T newVal)
++in {
++        assert( atomicValueIsProperlyAligned!(T)( cast(size_t) &val ), "invalid alignment" );
++        static assert(ClassPtr!(T).sizeof<=size_t.sizeof,"invalid size for "~T.stringof);
++} body {
++    volatile newVal=val;
++}
++
++/// increments the given value and returns the previous value with an atomic operation
++///
++/// some architectures might allow just increments/decrements by 1
++///
++/// no barriers implied, only atomicity!
++version(LDC){
++    T atomicAdd(T)(ref T val, T incV){
++        static if (isPointerOrClass!(T))
++        {
++            return cast(T)llvm_atomic_load_add!(size_t)(cast(size_t*)&val, incV);
++        }
++        else static if (isIntegerType!(T))
++        {
++            static assert( isIntegerType!(T), "invalid type "~T.stringof );
++            return llvm_atomic_load_add!(T)(&val, cast(T)incV);
++        } else {
++            return atomicOp(val,delegate T(T a){ return a+incV; });
++        }
++    }
++} else version (D_InlineAsm_X86){
++    T atomicAdd(T)(ref T val, T incV){
++        static if (isIntegerType!(T)||isPointerOrClass!(T)){
++            T* posVal=&val;
++            T res;
++            static if (T.sizeof==1){
++                volatile asm {
++                    mov DL, incV;
++                    mov ECX, posVal;
++                    lock;
++                    xadd byte ptr [ECX],DL;
++                    mov byte ptr res[EBP],DL;
++                }
++            } else static if (T.sizeof==2){
++                volatile asm {
++                    mov DX, incV;
++                    mov ECX, posVal;
++                    lock;
++                    xadd short ptr [ECX],DX;
++                    mov short ptr res[EBP],DX;
++                }
++            } else static if (T.sizeof==4){
++                volatile asm
++                {
++                    mov EDX, incV;
++                    mov ECX, posVal;
++                    lock;
++                    xadd int ptr [ECX],EDX;
++                    mov int ptr res[EBP],EDX;
++                }
++            } else static if (T.sizeof==8){
++                return atomicOp(val,delegate (T x){ return x+incV; });
++            } else {
++                static assert(0,"Unsupported type size");
++            }
++            return res;
++        } else {
++            return atomicOp(val,delegate T(T a){ return a+incV; });
++        }
++    }
++} else version (D_InlineAsm_X86_64){
++    T atomicAdd(T)(ref T val, T incV){
++        static if (isIntegerType!(T)||isPointerOrClass!(T)){
++            T* posVal=&val;
++            T res;
++            static if (T.sizeof==1){
++                volatile asm {
++                    mov DL, incV;
++                    mov RCX, posVal;
++                    lock;
++                    xadd byte ptr [RCX],DL;
++                    mov byte ptr res[EBP],DL;
++                }
++            } else static if (T.sizeof==2){
++                volatile asm {
++                    mov DX, incV;
++                    mov RCX, posVal;
++                    lock;
++                    xadd short ptr [RCX],DX;
++                    mov short ptr res[EBP],DX;
++                }
++            } else static if (T.sizeof==4){
++                volatile asm
++                {
++                    mov EDX, incV;
++                    mov RCX, posVal;
++                    lock;
++                    xadd int ptr [RCX],EDX;
++                    mov int ptr res[EBP],EDX;
++                }
++            } else static if (T.sizeof==8){
++                volatile asm
++                {
++                    mov RAX, val;
++                    mov RDX, incV;
++                    lock; // lock always needed to make this op atomic
++                    xadd qword ptr [RAX],RDX;
++                    mov res[EBP],RDX;
++                }
++            } else {
++                static assert(0,"Unsupported type size for type:"~T.stringof);
++            }
++            return res;
++        } else {
++            return atomicOp(val,delegate T(T a){ return a+incV; });
++        }
++    }
++} else {
++    static if (LockVersion){
++        T atomicAdd(T)(ref T val, T incV){
++            static assert( isIntegerType!(T)||isPointerOrClass!(T),"invalid type: "~T.stringof );
++            synchronized(typeid(T)){
++                T oldV=val;
++                val+=incV;
++                return oldV;
++            }
++        }
++    } else {
++        T atomicAdd(T)(ref T val, T incV){
++            static assert( isIntegerType!(T)||isPointerOrClass!(T),"invalid type: "~T.stringof );
++            synchronized(typeid(T)){
++                T oldV,newVal,nextVal;
++                volatile nextVal=val;
++                do{
++                    oldV=nextVal;
++                    newV=oldV+incV;
++                    auto nextVal=atomicCAS!(T)(val,newV,oldV);
++                } while(nextVal!=oldV)
++                return oldV;
++            }
++        }
++    }
++}
++
++/// applies a pure function atomically
++/// the function should be pure as it might be called several times to ensure atomicity
++/// the function should take a short time to compute otherwise contention is possible
++/// and no "fair" share is applied between fast function (more likely to succeed) and
++/// the others (i.e. do not use this in case of high contention)
++T atomicOp(T)(ref T val, T delegate(T) f){
++    T oldV,newV,nextV;
++    int i=0;
++    nextV=val;
++    do {
++        oldV=nextV;
++        newV=f(oldV);
++        nextV=aCas!(T)(val,newV,oldV);
++        if (nextV is oldV || newV is oldV) return oldV;
++    } while(++i<200)
++    while (true){
++        thread_yield();
++        volatile oldV=val;
++        newV=f(oldV);
++        nextV=aCas!(T)(val,newV,oldV);
++        if (nextV is oldV || newV is oldV) return oldV;
++    }
++}
++
++/// reads a flag (ensuring that other accesses can not happen before you read it)
++T flagGet(T)(ref T flag){
++    T res;
++    volatile res=flag;
++    memoryBarrier!(true,false,strictFences,false)();
++    return res;
++}
++
++/// sets a flag (ensuring that all pending writes are executed before this)
++/// the original value is returned
++T flagSet(T)(ref T flag,T newVal){
++    memoryBarrier!(false,strictFences,false,true)();
++    return atomicSwap(flag,newVal);
++}
++
++/// writes a flag (ensuring that all pending writes are executed before this)
++/// the original value is returned
++T flagOp(T)(ref T flag,T delegate(T) op){
++    memoryBarrier!(false,strictFences,false,true)();
++    return atomicOp(flag,op);
++}
++
++/// reads a flag (ensuring that all pending writes are executed before this)
++T flagAdd(T)(ref T flag,T incV=cast(T)1){
++    static if (!LockVersion)
++        memoryBarrier!(false,strictFences,false,true)();
++    return atomicAdd(flag,incV);
++}
++
++/// returns the value of val and increments it in one atomic operation
++/// useful for counters, and to generate unique values (fast)
++/// no barriers are implied
++T nextValue(T)(ref T val){
++    return atomicAdd(val,cast(T)1);
++}
+
+Property changes on: tango/core/sync/Atomic.d
+___________________________________________________________________
+Added: svn:mime-type
+   + text/x-dsrc
+Added: svn:eol-style
+   + native
+
+Index: tango/stdc/posix/signal.d
+===================================================================
+--- tango/stdc/posix/signal.d	(revision 5503)
++++ tango/stdc/posix/signal.d	(working copy)
+@@ -225,6 +225,10 @@
+     const SIGJVM2   = 40;   /* reserved signal for Java Virtual Machine */
+ +/
+ }
++else
++{
++   static assert(0, "Platform not supported...");
++}
+ 
+ struct sigaction_t
+ {
+@@ -492,7 +496,11 @@
+     {
+         uint[4] __bits;
+     }
+-
++   
++    const SIG_BLOCK = 2;
++    const SIG_UNBLOCK = 1;
++    const SIG_SETMASK = 3;
++   
+     struct siginfo_t
+     {
+         int si_signo;
+@@ -1165,6 +1173,14 @@
+         pthread_attr_t*         sigev_notify_attributes;
+         private int             __sigev_pad2;
+     }
++} else version (darwin){
++    struct sigevent {
++     int sigev_notify;
++     int sigev_signo;
++     sigval sigev_value;
++     void function(sigval) sigev_notify_function;
++     pthread_attr_t *sigev_notify_attributes;
++    }
+ }
+ 
+ //
+Index: tango/stdc/posix/sys/select.d
+===================================================================
+--- tango/stdc/posix/sys/select.d	(revision 5503)
++++ tango/stdc/posix/sys/select.d	(working copy)
+@@ -127,6 +127,19 @@
+     {
+         const uint __DARWIN_NBBY = 8;                               /* bits in a byte */
+         const uint __DARWIN_NFDBITS = (int.sizeof * __DARWIN_NBBY); /* bits per mask */
++
++        alias uint __fd_mask;
++        const __NFDBITS = 8 * __fd_mask.sizeof;
++
++        extern (D) int __FDELT( int d )
++        {
++            return d / __NFDBITS;
++        }
++
++        extern (D) __fd_mask __FDMASK( int d )
++        {
++            return cast(__fd_mask) 1 << ( d % __NFDBITS );
++        }
+     }
+ 
+     const FD_SETSIZE = 1024;
+@@ -135,6 +148,27 @@
+     {
+         int[(((FD_SETSIZE) + ((__DARWIN_NFDBITS) - 1)) / (__DARWIN_NFDBITS))] fds_bits;
+     }
++    
++    extern (D) void FD_CLR( int fd, fd_set* fdset )
++    {
++        fdset.fds_bits[__FDELT( fd )] &= ~__FDMASK( fd );
++    }
++
++    extern (D) int  FD_ISSET( int fd, fd_set* fdset )
++    {
++        return fdset.fds_bits[__FDELT( fd )] & __FDMASK( fd );
++    }
++
++    extern (D) void FD_SET( int fd, fd_set* fdset )
++    {
++        fdset.fds_bits[__FDELT( fd )] |= __FDMASK( fd );
++    }
++
++    extern (D) void FD_ZERO( fd_set* fdset )
++    {
++        fdset.fds_bits[0 .. $] = 0;
++    }
++    
+ }
+ else version( freebsd )
+ {
+@@ -142,11 +176,43 @@
+ 	{
+ 		const uint FD_SETSIZE = 1024;
+ 		const uint _NFDBITS = c_ulong.sizeof * 8;
++
++        alias c_long __fd_mask;
++        const _NFDBITS = 8 * __fd_mask.sizeof;
++
++        extern (D) int __FDELT( int d )
++        {
++            return d / _NFDBITS;
++        }
++
++        extern (D) __fd_mask __FDMASK( int d )
++        {
++            return cast(__fd_mask) 1 << ( d % _NFDBITS );
++        }
+ 	}
+ 	struct fd_set
+ 	{
+ 		c_ulong[((FD_SETSIZE + (_NFDBITS - 1)) / _NFDBITS)] fds_bits;
+ 	}
++    extern (D) void FD_CLR( int fd, fd_set* fdset )
++    {
++        fdset.fds_bits[__FDELT( fd )] &= ~__FDMASK( fd );
++    }
++
++    extern (D) int  FD_ISSET( int fd, fd_set* fdset )
++    {
++        return fdset.fds_bits[__FDELT( fd )] & __FDMASK( fd );
++    }
++
++    extern (D) void FD_SET( int fd, fd_set* fdset )
++    {
++        fdset.fds_bits[__FDELT( fd )] |= __FDMASK( fd );
++    }
++
++    extern (D) void FD_ZERO( fd_set* fdset )
++    {
++        fdset.fds_bits[0 .. $] = 0;
++    }
+ }
+ else version( solaris )
+ {
+@@ -161,7 +227,7 @@
+             return d / FD_NFDBITS;
+         }
+ 
+-        extern (D) int __FDMASK( int d )
++        extern (D) __fd_mask __FDMASK( int d )
+         {
+             return cast(__fd_mask) 1 << ( d % FD_NFDBITS );
+         }
+Index: tango/stdc/posix/sys/socket.d
+===================================================================
+--- tango/stdc/posix/sys/socket.d	(revision 5503)
++++ tango/stdc/posix/sys/socket.d	(working copy)
+@@ -185,9 +185,9 @@
+ 
+     extern (D) size_t CMSG_FIRSTHDR( msghdr* mhdr )
+     {
+-        return cast(size_t)( mhdr.msg_controllen >= cmsghdr.sizeof
+-                             ? cast(cmsghdr*) mhdr.msg_control
+-                             : cast(cmsghdr*) 0 );
++        return ( mhdr.msg_controllen >= cmsghdr.sizeof
++                             ? cast(size_t) mhdr.msg_control
++                             : cast(size_t) 0 );
+     }
+ 
+     struct linger

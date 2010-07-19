@@ -23,7 +23,8 @@ import blip.io.Console;
 import blip.stdc.stdlib;
 version(Posix){
     import tango.stdc.posix.signal;
-    version(NewTango) {} else {
+    import tango.core.Version;
+    static if(Tango.Major==1) {} else {
         private alias void function(int) sHandler;
         extern (C) void setthread_abortHandler(sHandler f);
     }
@@ -158,7 +159,7 @@ version(Posix){
         static TraceAll tracer;
         static this(){
             tracer=new TraceAll();
-            version(NewTango) {} else {
+            static if (Tango.Major==1) {} else {
                 setthread_abortHandler(function void(int i){ tracer.abort(); });
             }
         }

@@ -30,15 +30,14 @@ while [ $# -gt 0 ]
 do
     case $1 in
         --help)
-            echo "usage: build [--version x] [--quick] [--d-home dHome] [--tango-home tangoHome] "
+            echo "usage: build [--version x] [--quick] [--d-home dHome] "
             echo "           [--verbose] [--build-dir buildDir]"
             echo ""
-            echo "  builds mainDFile.d linking tango, blip and all needed libs (lapack, bz2,...)"
+            echo "  builds mainDFile.d linking blip and all needed libs (lapack, bz2,...)"
             echo "  --version x     builds version x (typically opt or dbg)"
             echo "  --quick         no clean before rebuilding"
             echo "  --verbose       verbose building"
             echo "  --d-home x      uses x as d home (default $D_HOME )"
-            echo "  --tango-home x  uses x as tango home"
             echo "  --blip-home x   uses x as blip home (defaults to $PWD )"
             echo "  --no-tests      does not compile the tests"
             echo "  --no-opt        does not compile the opt version"
@@ -72,10 +71,6 @@ do
             shift
             build_dir="OBJDIRBASE=$1"
             ;;
-        --tango-home)
-            shift
-            TANGO_HOME=$1
-            ;;
         --blip-home)
             shift
             BLIP_HOME=$1
@@ -96,9 +91,6 @@ do
     esac
     shift
 done
-if [ -z "$TANGO_HOME" ] ; then
-    TANGO_HOME=$D_HOME/tango
-fi
 if [ -z "$build_dir" ] ; then
     if [ -n "$D_BUILD_DIR" ] ; then
         build_dir=OBJDIRBASE="$D_BUILD_DIR"
@@ -116,7 +108,7 @@ fi
 case $compShort in
     dmd)
     linkFlag="-L"
-    extra_libs_comp="-defaultlib=tango-base-${compShort}"
+    extra_libs_comp=""
     ;;
     ldc)
     linkFlag="-L="
@@ -139,8 +131,8 @@ case `uname` in
   *)
   die "unknown platform, you need to set extra_libs_os"
 esac
-extra_libs_opt="${linkFlag}-L${D_HOME}/lib ${linkFlag}-ltango-user-${compShort} $extra_libs_os $extra_libs_comp"
-extra_libs_dbg="${linkFlag}-L${D_HOME}/lib ${linkFlag}-ltango-user-${compShort}-dbg $extra_libs_os $extra_libs_comp"
+extra_libs_opt="${linkFlag}-L${D_HOME}/lib $extra_libs_os $extra_libs_comp"
+extra_libs_dbg="${linkFlag}-L${D_HOME}/lib $extra_libs_os $extra_libs_comp"
 case $version in
     opt)
     extra_libs="$extra_libs_opt"
@@ -150,9 +142,9 @@ case $version in
     ;;
     *)
     echo "unknown version, guessing extra_libs"
-    extra_libs="${linkFlag}-L${D_HOME}/lib ${linkFlag}-ltango-user-${compShort}-${version} $extra_libs_os $extra_libs_comp"
+    extra_libs="${linkFlag}-L${D_HOME}/lib $extra_libs_os $extra_libs_comp"
 esac
-makeFlags="$silent TANGO_HOME=$TANGO_HOME $build_dir"
+makeFlags="$silent $build_dir"
 if [ -n "$clean" ]; then
     $make $makeFlags distclean
     rm -f libs/libblip-*

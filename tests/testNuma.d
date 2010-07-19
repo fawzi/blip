@@ -19,7 +19,7 @@ import blip.serialization.Sout;
 import blip.parallel.smp.Numa;
 import blip.serialization.Serialization;
 import blip.parallel.hwloc.hwloc;
-version(NoTrace){} else { import tango.core.stacktrace.TraceExceptions; }
+version(NoTrace){} else { import blip.core.stacktrace.TraceExceptions; }
 
 void numaLooper(NumaNode n,NumaTopology topo,void delegate(NumaNode) loopBody){
     loopBody(n);

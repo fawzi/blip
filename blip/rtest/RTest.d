@@ -162,7 +162,12 @@ module blip.rtest.RTest;
 public import blip.rtest.BasicGenerators;
 public import blip.rtest.RTestFramework;
 import tango.util.Convert;
-import tango.util.ArgParser;
+import tango.core.Version;
+static if (Tango.Major==1){
+    import tango.text.Arguments;
+} else {
+    import tango.util.ArgParser;
+}
 import tango.text.Util;
 import blip.io.Console;
 import blip.io.BasicIO;
@@ -196,7 +201,6 @@ int mainTestFun(char[][] argStr,SingleRTest testSuite){
      --seed defines the seed for the test
      --on-failure sets the action to perform after a test fails (default stop-test)
      --print-level sets the print level (default all-short)`;
-    ArgParser args = new ArgParser();
 
     char[] seed=null;
     char[] test=null;
@@ -207,44 +211,89 @@ int mainTestFun(char[][] argStr,SingleRTest testSuite){
     TextController.OnFailure onFailure=TextController.OnFailure.StopTest;
     TextController.PrintLevel printLevel=TextController.PrintLevel.AllShort;
     
-    args.bind("--","help",delegate void(){ help=true; });
-    args.bind("--","runs",delegate(char[] arg){ runs=to!(int)(arg[1..$]); });
-    args.bind("--","trace",delegate void(){ trace=true; });
-    args.bind("--","seed",delegate(char[] arg){ seed=arg[1..$].dup; });
-    args.bind("--","counter",delegate(char[] arg){ counter=parseIArray(arg[1..$]); });
-    args.bind("--","test",delegate void(char[] arg){ test=arg[1..$].dup; });
-    args.bind("--","on-failure",delegate void(char[] arg){
-        if (arg.length==0) throw new Exception("expected an argument after --on-failure");
-        if (arg[0]=='=') arg=arg[1..$];
-        switch(arg){
-            case "Continue","continue" : onFailure=TextController.OnFailure.Continue; break;
-            case "StopTest","stoptest","stop-test": onFailure=TextController.OnFailure.StopTest; break;
-            case "stop-all","StopAllTests","StopAll","stopall","stopalltests","stop-all-tests":
-            onFailure=TextController.OnFailure.StopAllTests; break;
-            case "Throw","throw": onFailure=TextController.OnFailure.Throw; break;
-            default:
-                // use Stderr?
-                sout("ERROR invalid options for on-failure: '")(arg)("'\n");
-                sout(helpStr)("\n");
-                exit(-1);
-        }
-    });
-    args.bind("--","print-level",delegate void(char[]arg){
-        if (arg[0]=='=') arg=arg[1..$];
-        switch(arg){
-            case "Error", "error": printLevel=TextController.PrintLevel.Error; break;
-            case "Skip","skip": printLevel=TextController.PrintLevel.Skip; break;
-            case "AllShort", "allshort", "all-short", "short": printLevel=TextController.PrintLevel.AllShort; break;
-            case "AllVerbose","allverbose","all","all-verbose","verbose":
-                printLevel=TextController.PrintLevel.AllVerbose; break;
-            default:
-                serr("ERROR invalid options for print-level: '")(arg)("'\n");
-                sout(helpStr)("\n");
-                exit(-2);
-        }
-    });
+    static if (Tango.Major==1){
+        auto args=new Arguments;
+        args("help").bind(delegate void(){ help=true; });
+        args("runs").bind(delegate char[](char[] arg){ runs=to!(int)(arg[1..$]); return null; });
+        args("trace").bind(delegate void(){ trace=true; });
+        args("seed").bind(delegate char[](char[] arg){ seed=arg[1..$].dup; return null; });
+        args("counter").bind(delegate char[](char[] arg){ counter=parseIArray(arg[1..$]); return null; });
+        args("test").bind(delegate char[](char[] arg){ test=arg[1..$].dup; return null; });
+        args("on-failure").bind(delegate char[](char[] arg){
+            if (arg.length==0) throw new Exception("expected an argument after --on-failure");
+            if (arg[0]=='=') arg=arg[1..$];
+            switch(arg){
+                case "Continue","continue" : onFailure=TextController.OnFailure.Continue; break;
+                case "StopTest","stoptest","stop-test": onFailure=TextController.OnFailure.StopTest; break;
+                case "stop-all","StopAllTests","StopAll","stopall","stopalltests","stop-all-tests":
+                onFailure=TextController.OnFailure.StopAllTests; break;
+                case "Throw","throw": onFailure=TextController.OnFailure.Throw; break;
+                default:
+                    // use Stderr?
+                    sout("ERROR invalid options for on-failure: '")(arg)("'\n");
+                    sout(helpStr)("\n");
+                    exit(-1);
+            }
+            return null;
+        });
+        args("print-level").bind(delegate char[](char[]arg){
+            if (arg[0]=='=') arg=arg[1..$];
+            switch(arg){
+                case "Error", "error": printLevel=TextController.PrintLevel.Error; break;
+                case "Skip","skip": printLevel=TextController.PrintLevel.Skip; break;
+                case "AllShort", "allshort", "all-short", "short": printLevel=TextController.PrintLevel.AllShort; break;
+                case "AllVerbose","allverbose","all","all-verbose","verbose":
+                    printLevel=TextController.PrintLevel.AllVerbose; break;
+                default:
+                    serr("ERROR invalid options for print-level: '")(arg)("'\n");
+                    sout(helpStr)("\n");
+                    exit(-2);
+            }
+            return null;
+        });
     
-    args.parse(argStr[1..$]);
+        args.parse(argStr[1..$]);
+    } else {
+        ArgParser args = new ArgParser();
+        args.bind("--","help",delegate void(){ help=true; });
+        args.bind("--","runs",delegate(char[] arg){ runs=to!(int)(arg[1..$]); });
+        args.bind("--","trace",delegate void(){ trace=true; });
+        args.bind("--","seed",delegate(char[] arg){ seed=arg[1..$].dup; });
+        args.bind("--","counter",delegate(char[] arg){ counter=parseIArray(arg[1..$]); });
+        args.bind("--","test",delegate void(char[] arg){ test=arg[1..$].dup; });
+        args.bind("--","on-failure",delegate void(char[] arg){
+            if (arg.length==0) throw new Exception("expected an argument after --on-failure");
+            if (arg[0]=='=') arg=arg[1..$];
+            switch(arg){
+                case "Continue","continue" : onFailure=TextController.OnFailure.Continue; break;
+                case "StopTest","stoptest","stop-test": onFailure=TextController.OnFailure.StopTest; break;
+                case "stop-all","StopAllTests","StopAll","stopall","stopalltests","stop-all-tests":
+                onFailure=TextController.OnFailure.StopAllTests; break;
+                case "Throw","throw": onFailure=TextController.OnFailure.Throw; break;
+                default:
+                    // use Stderr?
+                    sout("ERROR invalid options for on-failure: '")(arg)("'\n");
+                    sout(helpStr)("\n");
+                    exit(-1);
+            }
+        });
+        args.bind("--","print-level",delegate void(char[]arg){
+            if (arg[0]=='=') arg=arg[1..$];
+            switch(arg){
+                case "Error", "error": printLevel=TextController.PrintLevel.Error; break;
+                case "Skip","skip": printLevel=TextController.PrintLevel.Skip; break;
+                case "AllShort", "allshort", "all-short", "short": printLevel=TextController.PrintLevel.AllShort; break;
+                case "AllVerbose","allverbose","all","all-verbose","verbose":
+                    printLevel=TextController.PrintLevel.AllVerbose; break;
+                default:
+                    serr("ERROR invalid options for print-level: '")(arg)("'\n");
+                    sout(helpStr)("\n");
+                    exit(-2);
+            }
+        });
+    
+        args.parse(argStr[1..$]);
+    }
     
     if (help){
         sout(helpStr)("\n");

@@ -23,7 +23,7 @@ import tango.time.StopWatch;
 import tango.math.Math;
 import blip.narray.NArray;
 import blip.container.GrowableArray;
-version(NoTrace){} else { import tango.core.stacktrace.TraceExceptions; }
+version(NoTrace){} else { import blip.core.stacktrace.TraceExceptions; }
 
 version(multiarray){
     import murray.multiarray: ndarray,ones,zeros;

@@ -18,7 +18,7 @@
 module testHwloc;
 import blip.parallel.hwloc.hwloc;
 import tango.stdc.stdio;
-version(NoTrace){} else { import tango.core.stacktrace.TraceExceptions; }
+version(NoTrace){} else { import blip.core.stacktrace.TraceExceptions; }
 
 static void print_children(hwloc_topology_t topology, hwloc_obj_t obj, int depth)
 {
