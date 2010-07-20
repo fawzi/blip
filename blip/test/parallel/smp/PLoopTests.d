@@ -20,6 +20,7 @@ import blip.sync.Atomic;
 import blip.rtest.RTest;
 import blip.container.GrowableArray;
 import blip.io.BasicIO;
+import tango.core.Array;
 //import blip.io.Console;
 
 void testPLoopArray(T)(T[] arr1,SizeLikeNumber!(3,1) blockSize){

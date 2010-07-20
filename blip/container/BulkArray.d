@@ -102,7 +102,7 @@ class ChunkGuard{
         return this;
     }
     void release(){
-        auto oldVal=atomicAdd(refCount,-cast(size_t)1);
+        auto oldVal=atomicAdd(refCount,-cast(typeof(refCount))1);
         if (oldVal==0){
             throw new Exception("retain with refCount==0",__FILE__,__LINE__);
         }
