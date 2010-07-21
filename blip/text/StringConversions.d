@@ -33,8 +33,8 @@ template toStringT(T){
 }
 
 alias toStringT!(char) toString8;
-alias toStringT!(char) toString16;
-alias toStringT!(char) toString32;
+alias toStringT!(wchar) toString16;
+alias toStringT!(dchar) toString32;
 
 // add also a generic from string???
 // probably building on the top of json serialization would be the obvious choice...
