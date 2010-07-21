@@ -16,6 +16,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 module blip.text.String;
+import blip.text.StringConversions;
+import blip.io.BasicIO;
 
 struct String{
     void* ptr;
@@ -69,10 +71,11 @@ struct String{
     size_t len(){
         return (_l & MaskLen);
     }
+    /// encoding of this string
     size_t encodingId(){
         return cast(int)(_l>>BitsLen);
     }
-    
+    /// builds a string from encoded data
     static String opCall(char[] s){
         assert((s.length&~MaskLen)==0);
         String res;
@@ -80,6 +83,7 @@ struct String{
         res._l=(Encoding.Utf8<<BitsLen)|s.length;
         return res;
     }
+    /// ditto
     static String opCall(wchar[] s){
         assert((s.length&~(MaskLen>>1))==0);
         String res;
@@ -87,6 +91,7 @@ struct String{
         res._l=(Encoding.Utf16<<BitsLen)|(s.length>>1);
         return res;
     }
+    /// ditto
     static String opCall(char[] s){
         assert((s.length&~(MaskLen>>2))==0);
         String res;
@@ -94,6 +99,7 @@ struct String{
         res._l=(Encoding.Utf32<<BitsLen)|(s.length>>2);
         return res;
     }
+    /// this string within a given encoding
     T[] asStringT(T)(T[] buf=null){ // buf not used at the moment...
         auto e=encodingId();
         if (e==encodingOfT!(T)) {
@@ -101,8 +107,28 @@ struct String{
         }
         return toStringT!(T)((cast(T*)ptr)[0..(len>>BitshiftForT!(T))]);
     }
+    /// utility internal casting (use only if you know the encoding to be T)
+    T[] asT(T)(){
+        return (cast(T*)ptr)[0..(len>>BitshiftForT!(T))];
+    }
+    /// sinks the string in the requested encoding
+    void sinkTo(T)(T sink){
+        switch(encodingId){
+        case Encoding.Utf8:
+            writeOut(sink,asT!(char)());
+            break;
+        case Encoding.Utf16:
+            writeOut(sink,asT!(wchar)());
+            break;
+        case Encoding.Utf32:
+            writeOut(sink,asT!(dchar)());
+            break;
+        default:
+            throw new Exception("unexpected encoding",__FILE__,__LINE__);
+        }
+    }
 
     // implement common python/java/obj-c string ops
-    // indexing: deifine two indexing types? codepoint,native?
+    // indexing: define two indexing types? codepoint,native?
     
 }
