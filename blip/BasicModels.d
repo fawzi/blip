@@ -68,6 +68,22 @@ interface FIteratorI(T): SimpleIteratorI!(T){
     ForeachableI!(T) parallelLoop();
 }
 
+/// implements an empty iterator
+class EmptyFIterator(T):FIteratorI!(T){
+    bool next(ref T){ return false; }
+    static if (is(T U:U*)){
+        int opApply(int delegate(ref U x) dlg) { return 0; }
+        int opApply(int delegate(ref size_t i,ref U x) dlg) { return 0; }
+    } else {
+        int opApply(int delegate(ref T x) dlg) { return 0; }
+        int opApply(int delegate(ref size_t i,ref T x) dlg) { return 0; }
+    }
+    ForeachableI!(T) parallelLoop(size_t optimalChunkSize){ return this; }
+    ForeachableI!(T) parallelLoop() { return this; }
+    static EmptyFIterator instance;
+    static this(){ instance=new EmptyFIterator; }
+}
+
 /// template to mixin opApply based on a next operation
 template opApplyFromNext(T){
     static if(is(T U:U*)){

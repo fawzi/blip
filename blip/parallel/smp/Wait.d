@@ -242,7 +242,6 @@ class WaitLock(T){
 
 /// a recursive lock (detection of recursion is a bit expensive)
 /// locking by all subtasks succeeds immediately
-/// this can be used as a drop in replacement for a Mutex
 class RLock:Object.Monitor{
     TaskI locking;
     Deque!(TaskI) waiting;
@@ -417,12 +416,17 @@ class RLock:Object.Monitor{
         }
         toUnlock.deallocData();
     }
+    /// perform the given action while holding the lock
+    void synchronizedDo(void delegate() op){
+        lock();
+        scope(exit){ unlock(); }
+        op();
+    }
 }
 
 /// a refining recursive lock
 /// locking by a subtask refines the lock to it (i.e other subtask at the same level have to wait)
 /// I thought it could be useful, but I haven't needed it yet
-/// this can be used as a drop in replacement for a Mutex
 class RRLock:Object.Monitor{
     TaskI[] lockingStack;
     uint[] lockLevelStack;

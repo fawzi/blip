@@ -92,7 +92,6 @@ struct FieldMetaInfo {
         s("<FieldMetaInfo name:'"); s(name); s("',");
         s("level:"); writeOut(s,serializationLevel); s(",");
         s("metaInfo:"); s((metaInfo is null) ? "*NULL*"[] : metaInfo.className); s(">");
-        s("metaInfo:"); s((metaInfo is null) ? "*NULL*"[] : metaInfo.className); s(">");
     }
     char[][]citationKeys(){
         char[][] res=[];
@@ -526,6 +525,10 @@ class Serializer {
     bool removeCycles;
     bool structHasId;
     bool recursePtr;
+    /// if default values can be dropped (or all elements have to be serialized in any case)
+    bool canDropDefaults(){
+        return !handlers.binary();
+    }
     enum AutoReset:int {
         None,
         ResetCache,
@@ -1103,6 +1106,10 @@ class Unserializer {
         stack[nStack]=StackEntry(typeKindForType!(T),Variant(el),metaInfo);
         ++nStack;
         return nStack;
+    }
+    
+    bool canDropDefaults(){
+        return false;
     }
     
     T pop(T)(int handle){
