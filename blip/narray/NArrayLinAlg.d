@@ -38,27 +38,27 @@ import blip.core.Traits:isComplexType,isImaginaryType,ComplexTypeOf,RealTypeOf;
 
 /// return type of the generic dot operation
 template TypeOfDot(T,U,S...){
-    T t; U u; S args; // .init sometime fails (for tuples of complex types for example), thus going this way
-    static if (is(typeof(T.dotOp(t,u,args)))){ // static T.dotOp
-        alias typeof(T.dotOp(t,u,args)) ResType;
-    } else static if (is(typeof(U.dotOp(t,u,args)))){ // static U.dotOp
-        alias typeof(U.dotOp(t,u,args)) ResType;
-    } else static if (is(typeof(t.opDot(u,args)))){ // t.opDot
-        alias typeof(t.opDot(u,args)) ResType;
-    } else static if (is(typeof(u.opDot_r(t,args)))){ // u.opDot_r
-        alias typeof(u.opDot_r(t,args)) ResType;
-    } else static if (is(typeof(t.opVecMul(u,args)))){ // t.opVecMul
-        alias typeof(t.opVecMul(u,args)) ResType;
-    } else static if (is(typeof(u.opVecMul_r(t,args)))){ // u.opVecMul_r
-        alias typeof(u.opVecMul_r(t,args)) ResType;
-    } else static if (is(typeof(dotNA(t,u,args)))){ // NArray dot
-        alias typeof(dotNA(t,u,args)) ResType;
-    } else static if (is(typeof(t.opMul(u,args)))){ // t.opMul
-        alias typeof(t.opMul(u,args)) ResType;
-    } else static if (is(typeof(u.opMul_r(t,args)))){ // u.opMul_r
-        alias typeof(u.opMul_r(t,args)) ResType;
-    } else static if(nArgs!(S)==0 && is(typeof(t*u))){ // multiplication (for scalars)
-        alias typeof(t*u) ResType;
+    struct dummy{ T t; U u; S args; } // .init sometime fails (for tuples of complex types for example), thus going this way
+    static if (is(typeof(T.dotOp(dummy.init.t,dummy.init.u,dummy.init.args)))){ // static T.dotOp
+        alias typeof(T.dotOp(dummy.init.t,dummy.init.u,dummy.init.args)) ResType;
+    } else static if (is(typeof(U.dotOp(dummy.init.t,dummy.init.u,dummy.init.args)))){ // static U.dotOp
+        alias typeof(U.dotOp(dummy.init.t,dummy.init.u,dummy.init.args)) ResType;
+    } else static if (is(typeof(dummy.init.t.opDot(dummy.init.u,dummy.init.args)))){ // t.opDot
+        alias typeof(dummy.init.t.opDot(dummy.init.u,dummy.init.args)) ResType;
+    } else static if (is(typeof(dummy.init.u.opDot_r(dummy.init.t,dummy.init.args)))){ // u.opDot_r
+        alias typeof(dummy.init.u.opDot_r(dummy.init.t,dummy.init.args)) ResType;
+    } else static if (is(typeof(dummy.init.t.opVecMul(dummy.init.u,dummy.init.args)))){ // t.opVecMul
+        alias typeof(dummy.init.t.opVecMul(dummy.init.u,dummy.init.args)) ResType;
+    } else static if (is(typeof(dummy.init.u.opVecMul_r(dummy.init.t,dummy.init.args)))){ // u.opVecMul_r
+        alias typeof(dummy.init.u.opVecMul_r(dummy.init.t,dummy.init.args)) ResType;
+    } else static if (is(typeof(dotNA(dummy.init.t,dummy.init.u,dummy.init.args)))){ // NArray dot
+        alias typeof(dotNA(dummy.init.t,dummy.init.u,dummy.init.args)) ResType;
+    } else static if (is(typeof(dummy.init.t.opMul(dummy.init.u,dummy.init.args)))){ // t.opMul
+        alias typeof(dummy.init.t.opMul(dummy.init.u,dummy.init.args)) ResType;
+    } else static if (is(typeof(dummy.init.u.opMul_r(dummy.init.t,dummy.init.args)))){ // u.opMul_r
+        alias typeof(dummy.init.u.opMul_r(dummy.init.t,dummy.init.args)) ResType;
+    } else static if(nArgs!(S)==0 && is(typeof(dummy.init.t*dummy.init.u))){ // multiplication (for scalars)
+        alias typeof(dummy.init.t*dummy.init.u) ResType;
     } else {
         alias void ResType;
     }
@@ -134,20 +134,20 @@ TypeOfDot!(T,U,S).ResType dot(T,U,S...)(T t,U u,S args){
 
 /// return type of the generic outer multiplication operation
 template TypeOfOuter(T,U,S...){
-    T t; U u; S args; // .init sometime fails (for tuples of complex types for example), thus going this way
-    static if (is(typeof(T.outerOp(t,u,args)))){ // static T.outerOp
-        alias typeof(T.outerOp(t,u,args)) ResType;
-    } else static if (is(typeof(U.outerOp(t,u,args)))){ // static U.outerOp
-        alias typeof(U.outerOp(t,u,args)) ResType;
-    } else static if (is(typeof(t.opOuter(u,args)))){ // t.opOuter
-        alias typeof(t.opOuter(u,args)) ResType;
-    } else static if (is(typeof(u.opOuter_r(t,args)))){ // u.opOuter_r
-        alias typeof(u.opOuter_r(t,args)) ResType;
-    } else static if (is(typeof(outerNA(t,u,args)))){ // NArray outer
-        alias typeof(outerNA(t,u,args)) ResType;
-    } else static if(nArgs!(S)==0 && isAtomicType!(T) && isAtomicType!(U) && is(typeof(t*u))){ // multiplication (for scalars)
+    struct dummy{ T t; U u; S args; } // .init sometime fails (for tuples of complex types for example), thus going this way
+    static if (is(typeof(T.outerOp(dummyS.init.t,dummyS.init.u,dummyS.init.args)))){ // static T.outerOp
+        alias typeof(T.outerOp(dummyS.init.t,dummyS.init.u,dummyS.init.args)) ResType;
+    } else static if (is(typeof(U.outerOp(dummyS.init.t,dummyS.init.u,dummyS.init.args)))){ // static U.outerOp
+        alias typeof(U.outerOp(dummyS.init.t,dummyS.init.u,dummyS.init.args)) ResType;
+    } else static if (is(typeof(dummyS.init.t.opOuter(dummyS.init.u,dummyS.init.args)))){ // t.opOuter
+        alias typeof(dummyS.init.t.opOuter(dummyS.init.u,dummyS.init.args)) ResType;
+    } else static if (is(typeof(dummyS.init.u.opOuter_r(dummyS.init.t,dummyS.init.args)))){ // u.opOuter_r
+        alias typeof(dummyS.init.u.opOuter_r(dummyS.init.t,dummyS.init.args)) ResType;
+    } else static if (is(typeof(outerNA(dummyS.init.t,dummyS.init.u,dummyS.init.args)))){ // NArray outer
+        alias typeof(outerNA(dummyS.init.t,dummyS.init.u,dummyS.init.args)) ResType;
+    } else static if(nArgs!(S)==0 && isAtomicType!(T) && isAtomicType!(U) && is(typeof(dummyS.init.t*dummyS.init.u))){ // multiplication (for scalars)
         // extend support to all opMul? dot and outer are the same *only* for scalars... not (for example) for matrix multiplication
-        alias typeof(t*u) ResType;
+        alias typeof(dummyS.init.t*dummyS.init.u) ResType;
     } else {
         alias void ResType;
     }
@@ -199,25 +199,25 @@ TypeOfOuter!(T,U,S).ResType outer(T,U,S...)(T t,U u,S args){
 
 /// return type of the generic axpby
 template TypeOfAxpby(T,U,S...){
-    T t; U u; S args; // .init sometime fails (for tuples of complex types for example), thus going this way
-    static if (is(typeof(T.axpby(t,u,args)))){ // static T.outerOp
-        alias typeof(T.axpby(t,u,args)) ResType;
-    } else static if (is(typeof(U.axpby(t,u,args)))){ // static U.outerOp
-        alias typeof(U.axpby(t,u,args)) ResType;
-    } else static if (is(typeof(t.axpby(u,args)))){ // t.opOuter
-        alias typeof(t.axpby(u,args)) ResType;
-    } else static if (is(typeof(u.axpby_r(t,args)))){ // u.opOuter_r
-        alias typeof(u.axpby_r(t,args)) ResType;
-    } else static if (nArgs!(S)==0 && is(typeof(t+=u))){
-        alias typeof(t+=u) ResType;
-    } else static if (nArgs!(S)==0 && is(typeof(t=t+u))){
-        alias typeof(t=t+u) ResType;
-    } else static if (nArgs!(S)==1 && is(typeof(t+=u*args[0]))){
-        alias typeof(t+=u*args[0]) ResType;
-    } else static if (nArgs!(S)==1 && is(typeof(t=t+u*args[0]))){
-        alias typeof(t=t+u*args[0]) ResType;
-    } else static if (nArgs!(S)==2 && is(typeof(t=args[1]*t+args[0]*u))){
-        alias typeof(t=args[1]*t+args[0]*u) ResType;
+    struct dummy{ T t; U u; S args; } // .init sometime fails (for tuples of complex types for example), thus going this way
+    static if (is(typeof(T.axpby(dummyS.init.t,dummyS.init.u,dummyS.init.args)))){ // static T.outerOp
+        alias typeof(T.axpby(dummyS.init.t,dummyS.init.u,dummyS.init.args)) ResType;
+    } else static if (is(typeof(U.axpby(dummyS.init.t,dummyS.init.u,dummyS.init.args)))){ // static U.outerOp
+        alias typeof(U.axpby(dummyS.init.t,dummyS.init.u,dummyS.init.args)) ResType;
+    } else static if (is(typeof(dummyS.init.t.axpby(dummyS.init.u,dummyS.init.args)))){ // t.opOuter
+        alias typeof(dummyS.init.t.axpby(dummyS.init.u,dummyS.init.args)) ResType;
+    } else static if (is(typeof(dummyS.init.u.axpby_r(dummyS.init.t,dummyS.init.args)))){ // u.opOuter_r
+        alias typeof(dummyS.init.u.axpby_r(dummyS.init.t,dummyS.init.args)) ResType;
+    } else static if (nArgs!(S)==0 && is(typeof(dummyS.init.t+=dummyS.init.u))){
+        alias typeof(dummyS.init.t+=dummyS.init.u) ResType;
+    } else static if (nArgs!(S)==0 && is(typeof(dummyS.init.t=dummyS.init.t+dummyS.init.u))){
+        alias typeof(dummyS.init.t=dummyS.init.t+dummyS.init.u) ResType;
+    } else static if (nArgs!(S)==1 && is(typeof(dummyS.init.t+=dummyS.init.u*args[0]))){
+        alias typeof(dummyS.init.t+=dummyS.init.u*args[0]) ResType;
+    } else static if (nArgs!(S)==1 && is(typeof(dummyS.init.t=dummyS.init.t+dummyS.init.u*args[0]))){
+        alias typeof(dummyS.init.t=dummyS.init.t+dummyS.init.u*args[0]) ResType;
+    } else static if (nArgs!(S)==2 && is(typeof(dummyS.init.t=dummyS.init.args[1]*dummyS.init.t+args[0]*dummyS.init.u))){
+        alias typeof(dummyS.init.t=dummyS.init.args[1]*dummyS.init.t+args[0]*dummyS.init.u) ResType;
     } else {
         alias void ResType;
     }

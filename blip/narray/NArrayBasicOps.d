@@ -1050,13 +1050,12 @@ S norm2NA(T,int rank, S=TypeOfNorm22NARes!(T))(NArray!(T,rank)a){
 
 /// generic norm22 return type
 template TypeOfNorm22(T){
-    T t;
-    static if (is(typeof(T.norm22(t)))){
-        alias typeof(T.norm22(t)) ResType;
-    } else static if (is(typeof(t.norm22()))){
-        alias typeof(t.norm22()) ResType;
-    } else static if (is(typeof(norm22NA(t)))){
-        alias typeof(norm22NA(t)) ResType;
+    static if (is(typeof(T.norm22(T.init)))){
+        alias typeof(T.norm22(T.init)) ResType;
+    } else static if (is(typeof(T.init.norm22()))){
+        alias typeof(T.init.norm22()) ResType;
+    } else static if (is(typeof(norm22NA(T.init)))){
+        alias typeof(norm22NA(T.init)) ResType;
     } else {
         alias void ResType;
     }
@@ -1076,13 +1075,12 @@ TypeOfNorm22!(T).ResType norm22(T)(T t){
 
 /// generic norm22 return type
 template TypeOfNorm2(T){
-    T t;
-    static if (is(typeof(T.norm2(t)))){
-        alias typeof(T.norm2(t)) ResType;
-    } else static if (is(typeof(t.norm22()))){
-        alias typeof(t.norm2()) ResType;
-    } else static if (is(typeof(sqrt(norm22(t))))){
-        alias typeof(sqrt(norm22(t))) ResType;
+    static if (is(typeof(T.norm2(T.init)))){
+        alias typeof(T.norm2(T.init)) ResType;
+    } else static if (is(typeof(T.init.norm22()))){
+        alias typeof(T.init.norm2()) ResType;
+    } else static if (is(typeof(sqrt(norm22(T.init))))){
+	alias typeof(sqrt(norm22(T.init))) ResType;
     } else {
         alias void ResType;
     }
