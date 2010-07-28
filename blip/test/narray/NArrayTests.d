@@ -482,14 +482,14 @@ else {
         auto ev2=eig!(T)(d.a, ev,leftEVect,rightEVect);
         auto m1=dot(d.a,rightEVect);
         auto m2=repeat(ev2,n,0)*rightEVect;
-        auto diff1=norm2!(ComplexTypeOf!(T),2,real)(m1-m2)/n;
+        auto diff1=norm2NA!(ComplexTypeOf!(T),2,real)(m1-m2)/n;
         m1=dot(leftEVect.H1,d.a);
         m2=leftEVect.T*repeat(ev2,n,-1);
-        auto diff2=norm2!(ComplexTypeOf!(T),2,real)(m1-m2)/n;
+        auto diff2=norm2NA!(ComplexTypeOf!(T),2,real)(m1-m2)/n;
         auto err1=feqrel(diff1+1.0L,1.0L);
         auto err2=feqrel(diff2+1.0L,1.0L);
-        assert(norm2!(ComplexTypeOf!(T),2,real)(rightEVect)>0.5,"rightEVect too small");
-        assert(norm2!(ComplexTypeOf!(T),2,real)(leftEVect)>0.5,"leftEVect too small");
+        assert(norm2NA!(ComplexTypeOf!(T),2,real)(rightEVect)>0.5,"rightEVect too small");
+        assert(norm2NA!(ComplexTypeOf!(T),2,real)(leftEVect)>0.5,"leftEVect too small");
         if (err1<T.mant_dig*2/3-tol){
             sout("ev:");
             ev2.printData(sout.call,"F8,10"); sout("\n");
@@ -507,7 +507,7 @@ else {
             assert(false,"leftEVect error too large");
         }
         auto ev3=eig(d.a);
-        auto diff3=norm2!(ComplexTypeOf!(T),1,real)(ev2-ev3)/sqrt(cast(real)n);
+        auto diff3=norm2NA!(ComplexTypeOf!(T),1,real)(ev2-ev3)/sqrt(cast(real)n);
         auto err3=feqrel(diff3+1.0L,1.0L);
         if (err3<T.mant_dig*2/3-tol){
             sout(collectAppender(delegate void(CharSink s){
@@ -530,15 +530,15 @@ else {
         } else {
             a2=dot(u*repeat(s2,m,0),vt[Range(0,m)]);
         }
-        auto diff1=norm2!(T,2,real)(d.a-a2)/n;
+        auto diff1=norm2NA!(T,2,real)(d.a-a2)/n;
 
         auto m1=dot(u.H,u);
         diag(m1)-=cast(T)1;
-        auto diff2=norm2!(T,2,real)(m1)/n;
+        auto diff2=norm2NA!(T,2,real)(m1)/n;
 
         auto m2=dot(vt,vt.H);
         diag(m2)-=cast(T)1;
-        auto diff3=norm2!(T,2,real)(m1)/n;
+        auto diff3=norm2NA!(T,2,real)(m1)/n;
 
         auto err1=feqrel(diff1+1.0L,1.0L);
         auto err2=feqrel(diff2+1.0L,1.0L);
@@ -566,7 +566,7 @@ else {
             assert(false,"vt non orthogonal");
         }
         auto s3=svd(d.a);
-        auto diff4=norm2!(RealTypeOf!(T),1,real)(s2-s3)/sqrt(cast(real)n);
+        auto diff4=norm2NA!(RealTypeOf!(T),1,real)(s2-s3)/sqrt(cast(real)n);
         auto err4=feqrel(diff4+1.0L,1.0L);
         if (err3<T.mant_dig*2/3-tol){
             sout(collectAppender(delegate void(CharSink s){
@@ -587,11 +587,11 @@ else {
         auto ev2=eigh!(T)(d.a, MStorage.up,ev,eVect);
         auto m1=dot(d.a,eVect);
         auto m2=repeat(ev2,n,0)*eVect;
-        auto diff1=norm2!(T,2,real)(m1-m2)/n;
+        auto diff1=norm2NA!(T,2,real)(m1-m2)/n;
         auto m3=dot(eVect.H,eVect);
         auto dd=diag(m3);
         dd-=cast(T)1;
-        auto diff2=norm2!(T,2,real)(m3)/n;
+        auto diff2=norm2NA!(T,2,real)(m3)/n;
         auto err1=feqrel(diff1+1.0L,1.0L);
         auto err2=feqrel(diff2+1.0L,1.0L);
         if (err1<T.mant_dig*2/3-tol){
@@ -610,7 +610,7 @@ else {
             assert(false,"non orto eVect error too large");
         }
         auto ev3=eigh(d.a);
-        auto diff3=norm2!(RealTypeOf!(T),1,real)(ev2-ev3)/sqrt(cast(real)n);
+        auto diff3=norm2NA!(RealTypeOf!(T),1,real)(ev2-ev3)/sqrt(cast(real)n);
         auto err3=feqrel(diff3+1.0L,1.0L);
         if (err3<T.mant_dig*2/3-tol){
             sout(collectAppender(delegate void(CharSink s){

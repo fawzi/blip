@@ -32,9 +32,238 @@ import blip.narray.NArrayType;
 import blip.narray.NArrayBasicOps;
 import blip.math.Math:min,max,round,sqrt,ceil,abs;
 import blip.stdc.string:memcpy;
-
+import blip.util.TemplateFu: nArgs;
 import blip.core.Traits:isComplexType,isImaginaryType,ComplexTypeOf,RealTypeOf;
 //import tango.util.log.Trace; //pippo
+
+/// return type of the generic dot operation
+template TypeOfDot(T,U,S...){
+    T t; U u; S args; // .init sometime fails (for tuples of complex types for example), thus going this way
+    static if (is(typeof(T.dotOp(t,u,args)))){ // static T.dotOp
+        alias typeof(T.dotOp(t,u,args)) ResType;
+    } else static if (is(typeof(U.dotOp(t,u,args)))){ // static U.dotOp
+        alias typeof(U.dotOp(t,u,args)) ResType;
+    } else static if (is(typeof(t.opDot(u,args)))){ // t.opDot
+        alias typeof(t.opDot(u,args)) ResType;
+    } else static if (is(typeof(u.opDot_r(t,args)))){ // u.opDot_r
+        alias typeof(u.opDot_r(t,args)) ResType;
+    } else static if (is(typeof(t.opVecMul(u,args)))){ // t.opVecMul
+        alias typeof(t.opVecMul(u,args)) ResType;
+    } else static if (is(typeof(u.opVecMul_r(t,args)))){ // u.opVecMul_r
+        alias typeof(u.opVecMul_r(t,args)) ResType;
+    } else static if (is(typeof(dotNA(t,u,args)))){ // NArray dot
+        alias typeof(dotNA(t,u,args)) ResType;
+    } else static if (is(typeof(t.opMul(u,args)))){ // t.opMul
+        alias typeof(t.opMul(u,args)) ResType;
+    } else static if (is(typeof(u.opMul_r(t,args)))){ // u.opMul_r
+        alias typeof(u.opMul_r(t,args)) ResType;
+    } else static if(nArgs!(S)==0 && is(typeof(t*u))){ // multiplication (for scalars)
+        alias typeof(t*u) ResType;
+    } else {
+        alias void ResType;
+    }
+}
+
+/// generic op dot
+TypeOfDot!(T,U,S).ResType dot(T,U,S...)(T t,U u,S args){
+    static if (is(typeof(T.dotOp(t,u,args)))){ // static T.dotOp
+        static if(is(typeof(T.dotOp(t,u,args))==void)){
+            T.dotOp(t,u,args);
+        } else {
+            return T.dotOp(t,u,args);
+        }
+    } else static if (is(typeof(U.dotOp(t,u,args)))){ // static U.dotOp
+        static if(is(typeof(U.dotOp(t,u,args))==void)){
+            U.dotOp(t,u,args);
+        } else {
+            return U.dotOp(t,u,args);
+        }
+    } else static if (is(typeof(t.opDot(u,args)))){ // t.opDot
+        static if(is(typeof(t.opDot(u,args))==void)){
+            t.opDot(u,args);
+        } else {
+            return t.opDot(u,args);
+        }
+    } else static if (is(typeof(u.opDot_r(t,args)))){ // u.opDot_r
+        static if(is(typeof(u.opDot_r(t,args))==void)){
+            u.opDot_r(t,args);
+        } else {
+            return u.opDot_r(t,args);
+        }
+    } else static if (is(typeof(t.opVecMul(u,args)))){ // t.opVecMul
+        static if(is(typeof(t.opVecMul(u,args))==void)){
+            t.opVecMul(u,args);
+        } else {
+            return t.opVecMul(u,args);
+        }
+    } else static if (is(typeof(u.opVecMul_r(t,args)))){ // u.opVecMul_r
+        static if(is(typeof(u.opVecMul_r(t,args))==void)){
+            u.opVecMul_r(t,args);
+        } else {
+            return u.opVecMul_r(t,args);
+        }
+    } else static if (is(typeof(dotNA(t,u,args)))){ // NArray dot
+        /// it is defined here because NArray dot is speacial, being so large it was split in several
+        /// modules and putting it in NArray would create circular refs (or a huge module)
+        /// unfortunaley (by design?) the only "free" templates that are picked up are those that are
+        /// locally visible where the template is defined. To have other ones a mixin is needed...
+        return dotNA(t,u,args);
+    } else static if (is(typeof(t.opMul(u,args)))){ // t.opMul
+        static if(is(typeof(t.opMul(u,args))==void)){
+            t.opMul(u,args);
+        } else {
+            return t.opMul(u,args);
+        }
+    } else static if (is(typeof(u.opMul_r(t,args)))){ // u.opMul_r
+        static if(is(typeof(u.opMul_r(t,args))==void)){
+            u.opMul_r(t,args);
+        } else {
+            return u.opMul_r(t,args);
+        }
+    } else static if(nArgs!(S)==0 && is(typeof(t*u))){ // multiplication (for scalars)
+        static if(is(typeof(t*u)==void)){
+            t*u;
+        } else {
+            return t*u;
+        }
+    } else {
+        static assert(0,"could not find a valid definition of dot with the following arguments:"~
+            T.stringof~","~U.stringof~","~S.stringof);
+    }
+}
+
+/// return type of the generic outer multiplication operation
+template TypeOfOuter(T,U,S...){
+    T t; U u; S args; // .init sometime fails (for tuples of complex types for example), thus going this way
+    static if (is(typeof(T.outerOp(t,u,args)))){ // static T.outerOp
+        alias typeof(T.outerOp(t,u,args)) ResType;
+    } else static if (is(typeof(U.outerOp(t,u,args)))){ // static U.outerOp
+        alias typeof(U.outerOp(t,u,args)) ResType;
+    } else static if (is(typeof(t.opOuter(u,args)))){ // t.opOuter
+        alias typeof(t.opOuter(u,args)) ResType;
+    } else static if (is(typeof(u.opOuter_r(t,args)))){ // u.opOuter_r
+        alias typeof(u.opOuter_r(t,args)) ResType;
+    } else static if (is(typeof(outerNA(t,u,args)))){ // NArray outer
+        alias typeof(outerNA(t,u,args)) ResType;
+    } else static if(nArgs!(S)==0 && isAtomicType!(T) && isAtomicType!(U) && is(typeof(t*u))){ // multiplication (for scalars)
+        // extend support to all opMul? dot and outer are the same *only* for scalars... not (for example) for matrix multiplication
+        alias typeof(t*u) ResType;
+    } else {
+        alias void ResType;
+    }
+}
+
+/// generic op outer
+TypeOfOuter!(T,U,S).ResType outer(T,U,S...)(T t,U u,S args){
+    static if (is(typeof(T.outerOp(t,u,args)))){ // static T.outerOp
+        static if(is(typeof(T.outerOp(t,u,args))==void)){
+            T.outerOp(t,u,args);
+        } else {
+            return T.outerOp(t,u,args);
+        }
+    } else static if (is(typeof(U.outerOp(t,u,args)))){ // static U.outerOp
+        static if(is(typeof(U.outerOp(t,u,args))==void)){
+            U.outerOp(t,u,args);
+        } else {
+            return U.outerOp(t,u,args);
+        }
+    } else static if (is(typeof(t.opOuter(u,args)))){ // t.opOuter
+        static if(is(typeof(t.opOuter(u,args))==void)){
+            t.opOuter(u,args);
+        } else {
+            return t.opOuter(u,args);
+        }
+    } else static if (is(typeof(u.opOuter_r(t,args)))){ // u.opOuter_r
+        static if(is(typeof(u.opOuter_r(t,args))==void)){
+            u.opOuter_r(t,args);
+        } else {
+            return u.opOuter_r(t,args);
+        }
+    } else static if (is(typeof(outerNA(t,u,args)))){ // NArray outer
+        /// it is defined here because NArray outer is speacial, being so large it was split in several
+        /// modules and putting it in NArray would create circular refs (or a huge module)
+        /// unfortunaley (by design?) the only "free" templates that are picked up are those that are
+        /// locally visible where the template is defined. To have other ones a mixin is needed...
+        return outerNA(t,u,args);
+    } else static if(nArgs!(S)==0 && isAtomicType!(T) && isAtomicType!(U) && is(typeof(t*u))){ // multiplication (for scalars), enlarge support to all opMul? dot and outer are the same *only* for scalars... not (for example) for matrix multiplication
+        static if(is(typeof(t*u)==void)){
+            t*u;
+        } else {
+            return t*u;
+        }
+    } else {
+        static assert(0,"could not find a valid definition of outer with the following arguments:"~
+            T.stringof~","~U.stringof~","~S.stringof);
+    }
+}
+
+/// return type of the generic axpby
+template TypeOfAxpby(T,U,S...){
+    T t; U u; S args; // .init sometime fails (for tuples of complex types for example), thus going this way
+    static if (is(typeof(T.axpby(t,u,args)))){ // static T.outerOp
+        alias typeof(T.axpby(t,u,args)) ResType;
+    } else static if (is(typeof(U.axpby(t,u,args)))){ // static U.outerOp
+        alias typeof(U.axpby(t,u,args)) ResType;
+    } else static if (is(typeof(t.axpby(u,args)))){ // t.opOuter
+        alias typeof(t.axpby(u,args)) ResType;
+    } else static if (is(typeof(u.axpby_r(t,args)))){ // u.opOuter_r
+        alias typeof(u.axpby_r(t,args)) ResType;
+    } else static if (nArgs!(S)==0 && is(typeof(t+=u))){
+        alias typeof(t+=u) ResType;
+    } else static if (nArgs!(S)==0 && is(typeof(t=t+u))){
+        alias typeof(t=t+u) ResType;
+    } else static if (nArgs!(S)==1 && is(typeof(t+=u*args[0]))){
+        alias typeof(t+=u*args[0]) ResType;
+    } else static if (nArgs!(S)==1 && is(typeof(t=t+u*args[0]))){
+        alias typeof(t=t+u*args[0]) ResType;
+    } else static if (nArgs!(S)==2 && is(typeof(t=args[1]*t+args[0]*u))){
+        alias typeof(t=args[1]*t+args[0]*u) ResType;
+    } else {
+        alias void ResType;
+    }
+}
+
+/// generic axpby
+TypeOfOuter!(T,U,S).ResType axpby(T,U,S...)(T t,U u,S args){
+    static if (is(typeof(T.axpby(t,u,args)))){ // static T.outerOp
+        static if(is(typeof(T.axpby(t,u,args))==void)){
+            T.axpby(t,u,args);
+        } else {
+            return T.axpby(t,u,args);
+        }
+    } else static if (is(typeof(U.axpby(t,u,args)))){ // static U.outerOp
+        static if(is(typeof(U.axpby(t,u,args))==void)){
+            U.axpby(t,u,args);
+        } else {
+            return U.axpby(t,u,args);
+        }
+    } else static if (is(typeof(t.axpby(u,args)))){ // t.opOuter
+        static if(is(typeof(t.axpby(u,args))==void)){
+            t.axpby(u,args);
+        } else {
+            return t.axpby(u,args);
+        }
+    } else static if (is(typeof(u.axpby_r(t,args)))){ // u.opOuter_r
+        static if(is(typeof(u.axpby_r(t,args))==void)){
+            u.axpby_r(t,args);
+        } else {
+            return u.axpby_r(t,args);
+        }
+    } else static if (nArgs!(S)==0 && is(typeof(t+=u))){
+        return t+=u;
+    } else static if (nArgs!(S)==0 && is(typeof(t=t+u))){
+        return t=t+u;
+    } else static if (nArgs!(S)==1 && is(typeof(t+=u*args[0]))){
+        return t+=u*args[0];
+    } else static if (nArgs!(S)==1 && is(typeof(t=t+u*args[0]))){
+        return t=t+u*args[0];
+    } else static if (nArgs!(S)==2 && is(typeof(t=args[1]*t+args[0]*u))){
+        return t=args[1]*t+args[0]*u;
+    } else {
+        static assert(0,"could not find a valid definition of outer with the following arguments:"~
+            T.stringof~","~U.stringof~","~S.stringof);
+    }
+}
 
 version(no_blas){ 
     version(no_lapack){ }
@@ -58,7 +287,7 @@ class LinAlgException:Exception{
 
 /// dot product between tensors (reduces a single axis) with scaling and
 /// already present storage target
-NArray!(S,rank3)dot(T,int rank1,U,int rank2,S,int rank3)
+NArray!(S,rank3)dotNA(T,int rank1,U,int rank2,S,int rank3)
     (NArray!(T,rank1)a, NArray!(U,rank2)b, ref NArray!(S,rank3) c,
         S scaleRes=cast(S)1, S scaleC=cast(S)0, int axis1=-1, int axis2=0)
 in {
@@ -234,7 +463,7 @@ body {
 }
 
 /// dot product between tensors (reduces a single axis)
-NArray!(typeof(T.init*U.init),rank1+rank2-2)dot(T,int rank1,U,int rank2)
+NArray!(typeof(T.init*U.init),rank1+rank2-2)dotNA(T,int rank1,U,int rank2)
     (NArray!(T,rank1)a,NArray!(U,rank2)b,int axis1=-1, int axis2=0)
 in {
     assert(-rank1<=axis1 && axis1<rank1,"axis1 out of bounds");
@@ -266,12 +495,12 @@ body {
     } else {
         auto res=NArray!(S,rank3).empty(newshape);
     }
-    return dot!(T,rank1,U,rank2,S,rank3)(a,b,res,cast(S)1,cast(S)0,axis1,axis2);
+    return dotNA!(T,rank1,U,rank2,S,rank3)(a,b,res,cast(S)1,cast(S)0,axis1,axis2);
 }
 
 /// outer product between tensors with scaling and
 /// already present storage target
-NArray!(S,rank3)outer(T,int rank1,U,int rank2,S,int rank3)
+NArray!(S,rank3)outerNA(T,int rank1,U,int rank2,S,int rank3)
     (NArray!(T,rank1)a, NArray!(U,rank2)b, ref NArray!(S,rank3) c,
         S scaleRes=cast(S)1, S scaleC=cast(S)0)
 in {
@@ -342,7 +571,7 @@ S dotAll(T,int rank1,U,int rank2,S=typeof(T.init*U.init))(NArray!(T,rank1)a, NAr
     static if (rank1==0){
         return a*b;
     } else static if (rank1==1){
-        return dot(a,b);
+        return dotNA(a,b);
     } else {
         S res=0; // could be smater about the sequence of dimensions...
         foreach(i,v;a){
@@ -353,8 +582,8 @@ S dotAll(T,int rank1,U,int rank2,S=typeof(T.init*U.init))(NArray!(T,rank1)a, NAr
     }
 }
 
-/// outer product between tensors (reduces a single axis)
-NArray!(typeof(T.init*U.init),rank1+rank2)outer(T,int rank1,U,int rank2)
+/// outer product between tensors (extends them)
+NArray!(typeof(T.init*U.init),rank1+rank2)outerNA(T,int rank1,U,int rank2)
     (NArray!(T,rank1)a,NArray!(U,rank2)b)
 body {
     alias typeof(T.init*U.init) S;
@@ -367,15 +596,15 @@ body {
     } else {
         auto res=NArray!(S,rank3).empty(newshape);
     }
-    return outer!(T,rank1,U,rank2,S,rank3)(a,b,res,cast(S)1,cast(S)0);
+    return outerNA!(T,rank1,U,rank2,S,rank3)(a,b,res,cast(S)1,cast(S)0);
 }
 
 /// degenerate case v s
-NArray!(T,rank1)outer(T,int rank1)(NArray!(T,rank1) a,T b){
+NArray!(T,rank1)outerNA(T,int rank1)(NArray!(T,rank1) a,T b){
   return a*b;
 }
 /// degenerate case s v
-NArray!(T,rank1)outer(int rank1,T)(T b,NArray!(T,rank1) a){
+NArray!(T,rank1)outerNA(int rank1,T)(T b,NArray!(T,rank1) a){
   return a*b;
 }
 // scalar scalar case cannot be cleanly supported with D1 as far as can I see 

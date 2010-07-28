@@ -1469,8 +1469,14 @@ class Unserializer {
                             t.postUnserialize(this);
                         }
                     }
-                    void realRead5(){
-                        t.unserialize(this);
+                    static if(is(typeof(t.serialize(this)))){
+                        void realRead5(){
+                            t.unserialize(this);
+                        }
+                    } else {
+                        throw new Exception("no external handlers and no internal unserialize, cannot unserialize "~T.stringof,__FILE__,__LINE__);
+                        void realRead5(){
+                        }
                     }
                     static if (is(typeof(T.init.unserialize(this)))){
                         if (metaInfo.kind==TypeKind.CustomK){

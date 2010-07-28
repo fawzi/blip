@@ -1024,8 +1024,16 @@ int minFeqrel(T,int rank)(NArray!(T,rank) a,T b=cast(T)0){
     return minEq;
 }
 
+template TypeOfNorm22NARes(T){
+    static if(is(T==cfloat)||is(T==cdouble)||is(T==creal)){
+        alias RealTypeOf!(T) TypeOfNorm22NARes;
+    } else {
+        alias T TypeOfNorm22NARes;
+    }
+}
+
 /// return the square of the 2 norm of the array
-S norm22(T,int rank, S=T)(NArray!(T,rank)a){
+S norm22NA(T,int rank, S=TypeOfNorm22NARes!(T))(NArray!(T,rank)a){
     static if(is(T==cfloat)||is(T==cdouble)||is(T==creal)){
         S res=reduceAllGen!((ref S x,T y){ x+=cast(S)y.re * cast(S)y.re + cast(S)y.im * cast(S)y.im; },
             (ref S x,S y){ x+=y; }, (S x){return x;},T,rank,S)(a,cast(S)0);
@@ -1036,9 +1044,60 @@ S norm22(T,int rank, S=T)(NArray!(T,rank)a){
     return res;
 }
 
-/// return the 2 norm of the array
-S norm2(T,int rank, S=T)(NArray!(T,rank)a){
-    return cast(S)sqrt(norm22!(T,rank,S)(a));
+S norm2NA(T,int rank, S=TypeOfNorm22NARes!(T))(NArray!(T,rank)a){
+    return cast(S)sqrt(norm22NA!(T,rank,S)(a));
+}
+
+/// generic norm22 return type
+template TypeOfNorm22(T){
+    T t;
+    static if (is(typeof(T.norm22(t)))){
+        alias typeof(T.norm22(t)) ResType;
+    } else static if (is(typeof(t.norm22()))){
+        alias typeof(t.norm22()) ResType;
+    } else static if (is(typeof(norm22NA(t)))){
+        alias typeof(norm22NA(t)) ResType;
+    } else {
+        alias void ResType;
+    }
+}
+/// generic squared norm2
+TypeOfNorm22!(T).ResType norm22(T)(T t){
+    static if (is(typeof(T.norm22(t)))){
+        return T.norm22(t);
+    } else static if (is(typeof(t.norm22()))){
+        return t.norm22();
+    } else static if (is(typeof(norm22NA(t)))){
+        return norm22NA(t);
+    } else {
+        static assert(0,"could not find an implementation of norm22 for type "~T.stringof);
+    }
+}
+
+/// generic norm22 return type
+template TypeOfNorm2(T){
+    T t;
+    static if (is(typeof(T.norm2(t)))){
+        alias typeof(T.norm2(t)) ResType;
+    } else static if (is(typeof(t.norm22()))){
+        alias typeof(t.norm2()) ResType;
+    } else static if (is(typeof(sqrt(norm22(t))))){
+        alias typeof(sqrt(norm22(t))) ResType;
+    } else {
+        alias void ResType;
+    }
+}
+/// generic squared norm2
+TypeOfNorm2!(T).ResType norm2(T)(T t){
+    static if (is(typeof(T.norm2(t)))){
+        return T.norm2(t);
+    } else static if (is(typeof(t.norm2()))){
+        return t.norm2();
+    } else static if (is(typeof(sqrt(norm22(t))))){
+        return sqrt(norm22(t));
+    } else {
+        static assert(0,"could not find an implementation of norm2 for type "~T.stringof);
+    }
 }
 
 /// makes the array hermitish (a==a.H) should use a recursive algorithm

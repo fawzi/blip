@@ -23,13 +23,7 @@ import blip.io.BasicIO: dumper; // needed just for the desc method
 import blip.parallel.smp.WorkManager;
 import blip.core.Traits;
 
-enum GASharing{
-    Local, /// local, don't free
-    GlobalNoFree, /// global, don't free, don't grow
-    Global, /// global, free
-}
-
-int nextPower2(int i){
+private int nextPower2(int i){
     int res=1;
     while(res<i){
         res*=2;

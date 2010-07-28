@@ -30,3 +30,11 @@ T[] compress(T)(T[]a,bool delegate(T x,T y)cmpOp){
     }
     return a[0..i+1];
 }
+
+size_t findFirstPred(T)(T[]arr,bool delegate(T) pred){
+    auto len=arr.length;
+    for (size_t i=0;i<len;++i){
+        if (pred(arr[i])) return i;
+    }
+    return len;
+}
