@@ -84,10 +84,10 @@ struct ParsedUrl{
         }
     }
     char[] url(char[]buf=null){
-        return collectAppender(&urlWriter,buf);
+        return collectAppender(&this.urlWriter,buf);
     }
     char[] fullPath(char[]buf=null){
-        return collectAppender(&fullPathWriter,buf);
+        return collectAppender(&this.fullPathWriter,buf);
     }
     void clearPath(){
         pathBuf[]=null;
