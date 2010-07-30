@@ -25,9 +25,11 @@ struct LocalMem{
     ubyte* localBufPos;
     
     static LocalMem opCall(T)(T[] buf){
-        localBufStart=cast(ubyte*)buf.ptr;
-        localBufEnd=cast(ubyte*)(buf.ptr+buf.length);
-        localBufPos=localBufStart;
+        LocalMem res;
+        res.localBufStart=cast(ubyte*)buf.ptr;
+        res.localBufEnd=cast(ubyte*)(buf.ptr+buf.length);
+        res.localBufPos=res.localBufStart;
+        return res;
     }
     
     /// allocates an array of type T and dimension dim
@@ -35,9 +37,9 @@ struct LocalMem{
         enum { alignment=T.alignof }
         static assert(alignment!=0);
         static if((alignment&(alignment-1))==0){
-            auto rest=localBufPos &(alignment-1);
+            auto rest=((cast(size_t)localBufPos) &(alignment-1));
         } else {
-            auto rest=localBufPos%alignment;
+            auto rest=((cast(size_t)localBufPos)%alignment);
         }
         if (rest!=0) rest=alignment-rest;
         if (localBufEnd-localBufPos>=dim*T.sizeof+rest){
