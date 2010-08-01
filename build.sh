@@ -131,8 +131,8 @@ case `uname` in
   *)
   die "unknown platform, you need to set extra_libs_os"
 esac
-extra_libs_opt="${linkFlag}-L${D_HOME}/lib $extra_libs_os $extra_libs_comp"
-extra_libs_dbg="${linkFlag}-L${D_HOME}/lib $extra_libs_os $extra_libs_comp"
+extra_libs_opt="${linkFlag}-L${D_HOME}/lib ${linkFlag}-ltango-user-${compShort} $extra_libs_os $extra_libs_comp"
+extra_libs_dbg="${linkFlag}-L${D_HOME}/lib ${linkFlag}-ltango-user-${compShort}-dbg $extra_libs_os $extra_libs_comp"
 case $version in
     opt)
     extra_libs="$extra_libs_opt"
@@ -142,7 +142,7 @@ case $version in
     ;;
     *)
     echo "unknown version, guessing extra_libs"
-    extra_libs="${linkFlag}-L${D_HOME}/lib $extra_libs_os $extra_libs_comp"
+    extra_libs="${linkFlag}-L${D_HOME}/lib ${linkFlag}-ltango-user-${compShort}-dbg $extra_libs_os $extra_libs_comp"
 esac
 makeFlags="$silent $build_dir"
 if [ -n "$clean" ]; then

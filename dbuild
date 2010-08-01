@@ -139,7 +139,7 @@ case `uname` in
   *)
   die "unknown platform, you need to set extra_libs_os"
 esac
-extra_libs="${linkFlag}-L${D_HOME}/lib ${linkFlag}-lblip-${compShort}${mpiVersion}$libExt $mpiFlags $extra_libs_os"
+extra_libs="${linkFlag}-L${D_HOME}/lib ${linkFlag}-ltango-user-${compShort}$libExt  ${linkFlag}-lblip-${compShort}${mpiVersion}$libExt $mpiFlags $extra_libs_os"
 
 case $version in
     opt)
