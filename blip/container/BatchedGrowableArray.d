@@ -23,6 +23,7 @@ import blip.io.BasicIO: dumper; // needed just for the desc method
 import blip.parallel.smp.WorkManager;
 import blip.core.Traits;
 import blip.core.sync.Mutex;
+import blip.sync.Atomic;
 
 private int nextPower2(int i){
     int res=1;
@@ -367,6 +368,7 @@ class BatchedGrowableArray(T,int batchSize=((2048/T.sizeof>128)?2048/T.sizeof:12
                 if (lastBatch+toAlloc>data.batches.length){
                     auto newHeaders=T*[](growLength(lastBatch+toAlloc));
                     newHeaders[0..lastBatch]=data.batches[0..lastBatch];
+                    writeBarrier();
                     data.batches=newHeaders;
                 }
                 auto batchStart=cast(T*)malloc(toAlloc*batchSize*T.sizeof);
