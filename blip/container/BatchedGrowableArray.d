@@ -368,7 +368,7 @@ class BatchedGrowableArray(T,int batchSize=((2048/T.sizeof>128)?2048/T.sizeof:12
                 if (lastBatch+toAlloc>data.batches.length){
                     auto newHeaders=T*[](growLength(lastBatch+toAlloc));
                     newHeaders[0..lastBatch]=data.batches[0..lastBatch];
-                    writeBarrier();
+                    writeBarrier(); // with this one could access also the batches with just a read barrier
                     data.batches=newHeaders;
                 }
                 auto batchStart=cast(T*)malloc(toAlloc*batchSize*T.sizeof);
@@ -399,6 +399,7 @@ class BatchedGrowableArray(T,int batchSize=((2048/T.sizeof>128)?2048/T.sizeof:12
                     if (lastBatch+toAlloc>data.batches.length){
                         auto newHeaders=T*[](growLength(lastBatch+toAlloc));
                         newHeaders[0..lastBatch]=data.batches[0..lastBatch];
+                        writeBarrier();
                         data.batches=newHeaders;
                     }
                     auto batchStart=(cast(T*)malloc(toAlloc*batchSize*T.sizeof));
