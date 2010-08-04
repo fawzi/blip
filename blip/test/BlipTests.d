@@ -19,6 +19,7 @@ import blip.test.narray.NArrayTests:narrayTests;
 import blip.io.Console;
 import blip.rtest.RTest;
 import blip.test.ContainerTests;
+import blip.test.UtilTests:utilTests;
 import blip.test.parallel.ParallelTests:parallelTests;
 
 /// all tests for blip, as template so that they are not instantiated if not used
@@ -29,6 +30,7 @@ TestCollection blipTests()(TestCollection superColl=null){
     // narrayTests!()(coll); // deactivated this expensive test for now...
     containerTests!()(coll);
     parallelTests!()(coll);
+    utilTests!()(coll);
     
     return coll;
 }

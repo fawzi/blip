@@ -22,6 +22,7 @@ import blip.util.Grow;
 import blip.io.BasicIO: dumper; // needed just for the desc method
 import blip.parallel.smp.WorkManager;
 import blip.core.Traits;
+import blip.core.sync.Mutex;
 
 private int nextPower2(int i){
     int res=1;
@@ -36,107 +37,19 @@ template defaultBatchSize(T){
 }
 /// a growable(on one end) data storage
 /// appending never invalidates older data/pointers, but data is not contiguous in memory
+/// data is written, *then* the new length is set, so accessing the length with a read barrier
+/// guarantees that all the data up to length has been initialized
 class BatchedGrowableArray(T,int batchSize=((2048/T.sizeof>128)?2048/T.sizeof:128)){
     static assert(((batchSize-1)&batchSize)==0,"batchSize should be a power of two"); // relax?
-    /+
-    /// structure to build a persistent tree of BatchHeader
-    /// this is nice and all, but I thought that just using a GC collected jump table that is reallocated
-    /// when too small is a better solution, so this will go (still here just to have a copy in the 
-    /// repository..., fawzi)
-    struct BatchHeader{
-        size_t pos;
-        T*batch;
-        BatchHeader*prev;
-        BatchHeader*next;
-        static void subV(size_t v,ref size_t prevV,ref size_t nextV){
-            size_t p=v;
-            size_t idx=1;
-            while((p&1)!=0){
-                idx<<=1;
-            }
-            auto c=idx-1;
-            prevV=(v&(~c))|(c>>1);
-            nextV=prevV|idx;
-        }
-        size_t superV(size_t v){
-            size_t p=v;
-            size_t idx=1;
-            while((p&1)!=0){
-                idx<<=1;
-            }
-            return (v&(~(idx<<1)))|idx;
-        }
-        static BatchHeader*findHeader(size_t pos,BatchHeader*root){
-            if (root is null) throw new Exception("pos not found",__FILE__,__LINE__);
-            if (pos<root.pos) return findHeader(pos,root.prev);
-            if (pos>root.pos) return findHeader(pos,root.next);
-            return root;
-        }
-        static BatchHeader*findOrAdd(size_t pos,BatchHeader*root){
-            assert(root!is null); // roots are added by another path
-            if (pos<root.pos) {
-                if (root.prev !is null) {
-                    return findOrAdd(pos,root.prev);
-                }
-                size_t prevV,nextV;
-                subV(root.pos,prevV,nextV);
-                auto newBatchHeader=new BatchHeader;
-                newBatchHeader.pos=prevV;
-                root.prev=newBatchHeader;
-                if (prevV==pos){
-                    return newBatchHeader;
-                }
-                return findOrAdd(pos,newBatchHeader);
-            }
-            if (pos>root.pos) {
-                if (root.next !is null) {
-                    return findOrAdd(pos,root.next);
-                }
-                size_t prevV,nextV;
-                subV(root.pos,prevV,nextV);
-                auto newBatchHeader=new BatchHeader;
-                newBatchHeader.pos=nextV;
-                root.next=newBatchHeader;
-                if (nextV==pos){
-                    return newBatchHeader;
-                }
-                return findOrAdd(pos,newBatchHeader);
-            }
-            return root;
-        }
-        static BatchHeader*addHeader(ref BatchHeader*root,size_t pos,T*val){
-            if(((pos+1)&pos)==0){// new root
-                auto newHeader=BatchHeader;
-                newHeader.pos=pos;
-                newHeader.batch=val;
-                size_t prevV,nextV;
-                if (pos!=0){
-                    subV(pos,prevV,nextV);
-                    newHeader.prev=findHeader(prevV,root);
-                    assert(newHeader.prev is root);
-                }
-                root=newHeader;
-                return newHeader;
-            }
-            auto h=findOrAdd(pos,root);
-            assert(h.batch is null,"double add");
-            h.batch=val;
-        }
-        static void destroyAll(BatchHeader*root){
-            if (root is null) return;
-            if (root.prev !is null) destroyAll(root.prev);
-            if (root.next !is null) destroyAll(root.next);
-            if (root.batch !is null) free(root.batch);
-            delete root;
-        }
-    }
-    +/
-    /// a frozen (just extent, not necessarily content) view of an array
+    /// a frozen (just extent, not necessarily content) view of a piece of array
     struct View {
         T*[] batches;
         size_t start;
         size_t end;
         
+        size_t length(){
+            return end-start;
+        }
         T*ptrI(size_t i){
             auto ii=i+start;
             assert(ii<end,"index out of bounds");
@@ -434,7 +347,6 @@ class BatchedGrowableArray(T,int batchSize=((2048/T.sizeof>128)?2048/T.sizeof:12
     }
     
     View data;
-    Mutex headerLock;
     
     size_t capacity(){
         return batchSize*batchStarts.length;
@@ -442,11 +354,6 @@ class BatchedGrowableArray(T,int batchSize=((2048/T.sizeof>128)?2048/T.sizeof:12
     
     this(size_t batchSize=((2048/T.sizeof>128)?2048/T.sizeof:128)){
         data.batchSize=batchSize;
-        headerLock=new Mutex();
-    }
-    
-    size_t capacity(){
-        return batchSize*batchStarts.length;
     }
     
     void appendArr(T[] a){
@@ -475,12 +382,13 @@ class BatchedGrowableArray(T,int batchSize=((2048/T.sizeof>128)?2048/T.sizeof:12
                     data.batches[lastBatch]=batchStart;
                     batchStart+=batchSize;
                 }
-                data.length+=a.length;
             }
+            writeBarrier(); // this allows using just a readBarrier to access the length...
+            data.end+=a.length;
         }
     }
     /// grows the array to at least the requested size
-    void growTo(size_t c){
+    void growCapacityTo(size_t c){
         if (data.length<c){
             synchronized(this){
                 if (capacity<c){
@@ -502,7 +410,6 @@ class BatchedGrowableArray(T,int batchSize=((2048/T.sizeof>128)?2048/T.sizeof:12
                         batchStart+=batchSize;
                     }
                 }
-                data.length=c;
             }
         }
         assert(data.length>=c);
@@ -513,11 +420,10 @@ class BatchedGrowableArray(T,int batchSize=((2048/T.sizeof>128)?2048/T.sizeof:12
             auto len=data.length;
             auto lastBatch=len/batchSize;
             if (len==(lastBatch+1)*batchSize){
-                growTo(len+1);
-            } else{
-                ++data.length;
+                growCapacityTo(len+1);
             }
             data[len]=a;
+            ++data.length;
         }
     }
     
@@ -535,8 +441,14 @@ class BatchedGrowableArray(T,int batchSize=((2048/T.sizeof>128)?2048/T.sizeof:12
     static if(is(T==ubyte)){
         void appendVoid(void[]t){
             if (t.length!=0){
-                growTo(data.length+t.length);
-                dataPtr[(dataLen-t.length)..dataLen]=cast(ubyte[])t;
+                synchronized(this){
+                    growCapacityTo(data.length+t.length);
+                    auto dataLen=data.length;
+                    auto dataLenNew=dataLen+t.length;
+                    dataPtr[dataLen..dataLenNew]=cast(ubyte[])t;
+                    writeBarrier(); // this allows using just a readBarrier to access the length...
+                    data.end+=t.length;
+                }
             }
         }
         //alias appendVoid opCatAssign;
