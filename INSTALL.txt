@@ -1,5 +1,5 @@
 Blip is undergoing a reorganization, so building might be a little more complex than it should:
-* you need a specific version of tango, see http://github.com/fawzi/oldTango , the next release of tango will be supported
+* you need the trunk of tango to build blip (or the older frozen version http://github.com/fawzi/oldTango ), the next release of tango will be supported
 * 
 Git repositories is available at
     http://github.com/fawzi/
@@ -19,7 +19,7 @@ to install
     
 blas/lapack wrappers are used by default, and are part of the distribution, they come from the 
     http://dsource.org/projects/multiarray
-project, but the blas and lapack library themselves have to be installed by yourself (goto2 is a good choice)
+project, but the blas and lapack library themselves have to be installed by yourself (mkl is a good choice, some versions of goto2 have a threading problem)
 
 you can also use the included makefile, for example on mac I do
 
@@ -38,13 +38,7 @@ other useful flags are
     -debug=TestNArray   // activates extra internal consistency checks in NArray
     -version=multiarray // in perf_test times also multiarray performace (that you need to install separately)
 
-mpi has wrappers to the open mpi routines, but that has to be activatd.
-
-The serialization routine can use xpose to automatically define a serialization routine.
-Xpose comes from
-    http://h3.team0xf.com:1024/xf/file/38f8ec538442/xpose
-and its use can be activated with
-    -version=Xpose
+mpi has wrappers to the open mpi routines, but that has to be activated (openmpi is a good choice).
 
 To have maximum speed compile with -release -O, but as it is quite new you might want to 
 first compile it with checks.
@@ -55,14 +49,11 @@ if you don't want to build them use lib as target.
 The tests in testNArray are quite stringent, and with random generation they might be 
 numerically difficult.
 I did not want to reduce too much the accuracy of the tests, and so in some cases they 
-might fail (especially without blas, or with very agressive blas), it this is the case 
-look at the error that they have, probably everything is still ok.
+might fail (especially for single precision without blas, or with a very agressive blas),
+it this is the case look at the error that they have, probably everything is still ok.
 On windows there is a limit on the number of symbols that can be defined in a single file, 
 testNArray with all tests would exceed this limit, so by default only the tests for double 
 argument are performed, if you want other you have to activate them by hand.
-
-To test one can also 
-    dsss build -debug=UnitTest -g --test
 
 have fun!
 
