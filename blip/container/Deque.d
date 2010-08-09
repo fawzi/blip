@@ -349,6 +349,14 @@ class Deque(T):CopiableObjectI{
         }
     }
     
+    void clear(){
+        synchronized(this){
+            baseArr[]=T.init;
+            start=0;
+            nEl=0;
+        }
+    }
+    
     static if (is(typeof(T.serialize(Serializer.init)))){
         static ClassMetaInfo metaI;
         static this(){

@@ -24,6 +24,9 @@ import blip.parallel.smp.WorkManager;
 import blip.core.Traits;
 import blip.core.sync.Mutex;
 import blip.sync.Atomic;
+import blip.container.AtomicSLink;
+import blip.container.Pool;
+import blip.container.Cache;
 
 private int nextPower2(int i){
     int res=1;
@@ -73,16 +76,15 @@ class BatchedGrowableArray(T,int batchSize=((2048/T.sizeof>128)?2048/T.sizeof:12
             }
             /// returns the next batch
             bool next(ref T[]el){ // could cache the current batch...
-                if (view.start!=view.end){
-                    auto ii=i+start;
-                    assert(ii<length,"index out of bounds");
+                if (view.start<view.end){
+                    auto ii=view.start;
                     auto bIndex=ii/batchSize;
                     auto lStart=ii-bIndex*batchSize;
                     if (batchSize<view.end-ii){
-                        el=batches[bIndex][lStart..batchSize];
+                        el=view.batches[bIndex][lStart..batchSize];
                         view.start+=batchSize-lStart;
                     } else {
-                        el=batches[bIndex][lStart..view.end-ii];
+                        el=view.batches[bIndex][lStart..view.end-ii];
                         view.start=view.end;
                     }
                     return true;
@@ -94,29 +96,29 @@ class BatchedGrowableArray(T,int batchSize=((2048/T.sizeof>128)?2048/T.sizeof:12
                 if (view.start==view.end) return 0;
                 assert(view.start<view.end);
                 auto ii=0;
-                auto iEnd=end-start;
-                auto bIndex=start/batchSize;
-                auto lStart=start-bIndex*batchSize;
+                auto iEnd=view.end-view.start;
+                auto bIndex=view.start/batchSize;
+                auto lStart=view.start-bIndex*batchSize;
                 if (batchSize<lStart+iEnd){
-                    T[] batch=batches[bIndex][0..batchSize];
+                    T[] batch=view.batches[bIndex][0..batchSize];
                     if (auto res=loopBody(batch)) return res;
                     ii+=batchSize-lStart;
                 } else { // at end
-                    T[] batch=batches[bIndex][0..batchSize];
-                    auto res=loopBody(batches[bIndex][lStart..lStart+iEnd]);
+                    T[] batch=view.batches[bIndex][lStart..lStart+iEnd];
+                    auto res=loopBody(batch);
                     return res;
                 }
                 iEnd-=batchSize;
                 while(ii<=iEnd){
                     ++bIndex;
-                    T[] batch=batches[bIndex][0..batchSize];
+                    T[] batch=view.batches[bIndex][0..batchSize];
                     if (auto res=loopBody(batch)) return res;
                     ii+=batchSize;
                 }
                 iEnd+=batchSize;
                 if (ii!=iEnd){
                     ++bIndex;
-                    T[] batch=batches[bIndex][0..iEnd-ii];
+                    T[] batch=view.batches[bIndex][0..iEnd-ii];
                     if (auto res=loopBody(batch)) return res;
                 }
                 return 0;
@@ -125,62 +127,33 @@ class BatchedGrowableArray(T,int batchSize=((2048/T.sizeof>128)?2048/T.sizeof:12
             int opApply(int delegate(ref size_t,ref T[]) loopBody){
                 if (view.start==view.end) return 0;
                 assert(view.start<view.end);
-                auto ii=0;
-                auto iEnd=end-start;
-                auto bIndex=start/batchSize;
-                auto lStart=start-bIndex*batchSize;
+                size_t ii=0;
+                auto iEnd=view.end-view.start;
+                auto bIndex=view.start/batchSize;
+                auto lStart=view.start-bIndex*batchSize;
                 if (batchSize<lStart+iEnd){
-                    T[] batch=batches[bIndex][0..batchSize];
+                    T[] batch=view.batches[bIndex][0..batchSize];
                     if (auto res=loopBody(ii,batch)) return res;
                     ii+=batchSize-lStart;
                 } else { // at end
-                    T[] batch=batches[bIndex][0..batchSize];
-                    auto res=loopBody(ii,batches[bIndex][lStart..lStart+iEnd]);
+                    T[] batch=view.batches[bIndex][lStart..lStart+iEnd];
+                    auto res=loopBody(ii,batch);
                     return res;
                 }
                 iEnd-=batchSize;
                 while(ii<=iEnd){
                     ++bIndex;
-                    T[] batch=batches[bIndex][0..batchSize];
+                    T[] batch=view.batches[bIndex][0..batchSize];
                     if (auto res=loopBody(ii,batch)) return res;
                     ii+=batchSize;
                 }
                 iEnd+=batchSize;
                 if (ii!=iEnd){
                     ++bIndex;
-                    T[] batch=batches[bIndex][0..iEnd-ii];
+                    T[] batch=view.batches[bIndex][0..iEnd-ii];
                     if (auto res=loopBody(ii,batch)) return res;
                 }
                 return 0;
-            }
-        }
-        struct Batch{
-            T[] data;
-            size_t startI;
-            PLoop *context;
-            Batch * next;
-            void giveBack(){
-                insertAt(context.pool,this);
-            }
-            void doIndexLoop(){
-                try{
-                    if ((context.res)==0 && context.exception is null){
-                        auto res=loopBody.indexed(startI,data);
-                        if (res!=0) *resPtr=res;
-                    }
-                } catch (Exception e){
-                    *exceptionPtr=e;
-                }
-            }
-            void doNoIndexLoop(){
-                try{
-                    if ((*resPtr)==0 && exceptionPtr is null){
-                        auto res=loopBody.noIndex(data);
-                        if (res!=0) *resPtr=res;
-                    }
-                } catch (Exception e){
-                    *exceptionPtr=e;
-                }
             }
         }
         struct PLoop{
@@ -191,57 +164,111 @@ class BatchedGrowableArray(T,int batchSize=((2048/T.sizeof>128)?2048/T.sizeof:12
             View view;
             int res;
             Exception exception;
-            Batch *pool;
             Looper loopBody;
+            struct Batch{
+                T[] data;
+                size_t startI;
+                PLoop *context;
+                Batch * next;
+                PoolI!(Batch*) pool;
+                void giveBack(){
+                    if (pool!is null){
+                        pool.giveBack(this);
+                    } else {
+                        delete this; // avoid???
+                    }
+                }
+                void doIndexLoop(){
+                    try{
+                        if ((context.res)==0 && context.exception is null){
+                            auto res=context.loopBody.indexed(startI,data);
+                            if (res!=0) context.res=res;
+                        }
+                    } catch (Exception e){
+                        context.exception=e;
+                    }
+                }
+                void doNoIndexLoop(){
+                    try{
+                        if (context.res==0 && context.exception is null){
+                            auto res=context.loopBody.noIndex(data);
+                            if (res!=0) context.res=res;
+                        }
+                    } catch (Exception e){
+                        context.exception=e;
+                    }
+                }
+            }
             
+            static PoolI!(Batch *) pool;
+            static size_t poolLevel;
+            static Mutex poolLock;
+            static this(){
+                poolLock=new Mutex(); // avoid prealloc?
+            }
+            static void addPool(){
+                synchronized(poolLock){
+                    if (poolLevel==0){
+                        pool=cachedPoolNext(function Batch*(PoolI!(Batch*)p){
+                            auto res=new Batch;
+                            res.pool=p;
+                            return res;
+                        });
+                    }
+                    ++poolLevel;
+                }
+            }
+            static void rmPool(){
+                synchronized(poolLock){
+                    if (poolLevel==0) throw new Exception("poolLevel was 0 in rmPool",__FILE__,__LINE__);
+                    --poolLevel;
+                    if (poolLevel==0){
+                        pool.rmUser();
+                        pool=null;
+                    }
+                }
+            }
             static PLoop opCall(View view){
                 PLoop res;
                 res.view=view;
                 return res;
             }
             Batch* allocBatch(){
-                auto newBatch=popFrom(pool);
-                if (newBatch is null) newBatch=new Batch;
-                newBatch.context=this;
-                return new Batch;
+                auto res=pool.getObj();
+                res.context=this;
+                return res;
             }
             
-            void deallocBatches(){
-                Batch *p=pool;
-                while(p!is null){
-                    auto n=p.next;
-                    delete p;
-                    p=n;
-                }
-            }
             /// loops on the batches
             int opApply(int delegate(ref T[]el) loopBody){
                 if (view.start==view.end) return 0;
                 assert(view.start<view.end);
-                loopBody.noIndex=loopBody;
+                this.loopBody.noIndex=loopBody;
+                addPool();
+                scope(exit){ rmPool(); }
                 Task("BatchedGrowableArrayPLoopMain",delegate void(){
                     auto ii=0;
-                    auto iEnd=end-start;
-                    auto bIndex=start/batchSize;
-                    auto lStart=start-bIndex*batchSize;
+                    auto iEnd=view.end-view.start;
+                    auto bIndex=view.start/batchSize;
+                    auto lStart=view.start-bIndex*batchSize;
                     if (batchSize<lStart+iEnd){
                         auto bAtt=allocBatch();
-                        bAtt.start=0;
-                        bAtt.data=batches[bIndex][0..batchSize];
+                        bAtt.startI=0;
+                        bAtt.data=view.batches[bIndex][0..batchSize];
                         Task("BatchedGrowableArrayPLoopFirst",&bAtt.doNoIndexLoop)
                             .appendOnFinish(&bAtt.giveBack).autorelease.submitYield();
                         ii+=batchSize-lStart;
                     } else { // at end
-                        T[] batch=batches[bIndex][0..batchSize];
-                        auto res=loopBody(batches[bIndex][lStart..lStart+iEnd]);
-                        return res;
+                        T[] batch=view.batches[bIndex][lStart..lStart+iEnd];
+                        this.res=this.loopBody.noIndex(batch);
+                        return;
                     }
                     iEnd-=batchSize;
                     while(ii<=iEnd){
                         ++bIndex;
                         auto bAtt=allocBatch();
-                        bAtt.start=ii;
-                        bAtt.data=batches[bIndex][0..batchSize];
+                        bAtt.startI=ii;
+                        bAtt.data=view.batches[bIndex][0..batchSize];
                         Task("BatchedGrowableArrayPLoopIter",&bAtt.doNoIndexLoop)
                             .appendOnFinish(&bAtt.giveBack).autorelease.submitYield();
                         ii+=batchSize;
@@ -250,8 +277,8 @@ class BatchedGrowableArray(T,int batchSize=((2048/T.sizeof>128)?2048/T.sizeof:12
                     if (ii!=iEnd){
                         ++bIndex;
                         auto bAtt=allocBatch();
-                        bAtt.start=ii;
-                        bAtt.data=batches[bIndex][0..iEnd-ii];
+                        bAtt.startI=ii;
+                        bAtt.data=view.batches[bIndex][0..iEnd-ii];
                         Task("BatchedGrowableArrayPLoopIter",&bAtt.doNoIndexLoop)
                             .appendOnFinish(&bAtt.giveBack).autorelease.submit();
                     }
@@ -264,30 +291,32 @@ class BatchedGrowableArray(T,int batchSize=((2048/T.sizeof>128)?2048/T.sizeof:12
             int opApply(int delegate(ref size_t,ref T[]) loopBody){
                 if (view.start==view.end) return 0;
                 assert(view.start<view.end);
-                loopBody.indexed=loopBody;
+                this.loopBody.indexed=loopBody;
+                addPool();
+                scope(exit){ rmPool(); }
                 Task("BatchedGrowableArrayPLoopMain",delegate void(){
-                    auto ii=0;
-                    auto iEnd=end-start;
-                    auto bIndex=start/batchSize;
-                    auto lStart=start-bIndex*batchSize;
+                    size_t ii=0;
+                    auto iEnd=view.end-view.start;
+                    auto bIndex=view.start/batchSize;
+                    auto lStart=view.start-bIndex*batchSize;
                     if (batchSize<lStart+iEnd){
                         auto bAtt=allocBatch();
-                        bAtt.start=0;
-                        bAtt.data=batches[bIndex][0..batchSize];
+                        bAtt.startI=0;
+                        bAtt.data=view.batches[bIndex][0..batchSize];
                         Task("BatchedGrowableArrayPLoopFirst",&bAtt.doIndexLoop)
                             .appendOnFinish(&bAtt.giveBack).autorelease.submitYield();
                         ii+=batchSize-lStart;
                     } else { // at end
-                        T[] batch=batches[bIndex][0..batchSize];
-                        auto res=loopBody(batches[bIndex][lStart..lStart+iEnd]);
-                        return res;
+                        T[] batch=view.batches[bIndex][lStart..lStart+iEnd];
+                        res=this.loopBody.indexed(ii,batch);
+                        return;
                     }
                     iEnd-=batchSize;
                     while(ii<=iEnd){
                         ++bIndex;
                         auto bAtt=allocBatch();
-                        bAtt.start=ii;
-                        bAtt.data=batches[bIndex][0..batchSize];
+                        bAtt.startI=ii;
+                        bAtt.data=view.batches[bIndex][0..batchSize];
                         Task("BatchedGrowableArrayPLoopIter",&bAtt.doIndexLoop)
                             .appendOnFinish(&bAtt.giveBack).autorelease.submitYield();
                         ii+=batchSize;
@@ -296,8 +325,8 @@ class BatchedGrowableArray(T,int batchSize=((2048/T.sizeof>128)?2048/T.sizeof:12
                     if (ii!=iEnd){
                         ++bIndex;
                         auto bAtt=allocBatch();
-                        bAtt.start=ii;
-                        bAtt.data=batches[bIndex][0..iEnd-ii];
+                        bAtt.startI=ii;
+                        bAtt.data=view.batches[bIndex][0..iEnd-ii];
                         Task("BatchedGrowableArrayPLoopIter",&bAtt.doIndexLoop)
                             .appendOnFinish(&bAtt.giveBack).autorelease.submit();
                     }
@@ -310,7 +339,7 @@ class BatchedGrowableArray(T,int batchSize=((2048/T.sizeof>128)?2048/T.sizeof:12
         struct ElLoop{
             int delegate(ref T) loopEl;
             int loopBody(ref T[]a){
-                for (size_t i=0;i<t.length;++i){
+                for (size_t i=0;i<a.length;++i){
                     if (auto res=loopEl(a[i])) return res;
                 }
                 return 0;
@@ -320,7 +349,7 @@ class BatchedGrowableArray(T,int batchSize=((2048/T.sizeof>128)?2048/T.sizeof:12
             int delegate(ref size_t,ref T) loopEl;
             int loopBody(ref size_t i0,ref T[] a){
                 auto ii=i0;
-                for (size_t i=0;i<t.length;++i){
+                for (size_t i=0;i<a.length;++i){
                     if (auto res=loopEl(ii,a[i])) return res;
                     ++ii;
                 }
@@ -332,7 +361,7 @@ class BatchedGrowableArray(T,int batchSize=((2048/T.sizeof>128)?2048/T.sizeof:12
             return BatchLoop(*this);
         }
         /// parallel batch loop
-        BatchLoop pBatchLoop(){
+        PLoop pBatchLoop(){
             return PLoop(*this);
         }
         int delegate(ref T[]) toBatch(int delegate(ref T)l){
@@ -350,11 +379,13 @@ class BatchedGrowableArray(T,int batchSize=((2048/T.sizeof>128)?2048/T.sizeof:12
     View data;
     
     size_t capacity(){
-        return batchSize*batchStarts.length;
+        return batchSize*data.batches.length;
+    }
+    size_t length(){
+        return data.length();
     }
     
-    this(size_t batchSize=((2048/T.sizeof>128)?2048/T.sizeof:128)){
-        data.batchSize=batchSize;
+    this(){
     }
     
     void appendArr(T[] a){

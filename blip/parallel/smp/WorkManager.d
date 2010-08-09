@@ -131,17 +131,46 @@ import tango.util.log.Config;
 import blip.util.TangoLog;import blip.parallel.smp.NumaSchedulers;
 import blip.parallel.smp.Numa;
 
+char[][] ctfe_splitCompress(char[]sep,char[] str){
+    char[][] res;
+    size_t fromI=0;
+    bool wasSpace=false;
+    foreach(i,c;str){
+        if (wasSpace) fromI=i;
+        wasSpace=false;
+        bool isSep=false;
+        foreach(c2;sep){
+            if (c==c2) isSep=true;
+        }
+        if (isSep){
+            if (i>fromI){
+                res ~= str[fromI..i];
+            }
+            wasSpace=true;
+        }
+    }
+    if (!wasSpace){
+        res ~= str[fromI..$];
+    }
+    return res;
+}
 /// creates an action, i.e. a void delegate() called name, that captures the local
 /// variables locals, and executes the action action.
 /// lives in the heap, so it is safe
-char[] mkActionMixin(char[]name,char[]locals,char[]action){
+char[] mkActionMixin(char[]name,char[]locals_,char[]action){
+    char[][] locals=ctfe_splitCompress("|",locals_);
     char[] res= `
     void delegate() `~name~`;
-    {
+    {`;
+    foreach(v;locals){
+        res~=`
+        alias typeof(`~v~`) `~v~`Type_;`;
+    }
+    res~=`
         struct `~name~`Closure{`;
     foreach(v;locals){
         res~=`
-        typeof(`~v~`) `~v~`;`;
+        `~v~`Type_ `~v~`;`;
     }
     res~=`
             void doIt(){

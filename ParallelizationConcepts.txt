@@ -161,6 +161,9 @@ Some languages try have special syntax for some of these operations, but
 normally the program does not have so many of them to make any special syntax
 really worth it, it should be clean, but method calling work just well enough.
 
+Using these methods helper for the common case of parallel loops on arrays are
+available in blip.parallel.smp.PLoopHelpers.
+
 Another concept useful to build parallel programs are dataflow variables.
 Dataflow variables are variables that can be set several times but always to the
 same value. Reading a dataflow variable blocks until a value is set. The nice

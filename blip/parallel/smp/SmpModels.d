@@ -16,7 +16,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 module blip.parallel.smp.SmpModels;
-import blip.util.TangoLog;import blip.BasicModels;
+import blip.util.TangoLog;
+import blip.BasicModels;
 import blip.io.BasicIO;
 import blip.container.FiberPool;
 import blip.container.Cache;
@@ -80,7 +81,8 @@ TaskStatus taskStatusFromStr(char[] s){
                 res=10*res+cast(long)(s[i]-'0');
             }
             if (s[t.length]=='-') res=-res;
-            return cast(TaskStatus)cast(int)res;
+            assert(0,"compiler bug of dmd 1.063 beta");
+            //return cast(TaskStatus)cast(int)res;
         }
         throw new Exception("could not interpret taskStatus "~s,__FILE__,__LINE__);
     }

@@ -1469,7 +1469,7 @@ class Unserializer {
                             t.postUnserialize(this);
                         }
                     }
-                    static if(is(typeof(t.serialize(this)))){
+                    static if(is(typeof(t.unserialize(this)))){
                         void realRead5(){
                             t.unserialize(this);
                         }
