@@ -115,3 +115,12 @@ char[] ctfe_rep(char[] s){
 bool typeHasPointers(T)(){
     return (typeid(T).flags & 1)!=0;
 }
+
+/// type of a property
+template PropType(T){
+    static if((is(T==function)||is(T==delegate))&&is(T U==return)){
+        alias U PropType;
+    } else {
+        alias T PropType;
+    }
+}

@@ -16,6 +16,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 module blip.util.BinSearch;
+import blip.core.Traits;
 
 
 /// returns if t<u, using < or a comparing op x.opCmp and an element or a bool lessThan predicate
@@ -81,8 +82,9 @@ typeof(IdxType1.init+IdxType2.init) uBound(ArrType,ToFind,IdxType1=size_t,IdxTyp
     return lb;
 }
 /// ditto
-typeof(ArrType.init.length) lBound(ArrType,ToFind)(ArrType arr,ToFind toFind){
-    return lBound!(ArrType,ToFind,typeof(ArrType.init.length),typeof(ArrType.init.length))
+PropType!(typeof(ArrType.init.length)) lBound(ArrType,ToFind)(ArrType arr,ToFind toFind){
+    alias PropType!(typeof(ArrType.init.length)) IdxType;
+    return lBound!(ArrType,ToFind,IdxType,IdxType)
         (arr,toFind,0,arr.length);
 }
 
@@ -114,7 +116,8 @@ typeof(IdxType1.init+IdxType2.init) lBound(ArrType,ToFind,IdxType1=size_t,IdxTyp
     return lb;
 }
 /// ditto
-typeof(ArrType.init.length) uBound(ArrType,ToFind)(ArrType arr,ToFind toFind){
-    return uBound!(ArrType,ToFind,typeof(ArrType.init.length),typeof(ArrType.init.length))
+PropType!(typeof(ArrType.init.length)) uBound(ArrType,ToFind)(ArrType arr,ToFind toFind){
+    alias PropType!(typeof(ArrType.init.length)) IdxType;
+    return uBound!(ArrType,ToFind,IdxType,IdxType)
         (arr,toFind,0,arr.length);
 }

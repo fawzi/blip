@@ -81,8 +81,7 @@ TaskStatus taskStatusFromStr(char[] s){
                 res=10*res+cast(long)(s[i]-'0');
             }
             if (s[t.length]=='-') res=-res;
-            assert(0,"compiler bug of dmd 1.063 beta");
-            //return cast(TaskStatus)cast(int)res;
+            return cast(TaskStatus)cast(int)res;
         }
         throw new Exception("could not interpret taskStatus "~s,__FILE__,__LINE__);
     }

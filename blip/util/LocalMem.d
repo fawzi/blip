@@ -74,7 +74,7 @@ struct LocalMem{
     /// deallocates an array that was allocated with this
     void deallocArr(T)(ref T[] arr){
         if (cast(ubyte*)arr.ptr>=localBufEnd || cast(ubyte*)arr.ptr<localBufStart){
-            delete arr.ptr;
+            delete arr;
         }
         arr=null;
     }

@@ -23,12 +23,12 @@ public import blip.sync.Atomic;
 template RefCountMixin(){
     size_t refCount=1;
     
-    LazyMPLoader retain(){
+    void retain(){
         if (atomicAdd(refCount,cast(size_t)1)==0){
             throw new Exception("refCount was 0 in retain",__FILE__,__LINE__);
         }
     }
-    LazyMPLoader release(){
+    void release(){
         size_t oldVal=atomicAdd(refCount,-cast(size_t)1);
         if (oldVal==0){
             throw new Exception("refCount was 0 in release",__FILE__,__LINE__);

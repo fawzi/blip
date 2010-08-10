@@ -27,13 +27,15 @@ import blip.sync.Atomic;
 import blip.container.AtomicSLink;
 import blip.container.Pool;
 import blip.container.Cache;
+import blip.math.Math;
+import blip.stdc.stdlib;
 
 private int nextPower2(int i){
     int res=1;
     while(res<i){
         res*=2;
     }
-    return i;
+    return res;
 }
 
 template defaultBatchSize(T){
@@ -374,6 +376,14 @@ class BatchedGrowableArray(T,int batchSize=((2048/T.sizeof>128)?2048/T.sizeof:12
             res.loopEl=l;
             return &res.loopBody;
         }
+        int opApply(int delegate(ref T)loop){
+            auto loopB=toBatch(loop);
+            return sBatchLoop.opApply(loopB);
+        }
+        int opApply(int delegate(ref size_t,ref T)loop){
+            auto loopB=toBatch(loop);
+            return sBatchLoop.opApply(loopB);
+        }
     }
     
     View data;
@@ -392,63 +402,68 @@ class BatchedGrowableArray(T,int batchSize=((2048/T.sizeof>128)?2048/T.sizeof:12
         synchronized(this){
             auto rest=capacity-length;
             size_t toCopy=min(rest,a.length);
-            size_t lastBatch=length/batchSize;
-            data.batches[lastBatch][batchSize-rest..batchSize+toCopy-rest]=a[0..toCopy];
+            size_t nextBatch=data.end/batchSize;
+            if (toCopy>0){
+                size_t localStart=data.end-nextBatch*batchSize;
+                size_t localSize=batchSize-localStart;
+                size_t localToCopy=min(toCopy,localSize);
+                data.batches[nextBatch][localStart..localStart+localToCopy]=a[0..localToCopy];
+                size_t toCopyL=toCopy-localToCopy;
+                while(toCopyL!=0){
+                    ++nextBatch;
+                    localToCopy=min(toCopy,batchSize);
+                    data.batches[nextBatch][0..localToCopy]=a[0..localToCopy];
+                    toCopyL-=localToCopy;
+                }
+                ++nextBatch;
+            }
             if (toCopy<a.length){
-                size_t toAlloc=(a.length-rest+batchSize-1)/batchSize;
-                if (lastBatch+toAlloc>data.batches.length){
-                    auto newHeaders=T*[](growLength(lastBatch+toAlloc));
-                    newHeaders[0..lastBatch]=data.batches[0..lastBatch];
-                    writeBarrier(); // with this one could access also the batches with just a read barrier
-                    data.batches=newHeaders;
-                }
-                auto batchStart=cast(T*)malloc(toAlloc*batchSize*T.sizeof);
-                if (batchStart is null) throw new Exception("allocation failed",__FILE__,__LINE__);
-                auto newBatches=batchStart[0..toAlloc*batchSize];
-                if (typeHasPointers!(T)()){
-                    GC.addRange(newBatches.ptr,toAlloc*batchSize);
-                }
-                newBatches[0..a.length-rest]=a[rest..a.length];
-                auto batchStart=newBatches.ptr;
-                for(size_t iBatch=0;iBatch<toAlloc;++iBatch){
-                    ++lastBatch;
-                    data.batches[lastBatch]=batchStart;
-                    batchStart+=batchSize;
-                }
+                growCapacityTo(length+a.length); // contiguous alloc
+                data.batches[nextBatch][0..a.length-rest]=a[rest..a.length];
             }
             writeBarrier(); // this allows using just a readBarrier to access the length...
             data.end+=a.length;
         }
     }
-    /// grows the array to at least the requested size
+    /// grows the array to at least the requested capacity
     void growCapacityTo(size_t c){
         if (data.length<c){
             synchronized(this){
                 if (capacity<c){
-                    lastBatch=data.length/data.batchSize;
-                    size_t toAlloc=(c-data.length+batchSize-1)/batchSize;
-                    if (lastBatch+toAlloc>data.batches.length){
-                        auto newHeaders=T*[](growLength(lastBatch+toAlloc));
-                        newHeaders[0..lastBatch]=data.batches[0..lastBatch];
-                        writeBarrier();
-                        data.batches=newHeaders;
-                    }
+                    auto newC=growLength(c,T.sizeof);
+                    auto nBatches=data.batches.length;
+                    size_t toAlloc=(newC-capacity+batchSize-1)/batchSize;
+                    auto newHeaders=new T*[](growLength(nBatches+toAlloc));
+                    newHeaders[0..nBatches]=data.batches[0..nBatches];
                     auto batchStart=(cast(T*)malloc(toAlloc*batchSize*T.sizeof));
                     if (batchStart is null) throw new Exception("allocation failed",__FILE__,__LINE__);
                     if (typeHasPointers!(T)()){
                         GC.addRange(batchStart,toAlloc*batchSize);
                     }
                     for(size_t iBatch=0;iBatch<toAlloc;++iBatch){
-                        ++lastBatch;
-                        data.batches[lastBatch]=batchStart;
+                        newHeaders[nBatches]=batchStart;
+                        ++nBatches;
                         batchStart+=batchSize;
                     }
+                    writeBarrier();
+                    data.batches=newHeaders;
                 }
             }
         }
         assert(data.length>=c);
     }
-    
+    /// grows the array to at least the requested size
+    void growTo(size_t c){
+        if (data.length<c){
+            growCapacityTo(c);
+            synchronized(this){
+                if (data.length<c){
+                    data.end=data.start+c;
+                }
+            }
+        }
+    }
+    /// appends one element
     void appendEl(T a){
         synchronized(this){
             auto len=data.length;
@@ -457,7 +472,8 @@ class BatchedGrowableArray(T,int batchSize=((2048/T.sizeof>128)?2048/T.sizeof:12
                 growCapacityTo(len+1);
             }
             data[len]=a;
-            ++data.length;
+            writeBarrier();
+            ++data.end;
         }
     }
     
@@ -465,7 +481,7 @@ class BatchedGrowableArray(T,int batchSize=((2048/T.sizeof>128)?2048/T.sizeof:12
         // this is the only dependency on BasicIO...
         auto s=dumper(sink);
         s("<BatchedGrowableArray@")(cast(void*)this)(" len:")(this.data.length);
-        s(" capacity:")(this.data.capacity)(">")("\n");
+        s(" capacity:")(this.capacity)(">")("\n");
     }
     
     /// appends to the array
@@ -505,14 +521,16 @@ class BatchedGrowableArray(T,int batchSize=((2048/T.sizeof>128)?2048/T.sizeof:12
     /// deallocates data
     void deallocData(){
         synchronized(this){
-            lastBatch=data.length/batchSize;
-            foreach(b;data.batches[0..lastBatch]){
-                if (b!is null) {
+            T* oldP=null;
+            foreach(ref b;data.batches){
+                if (b!is null && b!is oldP+batchSize) {
                     if (typeHasPointers!(T)()) GC.removeRange(b);
                     free(b);
                 }
+                oldP=b;
+                b=null;
             }
-            data.length=0;
+            data.end=data.start;
         }
     }
     View view(){
