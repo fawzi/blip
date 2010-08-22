@@ -1,5 +1,10 @@
 /// basic types for remote procedure call
 ///
+/// localProxies are kind of hacked in... should probably be improved:
+/// - subtask handling (in mixins) slightly different from normal call
+/// - targetObj has to be available, and a single lookup is done at creation time
+///   (does not update if the vended object is changed)
+///
 /// author: fawzi
 //
 // Copyright 2008-2010 the blip developer group
@@ -20,7 +25,8 @@ import blip.parallel.smp.SmpModels;
 import blip.serialization.StringSerialize;
 import blip.serialization.Serialization;
 import blip.parallel.smp.SmpModels;
-import blip.util.TangoLog;import blip.sync.UniqueNumber;
+import blip.util.TangoLog;
+import blip.sync.UniqueNumber;
 import blip.time.Clock;
 import blip.time.Time;
 import blip.util.TangoConvert;
@@ -28,6 +34,8 @@ import blip.container.GrowableArray;
 import blip.BasicModels;
 import blip.core.sync.Mutex;
 import blip.io.BasicIO;
+import blip.core.Variant;
+import blip.io.Console;
 
 alias void delegate(ubyte[] reqId,void delegate(Serializer) sRes) SendResHandler;
 
@@ -43,7 +51,7 @@ class RpcException:Exception{
 /// urls have the following form: protocol://host:port/namespace/object/function#requestId?query
 /// paths skip the protocol://host:port part
 /// represent an url parsed in its components
-/// protocol:[//]host:port/path/path?query&qury#anchor
+/// protocol:[//]host:port/path/path?query&query#anchor
 struct ParsedUrl{
     char[] protocol;
     char[] host;
@@ -199,13 +207,6 @@ struct ParsedUrl{
         anchor=fPath[i..$];
         return fPath.length;
     }
-    char[] urlOrPath(){
-        if (url.length!=0){
-            return url;
-        } else {
-            return fullPath;
-        }
-    }
 }
 
 /// at the moment just checks that no encoding is needed
@@ -235,7 +236,9 @@ ubyte[] urlDecode(char[]str,bool query=false){
 
 /// an objects that can be published (typically publishes another object)
 interface ObjVendorI{
-    void proxyDesc(void delegate(char[]));
+    Object targetObj();
+    void proxyDescDumper(void delegate(char[]));
+    char[] proxyDesc();
     char[] proxyName();
     char[] objName();
     void objName(char[] newVal);
@@ -253,8 +256,14 @@ class BasicVendor:ObjVendorI{
     Publisher _publisher;
     TaskI _objTask;
     
-    void proxyDesc(void delegate(char[])s){
+    Object targetObj(){
+        return this;
+    }
+    void proxyDescDumper(void delegate(char[])s){
         s("char[] proxyDesc()\nchar[] proxyName()\nchar[]proxyObjUrl()\n");
+    }
+    char[] proxyDesc(){
+        return collectAppender(&proxyDescDumper);
     }
     char[] proxyName(){
         return _proxyName;
@@ -285,7 +294,7 @@ class BasicVendor:ObjVendorI{
     {
         switch(fName){
         case "proxyDesc":
-            simpleReply(sendRes,reqId,&proxyDesc);
+            simpleReply(sendRes,reqId,&proxyDescDumper);
             break;
         case "proxyName":
             simpleReply(sendRes,reqId,proxyName());
@@ -305,7 +314,7 @@ class BasicVendor:ObjVendorI{
     void simpleReply(T)(SendResHandler sendRes,ubyte[] reqId,T res)
     {
         sendRes(reqId,delegate void(Serializer s){
-            static if (is(typeof(res)==void)){
+            static if (is(T==void)){
                 s(0);
             } else {
                 s(1);
@@ -326,29 +335,47 @@ class BasicVendor:ObjVendorI{
 
 /// handler that performs an Rpc call
 alias void delegate(ParsedUrl url,void delegate(Serializer) serArgs,
-    void delegate(Unserializer) unserRes) RpcCallHandler;
+    void delegate(Unserializer) unserRes,Variant firstArg) RpcCallHandler;
 
 /// one can get a proxy for that object
 interface Proxiable{
+    /// returns the url to use to get a proxy to this object
     char[] proxyObjUrl();
 }
 
 /// a proxy of an object, exposes a partial interface, and communicate with the real
 /// object behind the scenes
 interface Proxy: Proxiable,Serializable{
+    /// returns the call handler used by this proxy
     RpcCallHandler rpcCallHandler();
+    //// sets the call handler
     void rpcCallHandler(RpcCallHandler);
+    /// name (class) of the proxy
     char[]proxyName();
+    /// sets the url of the object this proxy connects to
     void proxyObjUrl(char[]);
+    /// returns the url of the object this proxy connects to
+    /// (repeating it because it seems that overloading between interfaces doesn't work)
     char[] proxyObjUrl();
+    /// parsed version of proxyObjUrl
     ParsedUrl proxyObjPUrl();
+    /// if the target object is local
     bool proxyIsLocal();
+    /// cast helper, casts the proxy to Object
+    Object proxyObj();
+    /// equality check (of proxies!!!)
     equals_t opEqual(Object);
+    /// comparison check (of proxies!!!)
     int opCmp(Object);
 }
 
+interface LocalProxy {
+    Object targetObj();
+    void targetObj(Object);
+}
+
 /// basic implementation of a proxy
-class BasicProxy:Proxy{
+class BasicProxy: Proxy {
     char[] _proxyObjUrl;
     ParsedUrl _proxyObjPUrl;
     char[] _proxyName;
@@ -396,8 +423,8 @@ class BasicProxy:Proxy{
         }
         return -2;
     }
-    static this(){
-        ProtocolHandler.registerProxy(BasicProxy.mangleof,function Proxy(char[]name,char[]url){ return new BasicProxy(name,url); });
+    Object proxyObj(){
+        return this;
     }
     this(){ }
     this(char[]name,char[]url){
@@ -449,6 +476,13 @@ class Publisher{
     PublishedObject[char[]] objects;
     UniqueNumber!(int) idNr;
     ProtocolHandler protocol;
+    CharSink log;
+    
+    this(CharSink log=null){
+        if (log==null){
+            log=sout.call;
+        }
+    }
     
     PublishedObject publishedObjectNamed(char[]name){
         PublishedObject po;
@@ -520,6 +554,7 @@ class Publisher{
 
 /// handles vending (and possibly also receiving the results if using one channel for both)
 class ProtocolHandler{
+    CharSink log;
     // static part (move to a singleton?)
     
     alias ProtocolHandler function(ParsedUrl url) ProtocolGetter;
@@ -545,6 +580,7 @@ class ProtocolHandler{
     static Mutex proxyCreatorsLock;
     static this(){
         proxyCreatorsLock=new Mutex();
+        ProtocolHandler.registerProxy("blip.BasicProxy",function Proxy(char[]name,char[]url){ return new BasicProxy(name,url); });
     }
     /// registers an internal proxy creator
     static void registerProxy(char[] name,Proxy function(char[]name,char[]url) generate,
@@ -565,7 +601,7 @@ class ProtocolHandler{
     static Proxy proxyForUrl(char[]objectUrl,char[]proxyName=null){
         auto pUrl=ParsedUrl.parseUrl(objectUrl);
         auto handler=protocolForUrl(pUrl);
-        assert(handler!is null);
+        assert(handler!is null,"unhandled protocol for url "~objectUrl);
         return handler.proxyForPUrl(pUrl,proxyName);
     }
     
@@ -578,7 +614,7 @@ class ProtocolHandler{
     char[] simpleCall(ParsedUrl url){
         char[] res;
         doRpcCall(url,delegate void(Serializer){},
-            delegate void(Unserializer u){ u(res); });
+            delegate void(Unserializer u){ u(res); },Variant.init);
         return res;
     }
     
@@ -605,6 +641,8 @@ class ProtocolHandler{
         char[] objectUrl=pUrl.url(buf);
         if (localUrl(pUrl) && (*creator).localProxyCreator !is null){
             nP=(*creator).localProxyCreator(proxyName,objectUrl);
+            char[]objName=pUrl.path[1]; // kind of ugly
+            (cast(LocalProxy)cast(Object)nP).targetObj=publisher.objectNamed(objName).targetObj();
         } else {
             nP=(*creator).proxyCreator(proxyName,objectUrl);
         }
@@ -641,7 +679,8 @@ class ProtocolHandler{
     }
     
     /// starts a server that handles the incoming requests
-    void startServer(){
+    /// if strict is false some parameters might be changed to allow starting up (for example the post number)
+    void startServer(bool strict){
         assert(0,"unimplemented");
     }
     
@@ -704,7 +743,8 @@ class ProtocolHandler{
         }
     }
 
-    void doRpcCall(ParsedUrl url,void delegate(Serializer) serArgs, void delegate(Unserializer) unserRes){
+    void doRpcCall(ParsedUrl url,void delegate(Serializer) serArgs, void delegate(Unserializer) unserRes,
+        Variant firstArg){
         assert(0,"unimplemented");
     }
     

@@ -168,6 +168,7 @@ class Deque(T):CopiableObjectI{
             ++nEl;
         }
     }
+    alias append pushBack;
     /// returns the last element of the array and drops it
     bool popBack(ref T el){
         synchronized(this){

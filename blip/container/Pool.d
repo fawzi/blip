@@ -19,7 +19,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 module blip.container.Pool;
-import blip.core.Traits:ctfe_i2a;
+import blip.core.Traits:ctfe_i2a,tryDeleteT,isNullT;
 import blip.math.Math: max;
 import blip.container.AtomicSLink;
 import blip.sync.Atomic;
@@ -170,13 +170,13 @@ class Pool(T,int _batchSize=16):PoolI!(T){
                 dumper(s)("pool @")(cast(void*)this)(" given back ")(T.stringof)("@")(cast(void*)obj)("=")(obj)("\n");
             });
         }
-        if (obj is null) return;
+        if (isNullT(obj)) return;
         obj=clear(obj);
-        if (obj is null) return;
-        bool deleteObj=false;
+        if (isNullT(obj)) return;
+        bool deleteO=false;
         synchronized(this){
             if (nEl>=maxEl){
-                deleteObj=true;
+                deleteO=true;
             }else if (nEl==nCapacity){
                 S* nP=new S();
                 nP.array[0]=obj;
@@ -201,23 +201,27 @@ class Pool(T,int _batchSize=16):PoolI!(T){
                 ++nEl;
             }
             debug(TrackPools){
-                if (!deleteObj) sinkTogether(sout,delegate void(CharSink s){
+                if (!deleteO) sinkTogether(sout,delegate void(CharSink s){
                     dumper(s)("pool @")(cast(void*)this)(" added ")(T.stringof)("@")(cast(void*)obj)(" to pool, nEl=")(nEl)(" nCapacity=")(nCapacity)("\n");
                 });
             }
         }
-        if (deleteObj) delete obj;
+        if (deleteO){
+            tryDeleteT(obj);
+        }
     }
     /// returns an object, if possible from the pool
     T getObj(){
         if (nEl>0){
             T obj;
+            bool found=false;
             synchronized(this){
                 if (nEl>0){
+                    found=true;
                     --nEl;
                     size_t pos=nEl & (batchSize-1);
                     obj=pool.array[pos];
-                    pool.array[pos]=null;
+                    pool.array[pos]=T.init;
                     if (pos==0){
                         pool=pool.next;
                     }
@@ -226,7 +230,7 @@ class Pool(T,int _batchSize=16):PoolI!(T){
                         auto toRm=pool.prev;
                         toRm.prev.next=toRm.next;
                         toRm.next.prev=toRm.prev;
-                        delete toRm;
+                        tryDeleteT(toRm);
                     }
                     debug(TrackPools){
                         sinkTogether(sout,delegate void(CharSink s){
@@ -235,7 +239,7 @@ class Pool(T,int _batchSize=16):PoolI!(T){
                     }
                 }
             }
-            if (obj !is null){
+            if (found){
                 return reset(obj);
             }
         }
@@ -246,13 +250,15 @@ class Pool(T,int _batchSize=16):PoolI!(T){
         U[] getObj(size_t dim){
             if (nEl>0){
                 T obj;
+                bool found=false;
                 synchronized(this){
                     if (nEl>0){
                         --nEl;
                         size_t pos=nEl & (batchSize-1);
                         obj=pool.array[pos];
                         if (obj.length==dim){
-                            pool.array[pos]=null;
+                            found=true;
+                            pool.array[pos]=T.init;
                             if (pos==0){
                                 pool=pool.prev;
                             }
@@ -261,15 +267,15 @@ class Pool(T,int _batchSize=16):PoolI!(T){
                                 auto toRm=pool.prev;
                                 toRm.prev.next=toRm.next;
                                 toRm.next.prev=toRm.prev;
-                                delete toRm;
+                                tryDeleteT(toRm);
                             }
                         } else {
                             ++nEl;
-                            obj=null;
+                            obj=T.init;
                         }
                     }
                 }
-                if (obj !is null){
+                if (found){
                     return reset(obj);
                 }
             }
@@ -294,7 +300,7 @@ class Pool(T,int _batchSize=16):PoolI!(T){
                             dumper(s)("pool @")(cast(void*)this)(" deleting obj ")(T.stringof)("@")(cast(void*)(p.array[pos]))("\n");
                         });
                     }
-                    delete p.array[pos];
+                    tryDeleteT(p.array[pos]);
                     if (pos==0){
                         delete p;
                         p=pNext;
@@ -434,7 +440,7 @@ class PoolNext(T):PoolI!(T){
             static if (is(typeof(oldV.deallocData()))){
                 oldV.deallocData();
             }
-            delete oldV;
+            tryDeleteT(oldV);
         }
     }
     /// stop caching
@@ -477,7 +483,7 @@ class PoolNext(T):PoolI!(T){
                 static if(is(typeof(el.deallocData()))){
                     el.deallocData();
                 }
-                delete el;
+                delete(el);
             }
         }
     }

@@ -124,3 +124,44 @@ template PropType(T){
         alias T PropType;
     }
 }
+
+/// splits the string at the given splitChars
+char[][] ctfeSplit(char[] splitChars,char[]str,bool skipEmpty){
+    char[][]res;
+    size_t i=0;
+    foreach(j,c;str){
+        foreach (c2;splitChars){
+            if (c==c2){
+                if ((!skipEmpty)||j>i){
+                    res~=str[i..j];
+                }
+                i=j+1;
+            }
+        }
+    }
+    if (i<str.length) res~=str[i..$];
+    return res;
+}
+
+void tryDeleteT(T)(ref T t){
+    static if (is(typeof(obj.deallocData()))){
+        obj.deallocData();
+    } else static if (is(typeof(obj.clear()))){
+        obj.clear();
+    }
+    static if (is(typeof(delegate void(){ delete obj; }))){
+        delete obj;
+    }
+}
+
+bool isNullT(T)(ref T t){
+    static if (is(typeof(obj is null))){
+        return obj is null;
+    } else static if (is(typeof(obj.isNull()))){
+        return obj.isNull();
+    } else static if (is(typeof(obj.isDummy()))){
+        return obj.isDummy();
+    } else {
+        return false;
+    }
+}

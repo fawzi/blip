@@ -1,5 +1,4 @@
-/// basic IO definitions
-/// one has to choose one basic string type for "normal" output, otherwise *everything*
+
 /// becomes a template. I have choosen char[], but most basic things still are templates,
 /// so even using wchar or dchar as native types should not be too difficult.
 /// It might be a good idea to rename char[] string, so that one could switch
@@ -100,6 +99,7 @@ module blip.io.BasicIO;
 import blip.util.TangoConvert: formatFloat;
 import blip.core.Array: find;
 import blip.core.Traits: isStaticArrayType;
+import blip.util.TemplateFu: nArgs;
 import blip.text.UtfUtils: convertToString;
 
 /// extent of a slice of a buffer
@@ -491,8 +491,26 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
             v.desc(sinkDlg);
         } else static if(is(typeof(v.writeOut(sinkDlg)))){
             v.writeOut(sinkDlg);
-        } else static if (is(typeof(v.toString()))){
-            sink(v.toString);
+        } else static if((nArgs!(S)==0 || (nArgs!(S)==1 && is(S[0]==Char[]))) && 
+            (is(typeof(v(sink))) || is(typeof(v(delegate void(char[]c){ }))) 
+            || is(typeof(v(delegate void(wchar[]c){ })))
+            || is(typeof(v(delegate void(dchar[]c){ }))) ) )
+        {
+            static if (is(typeof(v(sink)))){
+                v(sink);
+            } else static if (is(typeof(v(sinkDlg)))){
+                v(sinkDlg);
+            } else static if (is(typeof(v(delegate void(char[]c){ })))){
+                v(delegate void(char[]c){ writeOut(sink,c); });
+            } else static if (is(typeof(v(delegate void(wchar[]c){ })))){
+                v(delegate void(wchar[]c){ writeOut(sink,c); });
+            } else static if (is(typeof(v(delegate void(dchar[]c){ }))) ){
+                v(delegate void(dchar[]c){ writeOut(sink,c); });
+            } else static assert(0,"internal writeOut error");
+        } else static if (is(typeof(sink(v.toString())))){
+            sink(v.toString());
+        } else static if (is(typeof(writeOut(sink,v.toString())))){
+            writeOut(sink,v.toString());
         } else static if (is(T U==typedef)){
             writeOut(sink1,cast(U)v,args);
         } else{

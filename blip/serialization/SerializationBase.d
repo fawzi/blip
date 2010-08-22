@@ -31,6 +31,7 @@ import tango.text.Util;
 import blip.util.TemplateFu;
 import tango.text.Regex;
 import blip.container.GrowableArray;
+import blip.util.Grow;
 public import blip.core.Traits;
 
 version(SerializationTrace){
@@ -1503,7 +1504,8 @@ class Unserializer {
                 elMetaInfo.pseudo=true;
                 auto ac=readArrayStart(fieldMeta);
                 static if (!isStaticArrayType!(T)) {
-                    t=new T(cast(size_t)ac.sizeHint());
+                    if (t.length==0)
+                        t=new T(cast(size_t)ac.sizeHint());
                 }
                 size_t pos=0;
                 while(readArrayEl(ac,
@@ -1512,7 +1514,7 @@ class Unserializer {
                             static if (isStaticArrayType!(T)) {
                                 serializationError("unserialized more elements than size of static array",__FILE__,__LINE__);
                             } else {
-                                t.length=t.length+t.length/2+1;
+                                t.length=growLength(pos,T.sizeof);
                             }
                         }
                         this.field(&elMetaInfo, t[pos]);

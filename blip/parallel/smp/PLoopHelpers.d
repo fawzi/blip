@@ -46,11 +46,8 @@ char[] loopCtxMixin(char[]ctxName,char[]ctxExtra,char[] startLoop,char[]loopOp,c
         PoolI!(`~ctxName~`*) pool;
         `~ctxExtra~`
         static size_t nGPools;
-        static Mutex gLock;
+        static auto gLock=typeid(typeof(*this));
         static CachedPool!(`~ctxName~`*) gPool;
-        static this(){
-            gLock=new Mutex();
-        }
         static void addGPool(){
             synchronized(gLock){
                 if (nGPools==0){
@@ -75,8 +72,7 @@ char[] loopCtxMixin(char[]ctxName,char[]ctxExtra,char[] startLoop,char[]loopOp,c
             }
         }
         static void gPoolSync(){
-            gLock.lock();
-            gLock.unlock();
+            synchronized(gLock){ }
         }
         `~ctxName~` *createNew(){
             assert(gPool!is null,"invalid gPool (forgot addGPool call?)");
@@ -275,18 +271,15 @@ class PLoopIter(T){
         this.iter=iter;
     }
     
-    struct LoopEl{
+    static struct LoopEl{
         PLoopIter context;
         LoopEl *next;
         PoolI!(LoopEl*) pool;
         size_t idx; // do a separate structure without idx?
         T el;
         static size_t nGPools=0;
-        static Mutex gLock;
+        static auto gLock=typeid(typeof(*this));
         static CachedPool!(LoopEl*) gPool;
-        static this(){
-            gLock=new Mutex();
-        }
         static void addGPool(){
             synchronized(gLock){
                 if (nGPools==0){
@@ -311,8 +304,7 @@ class PLoopIter(T){
             }
         }
         static void gPoolSync(){
-            gLock.lock();
-            gLock.unlock();
+            synchronized(gLock){ }
         }
         static LoopEl *opCall(){
             assert(gPool!is null);

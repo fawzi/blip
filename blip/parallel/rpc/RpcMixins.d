@@ -16,42 +16,56 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 module blip.parallel.rpc.RpcMixins;
-import blip.serialization.SerializationMixins:extractFieldsAndDocs;
-public import blip.util.TangoLog;
-/// main mixin, creates proxies (local and remote)
-char[] rpcMixin(char[] name,char[] extraProxyInterfaces,char[]functions,bool localProxy=true){
+public import blip.parallel.rpc.RpcBase;
+public import blip.serialization.Serialization;
+public import blip.container.Pool;
+public import blip.container.Cache;
+public import blip.core.sync.Mutex;
+public import blip.core.Variant;
+public import blip.parallel.smp.WorkManager;
+public import blip.container.GrowableArray;
+public import blip.io.BasicIO;
+
+/// main mixin, creates proxies (possibly also local) and vendor, called 'name~"Proxy"', 'name~"LocalProxy"',
+/// 'name~"Vendor"', extName is used to build the serializer and proxy registration names, it defaults to
+/// the mangleof.
+char[] rpcMixin(char[] name,char[] extName, char[] extraProxyInterfaces,char[]functions,bool localProxy=true){
     assert(name.length>0,"name cannot be empty");
     auto functionsComments=extractFieldsAndDocs(functions);
     char[] res;
-    res=rpcProxyMixin(name,extraProxyInterfaces,functionsComments,localProxy);
-    res~=rpcVendorMixin(name,functionsComments);
+    res=rpcProxyMixin(name,extName,extraProxyInterfaces,functionsComments,localProxy);
+    res~=rpcVendorMixin(name,extName,functionsComments);
     return res;
 }
 
 /// mixin definition for proxy objects
-char[] rpcProxyMixin(char[] name,char[] extraInterfaces,char[][] functionsComments,
+///
+/// at the moment the local proxy is not strict (i.e. does not always spawn a task), this while faster
+/// might introduce subtle changes (with respect to behaviour of the spawned subtasks, that might be non
+/// finished when the function returns). Switch to always spawn??
+char[] rpcProxyMixin(char[] name,char[] extName,char[] extraInterfaces,char[][] functionsComments,
     bool localProxy=true)
 {
+    char[] extNameProxy;
+    if (extName.length==0){
+        extNameProxy=name~`Proxy.mangleof`;
+    } else {
+        extNameProxy=`"`~extName~`Proxy"`;
+    }
     char[] res=`
     alias typeof(this) `~name~`ProxiedType;`;
     res~=`
-    static class `~name~`Proxy: `~extraInterfaces~` BasicProxy{
+    final static class `~name~`Proxy: `~extraInterfaces~` BasicProxy{
         this(char[]name,char[]url){
-            if (name=="")
-                name=`~name~`Proxy.mangleof;
+            if (name.length==0)
+                name=`~extNameProxy~`;
             super(name,url);
         }
         this(){
-            this(`~name~`Proxy.mangleof,"");
-        }
-        static ClassMetaInfo metaI;
-        static this(){
-            metaI=ClassMetaInfo.createForType!(typeof(this))(`~name~`Proxy.mangleof);
-        }
-        ClassMetaInfo getSerializationMetaInfo(){
-            return metaI;
+            this(`~extNameProxy~`,"");
         }
         `;
+    res~=serializeSome(extNameProxy,"");
     for (int ifield=0;ifield<functionsComments.length/2;++ifield){
         auto functionName=functionsComments[2*ifield];
         auto comment=functionsComments[2*ifield+1];
@@ -60,104 +74,69 @@ char[] rpcProxyMixin(char[] name,char[] extraInterfaces,char[][] functionsCommen
             if (comment.length>=6 && comment[0..6]=="oneway"){
                 oneway=true;
             } else {
-                assert(0,"invalid comment '"~comment~"'");
+                assert(0,"invalid comment '"~comment~"' in "~extNameProxy);
             }
         }
         res~=`
-        static if (is(typeof(`~name~`ProxiedType.`~functionName~`) `~functionName~`Args=function)){
-            static if (is(typeof(`~name~`ProxiedType.`~functionName~`) `~functionName~`Return=return)){
+        static if (is(typeof(`~name~`ProxiedType.`~functionName~`) `~functionName~`Args==function)){
+            static if (is(typeof(`~name~`ProxiedType.`~functionName~`) `~functionName~`Return==return)){
                 `~functionName~`Return `~functionName~`(`~functionName~`Args args){
-                    _proxyCallbacks.doPreCall("`~functionName~`",`~(oneway?"true"[]:"false")~`,this);
-                    scope(exit){
-                        _proxyCallbacks.doPostCall("`~functionName~`",`~(oneway?"true"[]:"false")~`,this);
+                    ParsedUrl pUrl2=proxyObjPUrl();
+                    pUrl2.appendToPath("`~functionName~`");
+                    Variant firstArg;
+                    static if (is(typeof(Variant(args[0])))){
+                        firstArg=Variant(args[0]);
                     }
-                    Task("proxySerializeArgs`~functionName~`",{
-                        _proxyCallbacks.doPreSerialize("`~functionName~`",`~(oneway?"true"[]:"false")~`,serializer,this);
-                        serializer(args);
-                        _proxyCallbacks.doPostSerialize("`~functionName~`",`~(oneway?"true"[]:"false")~`,serializer,this);
-                    }).autorelease.executeNow(sTask);`;
+                    static if (is(typeof(args[0]))){
+                        void serialArgs(Serializer s){ s(args); }
+                    } else {
+                        void serialArgs(Serializer s){ }
+                    }
+                    void delegate(Unserializer u) unserialRes;`;
         if (oneway){
             res~=`
-                    _proxyCallbacks.doDoCall("`~functionName~`",true,this);
-                    }`;
+                    static assert(is(`~functionName~`Return == void),"oneway in non void returning function "~`~extNameProxy~`~".`~functionName~`");`;
         } else {
             res~=`
-                    _proxyCallbacks.doDoCall("`~functionName~`",false,this);
-                    `~functionName~`Return res;
-                    char[] exceptionStr;
-                    bool hadExceptions=false;
-                    Task("unserializeResult`~functionName~`",{
-                        try{
-                            _proxyCallbacks.doPreUnserialize("`~functionName~`",false,serializer,unserializer,this);
-                            scope(exit){
-                                _proxyCallbacks.doPostUnserialize("`~functionName~`",false,serializer,unserializer,this);
-                            }
-                            int i;
-                            unserializer(i);
-                            switch(i){
-                                case 2:
-                                    static if (! is(T == void)){
-                                        exceptionStr="invaild return type2";
-                                        hadExceptions=true;
-                                    } else {
-                                        return;
-                                    }
-                                    break;
-                                case 1:
-                                    static if (is(T == void)){
-                                        exceptionStr="invaild return type1";
-                                        hadExceptions=true;
-                                    } else {
-                                        unserializer(res);
-                                    }
-                                    break;
-                                case 0;
-                                    unserializer(exceptionStr);
-                                    hadExceptions=true;
-                                    break;
-                                default:
-                                    exceptionStr="unexpected return type";
-                                    hadExceptions=true;
-                            }
-                        } catch(Exception e){
-                            exceptionStr="unserializing exception:"~e.toString();
-                            hadExceptions=true;
-                        }
-                    }).autorelease.executeNow(ERROR!!!!unserializerTask);
-                    if (hadExceptions){
-                        throw new Exception(exceptionStr,__FILE__,__LINE__)
-                    }
-                    return res;
-                    `;
+                    static if (is(`~functionName~`Return == void)){
+                        unserialRes=delegate void(Unserializer u){ };
+                    } else {
+                        `~functionName~`Return res;
+                        unserialRes=delegate void(Unserializer u){
+                            u(res);
+                        };
+                    }`;
         }
         res~=`
+                    rpcCallHandler()(pUrl2,&serialArgs,unserialRes,firstArg);
+                    static if (! is(`~functionName~`Return == void)){
+                        return res;
+                    }
                 }
+            } else {
+                static assert(0,"error getting return type for method "~`~extNameProxy~`~".`~functionName~`");
             }
-        }
-        `;
+        } else {
+            static assert(0,"error getting arguments for method "~`~extNameProxy~`~".`~functionName~`");
+        }`;
     }
     res~=`
     }
     `;
     if (localProxy){
         res~=`
-    static class `~name~`ProxyLocal:`~extraInterfaces~` BasicProxy{
-        this(char[]name,char[]url){
-            if (name=="")
-                name=`~name~`Proxy.mangleof;
-            super(name,url);
+    final static class `~name~`ProxyLocal:`~extraInterfaces~((extraInterfaces.length==0)?` `:`,`)~`BasicProxy,LocalProxy{
+        `~name~`ProxiedType _targetObj;
+        Object targetObj(){
+            return _targetObj;
         }
-        this(){
-            this(`~name~`Proxy.mangleof,"");
+        void targetObj(Object obj){
+            _targetObj=cast(`~name~`ProxiedType)obj;
         }
-        static ClassMetaInfo metaI;
-        static this(){
-            metaI=ClassMetaInfo.createForType!(typeof(this))(`~name~`Proxy.mangleof);
-        }
-        ClassMetaInfo getSerializationMetaInfo(){
-            return metaI;
-        }
-        `;
+        static struct OnewayClosure{
+            void delegate() callClosureDelegate;
+            PoolI!(OnewayClosure*) pool;
+            union Cl{`;
         for (int ifield=0;ifield<functionsComments.length/2;++ifield){
             auto functionName=functionsComments[2*ifield];
             auto comment=functionsComments[2*ifield+1];
@@ -168,29 +147,113 @@ char[] rpcProxyMixin(char[] name,char[] extraInterfaces,char[][] functionsCommen
                 } else {
                     assert(0,"invalid comment '"~comment~"'");
                 }
+            } else {
+                assert(comment.length==0,"invalid comment '"~comment~"'");
+            }
+            if (oneway){
+                res~=`
+                static if (is(typeof(`~name~`ProxiedType.`~functionName~`) `~functionName~`Args==function)){
+                
+                    static struct `~functionName~`Clsr{
+                        `~functionName~`Args args;
+                        `~name~`ProxiedType obj;
+                        void call(){
+                            obj.`~functionName~`(args);
+                        }
+                    }
+                    `~functionName~`Clsr `~functionName~`Closure;
+                }`;
+            }
+        }
+        res~=`
+            }
+            Cl closure;
+            void giveBack(){
+                if (pool!is null){
+                    pool.giveBack(this);
+                } else {
+                    delete this;
+                }
+            }
+            static PoolI!(OnewayClosure*) gPool;
+            static auto gLock=typeid(typeof(*this));
+            static size_t gPoolLevel;
+            static void addGPool(){
+                synchronized(gLock){
+                    if (gPoolLevel==0){
+                        gPool=cachedPool(function OnewayClosure*(PoolI!(OnewayClosure*) p){
+                            auto res=new OnewayClosure;
+                            res.pool=p;
+                            return res;
+                        });
+                    }
+                    ++gPoolLevel;
+                }
+            }
+            static void rmGPool(){
+                synchronized(gLock){
+                    if (gPoolLevel==0) throw new Exception("gPoolLevel is 0 in rmGPool for oneway method in "~`~extNameProxy~`,__FILE__,__LINE__);
+                    --gPoolLevel;
+                    if (gPoolLevel==0) {
+                        gPool.rmUser();
+                        gPool=null;
+                    }
+                }
+            }
+            static OnewayClosure *opCall(){
+                assert(gPoolLevel>0,"opCall outside add/rmGPool in OnewayClosure of "~`~extNameProxy~`);
+                return gPool.getObj();
+            }
+        }
+        this(char[]name,char[]url){
+            OnewayClosure.addGPool();
+            if (name=="")
+                name=`~extNameProxy~`;
+            super(name,url);
+        }
+        this(){
+            this(`~extNameProxy~`,"");
+        }
+        ~this(){
+            OnewayClosure.rmGPool();
+        }`;
+        for (int ifield=0;ifield<functionsComments.length/2;++ifield){
+            auto functionName=functionsComments[2*ifield];
+            auto comment=functionsComments[2*ifield+1];
+            bool oneway=false;
+            if (comment.length>0 && comment[0]>' ' && comment[0]<'~'){
+                if (comment.length>=6 && comment[0..6]=="oneway"){
+                    oneway=true;
+                } else {
+                    assert(0,"invalid comment '"~comment~"'");
+                }
+            } else {
+                assert(comment.length==0,"invalid comment '"~comment~"'");
             }
             res~=`
-        static if (is(typeof(`~name~`ProxiedType.`~functionName~`) `~functionName~`Args=function)){
-            static if (is(typeof(`~name~`ProxiedType.`~functionName~`) `~functionName~`Return=return)){
+        static if (is(typeof(`~name~`ProxiedType.`~functionName~`) `~functionName~`Args==function)){
+            static if (is(typeof(`~name~`ProxiedType.`~functionName~`) `~functionName~`Return==return)){
                 `~functionName~`Return `~functionName~`(`~functionName~`Args args){
-                    _proxyCallbacks.doPreCall("`~functionName~`",`~(oneway?"true"[]:"false")~`,this);
-                    scope(exit){
-                        _proxyCallbacks.doPostCall("`~functionName~`",`~(oneway?"true"[]:"false")~`,this);
-                    }
-                    auto obj=publisher.objNamed(objName);
+                    auto obj=_targetObj;
                     if (obj is null){
-                        throw new RpcException()
+                        throw new RpcException("vended object is null for "~`~extNameProxy~`~".`~functionName~`",__FILE__,__LINE__);
                     }`;
             if (oneway){
                 res~=`
-                    try{
-                        obj.`~functionName~`(args);
-                    } catch(Object o){
-                        Log.lookup ("blip.rpc").warn("exception during oneway call for `~functionName~` {}",o);
-                    }`;
+                    static assert(is(`~functionName~`Return==void),"oneway call on non void method `~name~`.`~functionName~`");
+                    auto cl=OnewayClosure();
+                    cl.closure.`~functionName~`.obj=obj;
+                    cl.closure.`~functionName~`.args=args;
+                    cl.callClosureDelegate=&cl.closure.`~functionName~`.call;
+                    Task("onewayMethodCall`~name~`.`~functionName~`",cl.callClosureDelegate)
+                        .appendOnFinish(&cl.giveBack).autorelease.submitYield(objTask);`;
             } else {
                 res~=`
-                    obj.`~functionName~`(args);`;
+                    static if(is(`~functionName~`Return==void)){
+                        obj.`~functionName~`(args);
+                    } else {
+                        return obj.`~functionName~`(args);
+                    }`;
             }
             res~=`
                 }
@@ -199,19 +262,18 @@ char[] rpcProxyMixin(char[] name,char[] extraInterfaces,char[][] functionsCommen
         `;
         }
         res~=`
-        override proxyIsLocal(){ return true; }
+        override bool proxyIsLocal(){ return true; }
     }
     static this(){
-        AquirerShop.registerProxy(`~name~`Proxy.mangleof,
+        ProtocolHandler.registerProxy(`~extNameProxy~`,
             function Proxy(char[]name,char[]url){ return new `~name~`Proxy(name,url); },
             function Proxy(char[]name,char[]url){ return new `~name~`ProxyLocal(name,url); });
-    }
-    `;
+    }`;
     } else {
-            res~=`
+        res~=`
         }
         static this(){
-            AquirerShop.registerProxy(`~name~`Proxy.mangleof,
+            ProtocolHandler.registerProxy(`~extNameProxy~`,
                 function Proxy(char[]name,char[]url){ return new `~name~`Proxy(name,url); });
         }
         `;
@@ -219,13 +281,18 @@ char[] rpcProxyMixin(char[] name,char[] extraInterfaces,char[][] functionsCommen
     return res;
 }
 
-char[] rpcVendorMixin(char[] name, char[][] functionsComments){
+char[] rpcVendorMixin(char[] name,char[] extName_, char[][] functionsComments){
+    char[] extName=`"`~extName_~`Vendor"`;
+    if (extName_.length==0) {
+        extName=name~`Vendor.mangleof`;
+    }
     char[] res=`
-    class `~name~`Vendor:BasicVendor{
+    static class `~name~`Vendor:BasicVendor{
         `~name~`ProxiedType obj;
-        
-        struct Closure{
-            Closure *next;
+        override `~name~`ProxiedType targetObj(){ return obj; }
+        static struct Closure{
+            void delegate() callClosureDelegate;
+            PoolI!(Closure*) pool;
             union Cl{`;
     for (int ifield=0;ifield<functionsComments.length/2;++ifield){
         auto functionName=functionsComments[2*ifield];
@@ -238,75 +305,108 @@ char[] rpcVendorMixin(char[] name, char[][] functionsComments){
                 assert(0,"invalid comment '"~comment~"'");
             }
         }
-        char[] onewayStr=(oneway?"true":"false");
         res~=`
-                static if (is(typeof(`~name~`ProxiedType.`~functionName~`) `~functionName~`Args=function)){
-                    struct Closure`~functionName~`{
-                        Closure *top;
-                        `~name~`Vendor context;
-                        TaskI sTask;
-                        Serializer serializer;
-                        bool oneway;
-                        `~functionName~`Args args;
-                        void call(){
-                            scope(exit){
+                static if (is(typeof(`~name~`ProxiedType.`~functionName~`) `~functionName~`Args==function)){
+                    static if (is(typeof(`~name~`ProxiedType.`~functionName~`) `~functionName~`Return==return)){
+                        struct `~functionName~`Clsr{
+                            `~name~`Vendor context;
+                            SendResHandler sendRes;
+                            ubyte[] reqId;
+                            `~functionName~`Args args;
+                            void call(){
+                                version(TrackRpc){
+                                    context.publisher.log("started real execution of rpc call "~`~extName~`~".`~functionName~`\n");
+                                    scope(exit){
+                                        context.publisher.log("finished rpc call "~`~extName~`~".`~functionName~`\n");
+                                    }
+                                }`;
+        if (oneway){
+            res~=`
+                                static assert(is(`~functionName~`Return==void),"non void return in oneway method "~`~extName~`~".`~functionName~`");
                                 try{
-                                    context._vendorCallbacks.doPostCall("`~functionName~`",reqId,`~onewayStr~`,context,this);
-                                    Closure *topAtt=top;
-                                    `~name~`Vendor contextAtt=context;
-                                    memset(this.`~functionName~`,0,closure.`~functionName~`.sizeof);
-                                    memBarrier!(false,false,false,true)(); /+ not really needed +/
-                                    insertAt(contextAtt.freeList,topAtt);
-                                } catch(Object o){
-                                    Log.lookup ("blip.rpc").warn("exception in post ops of `~functionName~`:{}",o);
-                                }
-                            }
-                            if (oneway){
-                                try{
-                                    context._vendorCallbacks.doPreCall("`~functionName~`",reqId,oneway,context,this);
                                     context.obj.`~functionName~`(args);
-                                } catch (Exception e){
-                                    Log.lookup("blip.rpc").warn("exception in oneway method `~functionName~`:{}",e);
-                                } catch (Object o){
-                                    Log.lookup("blip.rpc").warn("exception in oneway method `~functionName~`:{}",o);
-                                }
-                            } else {
-                                `~functionName~`Return res;
-                                try{
-                                    context._vendorCallbacks.doPreCall("`~functionName~`",reqId,oneway,context,this);
-                                    static if (is(typeof(res)==void)){
-                                        context.obj.`~functionName~`(args);
-                                    } else {
-                                        res=obj.`~functionName~`(args);
-                                    }
-                                } catch (Object o) {
-                                    context.exceptionReply("`~functionName~`",reqId,serializer,sTask,this,o);
-                                }
-                                static if (! is(typeof(res)==void)){
+                                } catch (Exception e){ /+ communicate back?? +/
+                                    sinkTogether(context.publisher.log,delegate void(CharSink s){
+                                        dumper(s)("exception in oneway method ")(`~extName~`)(".`~functionName~`:")(e);
+                                    });
+                                }`;
+    
+        } else {
+            res~=`
+                                static if (is(`~functionName~`Return==void)){
+                                    `~functionName~`Return res;
                                     try{
-                                        context.simpleReply(T)(`~functionName~`,requestId, serializer,
-                                            sTask,this,res);
-                                    } catch(Object o){
-                                        Log.lookup ("blip.rpc").warn("exception sending result of `~functionName~`:{}",o);
+                                        context.obj.`~functionName~`(args);
+                                        context.simpleReply!(void)(sendRes,reqId);
+                                    } catch (Exception o) {
+                                        version(TrackRpc){
+                                            context.publisher.log("sending back exception in rpc call "~`~extName~`~".`~functionName~`\n");
+                                        }
+                                        context.exceptionReply(sendRes,reqId,o);
+                                        return;
                                     }
-                                }
+                                } else {
+                                    try{
+                                        auto res=context.obj.`~functionName~`(args);
+                                        context.simpleReply(sendRes,reqId,res);
+                                    } catch(Exception o){
+                                        version(TrackRpc){
+                                            context.publisher.log("sending back exception in rpc call "~`~extName~`~".`~functionName~`\n");
+                                        }
+                                        context.exceptionReply(sendRes,reqId,o);
+                                    }
+                                }`;
+        }
+        res~=`
                             }
                         }
+                        `~functionName~`Clsr `~functionName~`Closure;
+                    }
+                }`;
+    }
+    res~=`
+            }
+            Cl closure;
+            void giveBack(){
+                if (pool!is null){
+                    pool.giveBack(this);
+                } else {
+                    delete this;
+                }
+            }
+            static PoolI!(Closure*) gPool;
+            static auto gLock=typeid(typeof(*this));
+            static size_t gPoolLevel;
+            static void addGPool(){
+                synchronized(gLock){
+                    if (gPoolLevel==0){
+                        gPool=cachedPool(function Closure*(PoolI!(Closure*) p){
+                            auto res=new Closure;
+                            res.pool=p;
+                            return res;
+                        });
+                    }
+                    ++gPoolLevel;
+                }
+            }
+            static void rmGPool(){
+                synchronized(gLock){
+                    if (gPoolLevel==0) throw new Exception("gPoolLevel is 0 in rmGPool for vendor "~`~extName~`,__FILE__,__LINE__);
+                    --gPoolLevel;
+                    if (gPoolLevel==0) {
+                        gPool.rmUser();
+                        gPool=null;
                     }
                 }
-        
-                Closure`~functionName~` `~functionName~`;`; 
-    }
-    
-    res~=`
             }
-            Cl cl;
+            static Closure *opCall(){
+                assert(gPoolLevel>0,"opCall outside add/rmGPool in Closure of "~`~extName~`);
+                return gPool.getObj();
+            }
         }
-    
-        Closure *freeList;
-    
-        override void proxyDesc(void delegate(char[])s){
-            super.proxyDesc(s);`;
+        
+        override void proxyDescDumper(void delegate(char[])s){
+            super.proxyDescDumper(s);`;
     for (int ifield=0;ifield<functionsComments.length/2;++ifield){
         auto functionName=functionsComments[2*ifield];
         auto comment=functionsComments[2*ifield+1];
@@ -319,17 +419,20 @@ char[] rpcVendorMixin(char[] name, char[][] functionsComments){
             }
         }
         res~=`
-            static if (is(typeof(`~name~`ProxiedType.`~functionName~`) `~functionName~`Args=function)){
-                    static if (is(typeof(`~name~`ProxiedType.`~functionName~`) `~functionName~`Return=return)){
-                    if (oneway){
-                        s("oneway ");
-                    }
+            static if (is(typeof(`~name~`ProxiedType.`~functionName~`) `~functionName~`Args==function)){
+                static if (is(typeof(`~name~`ProxiedType.`~functionName~`) `~functionName~`Return==return)){`;
+        if (oneway){
+            res~=`
+                    s("oneway ");`;
+        }
+        res~=`
                     s(`~functionName~`Return.stringof);
                     s("`~functionName~`");
+                    s("(");
                     s(`~functionName~`Args.stringof);
-                    s("\n");
-                } else { static assert(0,"could not extract function return for `~functionName~`"); }
-            } else { static assert(0,"could not extract function arguments for `~functionName~`"); }`;
+                    s(")\n");
+                } else { static assert(0,"could not extract function return for "~`~extName~`~".`~functionName~`"); }
+            } else { static assert(0,"could not extract function arguments for "~`~extName~`~".`~functionName~`"); }`;
     }
     res~=`
         }`;
@@ -345,41 +448,50 @@ char[] rpcVendorMixin(char[] name, char[][] functionsComments){
             }
         }
         res~=`
-        void remoteCall`~functionName~`(char[] reqId,Unserializer u,Serializer s,TaskI sTask){
-            `~functionName~`Args args;
-            auto closure=popFrom(freeList);
-            if (closure is null){
-                closure=new Closure;
-            } else {
-                volatile memoryBarrier!(true,false,false,false)(); /+ does the right thing in an if? +/
+        void remoteCall`~functionName~`(ubyte[] reqId,Unserializer u,SendResHandler sendRes){
+            version(TrackRpc){
+                publisher.log("starting rpc call "~`~extName~`~".`~functionName~`\n");
             }
-            auto cl=&closure.cl.`~functionName~`;
+            auto cl0=Closure();
+            auto cl= & cl0.closure.`~functionName~`Closure;
             try {
-                cl.top=closure;
                 cl.context=this;
-                cl.sTask=sTask;
-                cl.serializer=serializer;
-                cl.oneway=`~(oneway?"true"[]:"false"[])~`;
-                _vendorCallbacks.doPreUnserialize("`~functionName~`",cl.oneway,unserializer,context,cast(void*)cl);
+                cl.reqId=reqId;
+                cl.sendRes=sendRes;
                 u(cl.args);
-                _vendorCallbacks.doPostUnserialize("`~functionName~`",cl.oneway,unserializer,context,cast(void*)cl);
-            } catch (Object o){
-                exceptionReply("`~functionName~`",reqId,serializer,serializerTask,cast(void*)cl,
-                    "exception deserializing arguments for `~functionName~`:"~to!(char[])(o));
+                cl0.callClosureDelegate=&cl.call;
+            } catch (Exception o){
+                version(TrackRpc){
+                    publisher.log("exception deserializing rpc call `~name~`.`~functionName~`\n");
+                }
+                exceptionReply(sendRes,reqId,new Exception("exception deserializing arguments for "~`~extName~`~"`~functionName~`",__FILE__,__LINE__,o));
             }
             try{
-                Task("rpcCall`~functionName~`",&cl.call).autorelease.submit(objTask);
+                Task("rpcCall`~functionName~`",cl0.callClosureDelegate)
+                    .appendOnFinish(&cl0.giveBack).autorelease.submit(objTask);
             } catch (Object o){
-                Log.lookup ("blip.rpc").error("internal exception making call for `~functionName~` {}",o);
+                sinkTogether(publisher.log,delegate void(CharSink s){
+                    dumper(s)("internal exception in oneway method ")(`~extName~`)(".`~functionName~`:")(o);
+                });
             }
         }`;
     }
     res~=`
-        void remoteMainCall(char[] functionName,char[]reqId,Unserializer u,Serializer s,TaskI sTask){
-            assert(0,"unimplemented for local proxies");
-        }
+        void remoteMainCall(char[] fName,ubyte[] reqId, Unserializer u, SendResHandler sendRes){
+            switch(fName){`;
+    for (int ifield=0;ifield<functionsComments.length/2;++ifield){
+        auto functionName=functionsComments[2*ifield];
+        res~=`
+            case "`~functionName~`":
+                remoteCall`~functionName~`(reqId,u,sendRes);
+                break;`;
     }
-    `;
+    res~=`
+            default:
+                super.remoteMainCall(fName,reqId,u,sendRes);
+            }
+        }
+    }`;
     return res;
 }
 

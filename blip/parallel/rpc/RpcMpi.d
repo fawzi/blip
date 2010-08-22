@@ -118,7 +118,7 @@ class MpiProtocolHandler: ProtocolHandler{
         return to!(int)(pUrl.host)==comm.myRank;
     }
     
-    override void doRpcCall(ParsedUrl url,void delegate(Serializer) serArgs, void delegate(Unserializer) unserRes){
+    override void doRpcCall(ParsedUrl url,void delegate(Serializer) serArgs, void delegate(Unserializer) unserRes,Variant addrArg){
         ubyte[256] buf=void;
         char[256] buf2=void; // ugly duplication should be removed (direct custom serialization of url)
         auto target=to!(int)(url.host);
@@ -202,7 +202,7 @@ class MpiProtocolHandler: ProtocolHandler{
         }
     }
     
-    override void startServer(){
+    override void startServer(bool strict){
         comm.registerHandler(&channelHandler,tag);
     }
     

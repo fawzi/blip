@@ -2,6 +2,7 @@
 ///
 /// mainly wrapping of a tango module
 module blip.stdc.socket;
+public import tango.sys.consts.socket;
 
 version (Win32) {
         pragma (lib, "ws2_32.lib");

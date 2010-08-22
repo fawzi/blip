@@ -166,10 +166,14 @@ class WaitConditionT(bool oneAtTime=true){
                         }
                     }
                 }
-                while (!cnd()){
-                    sem.wait();
+                volatile {
+                    Semaphore mySem=sem;
+                    auto myCnd=cnd;
+                    while (!myCnd()){
+                        mySem.wait();
+                    }
+                    mySem.notify();
                 }
-                sem.notify();
             }
         } else {
             checkCondition();

@@ -24,6 +24,7 @@ import blip.stdc.socket;
 import blip.stdc.string: memset,strlen,memcpy;
 import blip.stdc.errno;
 import blip.util.TangoLog;
+
 class BasicSocket{
     socket_t sock;
     
@@ -61,7 +62,7 @@ class BasicSocket{
             s = socket(addrAtt.ai_family, addrAtt.ai_socktype, addrAtt.ai_protocol);
             if (s<0) continue;
             if (connect(s, addrAtt.ai_addr, addrAtt.ai_addrlen) != 0) {
-                close(s);
+                shutdown(s,SHUT_RDWR);
                 s = -1;
                 continue;
             }
@@ -111,6 +112,15 @@ class BasicSocket{
     
     final void flush(){
     }
+    
+    void shutdownInput(){
+        shutdown(sock,SHUT_RD);
+    }
+
+    void close(){
+        shutdown(sock,SHUT_WR);
+    }
+    
 }
 
 /// a server that listens on one port
