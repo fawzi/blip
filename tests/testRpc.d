@@ -26,7 +26,7 @@ class A{
         return 5*cast(int)y;
     }
     this(){}
-    pragma(msg,rpcMixin("A","tst.A","","b",true));
+    //pragma(msg,rpcMixin("A","tst.A","","b",true));
     mixin(rpcMixin("A","tst.A","","b",true));
     ///__________
     ///__________

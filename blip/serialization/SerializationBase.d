@@ -1514,7 +1514,7 @@ class Unserializer {
                             static if (isStaticArrayType!(T)) {
                                 serializationError("unserialized more elements than size of static array",__FILE__,__LINE__);
                             } else {
-                                t.length=growLength(pos,T.sizeof);
+                                t.length=growLength(pos+1,T.sizeof);
                             }
                         }
                         this.field(&elMetaInfo, t[pos]);
