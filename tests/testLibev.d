@@ -18,7 +18,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 module testLibev;
-import gobo.ev.Libev;
+import blip.bindings.ev.Libev;
 import blip.io.Console;
 import stdlib = blip.stdc.stdlib;
 import unistd = tango.stdc.posix.unistd;

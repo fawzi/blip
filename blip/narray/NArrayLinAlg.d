@@ -271,12 +271,12 @@ version(no_blas){
         static assert(false,"lapack needs blas");
     }
 } else {
-    import DBlas=gobo.blas.DBlas;
-    public import gobo.blas.Types;
+    import DBlas=blip.bindings.blas.DBlas;
+    public import blip.bindings.blas.Types;
 }
 version(no_lapack){ }
 else {
-    import DLapack=gobo.lapack.DLapack;
+    import DLapack=blip.bindings.lapack.DLapack;
 }
 
 class LinAlgException:Exception{

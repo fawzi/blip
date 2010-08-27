@@ -17,9 +17,9 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-module xf.omg.core.CoordSys;
+module blip.omg.core.CoordSys;
 private {
-    import xf.omg.core.LinearAlgebra;
+    import blip.omg.core.LinearAlgebra;
 }
 
 

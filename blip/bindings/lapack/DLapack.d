@@ -1,6 +1,6 @@
 /// D interface to lapack
 ///
-/// Version with minor modification of the gobo wrappers from
+/// Version with minor modification of the blip.bindings wrappers from
 /// http://www.dsource.org/projects/multiarray/browser/trunk/Gobo
 ///
 ///  Copyright (C) 2006-2008 William V. Baxter III, OLM Digital, Inc.
@@ -23,9 +23,9 @@
 ///  3. This notice may not be removed or altered from any source distribution.
 ///
 ///  William Baxter wbaxter@gmail.com
-module gobo.lapack.DLapack;
-import gobo.lapack.Lapack;
-public import gobo.blas.Types;
+module blip.bindings.lapack.DLapack;
+import blip.bindings.lapack.Lapack;
+public import blip.bindings.blas.Types;
 
 // Prototypes for the raw Fortran interface to BLAS
 

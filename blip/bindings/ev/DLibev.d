@@ -17,15 +17,15 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-module gobo.ev.DLibev;
+module blip.bindings.ev.DLibev;
 import blip.io.BasicIO;
 import blip.container.GrowableArray;
 import blip.container.Pool;
 //import blip.container.Cache;
-import gobo.ev.Libev;
+import blip.bindings.ev.Libev;
 import blip.core.Traits;
 import blip.util.TemplateFu;
-public import gobo.ev.Libev: EV_PERIODIC_ENABLED, EV_STAT_ENABLED, EV_IDLE_ENABLED, EV_FORK_ENABLED,
+public import blip.bindings.ev.Libev: EV_PERIODIC_ENABLED, EV_STAT_ENABLED, EV_IDLE_ENABLED, EV_FORK_ENABLED,
     EV_EMBED_ENABLED, EV_ASYNC_ENABLED, EV_WALK_ENABLED,ev_loop_t, EV_READ, EV_WRITE;
 import blip.io.Console; // pippo
 

@@ -23,7 +23,7 @@ version(mpi)
     public import blip.parallel.mpi.MpiModels;
     import blip.serialization.Serialization;
     import blip.parallel.smp.WorkManager;
-    import gobo.mpi.mpi;
+    import blip.bindings.mpi.mpi;
     import blip.io.IOArray;
     import blip.container.Deque;
     import blip.BasicModels;

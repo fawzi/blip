@@ -22,7 +22,7 @@ import blip.container.GrowableArray;
 import blip.io.Socket;
 import blip.core.sync.Semaphore;
 import blip.io.BasicIO;
-import gobo.ev.DLibev;
+import blip.bindings.ev.DLibev;
 import blip.io.EventWatcher;
 
 class ConnectionHandler{

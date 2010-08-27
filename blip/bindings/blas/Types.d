@@ -1,6 +1,6 @@
 /// aliases to easily cope with "strange" blas
 ///
-/// Version with minor modification of the gobo wrappers from
+/// Version with minor modification of the blip.bindings wrappers from
 /// http://www.dsource.org/projects/multiarray/browser/trunk/Gobo
 ///
 ///  Copyright (C) 2006-2008 William V. Baxter III, OLM Digital, Inc.
@@ -23,7 +23,7 @@
 ///  3. This notice may not be removed or altered from any source distribution.
 ///
 ///  William Baxter wbaxter@gmail.com
-module gobo.blas.Types;
+module blip.bindings.blas.Types;
 
 alias float f_float;
 alias double f_double;

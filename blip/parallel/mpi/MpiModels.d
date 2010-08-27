@@ -21,8 +21,8 @@ module blip.parallel.mpi.MpiModels;
 import blip.serialization.Serialization;
 import blip.BasicModels;
 import blip.parallel.smp.WorkManager;
-import gobo.mpi.mpi;
-public import gobo.mpi.mpi: MPI_Op, MPI_MAX, MPI_MIN, MPI_SUM, MPI_PROD, MPI_LAND, MPI_BAND, MPI_LOR,
+import blip.bindings.mpi.mpi;
+public import blip.bindings.mpi.mpi: MPI_Op, MPI_MAX, MPI_MIN, MPI_SUM, MPI_PROD, MPI_LAND, MPI_BAND, MPI_LOR,
     MPI_BOR, MPI_LXOR, MPI_BXOR, MPI_MAXLOC, MPI_MINLOC, MPI_REPLACE;
 
 enum :int{

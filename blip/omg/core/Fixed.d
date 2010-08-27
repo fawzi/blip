@@ -18,7 +18,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-module xf.omg.core.Fixed;
+module blip.omg.core.Fixed;
 
 private {
     import blip.util.TangoConvert : convTo = to;

@@ -18,12 +18,12 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-module xf.omg.core.LinearAlgebra;
+module blip.omg.core.LinearAlgebra;
 private {
-    import xf.omg.core.Algebra;
-    import xf.omg.core.Fixed;
-    import xf.omg.util.Meta;
-    import xf.omg.core.Misc : unitSqNormEpsilon, deg2rad, rad2deg, pi, invSqrt;
+    import blip.omg.core.Algebra;
+    import blip.omg.core.Fixed;
+    import blip.omg.util.Meta;
+    import blip.omg.core.Misc : unitSqNormEpsilon, deg2rad, rad2deg, pi, invSqrt;
     import blip.util.TangoConvert : convTo = to;
     import blip.math.Math : sqrt, abs, sin, cos, tan, acos, atan2, asin,floor;
     import blip.core.Traits : isFloatingPointType,ctfe_i2a;

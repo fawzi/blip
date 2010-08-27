@@ -1,6 +1,6 @@
 /// C interface to blas routines
 ///
-/// Version with minor modification of the gobo wrappers from
+/// Version with minor modification of the blip.bindings wrappers from
 /// http://www.dsource.org/projects/multiarray/browser/trunk/Gobo
 ///
 ///  Copyright (C) 2006-2008 William V. Baxter III, OLM Digital, Inc.
@@ -23,8 +23,8 @@
 ///  3. This notice may not be removed or altered from any source distribution.
 ///
 ///  William Baxter wbaxter@gmail.com
-module gobo.blas.Blas;
-public import gobo.blas.Types;
+module blip.bindings.blas.Blas;
+public import blip.bindings.blas.Types;
 // For a good description of issues calling Fortran from C see
 //    http://www.math.utah.edu/software/c-with-fortran.html
 // Namely the wierdness with char* arguments and complex return types.

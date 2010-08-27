@@ -15,13 +15,13 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-module gobo.ev.EventHandler;
+module blip.bindings.ev.EventHandler;
 import blip.io.BasicIO;
 import blip.container.GrowableArray;
 import blip.container.Pool;
 import blip.container.Cache;
-import gobo.ev.Libev;
-import gobo.ev.DLibev;
+import blip.bindings.ev.Libev;
+import blip.bindings.ev.DLibev;
 import blip.core.Traits;
 import blip.util.TemplateFu;
 import blip.parallel.smp.SmpModels;

@@ -17,7 +17,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-module xf.omg.core.Misc;
+module blip.omg.core.Misc;
 
 public {
     import blip.math.Math : min, max, floor, ceil, sin, cos, tan, atan, atan2, rndint, pow, abs, exp, sqrt;

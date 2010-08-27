@@ -36,7 +36,6 @@
 #  DFLAGS: as environment variable is not changed
 #  CFLAGS: adds the given C flags
 #  EXTRA_LIBS: add the given link flags (to link tango user for example)
-#  MOD_OMG: set it to none to not compile xf.omg into the blip library
 #
 # apache 2.0 license, © 2009 Fawzi Mohamed
 
@@ -74,7 +73,7 @@ endif
 vpath %d $(SRCDIR)
 vpath %di $(SRCDIR)
 
-MODULES=$(MOD_BLIP) $(MOD_GOBO) $(MOD_OMG)
+MODULES=$(MOD_BLIP)
 
 EXCLUDE_DEP_ALL=$(EXCLUDE_DEP_COMP) object.di ^tango.*
 
@@ -133,21 +132,15 @@ _tests: $(TESTS:%=_%)
 $(OBJDIR)/MODULES.inc:
 	@mkdir -p $(OBJDIR)
 	$(TOOLDIR)/mkMods.sh --out-var MOD_BLIP $(SRCDIR)/blip $(EXCLUDEPAT_ALL) > $(OBJDIR)/MODULES.inc
-	$(TOOLDIR)/mkMods.sh --out-var MOD_GOBO $(SRCDIR)/gobo $(EXCLUDEPAT_ALL) >> $(OBJDIR)/MODULES.inc
-	$(TOOLDIR)/mkMods.sh --out-var MOD_OMG $(SRCDIR)/xf/omg $(EXCLUDEPAT_ALL) >> $(OBJDIR)/MODULES.inc
 
 $(OBJDIR)/intermediate.rule:
 	@mkdir -p $(OBJDIR)
 	$(TOOLDIR)/mkIntermediate.sh $(SRCDIR)/blip $(EXCLUDEPAT_ALL) > $(OBJDIR)/intermediate.rule
-	$(TOOLDIR)/mkIntermediate.sh $(SRCDIR)/gobo $(EXCLUDEPAT_ALL) >> $(OBJDIR)/intermediate.rule
-	$(TOOLDIR)/mkIntermediate.sh $(SRCDIR)/xf $(EXCLUDEPAT_ALL) >> $(OBJDIR)/intermediate.rule
 
 newFiles:
 	@mkdir -p $(OBJDIR)
 	@echo regenerating MODULES.inc and intermediate.rule
 	$(TOOLDIR)/mkMods.sh --out-var MOD_BLIP $(SRCDIR)/blip $(EXCLUDEPAT_ALL) > $(OBJDIR)/MODULES.inc
-	$(TOOLDIR)/mkMods.sh --out-var MOD_GOBO $(SRCDIR)/gobo $(EXCLUDEPAT_ALL) >> $(OBJDIR)/MODULES.inc
-	$(TOOLDIR)/mkMods.sh --out-var MOD_OMG $(SRCDIR)/xf/omg $(EXCLUDEPAT_ALL) >> $(OBJDIR)/MODULES.inc
 	$(TOOLDIR)/mkIntermediate.sh $(SRCDIR) $(EXCLUDEPAT_ALL) > $(OBJDIR)/intermediate.rule
 
 clean:
