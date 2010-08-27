@@ -377,25 +377,35 @@ final class BinaryWriteHandlers(bool SwapBytes=isSmallEndian):WriteHandlers{
 /// binary read handlers
 /// build it on the top of InputBuffer? would spare a buffer and its copy if SwapBytes
 final class BinaryReadHandlers(bool SwapBytes=isSmallEndian):ReadHandlers{
-    InputStream       reader;
+    InputStream       tangoReader;
+    Reader!(void)     reader;
+    void delegate(void[]dest) readExact;
     
     this (Reader!(void) reader)
     {
+        this.reader=reader;
         auto tReader=cast(ReadHandler!(void))reader;
-        if (tReader is null){ assert(0,"only tango readers supported at the moment"); }
-        this.reader=((tReader.buf is null)?cast(InputStream)tReader.arr:cast(InputStream)tReader.buf);
+        if (tReader is null){ 
+            readExact=&this.readExactReader;
+        } else {
+            this.tangoReader=((tReader.buf is null)?cast(InputStream)tReader.arr:cast(InputStream)tReader.buf);
+            readExact=&this.readExactTango;
+        }
         setCoreHandlersFrom_basicRead();
     }
     
-    void readExact(void[] dest){
-        auto read=reader.read(dest);
+    void readExactReader(void[] dest){
+        blip.io.BasicIO.readExact(&reader.readSome,dest);
+    }
+    void readExactTango(void[] dest){
+        auto read=tangoReader.read(dest);
         if (read!=dest.length){
             if (read==OutputStream.Eof){
                 throw new Exception("unexpected Eof",__FILE__,__LINE__);
             }
             uint countEmpty=0;
             while (1){
-                auto readNow=reader.read(dest[read..$]);
+                auto readNow=tangoReader.read(dest[read..$]);
                 if (readNow==OutputStream.Eof){
                     throw new Exception("unexpected Eof",__FILE__,__LINE__);
                 } else if (readNow==0){
@@ -485,11 +495,13 @@ final class BinaryReadHandlers(bool SwapBytes=isSmallEndian):ReadHandlers{
     void parserPos(void delegate(char[]) s){
         long pos=0;
         try {
-            pos=reader.seek(0,reader.Anchor.Current);
+            if (tangoReader!is null)
+                pos=tangoReader.seek(0,tangoReader.Anchor.Current);
+            writeOut(s,(cast(Object)reader)); s("@"); writeOut(s,pos);
         } catch (IOException e){
             pos=-1;
+            writeOut(s,"reader"); s("@"); writeOut(s,pos);
         }
-        writeOut(s,(cast(Object)reader)); s("@"); writeOut(s,pos);
     }
 }
 

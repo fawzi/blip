@@ -18,21 +18,59 @@
 module blip.io.Socket;
 import blip.io.BasicIO;
 import blip.io.BasicStreams;
-import blip.io.BasicStreams;
 import blip.container.GrowableArray;
+import blip.container.Pool;
+import blip.container.Cache;
 import blip.stdc.socket;
 import blip.stdc.string: memset,strlen,memcpy;
 import blip.stdc.errno;
 import blip.util.TangoLog;
+import blip.io.EventWatcher;
+import blip.serialization.Serialization;
+import gobo.ev.DLibev;
+import gobo.ev.EventHandler;
+import gobo.ev.Libev;
+import tango.stdc.posix.fcntl;
+import blip.parallel.smp.WorkManager;
+import blip.parallel.smp.BasicTasks;
+import blip.sync.Atomic;
+import blip.core.sync.Semaphore;
 
-class BasicSocket{
-    socket_t sock;
+struct TargetHost{
+    char[] host;
+    char[] port;
     
-    this(socket_t s){
-        sock=s;
+    static TargetHost opCall(char[] host,char[] port){
+        TargetHost res;
+        res.host=host;
+        res.port=port;
+        return res;
+    }
+    equals_t opEquals(TargetHost p2){
+        return host==p2.host && port==p2.port;
+    }
+    int opCmp(TargetHost p){
+        int c=cmp(host,p.host);
+        return ((c==0)?cmp(port,p.port):c);
+    }
+    mixin(serializeSome("blip.TargetHost","host|port"));
+    mixin printOut!();
+}
+
+/// basically a wrapper around a socket just to group some functions...
+/// being a struct it is not possible to synchronize on this, but I realized that I did not need it
+struct BasicSocket{
+    socket_t sock=socket_t.init;
+    enum{ eagerTries=2 }
+    
+    static BasicSocket opCall(socket_t s){
+        BasicSocket res;
+        res.sock=s;
+        return res;
     }
     
-    this(char[]address,char[]service){
+    static BasicSocket opCall(char[]address,char[]service){
+        BasicSocket res;
         int err;
         char buf[256];
         char * nodeName,serviceName;
@@ -40,7 +78,7 @@ class BasicSocket{
         addrinfo hints;
         addrinfo* addressInfo,addrAtt;
 
-        sock=-1;
+        res.sock=-1;
         auto a1=lGrowableArray(buf,0);
         dumper(&a1)(address)("\0")(service)("\0");
         auto addr0=a1.data();
@@ -72,41 +110,124 @@ class BasicSocket{
         if (s<0){
             throw new BIOException("could not connect to "~address~" "~service,__FILE__,__LINE__);
         }
-        sock=s;
+        res.sock=s;
+        // set non blocking
+        int oldMode;
+        if ((oldMode = fcntl(res.sock, F_GETFL, 0)) != -1){
+            fcntl(res.sock, F_SETFL, oldMode | O_NONBLOCK);
+        }
+        // receive OutOfBand data inline
+        int i=1;
+        setsockopt(res.sock,SOL_SOCKET,SO_OOBINLINE,&i,4); // ignore failures...
+        return res;
+    }
+    
+    static BasicSocket opCall(TargetHost t){
+        return opCall(t.host,t.port);
+    }
+    /// writes at least one byte (unless src.length==0), but possibly less than src.length
+    final size_t writeSome(void[] src){
+        while(true){
+            ptrdiff_t wNow;
+            for (int itry=0;itry<eagerTries;++itry){
+                wNow=send(sock,src.ptr,src.length,0);
+                if (wNow<0){
+                    if (wNow!=-1 || errno()!=EWOULDBLOCK){
+                        char[] buf=new char[](256);
+                        auto msg=strerror_d(errno(), buf);
+                        if (msg.length==0){
+                            auto a=lGrowableArray(buf,0);
+                            a("IO error:");
+                            writeOut(&a.appendArr,errno());
+                            throw new BIOException(a.takeData(),__FILE__,__LINE__);
+                        }
+                        throw new BIOException(buf[0..strlen(buf.ptr)],__FILE__,__LINE__);
+                    }
+                } else if (wNow>0 || src.length==0){
+                    return wNow;
+                }
+                if (!Task.yield()) break;
+            }
+            if (wNow<0){
+                auto tAtt=taskAtt.val;
+                // implement blocking for non present or non yieldable tasks? it might be dangerous (deadlocks)
+                tAtt.delay(delegate void(){// add a timeout???
+                    defaultWatcher.addWatcher(GenericWatcher.ioCreate(cast(int)sock,EV_WRITE,EventHandler(tAtt)));
+                });
+                wNow=0;
+            }
+        }
     }
     
     final void writeExact(void[] src){
         size_t written=0;
         while(written<src.length){
-            auto wNow=write(sock,src.ptr+written,src.length-written);
-            if (wNow==-1){
-                char[] buf=new char[](256);
-                auto msg=strerror_d(errno(), buf);
-                if (msg.length==0){
-                    auto a=lGrowableArray(buf,0);
-                    a("IO error:");
-                    writeOut(&a.appendArr,errno());
-                    throw new BIOException(a.takeData(),__FILE__,__LINE__);
+            ptrdiff_t wNow;
+            for (int itry=0;itry<eagerTries;++itry){
+                wNow=send(sock,src.ptr+written,src.length-written,0);
+                if (wNow<0){
+                    if (wNow!=-1 || errno()!=EWOULDBLOCK){
+                        char[] buf=new char[](256);
+                        auto msg=strerror_d(errno(), buf);
+                        if (msg.length==0){
+                            auto a=lGrowableArray(buf,0);
+                            a("IO error:");
+                            writeOut(&a.appendArr,errno());
+                            throw new BIOException(a.takeData(),__FILE__,__LINE__);
+                        }
+                        throw new BIOException(buf[0..strlen(buf.ptr)],__FILE__,__LINE__);
+                    }
+                } else {
+                    break;
                 }
-                throw new BIOException(buf[0..strlen(buf.ptr)],__FILE__,__LINE__);
+                if (!Task.yield()) break;
+            }
+            if (wNow<0){
+                auto tAtt=taskAtt.val;
+                // implement blocking for non present or non yieldable tasks? it might be dangeroues (deadlocks)
+                tAtt.delay(delegate void(){// add a timeout???
+                    defaultWatcher.addWatcher(GenericWatcher.ioCreate(cast(int)sock,EV_WRITE,EventHandler(tAtt)));
+                });
+                wNow=0;
             }
             written+=wNow;
         }
     }
     
     final size_t rawReadInto(void[] dst){
-        size_t res=read(sock,dst.ptr,dst.length);
-        if (res==0) return Eof;
-        if (res==-cast(size_t)1){
-            char[] buf=new char[](256);
-            auto errMsg=strerror_d(errno,buf);
-            if (errMsg.length==0){
-                auto a=lGrowableArray(buf,0);
-                a("IO error:");
-                writeOut(&a.appendArr,errno());
-                throw new BIOException(a.takeData(),__FILE__,__LINE__);
+        ptrdiff_t res;
+        while(true){
+            for (int itry=0;itry<eagerTries;++itry){
+                res=cast(ptrdiff_t)recv(sock,dst.ptr,dst.length,0);
+                if (res==0) {
+                    if (dst.length!=0) return Eof;
+                    return 0;
+                }
+                if (res<0){
+                    if (res!=-1 || errno()!=EAGAIN){
+                        char[] buf=new char[](256);
+                        auto errMsg=strerror_d(errno,buf);
+                        if (errMsg.length==0){
+                            auto a=lGrowableArray(buf,0);
+                            a("IO error:");
+                            writeOut(&a.appendArr,errno());
+                            throw new BIOException(a.takeData(),__FILE__,__LINE__);
+                        }
+                        throw new BIOException(errMsg,__FILE__,__LINE__);
+                    }
+                } else {
+                    return res;
+                }
+                if (!Task.yield()) break;
             }
-            throw new BIOException(errMsg,__FILE__,__LINE__);
+            if (res<0){
+                auto tAtt=taskAtt.val;
+                // implement blocking for non present or non yieldable tasks? it might be dangeroues (deadlocks)
+                tAtt.delay(delegate void(){// add a timeout???
+                    defaultWatcher.addWatcher(GenericWatcher.ioCreate(cast(int)sock,EV_READ,EventHandler(tAtt)));
+                });
+                res=0;
+            }
         }
     }
     
@@ -121,6 +242,15 @@ class BasicSocket{
         shutdown(sock,SHUT_WR);
     }
     
+    void desc(CharSink s){
+        dumper(s)("socket@")(sock);
+    }
+}
+
+class BIONoBindException:BIOException{
+    this(char[] msg,char[] file,long line,Exception next=null){
+        super(msg,file,line,next);
+    }
 }
 
 /// a server that listens on one port
@@ -131,15 +261,68 @@ class SocketServer{
     int[] sockfamile;
     fd_set selectSet;
     socket_t maxDesc;
+    GenericWatcher[] watchers;
+    size_t pendingTasks;
+    size_t maxPendingTasks=size_t.max;
+    CharSink log;
     
-    static class StopException:Exception{
-        this(char[]msg,char[]file,long line){
-            super(msg,file,line);
+    static struct Handler{
+        BasicSocket sock;
+        sockaddr addrOther;
+        socklen_t addrLen;
+        SocketServer server;
+        PoolI!(Handler*) pool;
+
+        void doAction(){
+            server.handler(*this);
+            if (atomicAdd(server.pendingTasks,-1)==0)
+                throw new Exception("error in pending tasks",__FILE__,__LINE__);
+        }
+        void giveBack(){
+            if (pool!is null){
+                pool.giveBack(this);
+            } else {
+                //tryDeleteT(this);
+            }
+        }
+        TargetHost otherHost(char[] buf){
+            TargetHost res;
+            size_t lPort=buf.length/4;
+            auto toC=buf.length-lPort;
+            char[]addrStr=buf[0..toC];
+            char[]serviceStr=buf[toC..$];
+            if (getnameinfo(&addrOther,addrLen, addrStr.ptr, addrStr.length, serviceStr.ptr,serviceStr.length, 0)==0)
+            {
+                buf[$-1]=0;
+                res.host=addrStr[0..strlen(addrStr.ptr)];
+                res.port=serviceStr[0..strlen(serviceStr.ptr)];
+            }
+            return res;
+        }
+        TargetHost otherHost(){
+            char[512] buf;
+            auto res=otherHost(buf);
+            res.host=res.host.dup;
+            res.port=res.port.dup;
+            return res;
+        }
+        static PoolI!(Handler*)gPool;
+        static this(){
+            gPool=cachedPool(function Handler*(PoolI!(Handler*)p){
+                auto res=new Handler;
+                res.pool=p;
+                return res;
+            });
         }
     }
+    void delegate (ref Handler) handler;
     
-    this(char[]serviceName){
+    this(char[]serviceName,void delegate(ref Handler)handler,CharSink log){
         this.serviceName=serviceName;
+        this.handler=handler;
+        this.log=log;
+    }
+    void start(){
         addrinfo hints;
         addrinfo *res, res0;
         int isock, err;
@@ -175,118 +358,99 @@ class SocketServer{
                 continue;
             }
             listen(s,5);
+            // set non blocking
+            int oldMode;
+            if ((oldMode = fcntl(s, F_GETFL, 0)) != -1){
+                fcntl(s, F_SETFL, oldMode | O_NONBLOCK);
+            }
+            // receive OutOfBand data inline (useful for listening socket?)
+            int i=1;
+            setsockopt(s,SOL_SOCKET,SO_OOBINLINE,&i,4); // ignore failures...
             socks~=s;
             sockfamile~= res . ai_family;
+            watchers~=GenericWatcher.ioCreate(s,EV_READ,EventHandler(&this.callback));
         }
         freeaddrinfo(res0);
         if (socks.length==0){
-            throw new BIOException("no bind sucessful",__FILE__,__LINE__);
+            throw new BIONoBindException("no bind sucessful for "~serviceName,__FILE__,__LINE__);
         }
-        FD_ZERO(&selectSet);
-        maxDesc=0;
-        foreach (sock;socks){
-            FD_SET(sock,&selectSet);
-            if (maxDesc<sock) maxDesc=sock;
-        }
+        defaultWatcher.watchersToAdd.append(watchers);
+        defaultWatcher.notifyAdd();
+    }
+
+    bool isStarted(){
+        return socks.length!=0;
     }
     
-    BasicSocket accept(char[]*addrStrPtr=null,char[]*serviceStrPtr=null){
-        fd_set readSock;
-        socket_t newSock=-1;
-        while (1){
-            int nSock,ndesc,ierr=0;
-            memcpy(&readSock,&selectSet,fd_set.sizeof); // linux does not define FD_COPY
-            ndesc=select(maxDesc+1, &readSock, null, null, null);
-            if (ndesc<0){
-                if (errno!=EINTR){
-                    char[128] buf;
-                    throw new BIOException(strerror_d(errno,buf),__FILE__,__LINE__);
-                }
-            }
-            if (ndesc>0){
-                int iSock;
-                nSock=socks.length;
-                int firstSock=pos+1;
-                for (iSock=0;iSock<nSock;++iSock){
-                    int iSockAtt=(iSock+firstSock)%nSock;
-                    pos=iSockAtt;
-                    if (FD_ISSET(socks[iSockAtt],&readSock)){
-                        sockaddr address;
-                        socklen_t addrLen=cast(socklen_t)address.sizeof;
-                        newSock=blip.stdc.socket.accept(socks[iSockAtt],&address,&addrLen);
-                        if (newSock<=0){ // ignore lost connections???
-                            char[128] buf;
-                            auto errMsg=strerror_d(errno,buf);
-                            if (errMsg.length==0){
-                                auto a=lGrowableArray(buf,0,GASharing.Local);
-                                a("error accepting socket ");
-                                writeOut(&a.appendArr,errno);
-                                throw new BIOException(a.takeData,__FILE__,__LINE__);
-                            }
-                            throw new BIOException("error accepting socket "~errMsg,
-                                __FILE__,__LINE__);
-                        }
-                        if (addrStrPtr !is null || serviceStrPtr !is null){
-                            char[]addrStr,serviceStr;
-                            if (addrStrPtr!is null) {
-                                addrStr=*addrStrPtr;
-                            }
-                            if (serviceStrPtr!is null) {
-                                serviceStr=*serviceStrPtr;
-                            }
-                            if (getnameinfo(&address,addrLen, addrStr.ptr, addrStr.length, serviceStr.ptr,serviceStr.length, 0))
-                            {
-                                if (addrStrPtr!is null) {
-                                    *addrStrPtr=null;
-                                }
-                                if (serviceStrPtr!is null) {
-                                    *serviceStrPtr=null;
-                                }
-                            } else {
-                                if (addrStrPtr!is null) {
-                                    *addrStrPtr=addrStr[0..strlen(addrStr.ptr)];
-                                }
-                                if (serviceStrPtr!is null) {
-                                    *serviceStrPtr=serviceStr[0..strlen(serviceStr.ptr)];
-                                }
-                            }
-                        }
-                        return new BasicSocket(newSock);
-                    }
-                }
-                Log.lookup("blip.io.Socket").warn("could not find the descriptor that was ready in SocketServer.accept for service "~serviceName~"\n");
-            }
+    void callback(ev_loop_t*loop,GenericWatcher w,EventHandler* h){
+        version(TrackSocketServer){
+            // this is in a special version, because without it one can (in the normal case) accept a socket
+            // without any logging
+            sinkTogether(log,delegate void(CharSink sink){
+                auto s=dumper(sink);
+                s("server ")(serviceName)(" received request\n");
+            });
         }
-    }
-    
-    void runWithHandler(void delegate(BasicSocket,char[] source) h){
-        Log.lookup("blip.io.Socket").warn("starting server for "~serviceName);
-        while(1){
+        auto sock=cast(socket_t)(w.ptr!(ev_io)().fd);
+        sockaddr address;
+        socklen_t addrLen=cast(socklen_t)address.sizeof;
+        auto newSock=blip.stdc.socket.accept(sock,&address,&addrLen);
+        if (newSock<=0){ // ignore lost connections? would be safer but in development it is probably better to crash...
             char[256] buf;
-            char[] addr=buf;
-            BasicSocket s;
-            try{
-                s=accept(&addr);
-            } catch(BIOException e){
-                char[256]buf2;
-                auto a=lGrowableArray(buf2,0);
-                dumper(&a)("error accepting ")(serviceName)(":");
-                e.writeOut(&a.appendArr);
-                Log.lookup("blip.io.Socket").warn(a.data);
+            auto errMsg=strerror_d(errno,buf);
+            sinkTogether(log,delegate void(CharSink sink){
+                auto s=dumper(sink);
+                s("error accepting socket in ")(serviceName)(":")(errMsg);
+                if (errMsg.length==0){
+                    s(errno);
+                }
+                s("\n");
+            });
+        }
+        if (pendingTasks>= maxPendingTasks){
+            sinkTogether(log,delegate void(CharSink sink){
+                auto s=dumper(sink);
+                s("too many pending connections, dropping connection immeditely on ")(serviceName)("\n");
+            });
+            BasicSocket(newSock).close();
+            return;
+        }
+        atomicAdd(pendingTasks,1);
+        auto hh=Handler.gPool.getObj;
+        hh.sock=BasicSocket(newSock);
+        hh.server=this;
+        hh.addrOther=address;
+        hh.addrLen=addrLen;
+        Task("acceptedSocket",&hh.doAction).appendOnFinish(&hh.giveBack).autorelease.submit(defaultTask);
+    }
+    /// stops the server
+    void stop(){
+        if (!isStarted) return;
+        auto tAtt=taskAtt.val;
+        Semaphore sem;
+        void stopWatchers(){
+            foreach (w;watchers){
+                w.stop(defaultWatcher.loop);
             }
-            addr=addr.dup;
-            try{
-                h(s,addr);
-            } catch (StopException s){
-                Log.lookup("blip.io.Socket").warn("stopping server for "~serviceName);
-                break;
-            } catch(Exception e){
-                char[256]buf2;
-                auto a=lGrowableArray(buf2,0);
-                dumper(&a)("error handling accepted socket ")(serviceName)(" from ")(addr)(":");
-                e.writeOut(&a.appendArr);
-                Log.lookup("blip.io.Socket").warn(a.data);
+            watchers=[];
+            foreach (s;socks){
+                close(s);
             }
+            socks=[];
+            if (sem){
+                sem.notify();
+            } else {
+                tAtt.resubmitDelayed(tAtt.delayLevel-1);
+            }
+        }
+        if (tAtt!is null && tAtt.mightYield()){
+            tAtt.delay({
+                defaultWatcher.addAction(&stopWatchers);
+            });
+        } else {
+            sem=new Semaphore();
+            defaultWatcher.addAction(&stopWatchers);
+            sem.wait();
         }
     }
 }

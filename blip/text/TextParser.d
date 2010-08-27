@@ -388,7 +388,6 @@ class TextParser(T) : InputFilter
                 return 0;
             }
         }
-        return nlines; // what should be done with checkCr ??? anyway being here will probably be treated as an error...
     }
     /// scans a line
     protected size_t scanLine (T[] data,SliceExtent se){

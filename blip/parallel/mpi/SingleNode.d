@@ -240,9 +240,9 @@ class SNChannel:Channel,BasicObjectI{
                     if (immediate && data.length && (tag==AnyTag || data[0].tag==tag)){
                         msg=data.popFront();
                         didSetM=true;
-                        tAtt.resubmitDelayed();
+                        tAtt.resubmitDelayed(tAtt.delayLevel-1);
                     } else {
-                        localHandlers.append(HandlerAction(tag,&tAtt.resubmitDelayed));
+                        localHandlers.append(HandlerAction(tag,resubmitter(tAtt,tAtt.delayLevel-1)));
                     }
                 }
             });
@@ -280,14 +280,14 @@ class SNChannel:Channel,BasicObjectI{
             if (tAtt !is null && tAtt.mightYield){
                 SNMessage msg;
                 bool didSetM=false;
-                tAtt.delay({
+                tAtt.delay(delegate void(){
                     synchronized(this){
                         if (immediate && data.length && (tag==AnyTag || data[0].tag==tag)){
                             msg=data.popFront();
                             didSetM=true;
-                            tAtt.resubmitDelayed();
+                            tAtt.resubmitDelayed(tAtt.delayLevel-1);
                         } else {
-                            localHandlers.append(HandlerAction(tag,&tAtt.resubmitDelayed));
+                            localHandlers.append(HandlerAction(tag,resubmitter(tAtt,tAtt.delayLevel-1)));
                         }
                     }
                 });
@@ -416,6 +416,7 @@ class SNCart(int dimG):Cart!(dimG){
             rank/=p;
         }
         assert(rank==0,"out of bound rank");
+        return pos;
     }
     void shift(int direction, int disp, out int rank_source, out int rank_dest){
         assert(0<=direction && direction<dimG,"direction out of bounds");

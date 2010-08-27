@@ -79,15 +79,15 @@ class STask{
         auto tAtt=taskAtt.val;
         tAtt.delay({
             sout(name~" delayed!\n");
-            tAtt.resubmitDelayed();
+            tAtt.resubmitDelayed(tAtt.delayLevel-1);
         });
         sout(name~" waked!\n");
     }
     void lateWakeUp(){
         auto tAtt=taskAtt.val;
-        auto resub=&(cast(Task)tAtt).resubmitDelayed;
+        auto resub=resubmitter(tAtt,tAtt.delayLevel);
         sout(collectAppender(delegate void(CharSink s){
-            s("resub ptr:"); writeOut(s,cast(void*)resub.ptr); s(" funcptr:"); writeOut(s,cast(void*)resub.funcptr);
+            s("resub:"); writeOut(s,resub);
             s("\n");
         }));
         auto tt=new STask(name~"_wakeUp",0.5,resub);

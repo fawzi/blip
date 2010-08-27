@@ -31,7 +31,7 @@
 /// to avoid submitting too many tasks at once you might want to "pause" the current task
 /// so that it will be resumed when more tasks are requested:
 /// {{{
-/// Task.yield();
+/// if (!Task.yield()) throw Exception("cannot yield");
 /// }}}
 /// you might also insert a possible pause, which might be done or not with
 /// {{{
@@ -192,6 +192,7 @@ char[] mkActionMixin(char[]name,char[]locals_,char[]action){
 /// this is used to calculate the default block size for splitting up parallel tasks
 /// (this should probably be at least comparable to the l1 cache per thread)
 const size_t defaultSimpleLoopSize=64*1024;
+
 /// a real scheduler (unless one has version SequentialWorkManager)
 /// shares the work on a pool of threads
 TaskSchedulerI defaultScheduler;

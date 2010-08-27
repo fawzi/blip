@@ -36,6 +36,7 @@ struct SmpSemaphore{
     struct TaskISlist{
         TaskI el; // using this rather than delegates because it is more self descriptive
         TaskISlist * next;
+        int delayLevel;
     }
     ptrdiff_t counter; /// the number of waiting threads
     Semaphore sem; // remove support for this? it is just for waiting non yieldable tasks or the main thread
@@ -62,7 +63,7 @@ struct SmpSemaphore{
                     Thread.yield();
                 }
                 if (t.el !is null){
-                    t.el.resubmitDelayed();
+                    t.el.resubmitDelayed(t.delayLevel);
                 } else {
                     while (sem is null){
                         Thread.yield();
@@ -81,6 +82,7 @@ struct SmpSemaphore{
             auto tt=new TaskISlist;
             if (tAtt!is null && tAtt.mightYield()){
                 tt.el=tAtt;
+                tt.delayLevel=tAtt.delayLevel;
                 tAtt.delay(delegate void(){
                     insertAt(waiting,tt);
                 });
@@ -106,7 +108,8 @@ struct SmpSemaphore{
 class WaitConditionT(bool oneAtTime=true){
     bool delegate() cnd;
     Semaphore sem;
-    TaskI[]waiting; // using this rather than delegates because it is more self descriptive
+    TaskI waiting0,waiting1;
+    TaskI[]waiting; // using this rather than delegates because it is more self descriptive, 
     /// constructor
     this(bool delegate() cnd){
         this.cnd=cnd;
@@ -114,8 +117,16 @@ class WaitConditionT(bool oneAtTime=true){
     /// notify all waiters that the condition was met
     void notifyAll(){
         synchronized(this){
+            if (waiting0!is null){
+                waiting0.resubmitDelayed(waiting0.delayLevel-1);
+                waiting0=null;
+            }
+            if (waiting1!is null){
+                waiting1.resubmitDelayed(waiting0.delayLevel-1);
+                waiting1=null;
+            }
             foreach(t;waiting){
-                t.resubmitDelayed();
+                t.resubmitDelayed(t.delayLevel-1);
             }
             waiting=null;
             if (sem!is null) sem.notify();
@@ -125,10 +136,16 @@ class WaitConditionT(bool oneAtTime=true){
     void notifyOne(){
         synchronized(this){
             if (waiting.length>0){
-                waiting[waiting.length-1].resubmitDelayed();
+                waiting[$-1].resubmitDelayed(waiting[$-1].delayLevel-1);
+                waiting[$-1]=null;
                 waiting.length=waiting.length-1;
+            } else if (waiting1!is null){
+                waiting1.resubmitDelayed(waiting1.delayLevel-1);
+                waiting1=null;
+            } else if (waiting0!is null){
+                waiting0.resubmitDelayed(waiting0.delayLevel-1);
+                waiting0=null;
             }
-            waiting=null;
             if (sem!is null) sem.notify();
         }
     }
@@ -154,7 +171,13 @@ class WaitConditionT(bool oneAtTime=true){
             if (tAtt!is null && tAtt.mightYield()){
                 tAtt.delay({
                     synchronized(this){
-                        waiting~=tAtt;
+                        if (waiting0 is null){
+                            waiting0=tAtt;
+                        } else if (waiting1 is null){
+                            waiting1=tAtt;
+                        } else {
+                            waiting~=tAtt;
+                        }
                     }
                 });
                 checkCondition();
@@ -272,7 +295,7 @@ class RLock:Object.Monitor{
         }
         bool delayThis=false;
         { // quick path
-            TaskI[128] unlockBuf;
+            TaskI[128] unlockBuf=void;
             auto toUnlock=lGrowableArray(unlockBuf,0);
             synchronized(this){
                 if (locking is null){
@@ -323,13 +346,13 @@ class RLock:Object.Monitor{
                 }
             }
             foreach(t;toUnlock.data){
-                t.resubmitDelayed();
+                t.resubmitDelayed(t.delayLevel-1);
             }
             toUnlock.deallocData();
         }
         if (delayThis){
             newTask.delay(delegate void(){
-                TaskI[128] unlockBuf;
+                TaskI[128] unlockBuf=void;
                 auto toUnlock=lGrowableArray(unlockBuf,0);
                 synchronized(this){
                     if (locking is null){
@@ -370,7 +393,7 @@ class RLock:Object.Monitor{
                     }
                 }
                 foreach(t;toUnlock.data){
-                    t.resubmitDelayed();
+                    t.resubmitDelayed(t.delayLevel-1);
                 }
                 toUnlock.deallocData();
             });
@@ -391,7 +414,7 @@ class RLock:Object.Monitor{
         }
         assert(0,"unlock called when not locked by this task");
     }body{
-        TaskI[128] unlockBuf;
+        TaskI[128] unlockBuf=void;
         auto toUnlock=lGrowableArray(unlockBuf,0);
         synchronized(this){
             if (lockLevel==0) throw new Exception("mismatched unlock",__FILE__,__LINE__);
@@ -416,7 +439,7 @@ class RLock:Object.Monitor{
             }
         }
         foreach(t;toUnlock.data){
-            t.resubmitDelayed();
+            t.resubmitDelayed(t.delayLevel-1);
         }
         toUnlock.deallocData();
     }

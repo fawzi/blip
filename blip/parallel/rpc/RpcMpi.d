@@ -139,10 +139,11 @@ class MpiProtocolHandler: ProtocolHandler{
             if (unserRes!is null){
                 Unserializer u;
                 auto tAtt=taskAtt.val;
+                auto dLevel=tAtt.delayLevel;
                 tAtt.delay({
                     addPendingRequest(urlDecode(url.anchor),delegate void(ParsedUrl url,Unserializer us){
                         u=us;
-                        tAtt.resubmitDelayed;
+                        tAtt.resubmitDelayed(dLevel);
                     });
                     auto s=comm[target].sendTag(tag,buf);
                     s(url.url(buf2));

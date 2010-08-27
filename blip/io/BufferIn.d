@@ -19,6 +19,8 @@ import blip.io.BasicIO;
 import blip.text.UtfUtils;
 import blip.stdc.string: memmove,memcpy;
 import blip.math.Math: min;
+import blip.container.GrowableArray;
+version(TrackBInReadSome) import blip.io.Console;
 
 final class BufferIn(TInt):Reader!(TInt){
     static if(is(TInt==void)){
@@ -34,14 +36,20 @@ final class BufferIn(TInt):Reader!(TInt){
     size_t encodingOverhead;
     void delegate() _shutdownInput;
     
-    this(size_t delegate(TInt[]) basicReader,TBuf[] buf,size_t encodingOverhead=ulong.sizeof/TInt.sizeof,void delegate() shutdown=null){
+    this(size_t delegate(TInt[]) basicReader,TBuf[] buf,size_t encodingOverhead=ulong.sizeof/TInt.sizeof,void delegate() shutdown=null,size_t bufLen=0,size_t bufPos=0){
         assert(buf.length>encodingOverhead,"buf too small");
         this.buf=buf;
-        bufPos=0;
-        bufLen=0;
+        this.bufPos=bufPos;
+        this.bufLen=bufLen;
+        assert(bufPos<=buf.length && bufPos+bufLen<=buf.length,"invalid bufPos/bufLen");
         _read=basicReader;
         slice=SliceExtent.Partial;
         _shutdownInput=shutdown;
+    }
+    static if(is(TInt==void)){
+        this(size_t delegate(TInt[]) basicReader,TInt[] buf,size_t encodingOverhead=ulong.sizeof/TInt.sizeof,void delegate() shutdown=null,size_t bufLen=0,size_t bufPos=0){
+            this(basicReader, cast(TBuf[])buf, encodingOverhead, shutdown, bufLen, bufPos);
+        }
     }
     this(size_t delegate(TInt[]) basicReader,size_t bufLen=512,size_t encodingOverhead=0){
         this(basicReader,new TBuf[](bufLen),encodingOverhead);
@@ -114,6 +122,18 @@ final class BufferIn(TInt):Reader!(TInt){
     }
 
     size_t readSomeT(TOut)(TOut[]outBuf){
+        version(TrackBInReadSome){
+            sinkTogether(sout,delegate void(CharSink s){
+                dumper(s)("readSome started need to read ")(outBuf.length)(" ")(TOut.stringof)(",")
+                    ("buffer contents:\n'");
+                foreach (i,u;buf[bufPos..bufPos+bufLen]){
+                    s(" ");
+                    writeOut(s,u);
+                    if (i%10==9) s("\n");
+                }
+                s("'\n");
+            });
+        }
         static assert(TInt.sizeof<=TOut.sizeof,"internal size needs to be smaller than external");
         static assert(TOut.sizeof%TInt.sizeof==0,"external size needs to be a multiple of internal size");
         enum :size_t{OutToIn=TOut.sizeof/TInt.sizeof}
@@ -127,8 +147,8 @@ final class BufferIn(TInt):Reader!(TInt){
         size_t readTot=0;
         if (outLen <=bufLen){
             outPtr[0..outLen]=buf[bufPos..bufPos+outLen];
-            bufLen-=outBuf.length;
-            bufPos+=outBuf.length;
+            bufLen-=outLen;
+            bufPos+=outLen;
             return outBuf.length;
         } else if (bufLen>0){
             auto rest=bufLen%OutToIn;
@@ -151,9 +171,10 @@ final class BufferIn(TInt):Reader!(TInt){
         } else if (slice==SliceExtent.ToEnd) {
             return Eof;
         }
+        version(TrackBInReadSome) sout("BufferIn.readSome switching to real read\n");
         size_t readNow;
         if (outLen>buf.length/2){
-            readNow=_read(outPtr[bufLen..outLen]);
+            readNow=_read(outPtr[readTot..outLen]);
         } else {
             if (bufPos!=0) compact(); // should never be needed...
             auto rNow=_read(buf[bufPos+bufLen..$]);
@@ -260,7 +281,7 @@ final class BufferIn(TInt):Reader!(TInt){
             this.buf=buf;
         }
 
-        /// exact reader 
+        /// reader 
         size_t readSome(T[] t){
             this.buf.readSomeT!(T)(t);
         }
@@ -279,6 +300,13 @@ final class BufferIn(TInt):Reader!(TInt){
     ReinterpretReader!(T) reinterpretReader(T)(){
         return new ReinterpretReader!(T)(this);
     }
+}
+
+/// a reader that reads the contents of an array
+BufferIn!(T) arrayReader(T)(T[] a){
+    auto res=new BufferIn!(T)(delegate size_t(T[] b){ return Eof; },a,0,null,a.length,0);
+    res.slice=SliceExtent.ToEnd;
+    return res;
 }
 
 /// a class that supports all reading streams on the top of a binary stream

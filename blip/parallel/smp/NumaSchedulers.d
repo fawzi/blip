@@ -315,6 +315,7 @@ class PriQScheduler:TaskSchedulerI {
             }
             scheduler2.addTask0(t2);
         }+/
+        return true;
     }
     /// description (for debugging)
     /// non threadsafe

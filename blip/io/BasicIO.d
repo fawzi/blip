@@ -131,14 +131,14 @@ alias bool delegate(BinReader) BinReaderHandler;
 
 /// io exception
 class BIOException: Exception{
-    this(char[]msg,char[] file, long line){
-        super(msg,file,line);
+    this(char[]msg,char[] file, long line,Exception next=null){
+        super(msg,file,line,next);
     }
 }
 /// exception when the buffer is too small
 class SmallBufferException:BIOException{
-    this(char[]msg,char[]fileN,long lineN){
-        super(msg,fileN,lineN);
+    this(char[]msg,char[]fileN,long lineN,Exception next=null){
+        super(msg,fileN,lineN,next);
     }
 }
 
@@ -344,8 +344,8 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
                     cast(Char)'a',cast(Char)'b',cast(Char)'c',cast(Char)'d',cast(Char)'e',cast(Char)'f'];
                     Char[T.sizeof*2] str;
                     auto val=v;
-                    for(int i=1;i<=T.sizeof*2;++i){
-                        auto d=(0xF & val);
+                    for(int i=1;i<=cast(int)T.sizeof*2;++i){
+                        auto d=cast(int)(0xF & val);
                         str[str.length-i]=digits[d];
                         val>>=4;
                     }
@@ -358,7 +358,7 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
                     Char[T.sizeof*2] strU;
                     auto valU=v;
                     for(int i=1;i<=T.sizeof*2;++i){
-                        auto dU=(0xF & valU);
+                        auto dU=cast(int)(0xF & valU);
                         strU[strU.length-i]=digitsU[dU];
                         valU>>=4;
                     }
@@ -513,7 +513,16 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
             writeOut(sink,v.toString());
         } else static if (is(T U==typedef)){
             writeOut(sink1,cast(U)v,args);
-        } else{
+        } else static if (is(T == function)){
+            sink(convertToString!(Char)("function@"));
+            writeOut(sink,cast(void*)v);
+        } else static if (is(T==delegate)){
+            sink(convertToString!(Char)("delegate("));
+            writeOut(sink,cast(void*)v.ptr);
+            sink(",");
+            writeOut(sink,cast(void*)v.funcptr);
+            sink(")");
+        } else {
             static assert(0,"unsupported type in writeOut "~T.stringof);
         }
     }
@@ -572,7 +581,7 @@ void readExact(TInt,TOut)(size_t delegate(TInt[]) rSome,TOut[]outBuf){
     }
 
     auto outLen=outBuf.length*OutToIn;
-    auto outPtr=cast(TBuf*)outBuf.ptr;
+    auto outPtr=cast(TInt*)outBuf.ptr;
     size_t readTot=0;
     while(readTot!=outLen){
         auto readNow=rSome(outPtr[readTot..outLen]);

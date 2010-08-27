@@ -21,6 +21,7 @@ import blip.BasicModels;
 import blip.io.BasicIO;
 import blip.container.FiberPool;
 import blip.container.Cache;
+import blip.container.Pool;
 import blip.math.random.Random;
 import blip.core.Traits: ctfe_i2a;
 
@@ -209,8 +210,11 @@ interface TaskI:SubtaskNotificationsI{
     /// stopping the current execution. Use it to start the operation that will resume
     /// the task (so that it is not possible to resume before the delay is effective)
     void delay(void delegate()opStart=null);
-    /// resubmit a delayed task
-    void resubmitDelayed();
+    /// resubmit a delayed task, the value is the delayLevel at which the task will return
+    /// (thus you should use delayLevel-1 from within the delay task)
+    void resubmitDelayed(int);
+    /// the current level of delay
+    int delayLevel();
     /// executes the task, and waits for its completion
     void executeNow(TaskI t=null);
     //}
@@ -230,4 +234,46 @@ class ParaException: Exception{
     this(char[] msg, char[] file, size_t line, Exception next = null){
         super(msg,file,line,next);
     }
+}
+
+/// closure to resubmit a task safely (is now needed due to the recursive delay support)
+struct Resubmitter{
+    TaskI task;
+    PoolI!(Resubmitter*)pool;
+    int delayLevel=int.max;
+    void resub(){
+        task.resubmitDelayed(delayLevel);
+        giveBack();
+    }
+    void giveBack(){
+        if (pool!is null){
+            pool.giveBack(this);
+        } else {
+            task=null;
+            delayLevel=int.max;
+            delete this;
+        }
+    }
+    static PoolI!(Resubmitter*) gPool;
+    static this(){
+        gPool=cachedPool(function Resubmitter*(PoolI!(Resubmitter*)p){
+            auto res=new Resubmitter;
+            res.pool=p;
+            return res;
+        });
+    }
+    static Resubmitter *opCall(TaskI t,int delayLevel){
+        auto r=gPool.getObj();
+        r.task=t;
+        r.delayLevel=delayLevel;
+        return r;
+    }
+    void desc(CharSink s){
+        dumper(s)("{class:Resubmitter, @:")(cast(void*)this)(", task:")(task)(", delayLevel:")(delayLevel)("}");
+    }
+}
+/// returns a delegate that resubmits the task with the given delayLevel
+void delegate() resubmitter(TaskI task,int delayLevel){
+    auto res=Resubmitter(task,delayLevel);
+    return &res.resub;
 }

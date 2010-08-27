@@ -26,6 +26,7 @@ import blip.BasicModels;
 version(NoTrace){} else { import blip.core.stacktrace.TraceExceptions; }
 import blip.io.StreamConverters;
 import blip.io.BasicIO;
+import blip.io.BufferIn;
 
 version(Xpose){
     public import blip.serialization.SerializationExpose;
@@ -255,6 +256,7 @@ struct TestStruct{
 void testUnserial(T)(T a){
     testJsonUnserial!(T)(a);
     testBinUnserial!(T)(a);
+    testBin2Unserial!(T)(a);
 }
 /// unserialization test
 void testJsonUnserial(T)(T a){
@@ -322,9 +324,50 @@ void testBinUnserial(T)(T a){
     version(UnserializationTrace) sout("passed test of unserialization of "~T.stringof~"\n");
 }
 
+void testBin2Unserial(T)(T a){
+    version(UnserializationTrace) sout("testing unserialization of "~T.stringof~"\n");
+    ubyte[256] _buf;
+    auto buf=lGrowableArray(_buf,0);
+    auto js=new SBinSerializer(&buf.appendVoid);
+    js(a);
+    version(UnserializationTrace) {
+        auto js2=new JsonSerializer!()(sout);
+        sout("in the buffer:-----\n");
+        char[128] buf2;
+        auto arr=lGrowableArray!(char)(buf2,0);
+        foreach (i,ub;cast(ubyte[])buf.data){
+            writeOut(&arr.appendArr,ub);
+            arr(" ");
+            if (i%10==9) {
+                arr("\n");
+                sout(arr.data);
+                arr.clearData;
+            }
+        }
+        arr("\n");
+        sout(arr.data);
+        sout("original:----\n");
+        js2(a);
+        sout("XXXXXX Unserialization start\n");
+    }
+    auto reader=arrayReader(cast(void[])buf.data);
+    auto jus=new SBinUnserializer(reader);
+    T sOut;
+    jus(sOut);
+    version(UnserializationTrace){
+        sout("XXXXXX Unserialization end\n");
+        sout("unserialized:--\n");
+        js2(sOut);
+        sout("-----\n");
+    }
+    assert(a==sOut,"unserial error with "~T.stringof);
+    version(UnserializationTrace) sout("passed test of unserialization of "~T.stringof~"\n");
+}
+
 void testUnserial2(T,U)(void delegate(void function(T,U)) testF){
     testF(function void(T a,U b){ testJsonUnserial2!(T,U)(a,b); });
     testF(function void(T a,U b){ testBinUnserial2!(T,U)(a,b); });
+    testF(function void(T a,U b){ testBin2Unserial2!(T,U)(a,b); });
 }
 
 /// unserialization test2 Json
@@ -374,6 +417,40 @@ void testBinUnserial2(T,U)(T a,ref U b){
         sout("XXXXXX Unserialization start\n");
     }
     auto jus=new SBinUnserializer(toReaderT!(void)(buf));
+    jus(b);
+    version(UnserializationTrace){
+        sout("XXXXXX Unserialization end\n");
+    }
+    version(UnserializationTrace) sout("binary test of unserialization of "~T.stringof~"\n");
+}
+/// unserialization test2 Bin2
+void testBin2Unserial2(T,U)(T a,ref U b){
+    version(UnserializationTrace) sout("testing binary unserialization of "~T.stringof~"\n");
+    ubyte[256] _buf;
+    auto buf=lGrowableArray(_buf,0);
+    auto js=new SBinSerializer(&buf.appendVoid);
+    js(a);
+    version(UnserializationTrace) {
+        auto js2=new JsonSerializer!()(sout);
+        sout("in the buffer:-----\n");
+        char[128] buf2;
+        auto arr=lGrowableArray!(char)(buf2,0);
+        foreach (i,ub;cast(ubyte[])buf.data){
+            writeOut(&arr.appendArr,ub);
+            arr(" ");
+            if (i%10==9) {
+                arr("\n");
+                sout(arr.data);
+                arr.clearData;
+            }
+        }
+        arr("\n");
+        sout(arr.data);
+        sout("----\n");
+        sout("XXXXXX Unserialization start\n");
+    }
+    auto reader=arrayReader(cast(void[])buf.data);
+    auto jus=new SBinUnserializer(reader);
     jus(b);
     version(UnserializationTrace){
         sout("XXXXXX Unserialization end\n");

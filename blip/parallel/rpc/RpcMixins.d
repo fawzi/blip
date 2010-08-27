@@ -288,6 +288,10 @@ char[] rpcVendorMixin(char[] name,char[] extName_, char[][] functionsComments){
     }
     char[] res=`
     static class `~name~`Vendor:BasicVendor{
+        this(){}
+        this(`~name~`ProxiedType obj){
+            this.obj=obj;
+        }
         `~name~`ProxiedType obj;
         override `~name~`ProxiedType targetObj(){ return obj; }
         static struct Closure{
@@ -313,13 +317,14 @@ char[] rpcVendorMixin(char[] name,char[] extName_, char[][] functionsComments){
                             SendResHandler sendRes;
                             ubyte[] reqId;
                             `~functionName~`Args args;
-                            void call(){
-                                version(TrackRpc){
-                                    context.publisher.log("started real execution of rpc call "~`~extName~`~".`~functionName~`\n");
-                                    scope(exit){
-                                        context.publisher.log("finished rpc call "~`~extName~`~".`~functionName~`\n");
-                                    }
+                            void call(){`;
+        version(TrackRpc){
+            res~=`
+                                context.publisher.log("started real execution of rpc call "~`~extName~`~".`~functionName~`\n");
+                                scope(exit){
+                                    context.publisher.log("finished rpc call "~`~extName~`~".`~functionName~`\n");
                                 }`;
+        }
         if (oneway){
             res~=`
                                 static assert(is(`~functionName~`Return==void),"non void return in oneway method "~`~extName~`~".`~functionName~`");
@@ -338,21 +343,32 @@ char[] rpcVendorMixin(char[] name,char[] extName_, char[][] functionsComments){
                                     try{
                                         context.obj.`~functionName~`(args);
                                         context.simpleReply!(void)(sendRes,reqId);
-                                    } catch (Exception o) {
-                                        version(TrackRpc){
-                                            context.publisher.log("sending back exception in rpc call "~`~extName~`~".`~functionName~`\n");
-                                        }
+                                    } catch (Exception o) {`;
+            version(TrackRpc){
+                res~=`
+                                        context.publisher.log("sending back exception in rpc call "~`~extName~`~".`~functionName~`\n");`;
+            }
+            res~=`
                                         context.exceptionReply(sendRes,reqId,o);
                                         return;
                                     }
                                 } else {
                                     try{
                                         auto res=context.obj.`~functionName~`(args);
-                                        context.simpleReply(sendRes,reqId,res);
-                                    } catch(Exception o){
-                                        version(TrackRpc){
-                                            context.publisher.log("sending back exception in rpc call "~`~extName~`~".`~functionName~`\n");
-                                        }
+                                        context.simpleReply(sendRes,reqId,res);`;
+            version(TrackRpc){
+                res~=`
+                                        sinkTogether(context.publisher.log,delegate void(CharSink s){
+                                            dumper(s)("sending back result in rpc call "~`~extName~`~".`~functionName~`, resVal:")(res)("\n");
+                                        });`;
+            }
+            res~=`
+                                    } catch(Exception o){`;
+            version(TrackRpc){
+                res~=`
+                                            context.publisher.log("sending back exception in rpc call "~`~extName~`~".`~functionName~`\n");`;
+            }
+            res~=`
                                         context.exceptionReply(sendRes,reqId,o);
                                     }
                                 }`;
@@ -367,6 +383,7 @@ char[] rpcVendorMixin(char[] name,char[] extName_, char[][] functionsComments){
     res~=`
             }
             Cl closure;
+            ubyte[64] buf;
             void giveBack(){
                 if (pool!is null){
                     pool.giveBack(this);
@@ -453,6 +470,12 @@ char[] rpcVendorMixin(char[] name,char[] extName_, char[][] functionsComments){
                 publisher.log("starting rpc call "~`~extName~`~".`~functionName~`\n");
             }
             auto cl0=Closure();
+            if (reqId.length<=cl0.buf.length){
+                cl0.buf[0..reqId.length]=reqId;
+                reqId=cl0.buf[0..reqId.length];
+            } else {
+                reqId=reqId.dup;
+            }
             auto cl= & cl0.closure.`~functionName~`Closure;
             try {
                 cl.context=this;

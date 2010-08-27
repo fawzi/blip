@@ -20,18 +20,17 @@ version (Win32) {
         int     listen(socket_t, int);
         int     shutdown(socket_t, int);
         socket_t     socket(int, int, int);
+        ptrdiff_t recv(int, void *, size_t, int);
+        // ssize_t recvfrom(int, void *restrict, size_t, int,
+        //         struct sockaddr *restrict, socklen_t *restrict);
+        // ssize_t recvmsg(int, struct msghdr *, int);
+        ptrdiff_t send(int, void *, size_t, int);
+        // ssize_t sendmsg(int, const struct msghdr *, int);
+        // ssize_t sendto(int, const void *, size_t, int, const struct sockaddr *,
+        //         socklen_t);
+        int     setsockopt(int, int, int, void *, socklen_t);
+        int     getsockopt(int, int, int, void *, socklen_t *);
     }
-    // ssize_t recv(int, void *, size_t, int);
-    // ssize_t recvfrom(int, void *restrict, size_t, int,
-    //         struct sockaddr *restrict, socklen_t *restrict);
-    // ssize_t recvmsg(int, struct msghdr *, int);
-    // ssize_t send(int, const void *, size_t, int);
-    // ssize_t sendmsg(int, const struct msghdr *, int);
-    // ssize_t sendto(int, const void *, size_t, int, const struct sockaddr *,
-    //         socklen_t);
-    // int     setsockopt(int, int, int, const void *, socklen_t);
-    // int     getsockopt(int, int, int, void *restrict, socklen_t *restrict);
-    
     
     // select
     public import tango.stdc.posix.sys.select: fd_set,select,FD_ZERO,FD_SET,FD_ISSET;

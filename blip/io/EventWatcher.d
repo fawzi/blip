@@ -17,14 +17,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 module blip.io.EventWatcher;
-import blip.parallel.smp.WorkManager;
 import blip.io.BasicIO;
+import blip.io.Console;
 import blip.container.GrowableArray;
 import blip.container.Deque;
 import gobo.ev.DLibev;
 import gobo.ev.Libev;
 import blip.core.Traits;
 import blip.core.Thread;
+import blip.parallel.smp.WorkManager;
+import blip.core.sync.Semaphore;
 
 /// this creates a watcher thread that watches for events, and notifies 
 class EventWatcher{
@@ -42,11 +44,12 @@ class EventWatcher{
     Flags flags;
     
     static extern(C) void checkMoreWatchers(ev_loop_t* loop, ev_watcher *w,int relf){
-        (cast(EventWatcher)w.data).watchersToAdd.filterInPlace(delegate bool(GenericWatcher gw){
+        auto eW= cast(EventWatcher)w.data;
+        eW.watchersToAdd.filterInPlace(delegate bool(GenericWatcher gw){
             gw.start(loop);
             return false;
         });
-        (cast(EventWatcher)w.data).actionsToDo.filterInPlace(delegate bool(void delegate() a){
+        eW.actionsToDo.filterInPlace(delegate bool(void delegate() a){
             a();
             return false;
         });
@@ -62,6 +65,7 @@ class EventWatcher{
         this.watchersToAdd=new Deque!(GenericWatcher)();
         this.actionsToDo=new Deque!(void delegate())();
         this.asyncWatcher.asyncInit(&checkMoreWatchers);
+        this.asyncWatcher.data(this);
         this.asyncWatcher.start(this.loop);
     }
     
@@ -94,22 +98,28 @@ class EventWatcher{
     }
     
     void threadTask(){
-        synchronized(this){
-            flags |=Flags.LoopRunning;
-        }
+        try{
+            synchronized(this){
+                flags |=Flags.LoopRunning;
+            }
         
-        if (taskAtt.val is null || taskAtt.val is noTask){
-            // allow spawn from this task into the default work manager
-            taskAtt.val=defaultTask;
-        }
-        // start async communicator (for multithread communication)
-        asyncWatcher.start(loop);
+            if (taskAtt.val is null || taskAtt.val is noTask){
+                // allow spawn from this task into the default work manager
+                taskAtt.val=defaultTask;
+            }
+            // start async communicator (for multithread communication)
+            asyncWatcher.start(loop);
 
-        // now wait for events to arrive
-        ev_loop (loop, 0);
+            // now wait for events to arrive
+            ev_loop (loop, 0);
 
-        synchronized(this){
-            flags = flags & (~Flags.LoopRunning);
+            synchronized(this){
+                flags = flags & (~Flags.LoopRunning);
+            }
+        } catch (Exception e){
+            sinkTogether(serr,delegate void(CharSink s){
+                dumper(s)("EventWatcher thread crashed with Exception:")(e)("\n");
+            });
         }
     }
     
@@ -124,14 +134,54 @@ class EventWatcher{
         }
         loopThread.start();
     }
+    
+    /// stops the current event loop (if running), should not be called concurrently by several threads
+    bool stopLoop(){
+        bool shouldStop=false;
+        synchronized(this){
+            if (flags&Flags.LoopRunning){
+                shouldStop=true;
+            }
+        }
+        Semaphore sem;
+        auto tAtt=taskAtt.val;
+        void stopOldLoop(){
+            ev_unloop(loop,EVUNLOOP_ALL);
+            if (sem){
+                sem.notify();
+            } else {
+                tAtt.resubmitDelayed(tAtt.delayLevel-1);
+            }
+        }
+        if (shouldStop){
+            if (tAtt !is null && tAtt.mightYield){
+                tAtt.delay({
+                    addAction(&stopOldLoop);
+                });
+            } else {
+                sem=new Semaphore();
+                addAction(&stopOldLoop);
+                sem.wait();
+            }
+            return true;
+        }
+        synchronized(this){
+            assert((flags&Flags.LoopRunning)==0,"stopping of running thread failed");
+        }
+        return false;
+    }
+    /// stops the current event loop, and if startNow immediately re-starts it here
+    /// is not thradsafe if you do several moveLoopHere concurrently
+    void moveLoopHere(){
+        stopLoop();
+        threadTask();
+    }
 }
 
 EventWatcher defaultWatcher;
 
 static this(){
     defaultWatcher=new EventWatcher(true);
-    version(NoDefaultLoopInit){} else {
-        defaultWatcher.startThread();
-    }
+    defaultWatcher.startThread();
 }
 

@@ -260,5 +260,26 @@ char[] createView(char[] viewName,char[]fieldsDoc,char[] baseType=""){
     }
     return res;
 }
-    
 
+char[] descSome(char[] typeName1,char[]fieldsDoc){
+    char[] typeName;
+    char[] res=`
+    void desc(void delegate(char[]) sink){
+        dumper(sink)("{ class:")`;
+    if (typeName.length==0) {
+        res~="(typeof(this).mangleof)";
+    } else {
+        res~="`("~typeName~")`";
+    }
+    res~=`("@")(cast(void*)this)`;
+    auto fieldsDocArray=extractFieldsAndDocs(fieldsDoc);
+    for (int ifield=0;ifield<fieldsDocArray.length/2;++ifield){
+        auto field=fieldsDocArray[2*ifield];
+        auto doc=fieldsDocArray[2*ifield+1];
+        res~=`
+            (",`~field~`:")(`~field~`)`;
+    }
+    res~=`;
+    }`;
+    return res;
+}

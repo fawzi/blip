@@ -64,7 +64,7 @@ int main(){
             });
             sout("random childrens:\n");
             numaLooper(rootN,topo,delegate void(NumaNode n){
-                sout("{\n node:")(n)("has subnodes:");
+                sout("{\n node:")(n)("  has subnodes:[");
                 if (n.level>1){
                     NumaNode nSkip;
                     foreach(subN;randomSubnodesWithLevel(1,cast(Topology!(NumaNode))topo,n)){
@@ -77,7 +77,7 @@ int main(){
                         nSkip=n;
                     }
                 }
-                sout("}\n");
+                sout("]\n}\n");
             });
         }
     }

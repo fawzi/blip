@@ -323,6 +323,7 @@ version(mpi)
                     } else {
                         recvV=sendV;
                     }
+                    return MPI_SUCCESS;
                 } else {
                     sendT!(T).send(sendV,sendTag);
                     return recvChannel.recv(recvV,recvTag);

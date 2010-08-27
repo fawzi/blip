@@ -32,7 +32,7 @@ class WaitList{
     void notify(){
         synchronized(this){
             foreach(t;waiting){
-                t.resubmitDelayed();
+                t.resubmitDelayed(t.delayLevel-1);
             }
             waiting=null;
         }
@@ -253,7 +253,7 @@ struct DataFlow(T){
             assert(tAtt!is null);
             tAtt.delay(delegate void(){
                 if (!waitL.addTask(tAtt)){
-                    tAtt.resubmitDelayed();
+                    tAtt.resubmitDelayed(tAtt.delayLevel-1);
                 }
             });
         }

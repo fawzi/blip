@@ -22,13 +22,13 @@ import blip.core.Thread;
 import blip.core.Variant:Variant;
 import blip.core.sync.Mutex;
 import blip.math.Math;
-import blip.util.TangoLog;import blip.util.TangoConvert;
+import blip.util.TangoLog;
+import blip.util.TangoConvert;
 import blip.stdc.string;
 import blip.io.BasicIO;
 import blip.container.GrowableArray;
 import blip.core.sync.Semaphore;
 import blip.util.TemplateFu:ctfe_i2a;
-import blip.parallel.smp.SmpModels;
 import blip.BasicModels;
 import blip.container.Pool;
 import blip.sync.Atomic;
@@ -36,8 +36,17 @@ import blip.container.FiberPool;
 import blip.container.Deque;
 import tango.core.Memory:GC;
 import tango.util.container.LinkedList;
-debug(TrackTasks) import blip.io.Console;
-debug(TrackFibers) import blip.io.Console;
+import blip.core.BitManip;
+debug(TrackTasks){
+    version=ImportConsole;
+}
+debug(TrackFibers){
+    version=ImportConsole;
+}
+debug(TrackDelayFlags){
+    version=ImportConsole;
+}
+version(ImportConsole) import blip.io.Console;
 
 enum TaskFlags:uint{
     None=0,         /// no flags
@@ -49,9 +58,6 @@ enum TaskFlags:uint{
     FiberPoolTransfer=1<<5,      /// the fiber pool is transferred to subtasks
     Resubmit=1<<6,               /// the task should be resubmitted
     ThreadPinned=1<<7,           /// the task should stay pinned to the same thread
-    Delaying=1<<8,               /// the task is being put on hold
-    Delayed=1<<9,                /// the task is on hold
-    Delay=(Delaying|Delayed),    /// the task has been delayed and restarted
     WaitingSubtasks=1<<10,       /// the task is waiting for subtasks to end
     ImmediateSyncSubtasks=1<<11, /// subtasks submitted with spawnTaskSync are executed immediately if possible
 }
@@ -186,10 +192,10 @@ struct YieldableCall{
 /// then needed
 const int SimpleTaskLevel=int.max/2;
 
-Task noTask;
+/// no task is executing (just a way to get an error when spawning)
+TaskI noTask;
 
 /// thread local data to store current task
-/// setting this to TaskI triggers bugs in some compilers when taking the delegate of some methods
 ThreadLocal!(TaskI) taskAtt;
 
 static this(){
@@ -227,16 +233,21 @@ class Task:TaskI{
     }
     TaskSchedulerI _scheduler; /// scheduler of the current task
     Semaphore waitSem; /// lock to wait for task end
-
+    uint delayFlags=1; /// the top bit set represents the current delayLevel, single bits pairs are the state of the various levels
+    enum DelayStat{
+        NormalRun=0,
+        WantSuspend=1,
+        SuspendStart=2,
+        Suspended=3,
+    }
     /// yields the current task (which must be yieldable)
-    static void yield(){
+    static bool yield(){
         auto tAtt=taskAtt.val;
         if (tAtt is null || !tAtt.mightYield()){
-            throw new Exception(collectAppender(delegate void(CharSink s){
-                dumper(s)("asked to yield task ")(tAtt)(" which cannot be yielded");
-            }),__FILE__,__LINE__);
+            return false;
         }
         tAtt.scheduler.yield();
+        return true;
     }
     /// might Yield the current task (which must be yieldable)
     /// root tasks are ignored (and no yielding is performed) to make the use of maybeYield simpler.
@@ -250,6 +261,15 @@ class Task:TaskI{
             }),__FILE__,__LINE__);
         }
         tAtt.scheduler.maybeYield();
+    }
+    /// returns the last flags of the delayFlags
+    static int lastDelayFlags(int flags){
+        int level=bsr(flags);
+        assert((level&1)==0);
+        if (level>0){
+            return (0x3 &(flags>> (level-2)));
+        }
+        return 0; // change?
     }
     /// the task should be resubmitted
     bool resubmit(){
@@ -403,6 +423,7 @@ class Task:TaskI{
         this._superTask=null;
         this._scheduler=null;
         this.resubmit=false;
+        this.delayFlags=1;
         this.holdSubtasks=false;
         this.holdedSubtasks=[];
         version(NoTaskLock){} else {
@@ -423,13 +444,30 @@ class Task:TaskI{
     /// executes the actual task (after all the required setup)
     void internalExe(){
         assert(taskOp !is null);
-        if ((flags & TaskFlags.Delay)!=TaskFlags.Delay){
-            assert((flags & TaskFlags.Delay)==0);
+        if (delayFlags==1){ // not in some delay level
             taskOp();
         } else {
             assert(fiber!is null);
             synchronized(taskLock) {
-                flags=flags&(~(TaskFlags.Delay|TaskFlags.Resubmit));
+                auto delayLevel=bsr(delayFlags);
+                assert((delayLevel&1)==0);
+                auto endFlags=(delayFlags>>(delayLevel-2));
+                auto lastLevel=(endFlags&0x3);
+                debug(TrackDelayFlags){
+                    sinkTogether(sout,delegate void(CharSink s){
+                        dumper(s)("preExe, flags:")(delayFlags,"x")("\n");
+                    });
+                }
+                switch(lastLevel){
+                    case DelayStat.NormalRun: assert(0,"invalid stat in exe DelayStat.NormalRun");
+                    case DelayStat.WantSuspend: assert(0,"invalid stat in exe DelayStat.WantSuspend");
+                    case DelayStat.SuspendStart: assert(0,"invalid stat in exe DelayStat.SuspendStart");
+                    case DelayStat.Suspended:
+                        break;
+                    default: assert(0);
+                }
+                delayFlags=(delayFlags^(endFlags^1)<<(delayLevel-2)); // reduce level by one
+                assert(bsr(delayFlags)+2==delayLevel);
             }
             fiber.call();
         }
@@ -467,27 +505,37 @@ class Task:TaskI{
                 internalExe();
             }
             bool resub=resubmit;
+            int delayLevel;
             synchronized(taskLock){
-                switch(flags & TaskFlags.Delay){
-                case cast(TaskFlags)0:
-                    break;
-                case TaskFlags.Delaying:
-                    flags=cast(TaskFlags)((flags & (~TaskFlags.Delaying)) | TaskFlags.Delayed);
-                    resub=false;
-                    break;
-                case TaskFlags.Delayed:
-                    assert(0,"already delayed task");
-                case TaskFlags.Delay:
-                    resub=true;
-                    break;
-                default:
-                    assert(0);
+                delayLevel=bsr(delayFlags);
+                assert((delayLevel&1)==0);
+                if (delayLevel>0){
+                    auto endFlags=(delayFlags>>(delayLevel-2));
+                    debug(TrackDelayFlags){
+                        sinkTogether(sout,delegate void(CharSink s){
+                            dumper(s)("PostExe, flags:")(delayFlags,"x")("\n");
+                        });
+                    }
+                    switch(0x3 & endFlags){
+                        case DelayStat.NormalRun: assert(0,"invalid stat in post exe DelayStat.NormalRun");
+                        case DelayStat.WantSuspend: assert(0,"invalid stat in post exe DelayStat.WantSuspend");
+                        case DelayStat.SuspendStart:
+                            resub=false;
+                            static assert(DelayStat.Suspended==3);
+                            delayFlags |= (DelayStat.Suspended<<(delayLevel-2));
+                            assert(lastDelayFlags(delayFlags)==DelayStat.Suspended);
+                            break;
+                        case DelayStat.Suspended:
+                            resub=true;
+                            break;
+                        default: assert(0);
+                    }
                 }
             }
             if (resub) {
                 volatile auto sched=scheduler;
                 sched.addTask(this);
-            } else if((flags&TaskFlags.Delay)==0){
+            } else if(delayLevel==0){
                 startWaiting();
             }
         } else {
@@ -508,15 +556,6 @@ class Task:TaskI{
         } else {
             // tries to already give back the fiber if possible (agressively reuse fibers, as they are expensive)
             if (fiber !is null && fPool!is null){
-                /+if (fiber.state!=Fiber.State.TERM){
-                    sinkTogether(sout,delegate void(CharSink s){
-                        dumper(s)("pippo unexpected status fiber@")(cast(void*)fiber)(" in Task.startWaiting:")(fiber.state)(" exce ")(fiber.m_unhandled)("\n");
-                    });
-                } else {
-                    sinkTogether(sout,delegate void(CharSink s){
-                        dumper(s)("pippo Task.startWaiting giving back fiber@")(cast(void*)fiber)("\n");
-                    });
-                }+/
                 fPool.giveBack(fiber);
                 fiber=null;
             }
@@ -609,6 +648,14 @@ class Task:TaskI{
             }
         }
     }
+    /// the current delay level
+    int delayLevel(){
+        auto res=bsr(delayFlags);
+        assert((res&1)==0,collectAppender(delegate void(CharSink s){
+            dumper(s)("unexpected delayFlags:")(delayFlags);
+        }));
+        return (res>>1);
+    }
     /// called when a subtasks has finished
     void subtaskEnded(TaskI st){
         bool callOnFinish=false;
@@ -617,7 +664,7 @@ class Task:TaskI{
             if (oldTasks==1){
                 if (atomicCASB(statusAtt,TaskStatus.PostExec,TaskStatus.WaitingEnd)){
                     callOnFinish=true;
-                    assert(flags & (TaskFlags.WaitingSubtasks|TaskFlags.Delay)==0);
+                    assert((flags & TaskFlags.WaitingSubtasks)==0 && delayFlags==1);
                 } else {
                     volatile memoryBarrier!(true,false,false,true)();
                      while ((flagsAtt & TaskFlags.WaitingSubtasks)!=0){
@@ -635,7 +682,7 @@ class Task:TaskI{
                     if (status==TaskStatus.WaitingEnd){
                         status=TaskStatus.PostExec;
                         callOnFinish=true;
-                        assert((flags & (TaskFlags.WaitingSubtasks|TaskFlags.Delay))==0,"flags="~to!(char[])(flags));
+                        assert((flags & (TaskFlags.WaitingSubtasks))==0 && delayFlags==1,"flags="~to!(char[])(flags));
                     } else if ((flags & TaskFlags.WaitingSubtasks)!=0){
                         flags=flags & (~TaskFlags.WaitingSubtasks);
                         callOnFinish=true;
@@ -647,41 +694,61 @@ class Task:TaskI{
             if (status==TaskStatus.PostExec){
                 finishTask();
             } else {
-                resubmitDelayed();
+                resubmitDelayed(delayLevel-1); // ugly takes advantage that the level will be the top most
             }
         }
     }
     /// resubmits this task that has been delayed
     /// by default it throws if the task wasn't delayed
-    void resubmitDelayed(){
+    /// delayLevel is the level at which you will go back
+    void resubmitDelayed(int delayLevel_){
         version(NoTaskLock){
             assert(false,"unimplemented");
         } else {
+            int delayLevel=(delayLevel_<<1);
             debug(TrackTasks) sinkTogether(localLog,delegate void(CharSink s){
                 dumper(s)("will resubmit task ")(this)("\n");
             });
             bool resub=false;
             synchronized(taskLock){
-                switch(cast(TaskFlags)(flags & TaskFlags.Delay)){
-                case cast(TaskFlags)0:
-                    throw new ParaException("resubmitDelayed called on non delayed task ("~taskName~")",
-                        __FILE__,__LINE__);
-                case TaskFlags.Delaying:
-                    flags= cast(TaskFlags)(flags | TaskFlags.Delayed);
-                    break;
-                case TaskFlags.Delayed:
-                    flags= cast(TaskFlags)(flags | TaskFlags.Delaying);
-                    resub=true;
-                    break;
-                case TaskFlags.Delay:
-                    assert(0);
-                default:
-                    assert(0);
+                debug(TrackDelayFlags){
+                    sinkTogether(sout,delegate void(CharSink s){
+                        dumper(s)("preResubmit")(delayLevel_)(", flags:")(delayFlags,"x")("\n");
+                    });
+                }
+                auto delayLevelAtt=bsr(delayFlags);
+                assert(delayLevel<delayLevelAtt,"invalid delayLevel");
+                auto myFlag=((delayFlags>>delayLevel)&0x3);
+                switch(myFlag){
+                    case DelayStat.NormalRun: assert(0,"invalid stat in resubmit DelayStat.NormalRun for task "~taskName);
+                    case DelayStat.WantSuspend:
+                        static assert(DelayStat.NormalRun==0);
+                        delayFlags=(delayFlags^(DelayStat.WantSuspend<<delayLevel));
+                        break;
+                    case DelayStat.SuspendStart:
+                        static assert(DelayStat.Suspended==3);
+                        delayFlags |= (DelayStat.Suspended<<delayLevel);
+                        break;
+                    case DelayStat.Suspended:
+                        if (delayLevel+2==delayLevelAtt)
+                            resub=true;
+                        break;
+                    default: assert(0);
                 }
             }
             if (resub){
+                debug(TrackDelayFlags){
+                    sinkTogether(sout,delegate void(CharSink s){
+                        dumper(s)("preResubmit add task back ")(delayLevel_)(", flags:")(delayFlags,"x")("\n");
+                    });
+                }
                 volatile auto sched=scheduler;
                 sched.addTask(this);
+            }
+            debug(TrackDelayFlags){
+                sinkTogether(sout,delegate void(CharSink s){
+                    dumper(s)("postResubmit ")(delayLevel_)(", flags:")(delayFlags,"x")("\n");
+                });
             }
         }
     }
@@ -691,28 +758,34 @@ class Task:TaskI{
     /// the task (so that it is not possible to resume before the delay is effective)
     /// a similar thing could be done using a "delay count" but I find this cleaner and safer
     void delay(void delegate() opStart=null){
+        int myDelayLevel;
         auto tAtt=taskAtt.val;
         if (tAtt !is this){
             throw new ParaException("delay '"~taskName~"' called while executing '"~((tAtt is null)?"*null*":tAtt.taskName),
                 __FILE__,__LINE__);
         }
-        assert((flags & (TaskFlags.Delaying | TaskFlags.Delayed))==0);
         version(NoTaskLock){
             assert(false,"unimplemented");
         } else {
             synchronized(taskLock){
-                switch(cast(TaskFlags)(flags & TaskFlags.Delay)){
-                case cast(TaskFlags)0:
-                    flags|=TaskFlags.Delaying;
-                    break;
-                case TaskFlags.Delaying:
-                    assert(0,"delaying delaying task");
-                case TaskFlags.Delayed:
-                    assert(0,"delaying delayed task");
-                case TaskFlags.Delay:
-                    assert(0,"delay before full restart");// allow??
-                default:
-                    assert(0);
+                debug(TrackDelayFlags){
+                    sinkTogether(sout,delegate void(CharSink s){
+                        dumper(s)("preDelay, flags:")(delayFlags,"x")("\n");
+                    });
+                }
+                myDelayLevel=bsr(delayFlags);
+                if (myDelayLevel>=30) {
+                    throw new Exception("hit maximum recursive level of delay in task "~taskName,
+                        __FILE__,__LINE__);
+                }
+                assert(delayFlags>0 && (myDelayLevel&1)==0);
+                static assert(DelayStat.WantSuspend==1);
+                delayFlags|=(0x4<<myDelayLevel);
+                assert(lastDelayFlags(delayFlags)==DelayStat.WantSuspend);
+                debug(TrackDelayFlags){
+                    sinkTogether(sout,delegate void(CharSink s){
+                        dumper(s)("delay, preOp flags:")(delayFlags,"x")("\n");
+                    });
                 }
             }
         }
@@ -720,32 +793,55 @@ class Task:TaskI{
             throw new ParaException("delay called on non yieldable task ("~taskName~")",
                 __FILE__,__LINE__);
         } else {
-            if (opStart!is null){
-                opStart();
+            assert(opStart!is null);
+            opStart();
+            debug(TrackDelayFlags){
+                sinkTogether(sout,delegate void(CharSink s){
+                    dumper(s)("delay postTask, flags:")(delayFlags,"x")("\n");
+                });
             }
             volatile auto flagAtt=flags;
             bool do_yield=false;
             synchronized(taskLock){
-                switch(cast(TaskFlags)(flags & TaskFlags.Delay)){
-                default:
-                    assert(0);
-                case cast(TaskFlags)0:
-                    assert(0);
-                case TaskFlags.Delaying:
-                    do_yield=true;
-                    break;
-                case TaskFlags.Delayed:
-                    assert(0);
-                case TaskFlags.Delay:
-                    flags=cast(TaskFlags)(flags & (~TaskFlags.Delay));
-                    do_yield=false;
-                    break;
+                auto levelAtt=bsr(delayFlags);
+                if (levelAtt!=myDelayLevel+2){
+                    throw new ParaException(collectAppender(delegate void(CharSink s){
+                        dumper(s)("unexpected 2*delay level at the end of delay of (")(taskName)("), ")
+                            (levelAtt)(" vs ")(myDelayLevel);
+                    }), __FILE__,__LINE__);
                 }
+                auto endFlags=(delayFlags>>myDelayLevel);
+                switch(endFlags&0x3){
+                    case DelayStat.NormalRun:
+                        static assert(DelayStat.NormalRun==0);
+                        delayFlags=(delayFlags^(0x5<<myDelayLevel)); // reduce level and continue execution
+                        break;
+                    case DelayStat.WantSuspend:
+                        do_yield=true;
+                        static assert(DelayStat.WantSuspend==1&&DelayStat.SuspendStart==2);
+                        delayFlags=(delayFlags^(0x3<<myDelayLevel));
+                        assert(lastDelayFlags(delayFlags)==DelayStat.SuspendStart);
+                        break;
+                    case DelayStat.SuspendStart: assert(0,"invalid stat in post delay: DelayStat.SuspendStart");
+                    case DelayStat.Suspended: assert(0,"invalid stat in post delay: DelayStat.SuspendStart");
+                    default: assert(0);
+                }
+            }
+            debug(TrackDelayFlags){
+                sinkTogether(sout,delegate void(CharSink s){
+                    dumper(s)("delay preYield, flags:")(delayFlags,"x")("\n");
+                });
             }
             if (do_yield) {
                 scheduler.yield();
             }
         }
+        debug(TrackDelayFlags){
+            sinkTogether(sout,delegate void(CharSink s){
+                dumper(s)("postDelay, flags:")(delayFlags,"x")("\n");
+            });
+        }
+        assert(myDelayLevel==bsr(delayFlags),"unexpected delay level after delay");
     }
     /// called before spawning a new subtask
     void willSpawn(TaskI st){
@@ -800,14 +896,14 @@ class Task:TaskI{
                 task.wait();
             task.release();
         } else {
-            (cast(Task)task).appendOnFinish(&tAtt.resubmitDelayed);
+            (cast(Task)task).appendOnFinish(resubmitter(tAtt,tAtt.delayLevel));
             tAtt.delay(delegate void(){
                 if ((flags & TaskFlags.ImmediateSyncSubtasks)!=0){
                     // add something like && rand.uniform!(bool)() to avoid excessive task length?
                     this.spawnTask(task,delegate void(){ task.execute(); });
                 } else {
                     // to do: allowing the task to be stolen here introduces some problems
-                    // not sure why, should investigate
+                    // not sure why, should investigate (probably connected with scheduler change)
                     spawnTask(task,delegate void(){ volatile auto sched=scheduler; sched.addTask0(task); });
                 }
             });
@@ -980,29 +1076,17 @@ class Task:TaskI{
                 __FILE__,__LINE__);
         }
         if (mightYield){
-            version(NoTaskLock){
-                if (spawnTasks==0){
-                    return;
-                }
-                atomicOp(tAtt.flags,delegate TaskFlags(TaskFlags f){ return f|TaskFlags.Resubmit|TaskFlags.Delaying;});
-                if (0==flagGet(spawnTasks)){
-                    volatile auto flagsAtt=flags;
-                    while ((flagsAtt & TaskFlags.WaitingSubtasks)!=0){
-                        if (atomicCASB(flags,flagsAtt & (~(TaskFlags.Delaying|TaskFlags.WaitingSubtasks)),flagsAtt)){
-                            return;
-                        }
-                    }
-                }
-                
-            } else {
+            delay({
+                bool resub=false;
                 synchronized(taskLock){
                     if (spawnTasks==0){
-                        return;
+                        resub=true;
+                    } else {
+                        flags|=TaskFlags.WaitingSubtasks;
                     }
-                    flags|=TaskFlags.Resubmit|TaskFlags.Delaying|TaskFlags.WaitingSubtasks;
                 }
-            }
-            scheduler.yield();
+                if (resub) resubmitDelayed(delayLevel-1);
+            });
         } else {
             bool noSubT=false;
             version(NoTaskLock){
@@ -1262,8 +1346,8 @@ class SequentialTask:RootTask{
                 task.wait();
             task.release();
         } else {
-            (cast(Task)task).appendOnFinish(&tAtt.resubmitDelayed);
-            tAtt.delay({
+            (cast(Task)task).appendOnFinish(resubmitter(tAtt,tAtt.delayLevel));
+            tAtt.delay(delegate void(){
                 if (tAtt.superTask is this){
                     synchronized(queue){
                         flagAdd(spawnTasks,1);

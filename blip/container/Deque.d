@@ -159,7 +159,7 @@ class Deque(T):CopiableObjectI{
         }
     }
     /// appends an element at the end of the array
-    void append(T val){
+    void appendEl(T val){
         synchronized(this){
             if (nEl==baseArr.length){
                 growLen();
@@ -168,7 +168,22 @@ class Deque(T):CopiableObjectI{
             ++nEl;
         }
     }
-    alias append pushBack;
+    /// appends vals at the end of the array
+    /// could be improved (realloc just once if needed)
+    void appendArr(T[] vals){
+        synchronized(this){
+            foreach(val;vals){
+                if (nEl==baseArr.length){
+                    growLen();
+                }
+                baseArr[(start+nEl)%baseArr.length]=val;
+                ++nEl;
+            }
+        }
+    }
+    alias appendArr append;
+    alias appendEl append;
+    alias appendEl pushBack;
     /// returns the last element of the array and drops it
     bool popBack(ref T el){
         synchronized(this){
@@ -316,6 +331,8 @@ class Deque(T):CopiableObjectI{
                     if (filter(baseArr[i])){
                         baseArr[writePos]=baseArr[i];
                         ++writePos;
+                    } else {
+                        --nEl;
                     }
                 }
                 if (writePos==baseArr.length) writePos=0;
@@ -325,6 +342,8 @@ class Deque(T):CopiableObjectI{
                         baseArr[writePos]=baseArr[i];
                         ++writePos;
                         if (writePos==baseArr.length) writePos=0;
+                    } else {
+                        --nEl;
                     }
                 }
                 if (writePos>to1){
@@ -341,6 +360,8 @@ class Deque(T):CopiableObjectI{
                     if (filter(baseArr[i])){
                         baseArr[writePos]=baseArr[i];
                         ++writePos;
+                    } else {
+                        --nEl;
                     }
                 }
                 for (size_t i=writePos;i<to1;++i){

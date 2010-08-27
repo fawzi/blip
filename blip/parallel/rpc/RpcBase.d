@@ -24,19 +24,21 @@ module blip.parallel.rpc.RpcBase;
 import blip.parallel.smp.SmpModels;
 import blip.serialization.StringSerialize;
 import blip.serialization.Serialization;
-import blip.parallel.smp.SmpModels;
 import blip.util.TangoLog;
 import blip.sync.UniqueNumber;
 import blip.time.Clock;
 import blip.time.Time;
 import blip.util.TangoConvert;
 import blip.container.GrowableArray;
+import blip.container.HashMap;
 import blip.BasicModels;
 import blip.core.sync.Mutex;
 import blip.io.BasicIO;
 import blip.core.Variant;
 import blip.io.Console;
-
+version(TrackRpc){
+    import blip.parallel.smp.WorkManager;
+}
 alias void delegate(ubyte[] reqId,void delegate(Serializer) sRes) SendResHandler;
 
 class RpcException:Exception{
@@ -56,7 +58,7 @@ struct ParsedUrl{
     char[] protocol;
     char[] host;
     char[] port;
-    char[][3] pathBuf;
+    char[][4] pathBuf;
     char[][] path;
     char[][] query;
     char[] anchor;
@@ -110,13 +112,13 @@ struct ParsedUrl{
     }
     void appendToPath(char[]segment){
         if (path.length<pathBuf.length){
-            if (path.length!=0 && path.ptr!=pathBuf.ptr){
+            if (path.length!=0 && path.ptr !is pathBuf.ptr){
                 foreach (i,p;path){
                     pathBuf[i]=p;
                 }
             }
             pathBuf[path.length]=segment;
-            path=pathBuf[0..(pathBuf.length+1)];
+            path=pathBuf[0..(path.length+1)];
         } else {
             if (pathBuf.ptr==path.ptr){
                 path=path~segment;
@@ -131,8 +133,11 @@ struct ParsedUrl{
     }
     static ParsedUrl parseUrl(char[] url){
         ParsedUrl res;
-        if (res.parseUrlInternal(url)!=url.length){
-            throw new RpcException("url parsing failed",__FILE__,__LINE__);
+        auto len=res.parseUrlInternal(url);
+        if (len!=url.length){
+            throw new RpcException(collectAppender(delegate void(CharSink s){
+                dumper(s)("url parsing failed:")(len)("vs")(url.length)(", '")(&res.urlWriter)("' vs '")(url)("'");
+            }),__FILE__,__LINE__);
         }
         return res;
     }
@@ -174,7 +179,7 @@ struct ParsedUrl{
         }
         if (j==url.length) return j;
         i=j;
-        return 3+parsePathInternal(url[j..$]);
+        return j+parsePathInternal(url[j..$]);
     }
     
     size_t parsePathInternal(char[]fPath){
@@ -473,14 +478,18 @@ class Publisher{
         ObjVendorI obj;
     }
 
-    PublishedObject[char[]] objects;
+    HashMap!(char[],PublishedObject) objects;
     UniqueNumber!(int) idNr;
     ProtocolHandler protocol;
     CharSink log;
     
-    this(CharSink log=null){
+    this(ProtocolHandler pH){
+        this.protocol=pH;
+        this.log=pH.log;
+        this.objects=new HashMap!(char[],PublishedObject)();
+        this.idNr=UniqueNumber!(int)(3);
         if (log==null){
-            log=sout.call;
+            this.log=serr.call;
         }
     }
     
@@ -520,11 +529,12 @@ class Publisher{
         o.remoteMainCall(fName,requestId,u,sendRes);
     }
     
-    char[] publishObject(ObjVendorI obj, char[]name,Flags flags,bool makeUnique=false){
+    char[] publishObject(ObjVendorI obj, char[]name,Flags flags=Flags.Public,bool makeUnique=false){
         char[] myName=name;
         PublishedObject pObj;
         pObj.obj=obj;
         pObj.flags=flags;
+        obj.publisher(this);
         while(1){
             synchronized(this){
                 auto o=myName in objects;
@@ -535,18 +545,18 @@ class Publisher{
                     }
                     myName=name~to!(char[])(idNr.next());
                 } else {
+                    obj.objName(myName);
                     objects[myName]=pObj;
                     return myName;
                 }
             }
         }
-        return myName;
     }
     
     bool unpublishObject(char[]name){
         synchronized(this){
             bool res= (name in objects) !is null;
-            objects.remove(name);
+            objects.removeKey(name);
             return res;
         }
     }
@@ -609,8 +619,14 @@ class ProtocolHandler{
     Publisher publisher;
     char[]_handlerUrl;
     
-    this(){ }
-
+    this(CharSink log=null){
+        this.log=log;
+        if (log is null)
+            this.log=serr.call;
+        publisher=new Publisher(this);
+    }
+    
+    // a function with no arguments returning a char[]
     char[] simpleCall(ParsedUrl url){
         char[] res;
         doRpcCall(url,delegate void(Serializer){},
@@ -629,7 +645,7 @@ class ProtocolHandler{
         if (proxyName.length==0){
             ParsedUrl pUrl2=pUrl;
             pUrl2.appendToPath("proxyName");
-            proxyName=simpleCall(pUrl);
+            proxyName=simpleCall(pUrl2);
         }
         auto creator=proxyName in ProtocolHandler.proxyCreators;
         if (creator is null){
@@ -690,29 +706,43 @@ class ProtocolHandler{
     void handleNonPendingRequest(ParsedUrl url,Unserializer u, SendResHandler sendRes){
         int reqKind;
         u(reqKind);
-        char[256] buf;
         switch(reqKind){
         case 0:
-            Log.lookup ("blip.rpc").error("received result for non pending request {}",url.url(buf));
+            sinkTogether(log,delegate void(CharSink s){
+                dumper(s)("Warning: received result for non pending request ")(&url.urlWriter)("\n");
+            });
             return;
         case 1:
-            Log.lookup ("blip.rpc").error("received result for non pending request, possible garbling {}",url.url(buf));
+            sinkTogether(log,delegate void(CharSink s){
+                dumper(s)("Error: received result for non pending request, possible garbling ")(&url.urlWriter)("\n");
+            });
             throw new RpcException("received data for non pending request, possibly garbled receive stream",
                 __FILE__,__LINE__);
         case 2:
-            Log.lookup ("blip.rpc").warn("ignoring exception for non pending request {}",url.url(buf));
+            sinkTogether(log,delegate void(CharSink s){
+                dumper(s)("Warning: ignoring exception for non pending request ")(&url.urlWriter)("\n");
+            });
             return;
         case 3:
-            Log.lookup ("blip.rpc").warn("ignoring system error in non pending request {}",url.url(buf));
+            sinkTogether(log,delegate void(CharSink s){
+                dumper(s)("Warning: ignoring system error in non pending request ")(&url.urlWriter)("\n");
+            });
             return;
         default:
-            Log.lookup ("blip.rpc").error("received unknow reqKind {} for non pending request, possible garbling {}",reqKind,url.url(buf));
+            sinkTogether(log,delegate void(CharSink s){
+                dumper(s)("Error: received unknow reqKind ")(reqKind)(" for non pending request, possible garbling ")(&url.urlWriter)("\n");
+            });
             throw new RpcException("received data for non pending request, possibly garbled receive stream",
                 __FILE__,__LINE__);
         }
     }
     
     void handleRequest(ParsedUrl url,Unserializer u, SendResHandler sendRes){
+        version(TrackRpc){
+            sinkTogether(log,delegate void(CharSink s){
+                dumper(s)(taskAtt.val)("handling request ")(&url.urlWriter)("\n");
+            });
+        }
         if (url.path.length>0){
             switch(url.path[0]){
             case "obj":
