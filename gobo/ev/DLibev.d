@@ -21,13 +21,13 @@ module gobo.ev.DLibev;
 import blip.io.BasicIO;
 import blip.container.GrowableArray;
 import blip.container.Pool;
-import blip.container.Cache;
+//import blip.container.Cache;
 import gobo.ev.Libev;
 import blip.core.Traits;
 import blip.util.TemplateFu;
-import blip.parallel.smp.SmpModels;
 public import gobo.ev.Libev: EV_PERIODIC_ENABLED, EV_STAT_ENABLED, EV_IDLE_ENABLED, EV_FORK_ENABLED,
-    EV_EMBED_ENABLED, EV_ASYNC_ENABLED, EV_WALK_ENABLED;
+    EV_EMBED_ENABLED, EV_ASYNC_ENABLED, EV_WALK_ENABLED,ev_loop_t, EV_READ, EV_WRITE;
+import blip.io.Console; // pippo
 
 /// bits for ev_default_loop and ev_loop_new
 enum EVFLAG: uint{
@@ -38,7 +38,7 @@ enum EVFLAG: uint{
     FORKCHECK  = EVFLAG_FORKCHECK, /// check for a fork in each iteration
     // debugging/feature disable 
     NOINOTIFY  = EVFLAG_NOINOTIFY, /// do not attempt to use inotify
-    SIGNALFD   = EVFLAG_SIGNALFD , /// attempt to use signalfd
+    SIGNALFD   = EVFLAG_SIGNALFD , /// attempt to use signal
 }
 
 /// method bits to be ored together
@@ -153,9 +153,13 @@ char[] stopMixin(){
         case Kind.custom,Kind.none:
         break;
         default:
-        throw new Exception(collectAppender(delegate void(CharSink s){
-            dumper(s)("cannot stop kind ")(kind);
-        }),__FILE__,__LINE__);
+        if ((kind&Kind.io)!=0){
+            ev_io_stop(loop,ptr!(ev_io)());
+        } else {
+            throw new Exception(collectAppender(delegate void(CharSink s){
+                dumper(s)("cannot stop kind ")(kind);
+            }),__FILE__,__LINE__);
+        }
     }`;
     return res;
 }
@@ -168,28 +172,40 @@ char[] mixinInitAndCreate(char[]kind,char[] extraArgsDecls, char[] extraArgs){
     char[] res=`
 /// initialize a `~kind~` watcher, the callback can be either directly given, or created by passing
 /// valid arguments for EventHandler opCall
-GenericWatcher `~kind~`Init(S...)(`~extraArgsDeclsComma~` S args){
+GenericWatcher `~kind~`Init(T)(`~extraArgsDeclsComma~` T callback){
+    static if (is(typeof(*T.init))){
+        alias typeof(*T.init) TT;
+    } else {
+        alias T TT;
+    }
     assert(canCastTo!(ev_`~kind~`)(kind),"cannot case content to ev_`~kind~` type");
     kind=Kind.`~kind~`;
-    static if (nArgs!(S)==1 && is(S[0]==`~kind~`CbF)){
-        ev_`~kind~`_init(ptr!(ev_`~kind~`)(),args[0]`~commaExtraArgs~`);
-    } else static if (nArgs!(S)==1 && is(S[0]==watcherCbF)){
-        ev_init!(ev_watcher*)(ptr!(ev_watcher)(),args);
+    static if (is(T==`~kind~`CbF)){
+        ev_`~kind~`_init(ptr!(ev_`~kind~`)(),callback`~commaExtraArgs~`);
+    } else static if (is(T==watcherCbF)){
+        ev_init!(ev_watcher*)(ptr!(ev_watcher)(),callback);
         ev_`~kind~`_set(ptr!(ev_`~kind~`)()`~commaExtraArgs~`);
-    } else static if (is(typeof(EventHandler(args)))){
-        auto handler=EventHandler(args);
-        ev_init(ptr!(ev_watcher)(),&eventHExec);
+    } else static if (is(typeof(&TT.cCallback)==watcherCbF)){
+        ev_init!(ev_watcher*)(ptr!(ev_watcher)(),&TT.cCallback);
         ev_io_set(ptr!(ev_`~kind~`)()`~commaExtraArgs~`);
-        data=handler;
+        data!(T)(callback);
+    } else static if (is(typeof(&TT.cCallback)==`~kind~`CbF)){
+        ev_`~kind~`_init(ptr!(ev_`~kind~`)(),&TT.cCallback`~commaExtraArgs~`);
+        data!(T)(callback);
     } else {
-        static assert(0,"could not create a valid `~kind~` callback with "~S.stringof);
+        static assert(0,"could not create a valid `~kind~` callback with "~TT.stringof);
     }
     return *this;
 }
 /// create a `~kind~` watcher, the callback can be either directly given, or created by passing
 /// valid arguments for EventHandler opCall
 static GenericWatcher `~kind~`Create(S...)(`~extraArgsDeclsComma~` S args){
-    auto res=gPool.getObj();
+    GenericWatcher res;
+    if (gPool is null){
+        res.ptr_=new ev_any_watcher;
+    } else {
+        res=gPool.getObj();
+    }
     res.`~kind~`Init(`~extraArgs~((extraArgs.length>0)?",":" ")~`args);
     return res;
 }`;
@@ -200,7 +216,7 @@ struct GenericWatcher{
     enum Kind{
         none=EV_UNDEF,
         watcher=EV_READ|EV_WRITE|EV_TIMEOUT|EV_PERIODIC|EV_SIGNAL|EV_CHILD|EV_STAT|
-            EV_IDLE|EV_PREPARE|EV_CHECK|EV_EMBED|EV_FORK,
+            EV_IDLE|EV_PREPARE|EV_CHECK|EV_EMBED|EV_FORK|EV_ASYNC,
         watcher_list=EV_READ|EV_WRITE|EV_SIGNAL|EV_CHILD|EV_STAT,
         watcher_time=EV_TIMER|EV_PERIODIC,
         io=EV_READ|EV_WRITE,
@@ -361,6 +377,7 @@ struct GenericWatcher{
         if (pool!is null){
             kind=Kind.any_watcher;
         } else {
+            sout("pippo setting kind=none\n");
             kind=Kind.none;
             ptr_=null;
         }
@@ -404,14 +421,14 @@ struct GenericWatcher{
     }
     // global pool - static methods
     static PoolI!(GenericWatcher) gPool;
-    static this(){
+/+    static this(){
         gPool=cachedPool( function GenericWatcher(PoolI!(GenericWatcher)p){
             GenericWatcher res;
             res.ptr_=new ev_any_watcher;
             res.pool=p;
             return res;
         });
-    }
+    }+/
 
     mixin(mixinInitAndCreate("io","int fd, int what","fd,what"));
     mixin(mixinInitAndCreate("timer","ev_tstamp after, ev_tstamp repeat","after,repeat"));
@@ -435,97 +452,4 @@ struct GenericWatcher{
     static if (EV_ASYNC_ENABLED){
         mixin(mixinInitAndCreate("async","",""));
     }
-}
-
-/// structure that performs simple (but flexible) callbacks
-struct EventHandler{
-    TaskI task; // this allow nicer errors than inlineAction... but adds
-    void delegate() inlineAction;
-    void delegate(ev_loop_t*,GenericWatcher,EventHandler*) callback;
-    PoolI!(EventHandler*) pool;
-    
-    /// the default callback: stops the watcher, executes inlineAction in this thread, then
-    /// starts or resumes the task (if given). Finally recicles the handler and watcher
-    void defaultCallbackOnce(ev_loop_t*l,GenericWatcher w,EventHandler*h){
-        w.stop(l);
-        if (inlineAction !is null){
-            inlineAction();
-        }
-        if (task!is null){
-            if (task.status>=TaskStatus.Started){
-                task.resubmitDelayed();
-            } else {
-                task.submit();
-            }
-        }
-        w.giveBack();
-        giveBack();
-    }
-    /// the default callback: stops the watcher, executes inlineAction in this thread, then
-    /// starts or resumes the task (if given). Finally recicles the handler and watcher
-    void defaultCallbackRepeat(ev_loop_t*l,GenericWatcher w,EventHandler*h){
-        if (inlineAction !is null){
-            inlineAction();
-        }
-        if (task!is null){
-            if (task.status>=TaskStatus.Started){
-                task.resubmitDelayed();
-            } else {
-                task.submit();
-            }
-        }
-    }
-    void clear(){
-        task=null;
-        inlineAction=null;
-        callback=&this.defaultCallbackOnce;
-    }
-    void giveBack(){
-        if (pool !is null) {
-            pool.giveBack(this);
-        } else {
-            clear();
-        }
-    }
-    static PoolI!(EventHandler*) gPool;
-    static this(){
-        gPool=cachedPool(function EventHandler*(PoolI!(EventHandler*)p){
-            auto res=new EventHandler;
-            res.pool=p;
-            return res;
-        });
-    }
-    /// creates a callback that starts or resumes the task t
-    static EventHandler*opCall(TaskI t,bool repeat=false){
-        auto res=gPool.getObj();
-        res.task=t;
-        if (repeat) res.callback=&res.defaultCallbackRepeat;
-        return res;
-    }
-    /// creates a callback that executes the inlineAction (int the io thread, it should be short!)
-    /// then starts or resumes the task t (if given)
-    static EventHandler*opCall(void delegate() inlineAction,TaskI t=null,bool repeat=false){
-        auto res=gPool.getObj();
-        res.inlineAction=inlineAction;
-        res.task=t;
-        if (repeat) res.callback=&res.defaultCallbackRepeat;
-        return res;
-    }
-    /// creates a callback that executes the given callback passing this structure containing task and
-    /// inlineAction as last argument
-    static EventHandler*opCall(void delegate(ev_loop_t*,GenericWatcher,EventHandler*)callback,
-        void delegate() inlineAction=null,TaskI task=null){
-        auto res=gPool.getObj();
-        res.callback=callback;
-        res.inlineAction=inlineAction;
-        res.task=task;
-        return res;
-    }
-}
-
-extern(C) void eventHExec(ev_loop_t*loop, ev_watcher *w, int revents){
-    auto gWatcher=GenericWatcher(w,revents);
-    auto eH=gWatcher.data!(EventHandler*)();
-    assert(eH!is null);
-    eH.callback(loop,gWatcher,eH);
 }

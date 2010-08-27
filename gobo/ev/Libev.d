@@ -222,8 +222,8 @@ extern(C){
         }
         else // It should be POSIX
         {
-            static import stat = tango.stdc.posix.sys.stat;
-            alias stat.stat_t ev_statdata;
+            static import  tango.stdc.posix.sys.stat;
+            alias tango.stdc.posix.sys.stat.stat_t ev_statdata;
         }
 
         /** invoked each time the stat data changes for a given path */
