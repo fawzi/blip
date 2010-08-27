@@ -2,7 +2,8 @@ Library oriented toward scientific applications.
 
 It has:
 
- * N-dimensional arrays (blip.narray) that have a nice interface to lapack
+ * N-dimensional arrays (blip.narray) that have a nice interface to lapack (that leverages the wrappers of baxissimo)
+ * 2,3 and 4D vectors, matrixes and quaternions from the omg library of h3r3tic
  * random and combinatorial(extensive) testing framework (blip.rtest), parallel
  * serialization (blip.serialization) that supports both json format, that can be used also for input files and an efficient binary representation
  * SMP parallelization (blip.parallel.smp) a numa aware very flexible framework
