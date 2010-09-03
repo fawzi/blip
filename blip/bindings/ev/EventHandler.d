@@ -27,7 +27,6 @@ import blip.util.TemplateFu;
 import blip.parallel.smp.SmpModels;
 import blip.serialization.Serialization;
 
-
 /// structure that performs simple (but flexible) callbacks
 struct EventHandler{
     TaskI task; // this allow nicer errors than inlineAction... but adds some dependencies...
@@ -144,3 +143,8 @@ struct EventHandler{
         eH.callback(loop,gWatcher,eH);
     }
 }
+
+/+Deque!(EventHandler*) events;
+static this(){
+    events=new Deque!(EventHandler*)();
+}+/

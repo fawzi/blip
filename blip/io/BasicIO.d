@@ -302,8 +302,10 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
                     ii=0;
                     sink(buf);
                 }
-                auto d=(0xF & (*p));
-                buf[ii]=digits[d];
+                auto d=(*p);
+                buf[ii]=digits[(d>>4)];
+                ++ii;
+                buf[ii]=digits[(d&0xF)];
                 ++ii;
                 ++p;
             }

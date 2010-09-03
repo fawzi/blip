@@ -34,6 +34,7 @@ char[][] extractFieldsAndDocs(char[] fieldsDoc){
         field=fieldsDoc[fieldStart..i]; // check that it is actually a valid identifier???
         while (i<fieldsDoc.length && fieldsDoc[i]==' ') ++i;
         if (i<fieldsDoc.length && fieldsDoc[i]==':'){
+            ++i;
             while (i<fieldsDoc.length && fieldsDoc[i]==' ') ++i;
             auto docStart=i;
             while (i<fieldsDoc.length){

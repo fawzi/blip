@@ -50,11 +50,15 @@ final class BasicBinStream: OutStreamI{
         return sink;
     }
     void flush(){
-        if (_flush!is null) _flush();
+        if (_flush!is null){
+            _flush();
+        }
     }
     void close(){
-        if (_close!is null)
+        flush();
+        if (_close!is null){
             _close();
+        }
     }
 }
 
@@ -117,7 +121,10 @@ final class BasicStrStream(T=char): OutStreamI{
     }
 }
 
-/// basic stream based on a binary sink, no encoding conversion for strings, dangerous to mix!
+/// buffered stream based on a binary sink, no encoding conversion for strings, dangerous to mix!
+/// allow it to accept also a size_t delegate(void[]) ? it could be slightly more efficient,
+/// avoiding some suspensions...
+/// cannot be used by several threads/tasks at once!
 final class BufferedBinStream: OutStreamI{
     BinSink _sink;
     void delegate() _flush;
@@ -136,31 +143,29 @@ final class BufferedBinStream: OutStreamI{
         this.content=0;
     }
     void sink(void[]data){
-        synchronized(this){
-            if (data.length<=buf.length-content){
-                buf[content..content+data.length]=cast(ubyte[])data;
-                content+=data.length;
-            } else {
-                if (content<buf.length/2){
-                    auto nread=buf.length-content;
-                    buf[content..$]=cast(ubyte[])data[0..nread];
-                    sink(buf);
-                    if(data.length-nread>buf.length){
-                        sink(data[nread..$]);
-                        content=0;
-                    } else {
-                        content=data.length-nread;
-                        buf[0..content]=cast(ubyte[])data[nread..$];
-                    }
+        if (data.length<=buf.length-content){
+            buf[content..content+data.length]=cast(ubyte[])data;
+            content+=data.length;
+        } else {
+            if (content<buf.length/2){
+                auto nread=buf.length-content;
+                buf[content..$]=cast(ubyte[])data[0..nread];
+                _sink(buf);
+                if(data.length-nread>buf.length){
+                    _sink(data[nread..$]);
+                    content=0;
                 } else {
-                    sink(buf[0..content]);
-                    if(data.length>buf.length){
-                        sink(data);
-                        content=0;
-                    } else {
-                        content=data.length;
-                        buf[0..data.length]=cast(ubyte[])data;
-                    }
+                    content=data.length-nread;
+                    buf[0..content]=cast(ubyte[])data[nread..$];
+                }
+            } else {
+                _sink(buf[0..content]);
+                if(data.length>buf.length){
+                    _sink(data);
+                    content=0;
+                } else {
+                    content=data.length;
+                    buf[0..data.length]=cast(ubyte[])data;
                 }
             }
         }
@@ -187,10 +192,8 @@ final class BufferedBinStream: OutStreamI{
         return &this.sink;
     }
     void flush(){
-        synchronized(this){
-            sink(buf[0..content]);
-            content=0;
-        }
+        _sink(buf[0..content]);
+        content=0;
         if (_flush!is null) _flush();
     }
     void close(){
@@ -228,18 +231,18 @@ final class BufferedStrStream(T=char): OutStreamI{
                 if (content<buf.length/2){
                     auto nread=buf.length-content;
                     buf[content..$]=data[0..written];
-                    sink(buf);
+                    _sink(buf);
                     if(data.length-nread>buf.length){
-                        sink(data[nread..$]);
+                        _sink(data[nread..$]);
                         content=0;
                     } else {
                         content=data.length-nread;
                         buf[0..content]=data[nread..$];
                     }
                 } else {
-                    sink(buf[0..content]);
+                    _sink(buf[0..content]);
                     if(data.length>buf.length){
-                        sink(data);
+                        _sink(data);
                         content=0;
                     } else {
                         content=data.length;

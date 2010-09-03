@@ -255,6 +255,7 @@ struct TestStruct{
 
 void testUnserial(T)(T a){
     testJsonUnserial!(T)(a);
+    testJson2Unserial!(T)(a);
     testBinUnserial!(T)(a);
     testBin2Unserial!(T)(a);
 }
@@ -278,6 +279,35 @@ void testJsonUnserial(T)(T a){
         sout("in the buffer:-----\n");
         buf.seek(0,IOStream.Anchor.Begin);
         sout(cast(char[])buf.slice)("\n");
+        sout("-----\n");
+    }
+    assert(a==sOut,"unserial error with "~T.stringof);
+    version(UnserializationTrace) sout("passed test of unserialization of "~T.stringof~"\n");
+}
+/// unserialization test using native json
+void testJson2Unserial(T)(T a){
+    version(UnserializationTrace) sout("testing unserialization of "~T.stringof~"\n");
+    char[512] buf_;
+    auto buf=lGrowableArray(buf_,0);
+    auto js=new JsonSerializer!()(&buf.appendArr);
+    js(a);
+    auto r=arrayReader(buf.data);
+    auto jus=new JsonUnserializer!()(r);
+    T sOut;
+    version(UnserializationTrace){
+        sout("XXXXXX Unserialization start\n");
+        sout("in the buffer:-----\n");
+        sout(buf.data)("\n");
+        auto js2=new JsonSerializer!()(sout);
+        sout("original:----\n");
+        js2(a);
+        sout("-----\n");
+    }
+    jus(sOut);
+    version(UnserializationTrace) {
+        sout("XXXXXX Unserialization end\n");
+        sout("unserialized:--\n");
+        js2(sOut);
         sout("-----\n");
     }
     assert(a==sOut,"unserial error with "~T.stringof);
@@ -366,6 +396,7 @@ void testBin2Unserial(T)(T a){
 
 void testUnserial2(T,U)(void delegate(void function(T,U)) testF){
     testF(function void(T a,U b){ testJsonUnserial2!(T,U)(a,b); });
+    testF(function void(T a,U b){ testJson2Unserial2!(T,U)(a,b); });
     testF(function void(T a,U b){ testBinUnserial2!(T,U)(a,b); });
     testF(function void(T a,U b){ testBin2Unserial2!(T,U)(a,b); });
 }
@@ -387,6 +418,25 @@ void testJsonUnserial2(T,U)(T a,ref U sOut){
         sout(cast(char[])buf.slice);
         sout("\n-----\n");
     }
+    version(UnserializationTrace) sout("json unserialization of "~T.stringof~"\n");
+}
+/// unserialization test2 Json
+void testJson2Unserial2(T,U)(T a,ref U sOut){
+    version(UnserializationTrace) sout("testing json unserialization of "~T.stringof~"\n");
+    char[512] buf_;
+    auto buf=lGrowableArray(buf_,0);
+    auto js=new JsonSerializer!()(&buf.appendArr);
+    js(a);
+    auto r=arrayReader(buf.data);
+    auto jus=new JsonUnserializer!()(r);
+    version(UnserializationTrace) {
+        sout("XXXXXX Unserialization start\n");
+        sout("in the buffer:-----\n");
+        sout(buf.data);
+        sout("\n-----\n");
+    }
+    jus(sOut);
+    version(UnserializationTrace) sout("XXXXXX Unserialization end\n");
     version(UnserializationTrace) sout("json unserialization of "~T.stringof~"\n");
 }
 /// unserialization test2 Bin
@@ -423,7 +473,7 @@ void testBinUnserial2(T,U)(T a,ref U b){
     }
     version(UnserializationTrace) sout("binary test of unserialization of "~T.stringof~"\n");
 }
-/// unserialization test2 Bin2
+/// unserialization test2 native Bin
 void testBin2Unserial2(T,U)(T a,ref U b){
     version(UnserializationTrace) sout("testing binary unserialization of "~T.stringof~"\n");
     ubyte[256] _buf;

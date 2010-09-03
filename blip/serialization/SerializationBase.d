@@ -571,18 +571,21 @@ class Serializer {
     /// if it is a pointer (and not void*) then it is indirected once before feeding it on
     /// (to handle this in structs better)
     /// you should only use the field method to write in the serialization methods
-    typeof(this) opCall(T)(T o) {
+    typeof(this) opCall(S...)(S o) {
         if (rootObjStartCallback){
             rootObjStartCallback(this);
         }
         writeStartRoot();
-        static if(isStaticArrayType!(T)){
-            auto arr=o[];
-            field!(typeof(arr))(cast(FieldMetaInfo *)null,arr);
-        } else static if(is(typeof(*o)) && is(T==typeof(*o)*)){
-            field!(typeof(*o))(cast(FieldMetaInfo *)null,*o);
-        } else {
-            field!(T)(cast(FieldMetaInfo *)null,o);
+        foreach(i,T;S){
+            if (i!=0) writeTupleSpacer();
+            static if(isStaticArrayType!(T)){
+                auto arr=o[i][];
+                field!(typeof(arr))(cast(FieldMetaInfo *)null,arr);
+            } else static if(is(typeof(*o[i])) && is(T==typeof(*o[i])*)){
+                field!(typeof(*o[i]))(cast(FieldMetaInfo *)null,*o[i]);
+            } else {
+                field!(T)(cast(FieldMetaInfo *)null,o[i]);
+            }
         }
         writeEndRoot();
         if (rootObjEndCallback){
@@ -607,6 +610,7 @@ class Serializer {
     void writeProtocolVersion() { }
     void writeStartRoot() { }
     void writeEndRoot() { }
+    void writeTupleSpacer() { }
     
     /// removes the object from the register of known objects (that is used to remove loops)
     void unregisterObject(Object o){
@@ -1153,12 +1157,15 @@ class Unserializer {
 
     /// writes the given root object
     /// you should only use the field method to write in the serialization methods
-    typeof(this) opCall(T)(ref T o) {
+    typeof(this) opCall(S...)(ref S o) {
         if (rootObjStartCallback !is null){
             rootObjStartCallback(this);
         }
         readStartRoot();
-        field!(T)(cast(FieldMetaInfo *)null,o);
+        foreach(i,T;S){
+            if (i!=0) readTupleSpacer();
+            field!(T)(cast(FieldMetaInfo *)null,o[i]);
+        }
         readEndRoot();
         if (rootObjEndCallback !is null){
             rootObjEndCallback(this);
@@ -1613,6 +1620,7 @@ class Unserializer {
     
     void readStartRoot() { }
     void readEndRoot() { }
+    void readTupleSpacer() { }
     /// closes the serializer, after this it one could recyle the serializer
     void close(){
         if (unserializerCloseCallback){

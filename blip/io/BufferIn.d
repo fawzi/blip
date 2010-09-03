@@ -22,6 +22,29 @@ import blip.math.Math: min;
 import blip.container.GrowableArray;
 version(TrackBInReadSome) import blip.io.Console;
 
+/// a reader that reinterprets the memory
+final class ReinterpretReader(U,T):Reader!(T){
+    BufferIn!(U) buf;
+    
+    this(BufferIn!(U) buf){
+        this.buf=buf;
+    }
+
+    /// reader 
+    size_t readSome(T[] t){
+        return this.buf.readSomeT!(T)(t);
+    }
+    
+    ///  reader handler
+    bool handleReader(size_t delegate(T[], SliceExtent slice,out bool iterate) r){
+        return this.buf.handleReaderT!(T)(r);
+    }
+    
+    void shutdownInput(){
+        this.buf.shutdownInput();
+    }
+}
+
 final class BufferIn(TInt):Reader!(TInt){
     static if(is(TInt==void)){
         alias ubyte TBuf;
@@ -56,19 +79,31 @@ final class BufferIn(TInt):Reader!(TInt){
     }
     
     void loadMore(bool insist=true){
+        version(TrackBInReadSome){
+            sinkTogether(sout,delegate void(CharSink s){
+                dumper(s)("BufferIn@")(cast(void*)this)(",pre loadMore,")
+                    ("buffer contents:\n'")(buf[bufPos..bufPos+bufLen])("'\n");
+            });
+            scope(exit){
+                sinkTogether(sout,delegate void(CharSink s){
+                    dumper(s)("BufferIn@")(cast(void*)this)(",post loadMore,")
+                        ("buffer contents:\n'")(buf[bufPos..bufPos+bufLen])("'\n");
+                });
+            }
+        }
         if (slice==SliceExtent.ToEnd) return;
         if (bufLen+encodingOverhead<buf.length){
-            if (bufPos+bufPos+encodingOverhead>buf.length) compact();
-            auto readNow=_read(buf[bufPos+bufPos..buf.length]);
-            if (readNow==Eof) {
-                slice=SliceExtent.ToEnd;
-                return;
-            } else if (readNow!=0){
-                bufLen+=readNow;
-            } else {
-                compact();
-                while(readNow==0 && readNow!=Eof && insist){
-                    readNow=_read(buf[bufPos+bufPos..buf.length]);
+            if (bufPos+bufLen+encodingOverhead>=buf.length) compact();
+            while(insist){
+                auto readNow=_read(buf[bufPos+bufLen..buf.length]);
+                if (readNow==Eof) {
+                    slice=SliceExtent.ToEnd;
+                    return;
+                } else if (readNow!=0){
+                    bufLen+=readNow;
+                    break;
+                } else {
+                    compact();
                 }
             }
         }
@@ -125,13 +160,7 @@ final class BufferIn(TInt):Reader!(TInt){
         version(TrackBInReadSome){
             sinkTogether(sout,delegate void(CharSink s){
                 dumper(s)("readSome started need to read ")(outBuf.length)(" ")(TOut.stringof)(",")
-                    ("buffer contents:\n'");
-                foreach (i,u;buf[bufPos..bufPos+bufLen]){
-                    s(" ");
-                    writeOut(s,u);
-                    if (i%10==9) s("\n");
-                }
-                s("'\n");
+                    ("buffer contents:\n'")(buf[bufPos..bufPos+bufLen])("'\n");
             });
         }
         static assert(TInt.sizeof<=TOut.sizeof,"internal size needs to be smaller than external");
@@ -192,11 +221,13 @@ final class BufferIn(TInt):Reader!(TInt){
                 readNow=Eof;
             }
         }
+        version(TrackBInReadSome){
+            sinkTogether(sout,delegate void(CharSink s){
+                dumper(s)("readSome after realRead the buffer contents are:\n'")(buf[bufPos..bufPos+bufLen])("'\n");
+            });
+        }
         if (readNow==Eof){
             slice=SliceExtent.ToEnd;
-            if (readTot!=0){
-                throw new BIOException("partial read at end of file",__FILE__,__LINE__);
-            }
             return Eof;
         }
         readTot+=readNow;
@@ -226,7 +257,7 @@ final class BufferIn(TInt):Reader!(TInt){
             } else {
                 alias bufOut1 bufOut;
             }
-            if (slice!=SliceExtent.ToEnd || bufOut.length==bufOut1.length)
+            if (slice==SliceExtent.ToEnd && bufOut.length!=bufOut1.length)
                 throw new BIOException("invalid utf data at end of stream",__FILE__,__LINE__);
             auto consumed=r(bufOut,slice,iterate);
             switch (consumed){
@@ -273,32 +304,9 @@ final class BufferIn(TInt):Reader!(TInt){
         return handleReaderT!(TInt)(r);
     }
     
-    /// a reader that reinterprets the memory
-    static final class ReinterpretReader(T):Reader!(T){
-        BufferIn buf;
-        
-        this(BufferIn buf){
-            this.buf=buf;
-        }
-
-        /// reader 
-        size_t readSome(T[] t){
-            this.buf.readSomeT!(T)(t);
-        }
-        
-        ///  reader handler
-        bool handleReader(size_t delegate(T[], SliceExtent slice,out bool iterate) r){
-            return this.buf.handleReaderT!(T)(r);
-        }
-        
-        void shutdownInput(){
-            this.buf.shutdownInput();
-        }
-    }
-    
     /// returns a reader that reinterprets the memory
-    ReinterpretReader!(T) reinterpretReader(T)(){
-        return new ReinterpretReader!(T)(this);
+    ReinterpretReader!(TInt,T) reinterpretReader(T)(){
+        return new ReinterpretReader!(TInt,T)(this);
     }
 }
 

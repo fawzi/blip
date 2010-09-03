@@ -206,6 +206,15 @@ class SBinUnserializer: Unserializer {
     uint lastMetaId;
     bool fieldRead;
     
+    override void readEndRoot() {
+        uint l;
+        reader.handle(l);
+        if (l!=0xdeadbeef){
+            serializationError(collectAppender(delegate void(CharSink s){
+                    dumper(s)("readEndRoot found ")(l)(" instead of 0xdeadbeef, binary stream is likely to be garbled");
+                }),__FILE__,__LINE__);
+        }
+    }
     override void resetObjIdCounter(){
         lastMetaId=3;
         _readMetaInfo=null; // avoid this?

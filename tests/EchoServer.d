@@ -24,10 +24,13 @@ import blip.core.sync.Semaphore;
 import blip.io.BasicIO;
 import blip.bindings.ev.DLibev;
 import blip.io.EventWatcher;
+import blip.io.BasicStreams;
+import blip.io.BufferIn;
 
 class ConnectionHandler{
     SocketServer serv;
     int status=0;
+    bool cached=true;
     this(){}
     void handleConnection(ref SocketServer.Handler h){
         auto s=h.sock;
@@ -38,14 +41,30 @@ class ConnectionHandler{
         }
         try{
             char[256] buf;
+            BufferedBinStream outStream;
+            BufferIn!(void) readIn;
+            if (cached){
+                outStream=new BufferedBinStream(&h.sock.writeExact,2048,&h.sock.flush,&h.sock.close);
+                readIn=new BufferIn!(void)(&h.sock.rawReadInto);
+            }
             while(true){
-                auto read=s.rawReadInto(buf);
+                ptrdiff_t read;
+                if (cached){
+                    read=readIn.readSome(buf);
+                } else {
+                    read=s.rawReadInto(buf);
+                }
                 if (read>=5 && buf[0..5]=="close"){
                     version(NoLog){} else {
                         sout("detected close, closing connection...\n");
                     }
-                    s.close();
-                    s.shutdownInput();
+                    if (cached){
+                        outStream.close();
+                        readIn.shutdownInput();
+                    } else {
+                        s.close();
+                        s.shutdownInput();
+                    }
                     break;
                 } else if (read>=4 && buf[0..4]=="stop"){
                     sout("detected stop, stopping server...\n");
@@ -67,7 +86,12 @@ class ConnectionHandler{
                         dumper(sink)("Connection")(cast(int)s.sock)(" received '")(buf[0..read])("'\n");
                     });
                 }
-                s.writeExact(buf[0..read]);
+                if (cached){
+                    outStream.rawWrite(buf[0..read]);
+                    outStream.flush();
+                } else {
+                    s.writeExact(buf[0..read]);
+                }
             }
             version(NoLog){} else {
                 sinkTogether(sout,delegate void(CharSink sink){

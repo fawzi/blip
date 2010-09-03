@@ -35,6 +35,7 @@ import blip.parallel.smp.WorkManager;
 import blip.parallel.smp.BasicTasks;
 import blip.sync.Atomic;
 import blip.core.sync.Semaphore;
+import blip.io.Console;
 
 struct TargetHost{
     char[] host;
@@ -68,7 +69,7 @@ struct BasicSocket{
         res.sock=s;
         return res;
     }
-    
+    /// creates a socket
     static BasicSocket opCall(char[]address,char[]service){
         BasicSocket res;
         int err;
@@ -96,13 +97,46 @@ struct BasicSocket{
         }
 
         socket_t s=-1;
-        for (addrAtt=addressInfo;addrAtt;addrAtt.ai_next){
+        for (addrAtt=addressInfo;addrAtt;addrAtt=addrAtt.ai_next){
             s = socket(addrAtt.ai_family, addrAtt.ai_socktype, addrAtt.ai_protocol);
             if (s<0) continue;
+            version(TrackSocketServer){
+                sinkTogether(serr,delegate void(CharSink s){
+                    dumper(s)("trying to connect to ");
+                    char[256] buf;
+                    auto res=inet_ntop(addrAtt.ai_family, addrAtt.ai_addr,
+                           buf.ptr,buf.length);
+                    buf[$-1]=0;
+                    s(res[0..strlen(res)]);
+                    s("\n");
+                });
+            }
             if (connect(s, addrAtt.ai_addr, addrAtt.ai_addrlen) != 0) {
+                version(TrackSocketServer){
+                    sinkTogether(serr,delegate void(CharSink s){
+                        dumper(s)("connection to ");
+                        char[256] buf;
+                        auto res=inet_ntop(addrAtt.ai_family, addrAtt.ai_addr,
+                               buf.ptr,buf.length);
+                        buf[$-1]=0;
+                        s(res[0..strlen(res)]);
+                        s(" failed\n");
+                    });
+                }
                 shutdown(s,SHUT_RDWR);
                 s = -1;
                 continue;
+            }
+            version(TrackSocketServer){
+                sinkTogether(serr,delegate void(CharSink s){
+                    dumper(s)("connection to ");
+                    char[256] buf;
+                    auto res=inet_ntop(addrAtt.ai_family, addrAtt.ai_addr,
+                           buf.ptr,buf.length);
+                    buf[$-1]=0;
+                    s(res[0..strlen(res)]);
+                    s(" success\n");
+                });
             }
             break;
         }
@@ -120,6 +154,59 @@ struct BasicSocket{
         int i=1;
         setsockopt(res.sock,SOL_SOCKET,SO_OOBINLINE,&i,4); // ignore failures...
         return res;
+    }
+    /// sets the value of noDelay, if you do your own buffering using TCP setting it to noDelay gives smaller latency
+    void noDelay(bool val){
+        int i=(val?1:0);
+        if (setsockopt(sock,SOL_TCP,TCP_NODELAY,&i,4)!=0){
+            throw new Exception(collectAppender(delegate void(CharSink s){
+                dumper(s)("setsockopt SOL_TCP,TCP_NODELAY failed on socket ")(sock);
+                char[256] buf;
+                s(strerror_d(errno(),buf));
+            }),__FILE__,__LINE__);
+        }
+    }
+    /// returns the value of noDelay, if you do your own buffering using TCP setting it to noDelay gives smaller latency
+    bool noDelay(){
+        int i;
+        socklen_t len=4;
+        if (getsockopt(sock,SOL_TCP,TCP_NODELAY,&i,&len)){
+            throw new Exception(collectAppender(delegate void(CharSink s){
+                dumper(s)("getsockopt SOL_TCP,TCP_NODELAY failed on socket ")(sock);
+                char[256] buf;
+                s(strerror_d(errno(),buf));
+            }),__FILE__,__LINE__);
+        }
+        assert(len==4,"unexpected return length in getsockopt");
+        return i!=0;
+    }
+    /// sets keepalive
+    void keepalive(bool k){
+        int i=cast(int)k;
+        if (setsockopt(sock,SOL_SOCKET,SO_KEEPALIVE,&i,4)!=0){
+            throw new Exception(collectAppender(delegate void(CharSink s){
+                dumper(s)("setsockopt SOL_SOCKET,SO_KEEPALIVE failed on socket ")(sock);
+                char[256] buf;
+                s(strerror_d(errno(),buf));
+            }),__FILE__,__LINE__);
+        }
+    }
+    bool keepalive(){
+        int i;
+        socklen_t len=4;
+        if (getsockopt(sock,SOL_SOCKET,SO_KEEPALIVE,&i,&len)){
+            throw new Exception(collectAppender(delegate void(CharSink s){
+                dumper(s)("getsockopt SOL_SOCKET,SO_KEEPALIVE failed on socket ")(sock);
+                char[256] buf;
+                if (strerror_d(errno(),buf)){
+                    s(",");
+                    buf[$-1]=0;
+                    s(buf[0..strlen(buf.ptr)]);
+                }
+            }),__FILE__,__LINE__);
+        }
+        assert(len==4,"unexpected return length in getsockopt");
+        return i!=0;
     }
     
     static BasicSocket opCall(TargetHost t){
@@ -150,9 +237,10 @@ struct BasicSocket{
             }
             if (wNow<0){
                 auto tAtt=taskAtt.val;
+                auto watcher=GenericWatcher.ioCreate(cast(int)sock,EV_WRITE,EventHandler(tAtt,tAtt.delayLevel));
                 // implement blocking for non present or non yieldable tasks? it might be dangerous (deadlocks)
                 tAtt.delay(delegate void(){// add a timeout???
-                    defaultWatcher.addWatcher(GenericWatcher.ioCreate(cast(int)sock,EV_WRITE,EventHandler(tAtt)));
+                    defaultWatcher.addWatcher(watcher);
                 });
                 wNow=0;
             }
@@ -184,9 +272,10 @@ struct BasicSocket{
             }
             if (wNow<0){
                 auto tAtt=taskAtt.val;
+                auto watcher=GenericWatcher.ioCreate(cast(int)sock,EV_WRITE,EventHandler(tAtt,tAtt.delayLevel));
                 // implement blocking for non present or non yieldable tasks? it might be dangeroues (deadlocks)
                 tAtt.delay(delegate void(){// add a timeout???
-                    defaultWatcher.addWatcher(GenericWatcher.ioCreate(cast(int)sock,EV_WRITE,EventHandler(tAtt)));
+                    defaultWatcher.addWatcher(watcher);
                 });
                 wNow=0;
             }
@@ -222,9 +311,10 @@ struct BasicSocket{
             }
             if (res<0){
                 auto tAtt=taskAtt.val;
+                auto watcher=GenericWatcher.ioCreate(cast(int)sock,EV_READ,EventHandler(tAtt,tAtt.delayLevel));
                 // implement blocking for non present or non yieldable tasks? it might be dangeroues (deadlocks)
                 tAtt.delay(delegate void(){// add a timeout???
-                    defaultWatcher.addWatcher(GenericWatcher.ioCreate(cast(int)sock,EV_READ,EventHandler(tAtt)));
+                    defaultWatcher.addWatcher(watcher);
                 });
                 res=0;
             }
@@ -265,6 +355,7 @@ class SocketServer{
     size_t pendingTasks;
     size_t maxPendingTasks=size_t.max;
     CharSink log;
+    bool requireFirst;
     
     static struct Handler{
         BasicSocket sock;
@@ -322,6 +413,12 @@ class SocketServer{
         this.handler=handler;
         this.log=log;
     }
+    /// starts the server
+    ///
+    /// it seems that restaring a server might make it bind to only some of the socket/families/interfaces
+    /// it should, which might bring *large* slowdowns in creating the connections.
+    /// At the moment no as long as one socket can be bound, the start is considered a success.
+    /// maybe this should be tightened up
     void start(){
         addrinfo hints;
         addrinfo *res, res0;
@@ -352,10 +449,38 @@ class SocketServer{
             //printf("will create socket(%d,%d,%d)\n",res.ai_family,res.ai_socktype,res.ai_protocol);
             socket_t s=socket(res.ai_family,res.ai_socktype,res.ai_protocol);
             if (s<0) continue;
+            version(TrackSocketServer){
+                sinkTogether(log,delegate void(CharSink s){
+                    dumper(s)("trying bind to ");
+                    char[256] buf;
+                    auto res=inet_ntop(res.ai_family, res.ai_addr,
+                           buf.ptr,buf.length);
+                    buf[$-1]=0;
+                    dumper(s)(res[0..strlen(res)])(" on port ")(serviceName)("\n");
+                });
+            }
             if (bind(s,res.ai_addr,res.ai_addrlen)!=0){
+                sinkTogether(log,delegate void(CharSink s){
+                    dumper(s)("bind to ");
+                    char[256] buf;
+                    auto res=inet_ntop(res.ai_family, res.ai_addr,
+                           buf.ptr,buf.length);
+                    buf[$-1]=0;
+                    dumper(s)(res[0..strlen(res)])(" on port ")(serviceName)(" failed\n");
+                });
                 close(s);
                 s=-1;
                 continue;
+            }
+            version(TrackSocketServer){
+                sinkTogether(log,delegate void(CharSink s){
+                    dumper(s)("bind to ");
+                    char[256] buf;
+                    auto res=inet_ntop(res.ai_family, res.ai_addr,
+                           buf.ptr,buf.length);
+                    buf[$-1]=0;
+                    dumper(s)(res[0..strlen(res)])(" on port ")(serviceName)(" succeded\n");
+                });
             }
             listen(s,5);
             // set non blocking
@@ -404,7 +529,7 @@ class SocketServer{
                 if (errMsg.length==0){
                     s(errno);
                 }
-                s("\n");
+                s(", ")(__FILE__)(":")(__LINE__)("\n");
             });
         }
         if (pendingTasks>= maxPendingTasks){

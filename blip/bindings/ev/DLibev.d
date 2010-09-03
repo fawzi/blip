@@ -27,7 +27,7 @@ import blip.core.Traits;
 import blip.util.TemplateFu;
 public import blip.bindings.ev.Libev: EV_PERIODIC_ENABLED, EV_STAT_ENABLED, EV_IDLE_ENABLED, EV_FORK_ENABLED,
     EV_EMBED_ENABLED, EV_ASYNC_ENABLED, EV_WALK_ENABLED,ev_loop_t, EV_READ, EV_WRITE;
-import blip.io.Console; // pippo
+import blip.container.HashSet;
 
 /// bits for ev_default_loop and ev_loop_new
 enum EVFLAG: uint{
@@ -171,7 +171,7 @@ char[] mixinInitAndCreate(char[]kind,char[] extraArgsDecls, char[] extraArgs){
     char[] extraArgsDeclsComma=extraArgsDecls~((extraArgsDecls.length>0)?",":" ");
     char[] res=`
 /// initialize a `~kind~` watcher, the callback can be either directly given, or created by passing
-/// valid arguments for EventHandler opCall
+/// a structure pointer/class that contains an extern(C) cCallback static member
 GenericWatcher `~kind~`Init(T)(`~extraArgsDeclsComma~` T callback){
     static if (is(typeof(*T.init))){
         alias typeof(*T.init) TT;
@@ -237,12 +237,27 @@ struct GenericWatcher{
     void* ptr_;
     int kind;
     PoolI!(GenericWatcher) pool; // should be set only if it is based on any_watcher
+    
     void giveBack(){
         if (pool!is null && ptr_!is null){
             pool.giveBack(*this);
         }
     }
-    
+    equals_t opEqual(GenericWatcher w2){
+        return (ptr_ is w2.ptr_);
+    }
+    int opCmp(GenericWatcher w2){
+        return ((ptr_<w2.ptr_)?-1:((ptr_ is w2.ptr_)?0:1));
+    }
+    hash_t toHash(){
+        union H{
+            hash_t hash;
+            void* ptr;
+        }
+        H h;
+        h.ptr=ptr_;
+        return h.hash;
+    }
     /// returns the ad-hoc data stored in this watcher
     TP data(TP=void*)(){
         return cast(TP)ptr!(ev_watcher)().data;
@@ -253,12 +268,18 @@ struct GenericWatcher{
     }
     /// Starts (activates) the given watcher. Only active watchers will receive events. If the watcher is already active nothing will happen.
     void start(ev_loop_t* loop){
+        synchronized(activeWatchers()){
+            activeWatchers().add(*this); // slow and ugly!!!
+        }
         mixin(startMixin());
     }
     /// Stops the given watcher if active, and clears the pending status (whether the watcher was active or not).
     ///
     /// It is possible that stopped watchers are pending - for example, non-repeating timers are being stopped when they become pending - but calling ev_TYPE_stop ensures that the watcher is neither active nor pending. If you want to free or reuse the memory used by the watcher it is therefore a good idea to always call its stop function.
     void stop(ev_loop_t* loop){
+        synchronized(activeWatchers()){
+            activeWatchers().remove(*this); // slow and ugly!!!
+        }
         mixin(stopMixin());
     }
 
@@ -377,7 +398,6 @@ struct GenericWatcher{
         if (pool!is null){
             kind=Kind.any_watcher;
         } else {
-            sout("pippo setting kind=none\n");
             kind=Kind.none;
             ptr_=null;
         }
@@ -452,4 +472,16 @@ struct GenericWatcher{
     static if (EV_ASYNC_ENABLED){
         mixin(mixinInitAndCreate("async","",""));
     }
+}
+
+/// watchers that are currently active (to avoid gc collection, ugly hack)
+/// could store only the underlying ev_watcher...
+HashSet!(GenericWatcher) _activeWatchers;
+HashSet!(GenericWatcher) activeWatchers(){
+    if (_activeWatchers !is null) return _activeWatchers;
+    synchronized{
+        if (_activeWatchers is null)
+            _activeWatchers=new HashSet!(GenericWatcher)();
+    }
+    return _activeWatchers;
 }

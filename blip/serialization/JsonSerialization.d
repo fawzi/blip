@@ -251,11 +251,15 @@ class JsonSerializer(T=char) : Serializer {
     override void writeEndRoot() {
         newline;
     }
+    override void writeTupleSpacer() {
+        s(" ");
+    }
     
     override void writeProtocolVersion(){
         s("BLIP_JSON_1.0\n");
     }
 }
+
 
 class JsonUnserializer(T=char) : Unserializer {
     TextParser!(T) reader;
@@ -275,11 +279,11 @@ class JsonUnserializer(T=char) : Unserializer {
     this(Reader!(T) s){
         this(new TextParser!(T)(s));
     }
-    class FieldMismatchException:Exception{
+    static class FieldMismatchException:Exception{
         FieldMetaInfo *mismatchedField;
         char[] actualField;
         this(FieldMetaInfo *mismatchedField,char[] actualField,char[]desc,char[]filename,long line){
-            super(collectAppender(delegate void(CharSink s){ s(desc); s(" at "); reader.parserPos(s); }),filename,line);
+            super(desc,filename,line);
             this.actualField=actualField;
             this.mismatchedField=mismatchedField;
         }
@@ -287,20 +291,22 @@ class JsonUnserializer(T=char) : Unserializer {
     
     /// reads a field
     void readField(FieldMetaInfo *field){
-        if(fieldRead){
-            fieldRead=false;
+        if(this.fieldRead){
+            this.fieldRead=false;
         } else {
             if (field !is null && (!field.pseudo)){
-                reader.skipString(cast(S)",",false);
-                if (!reader.skipString2(cast(S)field.name,false)){
+                this.reader.skipString(cast(S)",",false);
+                if (!this.reader.skipString2(cast(S)field.name,false)){
                     char[] fieldReadName;
-                    reader(fieldReadName);
+                    this.reader(fieldReadName);
                     if (fieldReadName.length>0)
-                        reader.skipString(cast(S)":");
+                        this.reader.skipString(cast(S)":");
                     throw new FieldMismatchException(field,fieldReadName,
-                        "unexpected field",__FILE__,__LINE__);
+                        collectAppender(delegate void(CharSink s){
+                            dumper(s)("unexpected field '")(fieldReadName)("' at "); this.reader.parserPos(s);
+                        }),__FILE__,__LINE__);
                 }
-                reader.skipString(cast(S)":");
+                this.reader.skipString(cast(S)":");
             }
         }
     }

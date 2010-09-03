@@ -27,6 +27,7 @@ import blip.core.Traits;
 import blip.core.Thread;
 import blip.parallel.smp.WorkManager;
 import blip.core.sync.Semaphore;
+import blip.container.HashSet;
 
 /// this creates a watcher thread that watches for events, and notifies 
 class EventWatcher{
@@ -35,7 +36,7 @@ class EventWatcher{
         DestroyLoop=1,
         LoopRunning=2,
     }
-    static assert(EV_ASYNC_ENABLED,"ev_async is needed for proper functioning"); // buils a version that uses a periodic instead?
+    static assert(EV_ASYNC_ENABLED,"ev_async is needed for proper functioning"); // builds a version that uses a periodic instead?
     Deque!(GenericWatcher) watchersToAdd;
     Deque!(void delegate()) actionsToDo;
     ev_loop_t*loop;

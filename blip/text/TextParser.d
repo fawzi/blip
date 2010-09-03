@@ -42,6 +42,7 @@ import blip.io.StreamConverters: ReadHandler,toReaderChar;
 class TextParser(T) : InputFilter 
 {
     private InputBuffer     source;
+    Reader!(T)              reader;
     protected T[]           slice;
     size_t maxTranscodingOverhead;
     bool skippedWhitespace;
@@ -65,8 +66,21 @@ class TextParser(T) : InputFilter
     /// position of the parsed token
     void parserPos(void delegate(char[]) s){
         dumper(s)("line:")(oldLine)(" col:")(oldCol)(" token:\"")(convertToString!(char)(escape(slice)))("\"\n");
-        auto txt=cast(T[])source.slice;
-        if (txt.length>250) txt=txt[0..250];
+        T[] txt;
+        if (source!is null){
+            txt=cast(T[])source.slice;
+            if (txt.length>250) txt=txt[0..250];
+        } else {
+            reader.handleReader(delegate size_t(T[] dta, SliceExtent sExt,out bool iterate){
+                iterate=false;
+                if (dta.length>250){
+                    txt=dta[0..250];
+                } else {
+                    txt=dta[0..$];
+                }
+                return 0;
+            });
+        }
         txt=cropRight(txt);
         dumper(s)("next text:...<<")(convertToString!(char)(txt))(">>...\n");
     }
@@ -114,62 +128,75 @@ class TextParser(T) : InputFilter
     /// it has success
     final bool next (size_t delegate (T[],SliceExtent) scan,bool setSlice=true)
     {
-        if (!skippedWhitespace) skipWhitespace();
-        SliceExtent sliceE=SliceExtent.Partial;
-        BufferedInput buf=cast(BufferedInput)source;
-        if (buf !is null){
-            if (buf.position == 0 && buf.capacity-buf.limit <=maxTranscodingOverhead){
-                sliceE=SliceExtent.Maximal;
-            }
-        } else {
-            sliceE=SliceExtent.ToEnd;
-        }
-        size_t nonGrow=maxTranscodingOverhead;
         bool matchSuccess=false;
-        while (source.reader(delegate size_t(void[] rawData)
-                {
-                    T[] data=cropRight((cast(T*)rawData.ptr)[0..rawData.length/T.sizeof]);
-                    auto res=scan(data,sliceE);
-                    if (res != Eof){
-                        if (setSlice) slice=data[0..res];
-                        updatePos(data[0..res]);
-                        matchSuccess=res!=0;
-                        return T.sizeof*res;
-                    } else {
-                        if (setSlice) slice=[];
-                        return Eof;
-                    }
-                }) is Eof)
-        {
-            if (sliceE!=SliceExtent.Partial) {
-                if (sliceE==SliceExtent.ToEnd) {
-                    return false;
-                } else {
-                    smallCacheError("match needs more space, but buffer is not large enough",__FILE__,__LINE__);
+        if (!skippedWhitespace) skipWhitespace();
+        if (reader!is null){
+            matchSuccess=reader.handleReader(delegate size_t(T[] dta, SliceExtent sExt,out bool iterate){
+                iterate=false;
+                size_t res=scan(dta,sExt);if (res!is  Eof){
+                    if (setSlice) slice=dta[0..res];
+                    updatePos(dta[0..res]);
+                } else if(setSlice){
+                    slice=[];
                 }
-            }
-            if (buf.position != 0){
-                buf.compress;
-            }
-            auto oldWriteable=buf.capacity-buf.limit;
-            // read another chunk of data
-            if (buf.populate() is Eof) {
-                sliceE=SliceExtent.ToEnd;
-            } else if (buf.capacity-buf.limit <= maxTranscodingOverhead) {
-                sliceE=SliceExtent.Maximal;
-            } else if (oldWriteable==buf.capacity-buf.limit){
-                // did not grow
-                 // worst case should read at least a byte per read attempt,
-                 // so transcoding might not happen before maxTranscodingOverhead iterations
-                if (nonGrow==0){
-                    smallCacheError("did not grow and space available bigger than maxTranscodingOverhead",__FILE__,__LINE__);
+                return res;
+            });
+        } else  {
+            SliceExtent sliceE=SliceExtent.Partial;
+            BufferedInput buf=cast(BufferedInput)source;
+            if (buf !is null){
+                if (buf.position == 0 && buf.capacity-buf.limit <=maxTranscodingOverhead){
+                    sliceE=SliceExtent.Maximal;
                 }
-                --nonGrow;
             } else {
-                nonGrow=maxTranscodingOverhead;
+                sliceE=SliceExtent.ToEnd;
+            }
+            size_t nonGrow=maxTranscodingOverhead;
+            while (source.reader(delegate size_t(void[] rawData)
+                    {
+                        T[] data=cropRight((cast(T*)rawData.ptr)[0..rawData.length/T.sizeof]);
+                        auto res=scan(data,sliceE);
+                        if (res != Eof){
+                            if (setSlice) slice=data[0..res];
+                            updatePos(data[0..res]);
+                            matchSuccess=res!=0;
+                            return T.sizeof*res;
+                        } else {
+                            if (setSlice) slice=[];
+                            return Eof;
+                        }
+                    }) is Eof)
+            {
+                if (sliceE!=SliceExtent.Partial) {
+                    if (sliceE==SliceExtent.ToEnd) {
+                        return false;
+                    } else {
+                        smallCacheError("match needs more space, but buffer is not large enough",__FILE__,__LINE__);
+                    }
+                }
+                if (buf.position != 0){
+                    buf.compress;
+                }
+                auto oldWriteable=buf.capacity-buf.limit;
+                // read another chunk of data
+                if (buf.populate() is Eof) {
+                    sliceE=SliceExtent.ToEnd;
+                } else if (buf.capacity-buf.limit <= maxTranscodingOverhead) {
+                    sliceE=SliceExtent.Maximal;
+                } else if (oldWriteable==buf.capacity-buf.limit){
+                    // did not grow
+                     // worst case should read at least a byte per read attempt,
+                     // so transcoding might not happen before maxTranscodingOverhead iterations
+                    if (nonGrow==0){
+                        smallCacheError("did not grow and space available bigger than maxTranscodingOverhead",__FILE__,__LINE__);
+                    }
+                    --nonGrow;
+                } else {
+                    nonGrow=maxTranscodingOverhead;
+                }
             }
         }
-        skippedWhitespace=false;
+        if (matchSuccess) skippedWhitespace=false;
         return matchSuccess;
     }
     /// returns a separator
@@ -283,7 +310,7 @@ class TextParser(T) : InputFilter
         bool didSkip=false;
         do {
             skippedWhitespace=true;
-            if (next(&scanWhitespace) && source.slice.length!=0) {
+            if (next(&scanWhitespace) && slice.length!=0) {
                 didSkip=true;
             }
         } while (inComment!=CommentType.None);
@@ -315,7 +342,7 @@ class TextParser(T) : InputFilter
                 }
             }
             return 0;
-        }) && source.slice.length!=0) {
+        }) && slice.length!=0) {
             return true;
         }
         if (shouldThrow) parseError("no newline when expected",__FILE__,__LINE__);
@@ -749,12 +776,14 @@ class TextParser(T) : InputFilter
     {
         auto tReader=cast(ReadHandler!(T))reader;
         if (tReader is null){
-            assert(0,"at the moment only tango based readers are accepted (should change soon)");
+            super(null); // InputFilter not really usable...
+            this.reader=reader;
+        } else {
+            auto iStr=((tReader.buf is null)?cast(InputStream)tReader.arr:cast(InputStream)tReader.buf);
+            super(iStr);
+            if (iStr)
+                setS(iStr);
         }
-        auto iStr=((tReader.buf is null)?cast(InputStream)tReader.arr:cast(InputStream)tReader.buf);
-        super(iStr);
-        if (iStr)
-            setS(iStr);
         this.maxTranscodingOverhead=maxTranscodingOverhead;
         this.delims=delims;
         this.skipComments=skipComments;
@@ -848,6 +877,8 @@ T[] maybeUnescape(T)(T[] s){
         return s;
     }
 }
+
+private TextParser!(char) dummy;
 
 debug(UnitTest){
     import blip.io.IOArray;

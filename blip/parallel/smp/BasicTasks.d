@@ -37,6 +37,7 @@ import blip.container.Deque;
 import tango.core.Memory:GC;
 import tango.util.container.LinkedList;
 import blip.core.BitManip;
+
 debug(TrackTasks){
     version=ImportConsole;
 }
@@ -59,7 +60,7 @@ enum TaskFlags:uint{
     Resubmit=1<<6,               /// the task should be resubmitted
     ThreadPinned=1<<7,           /// the task should stay pinned to the same thread
     WaitingSubtasks=1<<10,       /// the task is waiting for subtasks to end
-    ImmediateSyncSubtasks=1<<11, /// subtasks submitted with spawnTaskSync are executed immediately if possible
+    ImmediateSyncSubtasks=0,// deactivated for now 1<<11, /// subtasks submitted with spawnTaskSync are executed immediately if possible
 }
 
 class TaskPoolT(int batchSize=16):Pool!(Task,batchSize){
@@ -1292,10 +1293,13 @@ class RootTask: Task{
 }
 
 /// root task that enforces a sequential execution of the submitted tasks
-/// should override submitSync and possibly execute immediately
+/// the tasks are strictly sequential, recursion is not allowed and deadlocks
+/// (i.e. a task submitted in this queue should not wait on another task submitted in this queue)
+/// sub-sub-tasks are scheduled normally (unless they influence scheduling) using the scheduler 
+/// of this task (i.e. normally in parallel, this is probably what one wants, and avoids deadlocks)
 class SequentialTask:RootTask{
     Deque!(TaskI) queue; // FIFO queue
-    int nExecuting;
+    TaskI executingTask; // the single task executing now
     
     this(char[] name,TaskSchedulerI scheduler, int level=0,bool canBeImmediate=true){
         super(scheduler,level,name,false);
@@ -1305,7 +1309,6 @@ class SequentialTask:RootTask{
             }
         }
         queue=new Deque!(TaskI)();
-        nExecuting=0;
     }
     this(char[]name,TaskI t,bool canBeImmediate=true){
         if (t is null){
@@ -1318,23 +1321,37 @@ class SequentialTask:RootTask{
         TaskI toExe;
         synchronized(queue){
             flagAdd(spawnTasks,1);
-            if (atomicCASB(nExecuting,1,0)){
+            if (executingTask is null){
                 if (queue.popFront(toExe)){
                     queue.append(t);
                 } else {
                     toExe=t;
                 }
+                executingTask=toExe;
             } else {
                 queue.append(t);
             }
         }
-        if (toExe){
+        if (toExe!is null){
             super.spawnTask(toExe);
         }
     }
     
     /// spawn a task and waits for its completion
-    void spawnTaskSync(TaskI task){
+    void spawnTaskSync(TaskI task)
+    in{
+        auto tNow=taskAtt.val;
+        while (tNow!is null && tNow.superTask!is null && tNow.superTask!is tNow){
+            if (tNow.superTask is this){
+                throw new ParaException(collectAppender(delegate void(CharSink s){
+                        dumper(s)(this)(".spawnTaskSync(")(task)(") called while executing ")
+                            (taskAtt)(" which is a subtask of ")(this)(" (wait between sequential tasks)");
+                    }),__FILE__,__LINE__);
+            }
+            tNow=tNow.superTask;
+        }
+    }
+    body{
         auto tAtt=taskAtt.val;
         if (tAtt is null || ((cast(RootTask)tAtt)!is null) || tAtt is noTask || !tAtt.mightYield){
             if (tAtt !is null && ((cast(RootTask)tAtt)is null) && tAtt !is noTask && !tAtt.mightYield) {
@@ -1347,38 +1364,24 @@ class SequentialTask:RootTask{
             task.release();
         } else {
             (cast(Task)task).appendOnFinish(resubmitter(tAtt,tAtt.delayLevel));
-            tAtt.delay(delegate void(){
-                if (tAtt.superTask is this){
-                    synchronized(queue){
+            TaskI toExe;
+            // to avoid excessive task length avoids immediate task execution with 25% probability
+            if (((flags & TaskFlags.ImmediateSyncSubtasks)!=0)&& scheduler.rand.uniformR(4)!=0){
+                synchronized(queue){
+                    if (executingTask is null){
                         flagAdd(spawnTasks,1);
-                        if (queue.length>0){
-                            throw new ParaException("sequential queue violation by recursive subtask",
-                                __FILE__,__LINE__);// allow??
-                        }
-                    }
-                    log.warn("'"~this.taskName~"'.spawnTaskSync('"~task.taskName~"') called while executing '"~tAtt.taskName~"' which is sequential task of '"~this.taskName~"'"); // remove?
-                    if (atomicAdd(nExecuting,1)<1){
-                        throw new ParaException("unexpected value of nExecuting",__FILE__,__LINE__);
-                    }
-                    super.spawnTask(task,{ task.execute(); });
-                } else if ((flags & TaskFlags.ImmediateSyncSubtasks)!=0){
-                    // add && scheduler.rand.uniform!(bool)() to avoid excessive task length
-                    TaskI toExe;
-                    synchronized(queue){
-                        flagAdd(spawnTasks,1);
-                        if (atomicCASB(nExecuting,1,0)){
-                            if (queue.popFront(toExe)){
-                                queue.append(task);
-                            } else {
-                                toExe=task;
-                            }
-                        } else {
+                        if (queue.popFront(toExe)){
                             queue.append(task);
+                        } else {
+                            toExe=task;
                         }
+                        executingTask=toExe;
                     }
-                    if (toExe){
-                        super.spawnTask(toExe,{ toExe.execute(); }); // could even loop until task is executed... but might give subtle priority problems
-                    }
+                }
+            }
+            tAtt.delay(delegate void(){
+                if (toExe!is null){
+                    super.spawnTask(toExe,{ toExe.execute(); }); // could even loop until task is executed... but might give subtle priority problems
                 } else {
                     spawnTask(task);
                 }
@@ -1388,28 +1391,28 @@ class SequentialTask:RootTask{
     
     override void willSpawn(TaskI st){ }
     
-    void subtaskEnded(TaskI st)
-    in{
-        volatile auto nExecutingAtt=nExecuting;
-        assert(nExecutingAtt==0 || nExecutingAtt==1);
-    }
-    out{
-            volatile auto nExecutingAtt=nExecuting;
-            assert(nExecutingAtt==0 || nExecutingAtt==1);
-    }
-    body{
+    void subtaskEnded(TaskI st){
         TaskI toExe;
         super.subtaskEnded(st);
         synchronized(queue){
-            if (nExecuting==1 && queue.length>0){
-                // add && scheduler.rand.uniform!(bool)() ?
-                toExe=queue.popFront;
-            } else if (atomicAdd(nExecuting,-1)<1){
-                throw new ParaException("unexpected value for nExecuting "~to!(char[])(nExecuting),__FILE__,__LINE__);
-            }
+            assert(st is executingTask,st.taskName~" ended unexpecteddly while executing "~((executingTask is null)?"*null*"[]:executingTask.taskName));
+            queue.popFront(toExe); // toExe will be null if pop fails...
+            executingTask=toExe;
         }
-        if (toExe){
+        if (toExe !is null){
             super.spawnTask(toExe);
         }
+    }
+    
+    void desc(CharSink sink,bool shortDesc){
+        auto s=dumper(sink);
+        s(`{class:blip.SequentialTask@`)(cast(void*)this);
+        if (!shortDesc){
+            s(`,executingTask:`)(executingTask)(",waiting:")(queue);
+        }
+        s("}");
+    }
+    void desc(CharSink sink){
+        desc(sink,true);
     }
 }

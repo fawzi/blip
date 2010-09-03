@@ -2,7 +2,16 @@
 ///
 /// mainly wrapping of a tango module
 module blip.stdc.socket;
-public import tango.sys.consts.socket;
+import tango.core.Version;
+static if(Tango.Major>0||Tango.Minor>999){
+    public import tango.sys.consts.socket;
+} else {
+    public import tango.stdc.constants.socket;
+}
+
+static if (!is(typeof(SOL_TCP))){
+    alias IPPROTO_TCP SOL_TCP;
+}
 
 version (Win32) {
         pragma (lib, "ws2_32.lib");
@@ -10,7 +19,7 @@ version (Win32) {
         private import tango.sys.win32.WsaSock;
 } else {
     
-    // sys/socket.h
+    // sys/socket.hostname
     public import tango.stdc.posix.sys.socket: sockaddr,socklen_t;
     private typedef int socket_t = -1;
     extern(C){
@@ -30,6 +39,13 @@ version (Win32) {
         //         socklen_t);
         int     setsockopt(int, int, int, void *, socklen_t);
         int     getsockopt(int, int, int, void *, socklen_t *);
+    }
+    
+    // arpa/inet.h
+    // print ip addresses
+    extern(C){
+        char *inet_ntop(int af, void * src, char * dst, socklen_t size);
+        int inet_pton(int af, char * src, void * dst);
     }
     
     // select

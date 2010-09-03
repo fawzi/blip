@@ -1148,18 +1148,19 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
                 return;
             }
         }
+        size_t selectedSched;
         synchronized(this){
             size_t i=this.rand.uniformR(scheds.length);
             size_t j=this.rand.uniformR(scheds.length-1);
             if (j>=i) ++j;
             if (scheds[i].queue.length<scheds[j].queue.length){
-                t.scheduler=scheds[i];
-                scheds[i].addTask(t);
+                selectedSched=i;
             } else {
-                t.scheduler=scheds[j];
-                scheds[j].addTask(t);
+                selectedSched=j;
             }
         }
+        t.scheduler=scheds[selectedSched];
+        scheds[selectedSched].addTask0(t);
     }
     // alias addTask addTask0;
     void addTask0(TaskI t){

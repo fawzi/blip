@@ -36,9 +36,10 @@ import blip.core.sync.Mutex;
 import blip.io.BasicIO;
 import blip.core.Variant;
 import blip.io.Console;
-version(TrackRpc){
-    import blip.parallel.smp.WorkManager;
-}
+import blip.container.Pool;
+import blip.container.Cache;
+import blip.parallel.smp.WorkManager;
+
 alias void delegate(ubyte[] reqId,void delegate(Serializer) sRes) SendResHandler;
 
 class RpcException:Exception{
@@ -58,8 +59,9 @@ struct ParsedUrl{
     char[] protocol;
     char[] host;
     char[] port;
-    char[][4] pathBuf;
-    char[][] path;
+    char[][4] pathBuf; // this is a hack for efficient appending to small paths
+    char[]* pathPtr;   // and still be able to copy the structure...
+    size_t pathLen;    //
     char[][] query;
     char[] anchor;
     void fullPathWriter(void delegate(char[])sink){
@@ -67,6 +69,16 @@ struct ParsedUrl{
             sink("/");
             sink(p);
         }
+    }
+    char[][] path(){
+        if (pathPtr is null){
+            return pathBuf[0..pathLen];
+        }
+        return pathPtr[0..pathLen];
+    }
+    void path(char[][]p){
+        pathPtr=p.ptr;
+        pathLen=p.length;
     }
     void urlWriter(void delegate(char[])sink){
         sink(protocol);
@@ -93,11 +105,32 @@ struct ParsedUrl{
             sink(anchor);
         }
     }
+    void pathAndRestWriter(void delegate(char[])sink){
+        foreach (p;path){
+            sink("/");
+            sink(p);
+        }
+        if (query.length){
+            sink("?");
+            sink(query[0]);
+            foreach (q;query[1..$]){
+                sink("&");
+                sink(q);
+            }
+        }
+        if (anchor.length){
+            sink("#");
+            sink(anchor);
+        }
+    }
     char[] url(char[]buf=null){
         return collectAppender(&this.urlWriter,buf);
     }
     char[] fullPath(char[]buf=null){
         return collectAppender(&this.fullPathWriter,buf);
+    }
+    char[] pathAndRest(char[]buf=null){
+        return collectAppender(&this.pathAndRestWriter,buf);
     }
     void clearPath(){
         pathBuf[]=null;
@@ -111,19 +144,23 @@ struct ParsedUrl{
         port=null;
     }
     void appendToPath(char[]segment){
-        if (path.length<pathBuf.length){
-            if (path.length!=0 && path.ptr !is pathBuf.ptr){
+        if (pathLen<pathBuf.length){
+            if (pathLen!=0 && pathPtr !is null){
                 foreach (i,p;path){
                     pathBuf[i]=p;
                 }
             }
             pathBuf[path.length]=segment;
-            path=pathBuf[0..(path.length+1)];
+            pathPtr=null;
+            ++pathLen;
         } else {
-            if (pathBuf.ptr==path.ptr){
+            if (pathPtr is null){
                 path=path~segment;
             } else {
-                path~=segment;
+                auto nPath=path;
+                nPath~=segment;
+                pathPtr=nPath.ptr;
+                pathLen=nPath.length;
             }
         }
     }
@@ -220,8 +257,20 @@ char[] urlEncode(ubyte[]str,bool query=false){
     for(size_t i=0;i<str.length;++i){
         char c=cast(char)str[i];
         if ((c<'a' || c>'z')&&(c<'A' || c>'Z')&&(c<'-' || c>'9' || c=='/') && c!='_'){
-            throw new Exception("only clean (not needing decoding) strings are supported (more efficient)",
+            throw new Exception("only clean (not needing decoding) strings are supported, not '"~(cast(char[])str)~"' (more efficient)",
                 __FILE__,__LINE__);
+        }
+    }
+    return cast(char[])str;
+}
+/// safe encoding, never raises (switches to '' delimited hex encoding)
+char[] urlEncode2(ubyte[]str,bool query=false){
+    for(size_t i=0;i<str.length;++i){
+        char c=cast(char)str[i];
+        if ((c<'a' || c>'z')&&(c<'A' || c>'Z')&&(c<'-' || c>'9' || c=='/') && c!='_'){
+            return collectAppender(delegate void(CharSink s){
+                dumper(s)("'")(str)("'");
+            });
         }
     }
     return cast(char[])str;
@@ -261,6 +310,11 @@ class BasicVendor:ObjVendorI{
     Publisher _publisher;
     TaskI _objTask;
     
+    this(char[] pName=""){
+        _proxyName=pName;
+        _objTask=defaultTask;
+    }
+    
     Object targetObj(){
         return this;
     }
@@ -295,27 +349,14 @@ class BasicVendor:ObjVendorI{
         _objTask=t;
     }
     
-    void remoteMainCall(char[] fName,ubyte[] reqId, Unserializer u, SendResHandler sendRes)
+    /// returns res, this should *not* be executed in the unserialization task
+    void simpleReply()(SendResHandler sendRes,ubyte[] reqId)
     {
-        switch(fName){
-        case "proxyDesc":
-            simpleReply(sendRes,reqId,&proxyDescDumper);
-            break;
-        case "proxyName":
-            simpleReply(sendRes,reqId,proxyName());
-            break;
-        case "proxyObjUrl":
-            simpleReply(sendRes,reqId,proxyObjUrl());
-            break;
-        default:
-            char[256] buf;
-            auto appender=lGrowableArray!(char)(buf,0,GASharing.Local);
-            dumper(&appender)("unknown function ")(fName)(" ")(__FILE__)(" ");
-            writeOut(&appender.appendArr,__LINE__);
-            exceptionReply(sendRes,reqId,appender.takeData());
-        }
+        sendRes(reqId,delegate void(Serializer s){
+            s(0);
+        });
     }
-    
+    /// returns res, this should *not* be executed in the unserialization task
     void simpleReply(T)(SendResHandler sendRes,ubyte[] reqId,T res)
     {
         sendRes(reqId,delegate void(Serializer s){
@@ -327,7 +368,7 @@ class BasicVendor:ObjVendorI{
             }
         });
     }
-    
+    /// returns an exception, this should *not* be executed in the unserialization task
     void exceptionReply(T)(SendResHandler sendRes,ubyte[] reqId,T exception)
     {
         sendRes(reqId,delegate void(Serializer s){
@@ -335,7 +376,95 @@ class BasicVendor:ObjVendorI{
             s(collectAppender(outWriter(exception)));
         });
     }
-
+    /// helper to create closures of simpleReply
+    static struct SimpleReplyClosure(T){
+        ubyte[64] reqIdBuf;
+        BasicVendor obj;
+        SendResHandler sendRes;
+        ubyte* reqIdPtr;
+        size_t reqIdLen;
+        T res;
+        PoolI!(SimpleReplyClosure*) pool;
+        static PoolI!(SimpleReplyClosure*) gPool;
+        ubyte[] reqId(){
+            if (reqIdPtr is null){
+                return reqIdBuf[0..reqIdLen];
+            }
+            return reqIdPtr[0..reqIdLen];
+        }
+        void reqId(ubyte[]v){
+            if (v.length<reqIdBuf.length){
+                reqIdBuf[0..v.length]=v;
+                reqIdPtr=null;
+                reqIdLen=v.length;
+            } else {
+                auto nV=v.dup;
+                reqIdPtr=nV.ptr;
+                reqIdLen=nV.length;
+            }
+        }
+        static this(){
+            gPool=cachedPool(function SimpleReplyClosure*(PoolI!(SimpleReplyClosure*)p){
+                auto res=new SimpleReplyClosure;
+                res.pool=p;
+                return res;
+            });
+        }
+        void doOp(){
+            obj.simpleReply(sendRes,reqId,res);
+        }
+        void doOpExcept(){
+            obj.exceptionReply(sendRes,reqId,res);
+        }
+        void giveBack(){
+            if (pool!is null){
+                pool.giveBack(this);
+            } else {
+                delete(this); // be more tolerant?
+            }
+        }
+    }
+    /// helper to more easily create closures of simpleReply
+    SimpleReplyClosure!(T) *simpleReplyClosure(T)(SendResHandler sendRes,ubyte[] reqId,T res){
+        auto r=SimpleReplyClosure!(T).gPool.getObj();
+        r.sendRes=sendRes;
+        r.reqId=reqId;
+        r.res=res;
+        r.obj=this;
+        return r;
+    }
+    /// performs simpleReply in another task (detached)
+    void simpleReplyBg(T)(SendResHandler sendRes,ubyte[] reqId,T res){
+        auto cl=simpleReplyClosure(sendRes,reqId,res);
+        Task("simpleReplyBg",&cl.doOp).appendOnFinish(&cl.giveBack).autorelease.submit(defaultTask);
+    }
+    /// performs exceptionReply in another task (detached)
+    void exceptionReplyBg(T)(SendResHandler sendRes,ubyte[] reqId,T res){
+        auto cl=simpleReplyClosure(sendRes,reqId,res);
+        Task("exceptionReplyBg",&cl.doOpExcept).appendOnFinish(&cl.giveBack).autorelease.submit(defaultTask);
+    }
+    
+    void remoteMainCall(char[] fName,ubyte[] reqId, Unserializer u, SendResHandler sendRes)
+    {
+        switch(fName){
+        case "proxyDesc":
+            simpleReplyBg(sendRes,reqId,&proxyDescDumper);
+            break;
+        case "proxyName":
+            simpleReplyBg(sendRes,reqId,proxyName());
+            break;
+        case "proxyObjUrl":
+            simpleReplyBg(sendRes,reqId,proxyObjUrl());
+            break;
+        default:
+            char[256] buf;
+            auto appender=lGrowableArray!(char)(buf,0,GASharing.Local);
+            dumper(&appender)("unknown function ")(fName)(" ")(__FILE__)(" ");
+            writeOut(&appender.appendArr,__LINE__);
+            exceptionReplyBg(sendRes,reqId,appender.takeData());
+        }
+    }
+    
 }
 
 /// handler that performs an Rpc call
@@ -377,6 +506,8 @@ interface Proxy: Proxiable,Serializable{
 interface LocalProxy {
     Object targetObj();
     void targetObj(Object);
+    TaskI objTask();
+    void objTask(TaskI);
 }
 
 /// basic implementation of a proxy
@@ -654,11 +785,15 @@ class ProtocolHandler{
         }
         Proxy nP;
         char[256] buf;
-        char[] objectUrl=pUrl.url(buf);
+        char[] objectUrl=(pUrl.url(buf)).dup;
         if (localUrl(pUrl) && (*creator).localProxyCreator !is null){
             nP=(*creator).localProxyCreator(proxyName,objectUrl);
             char[]objName=pUrl.path[1]; // kind of ugly
-            (cast(LocalProxy)cast(Object)nP).targetObj=publisher.objectNamed(objName).targetObj();
+            auto lP=cast(LocalProxy)cast(Object)nP;
+            auto vendor=publisher.objectNamed(objName);
+            assert(lP!is null,"local proxy is null");
+            lP.targetObj=vendor.targetObj();
+            lP.objTask=vendor.objTask();
         } else {
             nP=(*creator).proxyCreator(proxyName,objectUrl);
         }
@@ -688,7 +823,7 @@ class ProtocolHandler{
         synchronized(this){
             auto r=reqId in pendingRequests;
             if (r !is null){
-                throw new RpcException("duplicate pending request "~urlEncode(reqId),__FILE__,__LINE__);
+                throw new RpcException("duplicate pending request "~urlEncode2(reqId),__FILE__,__LINE__);
             }
             pendingRequests[reqId]=pReq;
         }

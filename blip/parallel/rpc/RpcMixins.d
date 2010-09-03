@@ -87,11 +87,7 @@ char[] rpcProxyMixin(char[] name,char[] extName,char[] extraInterfaces,char[][] 
                     static if (is(typeof(Variant(args[0])))){
                         firstArg=Variant(args[0]);
                     }
-                    static if (is(typeof(args[0]))){
-                        void serialArgs(Serializer s){ s(args); }
-                    } else {
-                        void serialArgs(Serializer s){ }
-                    }
+                    void serialArgs(Serializer s){ s(args); }
                     void delegate(Unserializer u) unserialRes;`;
         if (oneway){
             res~=`
@@ -127,11 +123,18 @@ char[] rpcProxyMixin(char[] name,char[] extName,char[] extraInterfaces,char[][] 
         res~=`
     final static class `~name~`ProxyLocal:`~extraInterfaces~((extraInterfaces.length==0)?` `:`,`)~`BasicProxy,LocalProxy{
         `~name~`ProxiedType _targetObj;
+        TaskI _objTask;
         Object targetObj(){
             return _targetObj;
         }
         void targetObj(Object obj){
             _targetObj=cast(`~name~`ProxiedType)obj;
+        }
+        TaskI objTask(){
+            return _objTask;
+        }
+        void objTask(TaskI t){
+            _objTask=t;
         }
         static struct OnewayClosure{
             void delegate() callClosureDelegate;
@@ -242,9 +245,9 @@ char[] rpcProxyMixin(char[] name,char[] extName,char[] extraInterfaces,char[][] 
                 res~=`
                     static assert(is(`~functionName~`Return==void),"oneway call on non void method `~name~`.`~functionName~`");
                     auto cl=OnewayClosure();
-                    cl.closure.`~functionName~`.obj=obj;
-                    cl.closure.`~functionName~`.args=args;
-                    cl.callClosureDelegate=&cl.closure.`~functionName~`.call;
+                    cl.closure.`~functionName~`Closure.obj=obj;
+                    cl.closure.`~functionName~`Closure.args=args;
+                    cl.callClosureDelegate=&cl.closure.`~functionName~`Closure.call;
                     Task("onewayMethodCall`~name~`.`~functionName~`",cl.callClosureDelegate)
                         .appendOnFinish(&cl.giveBack).autorelease.submitYield(objTask);`;
             } else {
@@ -282,16 +285,18 @@ char[] rpcProxyMixin(char[] name,char[] extName,char[] extraInterfaces,char[][] 
 }
 
 char[] rpcVendorMixin(char[] name,char[] extName_, char[][] functionsComments){
+    char[] extNameProxy;
+    if (extName_.length==0){
+        extNameProxy=name~`Proxy.mangleof`;
+    } else {
+        extNameProxy=`"`~extName_~`Proxy"`;
+    }
     char[] extName=`"`~extName_~`Vendor"`;
     if (extName_.length==0) {
         extName=name~`Vendor.mangleof`;
     }
     char[] res=`
     static class `~name~`Vendor:BasicVendor{
-        this(){}
-        this(`~name~`ProxiedType obj){
-            this.obj=obj;
-        }
         `~name~`ProxiedType obj;
         override `~name~`ProxiedType targetObj(){ return obj; }
         static struct Closure{
@@ -315,7 +320,19 @@ char[] rpcVendorMixin(char[] name,char[] extName_, char[][] functionsComments){
                         struct `~functionName~`Clsr{
                             `~name~`Vendor context;
                             SendResHandler sendRes;
-                            ubyte[] reqId;
+                            ubyte* reqIdPtr; size_t reqIdLen;
+                            ubyte[64] reqIdBuf; // it would be better to move this to the end of the structure, but I don't feel like playing with forward refs...
+                            ubyte[] reqId(){
+                                if (reqIdPtr is null){ return reqIdBuf[0..reqIdLen]; }
+                                return reqIdPtr[0..reqIdLen];
+                            }
+                            void reqId(ubyte[]v){
+                                if (v.length<reqIdBuf.length){
+                                    reqIdBuf[0..v.length]=v; reqIdPtr=null; reqIdLen=v.length;
+                                } else {
+                                    auto nV=v.dup; reqIdPtr=nV.ptr; reqIdLen=nV.length;
+                                }
+                            }
                             `~functionName~`Args args;
                             void call(){`;
         version(TrackRpc){
@@ -339,10 +356,9 @@ char[] rpcVendorMixin(char[] name,char[] extName_, char[][] functionsComments){
         } else {
             res~=`
                                 static if (is(`~functionName~`Return==void)){
-                                    `~functionName~`Return res;
                                     try{
                                         context.obj.`~functionName~`(args);
-                                        context.simpleReply!(void)(sendRes,reqId);
+                                        context.simpleReply!()(sendRes,reqId);
                                     } catch (Exception o) {`;
             version(TrackRpc){
                 res~=`
@@ -383,7 +399,6 @@ char[] rpcVendorMixin(char[] name,char[] extName_, char[][] functionsComments){
     res~=`
             }
             Cl closure;
-            ubyte[64] buf;
             void giveBack(){
                 if (pool!is null){
                     pool.giveBack(this);
@@ -420,6 +435,19 @@ char[] rpcVendorMixin(char[] name,char[] extName_, char[][] functionsComments){
                 assert(gPoolLevel>0,"opCall outside add/rmGPool in Closure of "~`~extName~`);
                 return gPool.getObj();
             }
+        }
+        
+        this(){
+            super(`~extNameProxy~`);
+            Closure.addGPool();
+        }
+        this(`~name~`ProxiedType obj){
+            super(`~extNameProxy~`); 
+            Closure.addGPool();
+            this.obj=obj;
+        }
+        ~this(){
+            Closure.rmGPool();
         }
         
         override void proxyDescDumper(void delegate(char[])s){
@@ -470,12 +498,6 @@ char[] rpcVendorMixin(char[] name,char[] extName_, char[][] functionsComments){
                 publisher.log("starting rpc call "~`~extName~`~".`~functionName~`\n");
             }
             auto cl0=Closure();
-            if (reqId.length<=cl0.buf.length){
-                cl0.buf[0..reqId.length]=reqId;
-                reqId=cl0.buf[0..reqId.length];
-            } else {
-                reqId=reqId.dup;
-            }
             auto cl= & cl0.closure.`~functionName~`Closure;
             try {
                 cl.context=this;
@@ -494,7 +516,7 @@ char[] rpcVendorMixin(char[] name,char[] extName_, char[][] functionsComments){
                     .appendOnFinish(&cl0.giveBack).autorelease.submit(objTask);
             } catch (Object o){
                 sinkTogether(publisher.log,delegate void(CharSink s){
-                    dumper(s)("internal exception in oneway method ")(`~extName~`)(".`~functionName~`:")(o);
+                    dumper(s)("internal exception in method ")(`~extName~`)(".`~functionName~`:")(o);
                 });
             }
         }`;

@@ -22,7 +22,6 @@
 module blip.container.GrowableArray;
 import blip.util.Grow;
 import blip.io.BasicIO: dumper; // needed just for the desc method
-
 enum GASharing{
     Local, /// local, don't free
     GlobalNoFree, /// global, don't free, don't grow
@@ -64,8 +63,8 @@ struct LocalGrowableArray(T){
         }
         this.sharing=sharing;
     }
-    /// grows the array to the requested size
-    void growTo(size_t c){
+    /// guarantees the given capacity
+    void guaranteeCapacity(size_t c){
         if (capacity<c){
             if(sharing==GASharing.Global){ // try to grow in place, destroy old data when reallocated
                 auto newData=dataPtr[0..capacity];
@@ -85,9 +84,12 @@ struct LocalGrowableArray(T){
             }
         }
         assert(capacity>=c);
+    }
+    /// grows the array to the requested size
+    void growTo(size_t c){
+        guaranteeCapacity(c);
         dataLen=c;
     }
-    
     void desc(void delegate(char[])sink){
         // this is the only dependency on BasicIO...
         auto s=dumper(sink);
@@ -109,13 +111,20 @@ struct LocalGrowableArray(T){
         void opCatAssign(void[]t){ appendVoid(t); }
     }
     void appendEl(T t){
-        growTo(dataLen+1);
-        dataPtr[dataLen-1]=t;
+        guaranteeCapacity(dataLen+1);
+        dataPtr[dataLen]=t;
+        // with a write barrier here one can guarantee that the data seen is always initialized...
+        // whereas the method used in appendVoid allows appends with smaller locking to reserve the space
+        // one could acheive both storing two lengths (reservedLen,initializedLen), but the update of
+        // initializedLen might get messy
+        ++dataLen;
     }
     void appendArr(T[] t){
         if (t.length!=0){
-            growTo(data.length+t.length);
-            dataPtr[(dataLen-t.length)..dataLen]=t;
+            assert(dataLen<=dataLen+t.length,"wrapping, garbled memory?");
+            guaranteeCapacity(dataLen+t.length);
+            dataPtr[dataLen..(dataLen+t.length)]=t;
+            dataLen+=t.length;
         }
     }
     /// sets the internal buffer (valid only if no data is stored in the array, 
