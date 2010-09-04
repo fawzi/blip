@@ -1,4 +1,4 @@
-module runUnittests_dmd;
+module runUnittests_ldc;
 
 import tango.core.Array;
 import tango.core.Atomic;
