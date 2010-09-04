@@ -7,5 +7,5 @@ import tango.core.Version;
 static if (Tango.Major==1){
   public import tango.core.tools.TraceExceptions;
 } else {
-  public import blip.core.stacktrace.TraceExceptions;
+  public import tango.core.stacktrace.TraceExceptions;
 }
