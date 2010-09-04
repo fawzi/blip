@@ -240,6 +240,7 @@ class Pool(T,int _batchSize=16):PoolI!(T){
                 }
             }
             if (found){
+                assert(! isNullT(obj),"unexpected null object");
                 return reset(obj);
             }
         }

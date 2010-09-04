@@ -143,7 +143,7 @@ char[][] ctfeSplit(char[] splitChars,char[]str,bool skipEmpty){
     return res;
 }
 
-void tryDeleteT(T)(ref T t){
+void tryDeleteT(T)(ref T obj){
     static if (is(typeof(obj.deallocData()))){
         obj.deallocData();
     } else static if (is(typeof(obj.clear()))){
@@ -154,7 +154,7 @@ void tryDeleteT(T)(ref T t){
     }
 }
 
-bool isNullT(T)(ref T t){
+bool isNullT(T)(ref T obj){
     static if (is(typeof(obj is null))){
         return obj is null;
     } else static if (is(typeof(obj.isNull()))){

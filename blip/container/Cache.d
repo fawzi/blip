@@ -383,9 +383,7 @@ class CachedPool(T):Cached,PoolI!(T){
     /// possible that you call this from a different thread than the one that called getObj then it is 
     /// better to cache the NFreeList in the object and returns to it)
     void giveBack(Cache cache,T obj){
-        static if (is(typeof(obj !is null))){
-            assert(obj!is null,"cannot give back null objects");
-        }
+        assert(! isNullT(obj),"cannot give back null objects");
         if (!cacheStopped){
             cache.get!(PoolI!(T))(this).giveBack(obj);
         } else {
