@@ -179,7 +179,10 @@ char[] rpcProxyMixin(char[] name,char[] extName,char[] extraInterfaces,char[][] 
                 }
             }
             static PoolI!(OnewayClosure*) gPool;
-            static auto gLock=typeid(typeof(*this));
+            static Mutex gLock;
+            static this(){
+                gLock=new Mutex();
+            }
             static size_t gPoolLevel;
             static void addGPool(){
                 synchronized(gLock){
@@ -407,7 +410,10 @@ char[] rpcVendorMixin(char[] name,char[] extName_, char[][] functionsComments){
                 }
             }
             static PoolI!(Closure*) gPool;
-            static auto gLock=typeid(typeof(*this));
+            static Mutex gLock;
+            static this(){
+                gLock=new Mutex();
+            }
             static size_t gPoolLevel;
             static void addGPool(){
                 synchronized(gLock){
