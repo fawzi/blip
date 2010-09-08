@@ -1483,8 +1483,8 @@ class Unserializer {
                         }
                     } else {
                         throw new Exception("no external handlers and no internal unserialize, cannot unserialize "~T.stringof,__FILE__,__LINE__);
-                        void realRead5(){
-                        }
+/+                        void realRead5(){
+                        }+/
                     }
                     static if (is(typeof(T.init.unserialize(this)))){
                         if (metaInfo.kind==TypeKind.CustomK){
@@ -1510,9 +1510,12 @@ class Unserializer {
                     getSerializationInfoForType!(ElementTypeOfArray!(T))());
                 elMetaInfo.pseudo=true;
                 auto ac=readArrayStart(fieldMeta);
+                bool freeOld=false;
                 static if (!isStaticArrayType!(T)) {
-                    if (t.length==0)
+                    if (t.length==0) {
                         t=new T(cast(size_t)ac.sizeHint());
+                        freeOld=true;
+                    }
                 }
                 size_t pos=0;
                 while(readArrayEl(ac,
@@ -1521,7 +1524,15 @@ class Unserializer {
                             static if (isStaticArrayType!(T)) {
                                 serializationError("unserialized more elements than size of static array",__FILE__,__LINE__);
                             } else {
-                                t.length=growLength(pos+1,T.sizeof);
+                                if (freeOld){
+                                    auto tOld=t.ptr;
+                                    t.length=growLength(pos+1,T.sizeof);
+                                    if (t.ptr !is tOld) delete tOld;
+                                } else {
+                                    auto tNew=new T(growLength(pos+1,T.sizeof));
+                                    tNew[0..t.length]=t;
+                                    freeOld=true;
+                                }
                             }
                         }
                         this.field(&elMetaInfo, t[pos]);

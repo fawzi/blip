@@ -70,3 +70,4 @@ public import blip.serialization.JsonSerialization;
 public import blip.serialization.SBinSerialization;
 public import blip.serialization.SimpleWrappers;
 public import blip.serialization.StringSerialize;
+public import blip.serialization.Handlers: isCoreType;
