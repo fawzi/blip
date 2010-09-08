@@ -234,10 +234,160 @@ void rpcTests(){
     }
 }
 
-void main(){
-    A.globalA=new A();
+void rpcTestServer(){
+    try{
+        //GC.disable();
+        auto vendor=new A.AVendor(A.globalA);
+        sout("initedVendor\n");
+        auto rpc1=new StcpProtocolHandler("","1242");
+        sout("register:\n");
+        rpc1.register();
+        sout("start\n");
+        rpc1.startServer(false);
+        sout("rpc1:")(cast(void*)rpc1)("\n");
+        auto pName=rpc1.publisher.publishObject(vendor,"globalA");
+        sinkTogether(sout,delegate void(CharSink s){
+            dumper(s)("prox from url:")(vendor.proxyObjUrl())("\n");
+        });
+        while(true){
+            Thread.sleep(10.0);
+            sout("gc collect!\n");
+            GC.collect();
+            sout("gc did collect!\n");
+        }
+    } catch (Exception e){
+        sinkTogether(sout,delegate void(CharSink s){
+            dumper(s)("Exception during rpcTests:")(e)("\n");
+        });
+    }
+}
+
+void rpcTestClient(char[] url){
+    try{
+        //GC.disable();
+        
+        sinkTogether(sout,delegate void(CharSink s){
+            dumper(s)("non loc proxy from url:")(url)("\n");
+        });
+        auto localP3=ProtocolHandler.proxyForUrl(url);
+        auto localP4=cast(A.AProxy)localP3;
+        assert(localP4 !is null,"Proxy error");
+        sout("will call Proxy\n");
+        sout("gc collect3!\n");
+        GC.collect();
+        sout("gc did collect3!\n");
+        {
+            auto res=localP4.b(4);
+            sinkTogether(sout,delegate void(CharSink s){
+                dumper(s)("b thorugh Proxy:")(res)("\n");
+            });
+        }
+        auto r=localP4.mult(3.4,2.0);
+        sinkTogether(sout,delegate void(CharSink s){
+            dumper(s)("Proxy mult:")(r)("\n");
+        });
+        r=localP4.div(3.4,2.0);
+        sinkTogether(sout,delegate void(CharSink s){
+            dumper(s)("Proxy div:")(r)("\n");
+        });
+        localP4.notify(3);
+        sinkTogether(sout,delegate void(CharSink s){
+            dumper(s)("Proxy notify\n");
+        });
+        Thread.sleep(2.0);
+        localP4.voidMethod();
+        sout("Proxy voidMethod\n");
+        char[128] buf;
+        auto arr=lGrowableArray(buf,0);
+        for (int itime=0;itime<1;++itime){
+            auto s=dumper(&arr.appendArr);
+            double tNat,tProxy;
+            auto t0=realtimeClock();
+            enum { nIter=5000 }
+            double totRef=0,x0=1.23,y0=35.7;
+            sout("gc collect!\n");
+            GC.collect();
+            sout("gc did collect!\n");
+            {
+                sout("XXX:Native\n");
+                double tot=0,x=x0,y=y0;
+                for (int i=0;i<nIter;++i){
+                    x=A.globalA.mult(x,y);
+                    x=A.globalA.div(x,y);
+                    tot+=x;
+                    if (i%100==0) A.globalA.notify(i);
+                }
+                auto t1=realtimeClock();
+                s("native single thread:")(t1-t0)(", ")(tot)("\n");
+                tNat=(t1-t0);
+                totRef=tot;
+            }
+            sout("gc collect!\n");
+            GC.collect();
+            sout("gc did collect!\n");
+            {
+                sout("XXX:Proxy\n");
+                double tot=0,x=x0,y=y0;
+                for (int i=0;i<nIter;++i){
+                    x=localP4.mult(x,y);
+                    x=localP4.div(x,y);
+                    tot+=x;
+                    //if (i%100==0) localP4.notify(i);
+                }
+                auto t1=realtimeClock();
+                s("Proxy:")(t1-t0)(", ")(tot)(" err: ")(tot-totRef)("\n");
+                tProxy=(t1-t0);
+            }
+            sout("gc collect!\n");
+            GC.collect();
+            sout("gc did collect!\n");
+            s("tt:")(tNat/tNat)(" ")(tProxy/tNat)("\n");
+        }
+        sout(arr.data);
+    } catch (Exception e){
+        sinkTogether(sout,delegate void(CharSink s){
+            dumper(s)("Exception during rpcTests:")(e)("\n");
+        });
+    }
+}
+
+
+void main(char[][]args){
+    void help(){
+        sout("usage:\n")
+            (args[0])(" [--help|-server|-client proxUrl|-combined]\n");
+    }
     
-    Task("rpcTests",delegate void(){ rpcTests(); }).autorelease.executeNow();
+    A.globalA=new A();
+    if (args.length>1){
+        switch(args[1]){
+        case "-server":
+            Task("rpcTestServer",delegate void(){ rpcTestServer(); }).autorelease.executeNow();
+            break;
+        case "-client":
+            if (args.length!=3){
+                sout("unexpected number of arguments\n");
+                help();
+            } else {
+                auto url=args[2];
+                sout("client will try connecting to url ")(url)("\n");
+                Task("rpcTestClient",delegate void(){ rpcTestClient(url); }).autorelease.executeNow();
+            }
+            break;
+        case "-combined":
+            Task("rpcTests",delegate void(){ rpcTests(); }).autorelease.executeNow();
+            break;
+        case "-help","--help":
+            help();
+            break;
+        default:
+            sout("invalid argument ")(args[0])("\n");
+            help();
+            break;
+        }
+    } else {
+        Task("rpcTests",delegate void(){ rpcTests(); }).autorelease.executeNow();
+    }
     sout("done!!\n");
     exit(0);
 }
