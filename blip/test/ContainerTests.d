@@ -24,6 +24,108 @@ import blip.container.GrowableArray;
 import blip.container.BulkArray;
 import blip.sync.Atomic;
 import blip.container.Pool;
+import blip.container.Deque;
+
+void testDeque(int[] arr1,int[] arr2){
+    Deque!(int) d=new Deque!(int)(2);
+    foreach(e;arr1){
+        d.pushFront(e);
+    }
+    foreach(e;arr2){
+        d.pushFront(e);
+        assert(e==d.popFront);
+    }
+    foreach(e;arr2){
+        d.pushBack(e);
+        assert(e==d.popBack);
+    }
+    foreach(e;arr1){
+        assert(e==d.popBack);
+    }
+    int i;
+    assert(!d.popFront(i));
+    arr1~=arr2;
+    foreach(e;arr1){
+        d.pushFront(e);
+    }
+    foreach_reverse(e;arr1){
+        assert(e==d.popFront);
+    }
+    assert(!d.popBack(i));
+    foreach(e;arr1){
+        d.pushFront(e);
+    }
+    {
+        bool popped=d.popBack(i,delegate bool(int i){ return (cast(uint)i)%2==0; });
+        size_t pos=size_t.max;
+        foreach(ii,e;arr1){
+            if ((cast(uint)e)%2==0){
+                pos=ii;
+                break;
+            }
+        }
+        if (popped){
+            assert(pos!=size_t.max);
+            assert(i==arr1[pos]);
+        } else {
+            assert(pos==size_t.max);
+        }
+        size_t ii=0;
+        while (ii<arr1.length){
+            if (ii!=pos) {
+                assert(d.popBack()==arr1[ii]);
+            }
+            ++ii;
+        }
+        assert(!d.popBack(i));
+    }
+    foreach(e;arr1){
+        d.pushFront(e);
+    }
+    {
+        bool popped=d.popFront(i,delegate bool(int i){ return (cast(uint)i)%2==0; });
+        size_t pos=size_t.max;
+        foreach_reverse(ii,e;arr1){
+            if ((cast(uint)e)%2==0){
+                pos=ii;
+                break;
+            }
+        }
+        if (popped){
+            assert(pos!=size_t.max);
+            assert(i==arr1[pos]);
+        } else {
+            assert(pos==size_t.max);
+        }
+        size_t ii=arr1.length;
+        while (ii!=0){
+            --ii;
+            if (ii==pos) {
+                if (ii==0) break;
+            } else {
+                assert(d.popFront()==arr1[ii]);
+            }
+        }
+        assert(!d.popFront(i));
+    }
+    foreach(e;arr1){
+        d.pushFront(e);
+    }
+    {
+        d.filterInPlace(delegate bool(int i){ return (cast(uint)i)%2==0; });
+        size_t ii=0;
+        while (ii<arr1.length){
+            if ((cast(uint)arr1[ii])%2==0) {
+                auto el=d.popBack();
+                assert(el==arr1[ii],collectAppender(delegate void(CharSink s){
+                    dumper(s)(el)(" vs ")(arr1[ii])("\n");
+                }));
+            }
+            ++ii;
+        }
+        assert(!d.popFront(i));
+    }
+}
 
 void testLoop(T)(T[] arr1,SizeLikeNumber!(3,1) s){
     BulkArray!(T) barr;
@@ -173,6 +275,7 @@ void testPoolNext(){
 /// all container tests (a template to avoid compilation and instantiation unless really requested)
 TestCollection containerTests()(TestCollection superColl=null){
     TestCollection coll=new TestCollection("container",__LINE__,__FILE__,superColl);
+    autoInitTst.testNoFailF("Deque",&testDeque,__LINE__,__FILE__,coll);
     autoInitTst.testNoFailF("BulkArrayLoop",&testLoop!(int),__LINE__,__FILE__,coll);
     autoInitTst.testNoFailF("Pool!(void*,16)",&testPool,__LINE__,__FILE__,coll);
     autoInitTst.testNoFailF("PoolNext!(NextI)",&testPoolNext,__LINE__,__FILE__,coll);

@@ -21,6 +21,7 @@ import blip.BasicModels:CopiableObjectI;
 import blip.math.Math;
 import blip.io.BasicIO;
 import blip.util.Grow:growLength;
+import blip.serialization.Serialization;
 
 class Deque(T):CopiableObjectI{
     T[] baseArr;
@@ -40,6 +41,7 @@ class Deque(T):CopiableObjectI{
         size_t to1=min(start,baseArr.length-nEl);
         baseArr[nEl..nEl+to1]=baseArr[0..to1];
         if (to1<start){
+            assert((start-to1)<=baseArr.length);
             memmove(baseArr.ptr,baseArr.ptr+to1,(start-to1)*T.sizeof);
         }
         baseArr[start-to1..start]=T.init;
@@ -56,8 +58,10 @@ class Deque(T):CopiableObjectI{
                 start=baseArr.length-1;
             else
                 --start;
+            baseArr[start]=t;
         }
     }
+    alias push pushFront;
     /// returns the element at the beginning of the array into el and drops it
     /// if the array is empty returns false
     bool popFront(ref T el){
@@ -77,7 +81,7 @@ class Deque(T):CopiableObjectI{
             synchronized(this){
                 size_t i=0;
                 bool res=false;
-                while (i<length){
+                while (i<nEl){
                     if (filter(opIndex(i))){
                         el=opIndex(i);
                         res=true;
@@ -86,11 +90,14 @@ class Deque(T):CopiableObjectI{
                     ++i;
                 }
                 ++i;
-                while (i<length){
+                while (i<nEl){
                     opIndexAssign(opIndex(i-1),i);
                     ++i;
                 }
-                if (res) popBack();
+                if (res) {
+                    opIndexAssign(T.init,length);
+                    --nEl;
+                }
                 return res;
             }
         } else {
@@ -114,6 +121,7 @@ class Deque(T):CopiableObjectI{
                         for (size_t i=1;i<to2;++i){
                             if (filter(baseArr[start+i])){
                                 el=baseArr[start+i];
+                                assert(start+1<=baseArr.length && start+1+i<=baseArr.length);
                                 memmove(baseArr.ptr+start+1,baseArr.ptr+start,i*T.sizeof);
                                 return retRes();
                             }
@@ -121,6 +129,7 @@ class Deque(T):CopiableObjectI{
                         for (size_t i=0;i<nEl-to2;++i){
                             if (filter(baseArr[i])){
                                 el=baseArr[i];
+                                assert(i<=baseArr.length && (i+nEl-to2-i-1)<=baseArr.length && nEl-to2-i-1>=0);
                                 memmove(baseArr.ptr+i,baseArr.ptr+i+1,(nEl-to2-i-1)*T.sizeof);
                                 baseArr[nEl-to2-1]=T.init;
                                 --nEl;
@@ -131,6 +140,7 @@ class Deque(T):CopiableObjectI{
                         for (size_t i=1;i<nEl;++i){
                             if (filter(baseArr[start+i])){
                                 el=baseArr[start+i];
+                                assert(start+1+i<=baseArr.length);
                                 memmove(baseArr.ptr+start+1,baseArr.ptr+start,i*T.sizeof);
                                 return retRes();
                             }
@@ -212,24 +222,29 @@ class Deque(T):CopiableObjectI{
                     --pos;
                     opIndexAssign(opIndex(pos+1),pos);
                 }
+                if (res){
+                    --nEl;
+                }
                 return res;
             }
         } else {
             synchronized(this){
                 if (nEl==0) return false;
-                if (filter(baseArr[(start+nEl-1)%baseArr.length])){
-                    el=baseArr[(start+nEl-1)%baseArr.length];
-                    baseArr[(start+nEl-1)%baseArr.length]=T.init;
+                auto lastIdx=(start+nEl-1)%baseArr.length;
+                if (filter(baseArr[lastIdx])){
+                    el=baseArr[lastIdx];
+                    baseArr[lastIdx]=T.init;
                     --nEl;
                     return true;
                 }
                 size_t i=start+nEl;
-                if (i>=baseArr.length){
-                    size_t ii=i-baseArr.length+1;
+                if (i>baseArr.length){
+                    size_t ii=i-baseArr.length;
                     while(ii!=0){
                         --ii;
                         if (filter(baseArr[ii])){
                             el=baseArr[ii];
+                            assert(ii+1<=baseArr.length && i-baseArr.length<=baseArr.length);
                             memmove(baseArr.ptr+ii,baseArr.ptr+ii+1,(i-baseArr.length-ii)*T.sizeof);
                             baseArr[(start+nEl-1)-baseArr.length]=T.init;
                             --nEl;
@@ -242,6 +257,7 @@ class Deque(T):CopiableObjectI{
                     --i;
                     if (filter(baseArr[i])){
                         el=baseArr[i];
+                        assert(start+1<=baseArr.length && i+1<=baseArr.length);
                         memmove(baseArr.ptr+start+1,baseArr.ptr+start,(i-start)*T.sizeof);
                         baseArr[start]=T.init;
                         --nEl;
@@ -274,7 +290,7 @@ class Deque(T):CopiableObjectI{
         }
     }
     /// foreach looping
-    int opApply(int delegate(ref T) loopBody){
+    int opApplyNoIdx(int delegate(ref T) loopBody){
         synchronized(this){
             size_t to1=start+nEl;
             if (to1>baseArr.length){
@@ -294,8 +310,9 @@ class Deque(T):CopiableObjectI{
         }
         return 0;
     }
+    alias opApplyNoIdx opApply;
     /// foreach looping
-    int opApply(int delegate(ref size_t i,ref T) loopBody){
+    int opApplyIdx(int delegate(ref size_t i,ref T) loopBody){
         synchronized(this){
             size_t to1=start+nEl;
             size_t ii=0;
@@ -319,12 +336,13 @@ class Deque(T):CopiableObjectI{
         }
         return 0;
     }
+    alias opApplyIdx opApply;
     
     /// removes all elements that do not match the given predicate
     void filterInPlace(U)(U filter){
         synchronized(this){
             size_t to1=start+nEl;
-            size_t writePos=to1;
+            size_t writePos=start;
             if (to1>baseArr.length){
                 auto to2=baseArr.length;
                 for (size_t i=start;i<to2;++i){
@@ -379,7 +397,7 @@ class Deque(T):CopiableObjectI{
         }
     }
     
-    static if (is(typeof(T.serialize(Serializer.init)))){
+    static if (isCoreType!(T) ||is(typeof(T.init.serialize(Serializer.init)))) {
         static ClassMetaInfo metaI;
         static this(){
             metaI=ClassMetaInfo.createForType!(typeof(this))("blip.container.Deque");
@@ -391,7 +409,7 @@ class Deque(T):CopiableObjectI{
         void preSerialize(Serializer s){ }
         void postSerialize(Serializer s){ }
         void serialize(Serializer s){
-            auto la=LazyArray!(T)(cast(int delegate(ref T))&this.opApply,nEl);
+            LazyArray!(T) la=LazyArray!(T).opCall(&this.opApplyNoIdx,cast(ulong)nEl);
             s.field(metaI[0],la);
         }
 
@@ -410,6 +428,10 @@ class Deque(T):CopiableObjectI{
             s(T.stringof);
             s(") nEl=");
             writeOut(s,nEl);
+            static if (is(typeof(writeOut(s,baseArr)))){
+                s(", baseArr=");
+                writeOut(s,baseArr);
+            }
             s("}");
         }
     }
