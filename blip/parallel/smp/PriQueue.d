@@ -243,6 +243,21 @@ class PriQueue(T){
                 }
                 if (levels[ilevel%levels.length].entries.popBack(el,filter)){
                     --nEntries;
+                    if (levels[ilevel%levels.length].entries.length==0){
+                        if (ilevel%levels.length>0){
+                            levels[ilevel%levels.length-1].next=levels[ilevel%levels.length].next;
+                        } else if (ilevel==0){
+                            queue=levels[0].next;
+                        } else {
+                            auto lPrev=queue;
+                            for (size_t iilev=ilevel;iilev!=0;--iilev){
+                                lPrev=lPrev.next;
+                            }
+                            lPrev.next=levels[ilevel%levels.length].next;
+                        }
+                        levels[ilevel%levels.length].next=null;
+                        lPool.giveBack(levels[ilevel%levels.length]);
+                    }
                     return true;
                 }
             }

@@ -131,6 +131,7 @@ class PriQScheduler:TaskSchedulerI {
 		log.warn("adding task "~name~" to stopped scheduler...");
             }
         }
+        stealLevel=int.max;
         waitingSince=Time.max;
         _rootTask=new RootTask(this,0,name~"RootTask");
     }
@@ -255,7 +256,9 @@ class PriQScheduler:TaskSchedulerI {
     }
     /// steals tasks from the current scheduler
     bool stealTask(int stealLevel,TaskSchedulerI targetScheduler){
-        if (stealLevel>this.stealLevel) return false;
+        if (stealLevel>this.stealLevel) {
+            return false;
+        }
         TaskI t;
         if (runLevel>=SchedulerRunLevel.StopNoTasks){
             if (queue.nEntries==0){
@@ -601,7 +604,9 @@ class MultiSched:TaskSchedulerI {
     }
     /// steals tasks from this scheduler
     bool stealTask(int stealLevel,TaskSchedulerI targetScheduler){
-        if (stealLevel>this.stealLevel) return false;
+        if (stealLevel>this.stealLevel) {
+            return false;
+        }
         if (runLevel>=SchedulerRunLevel.StopNoTasks){
             if (queue.length==0){
                 if (runLevel==SchedulerRunLevel.StopNoQueuedTasks){
@@ -616,16 +621,21 @@ class MultiSched:TaskSchedulerI {
             }
         }
         size_t didSteal=0;
-        synchronized(queue){
-            foreach (sched;queue){
+        size_t pos=0;
+        while (true){
+            PriQScheduler sched;
+            synchronized(queue){
+                if (pos>=queue.length) break;
+                sched=queue[pos];
                 assert(sched.inSuperSched!=0,"unexpected inSuperSched value");
-                if (sched.stealLevel>=stealLevel){
-                    if (sched.stealTask(stealLevel,targetScheduler)){
-                        ++didSteal;
-                        if (rand.uniform!(bool)()) break;
-                    }
+            }
+            if (sched.stealLevel>=stealLevel){
+                if (sched.stealTask(stealLevel,targetScheduler)){
+                    ++didSteal;
+                    if (rand.uniform!(bool)()) break;
                 }
             }
+            ++pos;
         }
         return didSteal!=0;
     }
@@ -1024,13 +1034,15 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
     }
     /// tries to steal a task, might redistribute the tasks
     TaskI trySteal(MultiSched el,int stealLevel){
+        TaskI t;
         debug(TrackQueues){
             log.info(collectAppender(delegate void(CharSink s){
                 s("pre trySteal for "); s(el.name); s(" in "); s(name); s(":");writeStatus(s,4);
             }));
             scope(exit){
                 log.info(collectAppender(delegate void(CharSink s){
-                    s("post trySteal for "); s(el.name); s(" in "); s(name); s(":");writeStatus(s,4);
+                    dumper(s)("trySteal for ")(el.name)(" in ")(name)(" returns ")(t)(", status:");
+                    writeStatus(s,4);
                 }));
             }
         }
@@ -1042,7 +1054,7 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
             foreach(subN;randomSubnodesWithLevel(1,cast(Topology!(NumaNode))topo,superN,oldSuper)){
                 auto subP=numa2pos(subN);
                 if (subP<scheds.length && scheds[subP].stealTask(superN.level,el)){
-                    auto t=el.nextTaskImmediate();
+                    t=el.nextTaskImmediate();
                     if (t !is null) {
                         rmStarvingSched(el);
                         return t;
@@ -1051,7 +1063,7 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
             }
             oldSuper=superN;
         }
-        auto t=el.nextTaskImmediate();
+        t=el.nextTaskImmediate();
         if (t is null){
             onStarvingSched.queue.popFront(t);
             if (t!is null) {
