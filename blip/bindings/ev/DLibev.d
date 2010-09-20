@@ -21,13 +21,16 @@ module blip.bindings.ev.DLibev;
 import blip.io.BasicIO;
 import blip.container.GrowableArray;
 import blip.container.Pool;
-//import blip.container.Cache;
+import blip.container.Cache;
 import blip.bindings.ev.Libev;
 import blip.core.Traits;
 import blip.util.TemplateFu;
 public import blip.bindings.ev.Libev: EV_PERIODIC_ENABLED, EV_STAT_ENABLED, EV_IDLE_ENABLED, EV_FORK_ENABLED,
     EV_EMBED_ENABLED, EV_ASYNC_ENABLED, EV_WALK_ENABLED,ev_loop_t, EV_READ, EV_WRITE;
 import blip.container.HashSet;
+version(TrackEvents){
+    import blip.io.Console;
+}
 
 /// bits for ev_default_loop and ev_loop_new
 enum EVFLAG: uint{
@@ -172,7 +175,7 @@ char[] mixinInitAndCreate(char[]kind,char[] extraArgsDecls, char[] extraArgs){
     char[] res=`
 /// initialize a `~kind~` watcher, the callback can be either directly given, or created by passing
 /// a structure pointer/class that contains an extern(C) cCallback static member
-GenericWatcher `~kind~`Init(T)(`~extraArgsDeclsComma~` T callback){
+GenericWatcher `~kind~`Init(T=watcherCbF)(`~extraArgsDeclsComma~` T callback=null){
     static if (is(typeof(*T.init))){
         alias typeof(*T.init) TT;
     } else {
@@ -187,7 +190,7 @@ GenericWatcher `~kind~`Init(T)(`~extraArgsDeclsComma~` T callback){
         ev_`~kind~`_set(ptr!(ev_`~kind~`)()`~commaExtraArgs~`);
     } else static if (is(typeof(&TT.cCallback)==watcherCbF)){
         ev_init!(ev_watcher*)(ptr!(ev_watcher)(),&TT.cCallback);
-        ev_io_set(ptr!(ev_`~kind~`)()`~commaExtraArgs~`);
+        ev_`~kind~`_set(ptr!(ev_`~kind~`)()`~commaExtraArgs~`);
         data!(T)(callback);
     } else static if (is(typeof(&TT.cCallback)==`~kind~`CbF)){
         ev_`~kind~`_init(ptr!(ev_`~kind~`)(),&TT.cCallback`~commaExtraArgs~`);
@@ -268,6 +271,11 @@ struct GenericWatcher{
     }
     /// Starts (activates) the given watcher. Only active watchers will receive events. If the watcher is already active nothing will happen.
     void start(ev_loop_t* loop){
+        version(TrackEvents){
+            sinkTogether(sout,delegate void(CharSink s){
+                dumper(s)("starting event@")(cast(void*)ptr_)(" on loop@")(cast(void*)loop)("\n");
+            });
+        }
         synchronized(activeWatchers()){
             activeWatchers().add(*this); // slow and ugly!!!
         }
@@ -277,6 +285,11 @@ struct GenericWatcher{
     ///
     /// It is possible that stopped watchers are pending - for example, non-repeating timers are being stopped when they become pending - but calling ev_TYPE_stop ensures that the watcher is neither active nor pending. If you want to free or reuse the memory used by the watcher it is therefore a good idea to always call its stop function.
     void stop(ev_loop_t* loop){
+        version(TrackEvents){
+            sinkTogether(sout,delegate void(CharSink s){
+                dumper(s)("stopping event@")(cast(void*)ptr_)(" on loop@")(cast(void*)loop)("\n");
+            });
+        }
         synchronized(activeWatchers()){
             activeWatchers().remove(*this); // slow and ugly!!!
         }
@@ -294,11 +307,27 @@ struct GenericWatcher{
     }
 
     /// Change the callback. You can change the callback at virtually any time (modulo threads).
+    /// callback can either be a pointer to a C function, or a pointer like type that will be stored
+    /// in data and a static C function into its type called cCallback that will be the callback.
     void cb(T=watcherCbF)(T callback){
-        static if (is(T U==arguments)){
-            ev_cb_set(ptrP!(U[1])());
+        static if (is(typeof(*T.init))){
+            alias typeof(*T.init) TT;
         } else {
-            static assert(0,"could not extract type for "~T.stringof);
+            alias T TT;
+        }
+        static if (is(T == function)){
+            static if (is(T U==arguments)){
+                ev_cb_set(ptrP!(U[1])(),callback);
+            } else {
+                static assert(0,"could not extract callback for "~T.stringof);
+            }
+        } else static if (is(typeof(&TT.cCallback)== function)){
+            static if (is(typeof(&TT.cCallback) U==arguments)){
+                ev_cb_set(ptrP!(U[1])(),&TT.cCallback);
+            }
+            data!(T)(callback);
+        } else {
+            static assert(0,"could not create a valid callback with "~TT.stringof);
         }
     }
     /// Returns the callback currently set on the watcher.
@@ -441,14 +470,15 @@ struct GenericWatcher{
     }
     // global pool - static methods
     static PoolI!(GenericWatcher) gPool;
-/+    static this(){
+    static this(){
         gPool=cachedPool( function GenericWatcher(PoolI!(GenericWatcher)p){
             GenericWatcher res;
             res.ptr_=new ev_any_watcher;
             res.pool=p;
+            res.kind=Kind.any_watcher;
             return res;
         });
-    }+/
+    }
 
     mixin(mixinInitAndCreate("io","int fd, int what","fd,what"));
     mixin(mixinInitAndCreate("timer","ev_tstamp after, ev_tstamp repeat","after,repeat"));

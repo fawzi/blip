@@ -26,6 +26,9 @@ import blip.core.Traits;
 import blip.util.TemplateFu;
 import blip.parallel.smp.SmpModels;
 import blip.serialization.Serialization;
+version(TrackEvents){
+    import blip.io.Console;
+}
 
 /// structure that performs simple (but flexible) callbacks
 struct EventHandler{
@@ -54,8 +57,8 @@ struct EventHandler{
         w.giveBack();
         giveBack();
     }
-    /// the default callback: stops the watcher, executes inlineAction in this thread, then
-    /// starts or resumes the task (if given). Finally recicles the handler and watcher
+    /// the default repeating callback: executes inlineAction in this thread, then
+    /// starts or resumes the task (if given).
     void defaultCallbackRepeat(ev_loop_t*l,GenericWatcher w,EventHandler*h){
         if (inlineAction !is null){
             inlineAction();
@@ -100,7 +103,7 @@ struct EventHandler{
         res.callback=&res.defaultCallbackOnce;
         return res;
     }
-    /// creates a callback that executes the inlineAction (int the io thread, it should be short!)
+    /// creates a callback that executes the inlineAction (in the io thread, it should be short!)
     /// then starts or resumes the task t (if given)
     static EventHandler*opCall(void delegate() inlineAction,TaskI t=null, int delayLevel=int.min,bool repeat=false){
         auto res=gPool.getObj();
@@ -136,6 +139,11 @@ struct EventHandler{
     }
     
     static extern(C) void cCallback(ev_loop_t*loop, ev_watcher *w, int revents){
+        version(TrackEvents){
+            sinkTogether(sout,delegate void(CharSink s){
+                dumper(s)("event@")(cast(void*)w)(" has been fired\n");
+            });
+        }
         auto gWatcher=GenericWatcher(w,revents);
         auto eH=gWatcher.data!(EventHandler*)();
         if (eH.callback is null) throw new Exception("callback of event is null",__FILE__,__LINE__);
@@ -144,7 +152,71 @@ struct EventHandler{
     }
 }
 
-/+Deque!(EventHandler*) events;
-static this(){
-    events=new Deque!(EventHandler*)();
-}+/
+/+
+/// A class that handles all events that share a timeout time
+/// I haven't needed this yet, but here is more or less its API
+class TimeoutManager{
+    ev_tstamp timeout;
+    struct TimedEvent{
+        GenericWatcher event;
+        void delegate(bool) eventOp;
+        void delegate() resumeOp;
+        PoolI!(TimedEvent*) pool;
+        TaskI task;
+        TimeoutManager timeoutManager;
+        void delegate() timeoutOp;
+        ev_tstamp endTime;
+        int delayLevel;
+        equals_t opEquals(ref TimedEvent t2){}
+        int opCmp(ref TimedEvent t2){}
+        hash_t toHash(){
+        }
+        void giveBack(){
+        }
+        void start(ev_loop_t* loop){
+
+        }
+        void stop(ev_loop_t* loop){
+
+        }
+        static extern(C) void cCallback(ev_loop_t*loop, ev_watcher *w, int revents){
+            auto gWatcher=GenericWatcher(w,revents);
+            auto eH=gWatcher.data!(TimedEvent*)();
+            if (eH.timeoutManager !is null) {
+                eH.timeoutManager.removeEvent(eH);
+            }
+            assert(eH!is null);
+            if (eventOp)
+            eH.callback(loop,gWatcher,eH);
+        }
+
+        void doTimeout(ev_loop_t* ev_loop){
+            if (endTime<ev_now(ev_loop)){
+                event.stop(ev_loop);
+                if (timeoutOp !is null) timeoutOp();
+                if (task!is null){
+                    if (task.status>=TaskStatus.Started){
+                        task.resubmitDelayed(delayLevel);
+                    } else {
+                        task.submit();
+                    }
+                }
+            }
+        }
+        static PoolI!(TimedEvent*) gPool;
+        static this(){
+            gPool=...;
+        }
+    }
+    MinHeap!(TimedEvent*) timedEvents;
+    ev_loop_t loop;
+    
+    // add new: if none pending add also a new timer. when it "rings", check the endTime of all the events past due, execute them and then set a timer for the next element
+    
+    /// executes timeoutOp if a timeout has occurred, normalOp otherwise normalOp and then resumes toResume (if given)
+    void addNewTimedEvent(GenericWatcher w,Task toResume,void delegate() timeoutOp,void delegate() normalOp=null);
+    /// calls eventOp with true if a timeout occurred, then resumes toResume (if given)
+    void addNewTimedEvent(GenericWatcher w,Task toResume,void delegate(bool) eventOp);
+}
++/
+
