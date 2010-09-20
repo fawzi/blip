@@ -26,8 +26,9 @@ import blip.sync.Atomic;
 import blip.container.Pool;
 import blip.container.Deque;
 
-void testDeque(int[] arr1,int[] arr2){
+void testDeque(uint startPos,int[] arr1,int[] arr2){
     Deque!(int) d=new Deque!(int)(2);
+    d.start=(startPos%d.baseArr.length);
     foreach(e;arr1){
         d.pushFront(e);
     }
@@ -44,6 +45,7 @@ void testDeque(int[] arr1,int[] arr2){
     }
     int i;
     assert(!d.popFront(i));
+    d.start=(startPos%d.baseArr.length);
     arr1~=arr2;
     foreach(e;arr1){
         d.pushFront(e);
@@ -52,6 +54,7 @@ void testDeque(int[] arr1,int[] arr2){
         assert(e==d.popFront);
     }
     assert(!d.popBack(i));
+    d.start=(startPos%d.baseArr.length);
     foreach(e;arr1){
         d.pushFront(e);
     }
@@ -78,6 +81,7 @@ void testDeque(int[] arr1,int[] arr2){
             ++ii;
         }
         assert(!d.popBack(i));
+        d.start=(startPos%d.baseArr.length);
     }
     foreach(e;arr1){
         d.pushFront(e);
@@ -107,6 +111,7 @@ void testDeque(int[] arr1,int[] arr2){
             }
         }
         assert(!d.popFront(i));
+        d.start=(startPos%d.baseArr.length);
     }
     foreach(e;arr1){
         d.pushFront(e);
@@ -124,6 +129,7 @@ void testDeque(int[] arr1,int[] arr2){
             ++ii;
         }
         assert(!d.popFront(i));
+        d.start=(startPos%d.baseArr.length);
     }
 }
 
