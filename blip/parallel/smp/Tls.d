@@ -28,6 +28,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 module blip.parallel.smp.Tls;
+import blip.core.Thread;
 
 version(Win32){
     import tango.sys.win32.UserGdi;
@@ -74,6 +75,7 @@ class TlsClass(T){
         T val;
         void* ptr;
     }
+    void*[long] gcVals;
     
     version(Posix){
         pthread_key_t key;
@@ -96,6 +98,11 @@ class TlsClass(T){
         void val(T newV){
             ElStorage res;
             res.val=newV;
+            synchronized(this){ // kills update speed and auto collection of ended threads :(
+                auto pid=Thread.getThis().m_addr;
+                assert((cast(typeof(pid))cast(long)pid)==pid,"thread addr cannot be stored in long...");
+                gcVals[cast(long)pid]=res.ptr;
+            }
             auto err=pthread_setspecific(key,res.ptr);
             if (err!=0){
                 throw new Exception("error in pthread_setspecific",__FILE__,__LINE__);
@@ -122,9 +129,14 @@ class TlsClass(T){
         void val(T newV){
             ElStorage res;
             res.val=newV;
+            synchronized(this){ // kills update speed and auto collection of ended threads, store in thread m_local?
+                auto pid=Thread.getThis().m_addr;
+                assert((cast(typeof(pid))cast(long)pid)==pid,"thread addr cannot be stored in long...");
+                gcVals[cast(long)pid]=res.ptr;
+            }
             auto err=TlsSetValue(key,res.ptr);
             if (err!=0){
-                throw new Exception("error in pthread_setspecific",__FILE__,__LINE__);
+                throw new Exception("error in TlsSetValue",__FILE__,__LINE__);
             }
         }
     } else {
