@@ -265,6 +265,9 @@ class SBinUnserializer: Unserializer {
     this(Reader!(void) s){
         this(new BinaryReadHandlers!()(s));
     }
+    this(void delegate(void[])readExact){
+        this(new BinaryReadHandlers!()(readExact));
+    }
     class FieldMismatchException:Exception{
         FieldMetaInfo *mismatchedField;
         char[] actualField;

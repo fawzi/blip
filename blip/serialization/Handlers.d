@@ -393,6 +393,10 @@ final class BinaryReadHandlers(bool SwapBytes=isSmallEndian):ReadHandlers{
         }
         setCoreHandlersFrom_basicRead();
     }
+    this (void delegate(void[])readExact){
+        this.readExact=readExact;
+        setCoreHandlersFrom_basicRead();
+    }
     
     void readExactReader(void[] dest){
         blip.io.BasicIO.readExact(&reader.readSome,dest);
