@@ -16,7 +16,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 module blip.container.Deque;
-import blip.stdc.string:memmove;
+import blip.stdc.string:memmove,memcpy;
 import blip.BasicModels:CopiableObjectI;
 import blip.math.Math;
 import blip.io.BasicIO;
@@ -35,23 +35,33 @@ class Deque(T):CopiableObjectI{
     size_t length(){
         return nEl;
     }
-    private void growLen(){
-        assert(nEl==baseArr.length,"growLen should be called only when the array is full");
-        baseArr.length=growLength(nEl,T.sizeof,60);
-        size_t to1=min(start,baseArr.length-nEl);
-        baseArr[nEl..nEl+to1]=baseArr[0..to1];
-        if (to1<start){
-            assert((start-to1)<=baseArr.length);
-            memmove(baseArr.ptr,baseArr.ptr+to1,(start-to1)*T.sizeof);
+    private void growLen(size_t newSize){
+        if (newSize>baseArr.length){
+            synchronized(this){
+                if (newSize>baseArr.length){
+                    auto newArr=new T[](growLength(newSize,T.sizeof,60));
+                    auto to1=start+nEl;
+                    if (to1>baseArr.length){
+                        auto nel1=baseArr.length-start;
+                        memcpy(newArr.ptr,baseArr.ptr+start,nel1*T.sizeof);
+                        memcpy(newArr.ptr+nel1,baseArr.ptr,(to1-baseArr.length)*T.sizeof);
+                    } else {
+                        memcpy(newArr.ptr,baseArr.ptr+start,baseArr.length*T.sizeof);
+                    }
+                    auto oldArr=baseArr;
+                    baseArr=newArr;
+                    delete(oldArr); // be less aggressive with memory reclaim?
+                    start=0;
+                }
+            }
         }
-        baseArr[start-to1..start]=T.init;
     }
     
     /// pushes (inserts) an element at the beginning of the array
     void push(T t){
         synchronized(this){
             if (nEl==baseArr.length){
-                growLen();
+                growLen(nEl+1);
             }
             ++nEl;
             if (start==0)
@@ -161,7 +171,7 @@ class Deque(T):CopiableObjectI{
     size_t appendL(T val){
         synchronized(this){
             if (nEl==baseArr.length){
-                growLen();
+                growLen(nEl+1);
             }
             baseArr[(start+nEl)%baseArr.length]=val;
             ++nEl;
@@ -172,7 +182,7 @@ class Deque(T):CopiableObjectI{
     void appendEl(T val){
         synchronized(this){
             if (nEl==baseArr.length){
-                growLen();
+                growLen(nEl+1);
             }
             baseArr[(start+nEl)%baseArr.length]=val;
             ++nEl;
@@ -182,10 +192,8 @@ class Deque(T):CopiableObjectI{
     /// could be improved (realloc just once if needed)
     void appendArr(T[] vals){
         synchronized(this){
+            growLen(nEl+vals.length);
             foreach(val;vals){
-                if (nEl==baseArr.length){
-                    growLen();
-                }
                 baseArr[(start+nEl)%baseArr.length]=val;
                 ++nEl;
             }
