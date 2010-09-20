@@ -1,5 +1,5 @@
 /// a very simple echo server
-/// to perform timings compile the NoLog version (logginh )
+/// to perform timings compile the NoLog version (logging slows down very much)
 ///
 /// author: fawzi
 //
@@ -26,6 +26,9 @@ import blip.bindings.ev.DLibev;
 import blip.io.EventWatcher;
 import blip.io.BasicStreams;
 import blip.io.BufferIn;
+import blip.core.Thread; //pippo
+import blip.stdc.stdlib:exit;
+import blip.util.IgnoreSigpipe;
 
 class ConnectionHandler{
     SocketServer serv;
@@ -107,10 +110,19 @@ class ConnectionHandler{
         }
     }
 }
-void main()
+void main(char[][] argv)
 {
     auto c=new ConnectionHandler();
-    auto port="50000";
+    char[] port="50000";
+    if (argv.length>1){
+        port=argv[1];
+    }
+    if (argv.length>2){
+        if (argv[2].length>0 && argv[2][0]!='c'){
+            sout("no cache\n");
+            c.cached=false;
+        }
+    }
     auto serv=new SocketServer(port,&c.handleConnection,sout.call);
     c.serv=serv;
     sinkTogether(sout,delegate void(CharSink s){
@@ -119,4 +131,6 @@ void main()
     serv.start();
     defaultWatcher.moveLoopHere();
     sout("main thread finished...\n");
+    Thread.sleep(0.1);
+    exit(0);
 }
