@@ -26,6 +26,7 @@ import blip.io.IOArray;
 import blip.parallel.smp.WorkManager;
 import blip.io.BasicIO;
 import blip.io.StreamConverters;
+import blip.core.Variant;
 
 /// handles vending (and possibly also receiving the results if using one channel for both)
 class MpiProtocolHandler: ProtocolHandler{

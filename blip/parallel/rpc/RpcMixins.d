@@ -249,7 +249,9 @@ char[] rpcProxyMixin(char[] name,char[] extName,char[] extraInterfaces,char[][] 
                     static assert(is(`~functionName~`Return==void),"oneway call on non void method `~name~`.`~functionName~`");
                     auto cl=OnewayClosure();
                     cl.closure.`~functionName~`Closure.obj=obj;
-                    cl.closure.`~functionName~`Closure.args=args;
+		    foreach (i,TT;`~functionName~`Args){
+			cl.closure.`~functionName~`Closure.args[i]=args[i];
+		    }
                     cl.callClosureDelegate=&cl.closure.`~functionName~`Closure.call;
                     Task("onewayMethodCall`~name~`.`~functionName~`",cl.callClosureDelegate)
                         .appendOnFinish(&cl.giveBack).autorelease.submitYield(objTask);`;

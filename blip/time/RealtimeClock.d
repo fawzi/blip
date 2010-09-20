@@ -15,6 +15,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 module blip.time.RealtimeClock;
+import tango.core.Exception;
 
 version (Win32){
     private extern (Windows) 
@@ -86,6 +87,7 @@ version (Win32){
 
 } else version (Posix) {
     private import tango.stdc.posix.time;
+    private import tango.stdc.posix.sys.time;
     
     // realtime (global) clock
     static if (is(typeof(timespec)) && is(typeof(clock_gettime(CLOCK_REALTIME,cast(timespec*)null)))){

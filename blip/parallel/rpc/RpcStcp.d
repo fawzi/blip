@@ -42,6 +42,8 @@ import blip.math.random.Random;
 import blip.container.Pool;
 import blip.container.Cache;
 import blip.util.RefCount;
+import blip.core.Variant;
+import blip.stdc.string:strlen;
 
 /// represents a request to another handler
 ///
