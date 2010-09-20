@@ -220,7 +220,7 @@ else {
         alias V dtype;
         alias ArrayFlags Flags;
         // default optimal chunk size for parallel looping
-        static index_type defaultOptimalChunkSize=defaultSimpleLoopSize/V.sizeof;
+        static index_type defaultOptimalChunkSize=defaultSimpleLoopSize/cast(index_type)V.sizeof;
         /// pointer to the element 0,...0 (not necessarily the start of the slice)
         V* startPtrArray;
         /// strides multiplied by V.sizeof (can be negative)
@@ -244,7 +244,7 @@ else {
                     minExt+=this.bStrides[i]*(this.shape[i]-1);
                 }
             }
-            return (cast(V*)(cast(size_t)this.startPtrArray+minExt))[0..((maxExt-minExt)/cast(index_type)V.sizeof+1)];
+            return (cast(V*)(cast(size_t)this.startPtrArray+minExt))[0..cast(size_t)((maxExt-minExt)/cast(index_type)V.sizeof+1)];
         }
         /// calulates the base flags (Contiguos,Fortran,Compact1,Compact2,Small,Large)
         static uint calcBaseFlags(index_type[rank] strides, index_type[rank] shape)
@@ -464,11 +464,11 @@ else {
             V[] mData;
             Guard guard;
             if (size>manualAllocThreshold/cast(index_type)V.sizeof) {
-                guard=new Guard(size*V.sizeof,(typeid(V).flags & 2)!=0);
+                guard=new Guard(cast(size_t)size*V.sizeof,(typeid(V).flags & 2)!=0);
                 V* mData2=cast(V*)guard.dataPtr;
-                mData=mData2[0..size];
+                mData=mData2[0..cast(size_t)size];
             } else {
-                mData=new V[size];
+                mData=new V[](cast(size_t)size);
             }
             index_type[rank] strides;
             if (!fortran){
@@ -492,16 +492,16 @@ else {
         static NArray zeros(index_type[rank] shape, bool fortran=false){
             NArray res=empty(shape,fortran);
             static if(isAtomicType!(V)){
-                memset(res.startPtrArray,0,res.nElArray*cast(index_type)V.sizeof);
+                memset(res.startPtrArray,0,cast(size_t)(cast(size_t)res.nElArray*V.sizeof));
             } else {
-                res.startPtrArray[0..res.nElArray]=cast(V)0;
+                res.startPtrArray[0..cast(size_t)res.nElArray]=cast(V)0;
             }
             return res;
         }
         /// returns an array initialized to 1 of the requested shape
         static NArray ones(index_type[rank] shape, bool fortran=false){
             NArray res=empty(shape,fortran);
-            res.startPtrArray[0..res.nElArray]=cast(V)1;
+            res.startPtrArray[0..cast(size_t)res.nElArray]=cast(V)1;
             return res;
         }
         
@@ -1261,7 +1261,7 @@ else {
             NArray res=empty(this.shape,fortran);
             if ( this.flags & res.flags & (Flags.Fortran | Flags.Contiguous) ) 
             {
-                memcpy(res.startPtrArray, this.startPtrArray, cast(index_type)V.sizeof * this.nElArray);
+                memcpy(res.startPtrArray, this.startPtrArray, V.sizeof * cast(size_t)this.nElArray);
             }
             else
             {
@@ -1285,7 +1285,7 @@ else {
             } else{
                 if ( this.flags & res.flags & (Flags.Fortran | Flags.Contiguous) ) 
                 {
-                    memcpy(res.startPtrArray, this.startPtrArray, cast(index_type)V.sizeof * this.nElArray);
+                    memcpy(res.startPtrArray, this.startPtrArray, V.sizeof * cast(size_t)this.nElArray);
                 }
                 else
                 {
@@ -1504,7 +1504,7 @@ else {
         bool opEquals(NArray o) { 
             if (this.shape!=o.shape) return false;
             if (this.flags & o.flags & Flags.Compact1){
-                return !memcmp(this.startPtrArray,o.startPtrArray,this.nElArray*cast(index_type)V.sizeof);
+                return !memcmp(this.startPtrArray,o.startPtrArray,cast(size_t)this.nElArray*V.sizeof);
             }
             NArray a=this;
             mixin(sLoopPtr(rank,["a","o"],"if (*aPtr0 != *oPtr0) return false;","i"));
@@ -1860,7 +1860,7 @@ else {
             s.field(metaI[0],shp);
             typeof(this) a=this;
             s.customField(metaI[1],{
-                auto ac=s.writeArrayStart(null,this.size());
+		    auto ac=s.writeArrayStart(null,cast(size_t)this.size());
                 mixin(sLoopPtr(rank,["a"],`s.writeArrayEl(ac,{ s.field(cast(FieldMetaInfo*)null, *aPtr0); } );`,"i"));
                 s.writeArrayEnd(ac);
             });
@@ -2111,7 +2111,7 @@ char [] pLoopIdx(int rank,char[][] arrayNames,
     char[] indent2=indent~"    ";
     char[] indent3=indent2~"    ";
     bool hasNamesDot=true;
-    res~=indent~"size_t dummy"~ivarStr~"=optimalChunkSize_"~ivarStr~";\n";
+    res~=indent~"index_type dummy"~ivarStr~"=optimalChunkSize_"~ivarStr~";\n";
     if (arrayNamesDot.length==0){
         hasNamesDot=false;
         arrayNamesDot=[];
@@ -2203,7 +2203,7 @@ char [] pLoopPtr(int rank,char[][] arrayNames,
     if(hasNamesDot){
         res~=indent~"commonFlags"~ivarStr~"=";
     } else{
-        res~=indent~"size_t dummy"~ivarStr~"=optimalChunkSize_"~ivarStr~";\n";
+        res~=indent~"index_type dummy"~ivarStr~"=optimalChunkSize_"~ivarStr~";\n";
         res~=indent~"uint commonFlags"~ivarStr~"=";
     }
     foreach (i,arrayNameD;arrayNamesDot){

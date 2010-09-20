@@ -51,7 +51,7 @@ class ConnectionHandler{
                 readIn=new BufferIn!(void)(&h.sock.rawReadInto);
             }
             while(true){
-                ptrdiff_t read;
+                size_t read;
                 if (cached){
                     read=readIn.readSome(buf);
                 } else {

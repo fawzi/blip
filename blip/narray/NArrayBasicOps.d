@@ -344,13 +344,13 @@ NArray!(T,dim)a2NA(T,U=int,int dim=1)(T[] arr,bool shouldFree=false,bool fortran
         }
     }
     if (!fortran){
-        auto stride=T.sizeof;
+        index_type stride=cast(index_type)T.sizeof;
         for(int idim=0;idim<dim;++idim){
             strides[idim]=stride;
             stride *= shape[idim];
         }
     } else {
-        auto stride=T.sizeof;
+        index_type stride=cast(index_type)T.sizeof;
         int idim=dim;
         while (idim!=0){
             strides[--idim]=stride;
