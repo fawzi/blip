@@ -23,6 +23,7 @@ import blip.container.GrowableArray;
 import blip.container.Deque;
 import blip.bindings.ev.DLibev;
 import blip.bindings.ev.Libev;
+import blip.bindings.ev.EventHandler;
 import blip.core.Traits;
 import blip.core.Thread;
 import blip.parallel.smp.WorkManager;
@@ -85,6 +86,11 @@ class EventWatcher{
     }
     
     void addWatcher(GenericWatcher w){
+        version(TrackEvents){
+            sinkTogether(sout,delegate void(CharSink s){
+                dumper(s)("queuing event@")(w.ptr_)(" for addition\n");
+            });
+        }
         watchersToAdd.pushBack(w);
         notifyAdd();
     }
@@ -176,6 +182,18 @@ class EventWatcher{
     void moveLoopHere(){
         stopLoop();
         threadTask();
+    }
+    /// sleeps a task for at least the requested amount of seconds
+    static void sleepTask(double time){
+        auto tAtt=taskAtt.val;
+        if (tAtt!is null && tAtt.mightYield()){
+            auto w=GenericWatcher.timerCreate(time,0.0,EventHandler(tAtt,tAtt.delayLevel));
+            tAtt.delay(delegate void(){
+                defaultWatcher.addWatcher(w);
+            });
+        } else {
+            Thread.sleep(time);
+        }
     }
 }
 
