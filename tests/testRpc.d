@@ -76,7 +76,7 @@ void rpcTests(){
         sout("rpc1:")(cast(void*)rpc1)("\n");
         auto pName=rpc1.publisher.publishObject(vendor,"globalA");
         sinkTogether(sout,delegate void(CharSink s){
-            dumper(s)("prox from url:")(vendor.proxyObjUrl())("\n");
+            dumper(s)("proxy from url: ")(vendor.proxyObjUrl())("\n");
         });
         sout("gc collect!\n");
         GC.collect();
@@ -113,7 +113,7 @@ void rpcTests(){
         });
     
         sinkTogether(sout,delegate void(CharSink s){
-            dumper(s)("non loc proxy from url:")(vendor.proxyObjUrl())("\n");
+            dumper(s)("non loc proxy from url: ")(vendor.proxyObjUrl())("\n");
         });
         auto localP3=ProtocolHandler.proxyForUrl(vendor.proxyObjUrl());
         auto localP4=cast(A.AProxy)localP3;
@@ -236,6 +236,9 @@ void rpcTests(){
 
 void rpcTestServer(){
     try{
+        Task("allocThread",delegate void(){
+            sout("allocatedNewThread\n");
+        }).autorelease.submit();
         //GC.disable();
         auto vendor=new A.AVendor(A.globalA);
         sout("initedVendor\n");
@@ -247,7 +250,7 @@ void rpcTestServer(){
         sout("rpc1:")(cast(void*)rpc1)("\n");
         auto pName=rpc1.publisher.publishObject(vendor,"globalA");
         sinkTogether(sout,delegate void(CharSink s){
-            dumper(s)("prox from url:")(vendor.proxyObjUrl())("\n");
+            dumper(s)("vending url: ")(vendor.proxyObjUrl())("\n");
         });
         while(true){
             Thread.sleep(10.0);
@@ -267,7 +270,7 @@ void rpcTestClient(char[] url){
         //GC.disable();
         
         sinkTogether(sout,delegate void(CharSink s){
-            dumper(s)("non loc proxy from url:")(url)("\n");
+            dumper(s)("non loc proxy from url: ")(url)("\n");
         });
         auto localP3=ProtocolHandler.proxyForUrl(url);
         auto localP4=cast(A.AProxy)localP3;
@@ -362,7 +365,11 @@ void main(char[][]args){
     if (args.length>1){
         switch(args[1]){
         case "-server":
-            Task("rpcTestServer",delegate void(){ rpcTestServer(); }).autorelease.executeNow();
+            auto t=Task("rpcTestServer",delegate void(){ rpcTestServer(); });
+            t.executeNow();
+            while (t.status!=TaskStatus.Finished){
+                t.wait();
+            }
             break;
         case "-client":
             if (args.length!=3){
