@@ -134,7 +134,8 @@ struct ParsedUrl{
     }
     void clearPath(){
         pathBuf[]=null;
-        path=null;
+        pathLen=0;
+        pathPtr=null;
         query=null;
         anchor=null;
     }
@@ -150,7 +151,7 @@ struct ParsedUrl{
                     pathBuf[i]=p;
                 }
             }
-            pathBuf[path.length]=segment;
+            pathBuf[pathLen]=segment;
             pathPtr=null;
             ++pathLen;
         } else {
@@ -778,24 +779,28 @@ class ProtocolHandler{
             pUrl2.appendToPath("proxyName");
             proxyName=simpleCall(pUrl2);
         }
-        auto creator=proxyName in ProtocolHandler.proxyCreators;
-        if (creator is null){
-            throw new RpcException("does not know how to create proxy '"~proxyName~"'",
-                __FILE__,__LINE__);
+        ProxyCreators creator;
+        synchronized(proxyCreatorsLock){
+            auto creatorPtr=proxyName in ProtocolHandler.proxyCreators;
+            if (creatorPtr is null){
+                throw new RpcException("does not know how to create proxy '"~proxyName~"'",
+                    __FILE__,__LINE__);
+            }
+            creator=*creatorPtr;
         }
         Proxy nP;
         char[256] buf;
         char[] objectUrl=(pUrl.url(buf)).dup;
-        if (localUrl(pUrl) && (*creator).localProxyCreator !is null){
-            nP=(*creator).localProxyCreator(proxyName,objectUrl);
+        if (localUrl(pUrl) && creator.localProxyCreator !is null){
+            nP=creator.localProxyCreator(proxyName,objectUrl);
             char[]objName=pUrl.path[1]; // kind of ugly
             auto lP=cast(LocalProxy)cast(Object)nP;
-            auto vendor=publisher.objectNamed(objName);
+            auto vendor=publisher.objectNamed(objName.dup);
             assert(lP!is null,"local proxy is null");
             lP.targetObj=vendor.targetObj();
             lP.objTask=vendor.objTask();
         } else {
-            nP=(*creator).proxyCreator(proxyName,objectUrl);
+            nP=creator.proxyCreator(proxyName,objectUrl);
         }
         nP.rpcCallHandler=&this.doRpcCall;
         return nP;

@@ -236,7 +236,10 @@ class StcpConnection{
         this.protocolHandler=protocolHandler;
         this.targetHost=targetHost;
         this.sock=sock;
-        this.sock.noDelay(true); // use no delay to reduce the latency
+        version(StcpNoCache){}
+        else {
+            this.sock.noDelay(true); // use no delay to reduce the latency
+        }
         //this.sock.keepalive(true);
         serTask=new SequentialTask("stcpSerTask",defaultTask,true);
         // should limit buffer to 1280 or 1500 or multiples of them? (jumbo frames)
@@ -249,8 +252,13 @@ class StcpConnection{
             serializer=new JsonSerializer!(char)(outStream.charSink());
             unserializer=new JsonUnserializer!(char)(charReader);
         } else {
-            serializer=new SBinSerializer(outStream.binSink());
-            unserializer=new SBinUnserializer(readIn);
+            version(StcpNoCache){
+                serializer=new SBinSerializer(&this.sock.writeExact);
+                unserializer=new SBinUnserializer(&this.sock.rawReadExact);
+            } else {
+                serializer=new SBinSerializer(outStream.binSink());
+                unserializer=new SBinUnserializer(readIn);
+            }
         }
         localUsers=1;
         log=protocolHandler.log;
@@ -490,7 +498,7 @@ class StcpProtocolHandler: ProtocolHandler{
             synchronized(StcpProtocolHandler.classinfo){
                 auto ph=group in stcpProtocolHandlers;
                 if (ph!is null){
-                    return (*ph).port==prt;
+                    return (*ph).port==prt && (*ph).server !is null && (*ph).server.isStarted();
                 }
             }
         }
@@ -518,12 +526,24 @@ class StcpProtocolHandler: ProtocolHandler{
         }
         StcpConnection connection;
         bool startHandler=false;
-        synchronized(this){
+        synchronized(connections){
             auto conn=tHost in connections;
             if (conn!is null) connection= *conn;
             if (connection is null || (! connection.tryAddLocalUser())){
+                version(TrackRpc){
+                    if (connection !is null)
+                        sinkTogether(log,delegate void(CharSink s){
+                            dumper(s)(taskAtt.val)(" created double connection to ")(tHost)("\n");
+                        });
+                }
                 connection=new StcpConnection(this,tHost);
-                connections[tHost]=connection;
+                connections[tHost.dup]=connection;
+                sinkTogether(log,delegate void(CharSink s){
+                    auto td=tHost.dup;
+                    dumper(s)(taskAtt.val)(" pippo")(tHost)(",")(td)(":")(tHost==td)(tHost<td)(tHost>td)("\n");
+                });
+                
+                assert((tHost in connections)!is null,"host not in connections");
                 startHandler=true;
             }
         }
@@ -545,6 +565,9 @@ class StcpProtocolHandler: ProtocolHandler{
         synchronized(connections){
             auto dConn=th in connections;
             if (dConn !is null){
+                sinkTogether(log,delegate void(CharSink s){
+                    dumper(s)(taskAtt.val)(" has double connection to ")(th)("\n");
+                });
                 doubleConnections~=*dConn;
             }
             connections[th]=newC;
