@@ -17,7 +17,7 @@
 module blip.io.BufferIn;
 import blip.io.BasicIO;
 import blip.text.UtfUtils;
-import blip.stdc.string: memmove,memcpy;
+import blip.stdc.string: memmove;
 import blip.math.Math: min;
 import blip.container.GrowableArray;
 version(TrackBInReadSome) import blip.io.Console;
@@ -145,6 +145,7 @@ final class BufferIn(TInt):Reader!(TInt){
     
     void compact(){
         if (bufPos!=0){
+            assert(bufPos+bufLen<=buf.length);
             memmove(buf.ptr,buf.ptr+bufPos,bufLen*TBuf.sizeof);
             bufPos=0;
         }
