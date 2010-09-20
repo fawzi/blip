@@ -51,11 +51,20 @@ struct TargetHost{
         return host==p2.host && port==p2.port;
     }
     int opCmp(TargetHost p){
-        int c=cmp(host,p.host);
-        return ((c==0)?cmp(port,p.port):c);
+        int c=((host<p.host)?-1:((host==p.host)?0:1));
+        return ((c==0)?((port<p.port)?-1:((port==p.port)?0:1)):c);
     }
     mixin(serializeSome("blip.TargetHost","host|port"));
     mixin printOut!();
+    TargetHost dup(){
+        TargetHost res;
+        res.host=host.dup;
+        res.port=port.dup;
+        return res;
+    }
+    hash_t toHash(){
+        return rt_hash_combine(getHash(host),getHash(port));
+    }
 }
 
 /// basically a wrapper around a socket just to group some functions...
@@ -219,6 +228,7 @@ struct BasicSocket{
             for (int itry=0;itry<eagerTries;++itry){
                 wNow=send(sock,src.ptr,src.length,0);
                 if (wNow<0){
+                    if (errno()==EINTR) continue;
                     if (wNow!=-1 || errno()!=EWOULDBLOCK){
                         char[] buf=new char[](256);
                         auto msg=strerror_d(errno(), buf);
@@ -231,6 +241,11 @@ struct BasicSocket{
                         throw new BIOException(buf[0..strlen(buf.ptr)],__FILE__,__LINE__);
                     }
                 } else if (wNow>0 || src.length==0){
+                    version(SocketEcho){
+                        sinkTogether(sout,delegate void(CharSink s){
+                            dumper(s)("pippo socket ")(sock)(" writing '")(src[0..wNow])("'\n");
+                        });
+                    }
                     return wNow;
                 }
                 if (!Task.yield()) break;
@@ -254,6 +269,7 @@ struct BasicSocket{
             for (int itry=0;itry<eagerTries;++itry){
                 wNow=send(sock,src.ptr+written,src.length-written,0);
                 if (wNow<0){
+                    if (errno()==EINTR) continue;
                     if (wNow!=-1 || errno()!=EWOULDBLOCK){
                         char[] buf=new char[](256);
                         auto msg=strerror_d(errno(), buf);
@@ -279,6 +295,11 @@ struct BasicSocket{
                 });
                 wNow=0;
             }
+            version(SocketEcho){
+                sinkTogether(sout,delegate void(CharSink s){
+                    dumper(s)("socket ")(sock)(" writing '")(src[0..wNow])("'\n");
+                });
+            }
             written+=wNow;
         }
     }
@@ -293,6 +314,7 @@ struct BasicSocket{
                     return 0;
                 }
                 if (res<0){
+                    if (errno()==EINTR) continue;
                     if (res!=-1 || errno()!=EAGAIN){
                         char[] buf=new char[](256);
                         auto errMsg=strerror_d(errno,buf);
@@ -305,6 +327,11 @@ struct BasicSocket{
                         throw new BIOException(errMsg,__FILE__,__LINE__);
                     }
                 } else {
+                    version(SocketEcho){
+                        sinkTogether(sout,delegate void(CharSink s){
+                            dumper(s)("pippo socket ")(sock)(" got '")(dst[0..res])("'\n");
+                        });
+                    }
                     return res;
                 }
                 if (!Task.yield()) break;
@@ -313,12 +340,26 @@ struct BasicSocket{
                 auto tAtt=taskAtt.val;
                 auto watcher=GenericWatcher.ioCreate(cast(int)sock,EV_READ,EventHandler(tAtt,tAtt.delayLevel));
                 // implement blocking for non present or non yieldable tasks? it might be dangeroues (deadlocks)
+                version(LogReadWaits){
+                    sinkTogether(sout,delegate void(CharSink s){
+                        dumper(s)("pippo socket ")(sock)(" start waiting in read with event@")(cast(void*)watcher.ptr_)("\n");
+                    });
+                }
                 tAtt.delay(delegate void(){// add a timeout???
                     defaultWatcher.addWatcher(watcher);
                 });
                 res=0;
+                version(LogReadWaits){
+                    sinkTogether(sout,delegate void(CharSink s){
+                        dumper(s)("pippo socket ")(sock)(" did waiting in read\n");
+                    });
+                }
             }
         }
+    }
+    
+    void rawReadExact(void[] buf){
+        readExact(&this.rawReadInto,buf);
     }
     
     final void flush(){
@@ -370,11 +411,17 @@ class SocketServer{
                 throw new Exception("error in pending tasks",__FILE__,__LINE__);
         }
         void giveBack(){
+//            sinkTogether(sout,delegate void(CharSink s){
+//                dumper(s)(taskAtt.val)(" giving back Handler ")(cast(void*)this)(",")(cast(void*)this.pool)("\n");
+//            });
             if (pool!is null){
                 pool.giveBack(this);
             } else {
                 //tryDeleteT(this);
             }
+//            sinkTogether(sout,delegate void(CharSink s){
+//                dumper(s)(taskAtt.val)(" done give back Handler\n");
+//            });
         }
         TargetHost otherHost(char[] buf){
             TargetHost res;
@@ -424,7 +471,7 @@ class SocketServer{
         addrinfo *res, res0;
         int isock, err;
         char nullTermAddress[80];
-        memset(&hints,0,hints.sizeof);
+        memset(&hints,0,addrinfo.sizeof);
         hints.ai_family = PF_UNSPEC;
         hints.ai_socktype = SOCK_STREAM;
         hints.ai_flags = AI_PASSIVE;
