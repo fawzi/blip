@@ -84,7 +84,7 @@ struct BasicSocket{
         int err;
         char buf[256];
         char * nodeName,serviceName;
-        sockaddr addrName;
+        sockaddr_storage addrName;
         addrinfo hints;
         addrinfo* addressInfo,addrAtt;
 
@@ -243,7 +243,7 @@ struct BasicSocket{
                 } else if (wNow>0 || src.length==0){
                     version(SocketEcho){
                         sinkTogether(sout,delegate void(CharSink s){
-                            dumper(s)("pippo socket ")(sock)(" writing '")(src[0..wNow])("'\n");
+                            dumper(s)("socket ")(sock)(" writing '")(src[0..wNow])("'\n");
                         });
                     }
                     return wNow;
@@ -329,7 +329,7 @@ struct BasicSocket{
                 } else {
                     version(SocketEcho){
                         sinkTogether(sout,delegate void(CharSink s){
-                            dumper(s)("pippo socket ")(sock)(" got '")(dst[0..res])("'\n");
+                            dumper(s)("socket ")(sock)(" got '")(dst[0..res])("'\n");
                         });
                     }
                     return res;
@@ -342,7 +342,7 @@ struct BasicSocket{
                 // implement blocking for non present or non yieldable tasks? it might be dangeroues (deadlocks)
                 version(LogReadWaits){
                     sinkTogether(sout,delegate void(CharSink s){
-                        dumper(s)("pippo socket ")(sock)(" start waiting in read with event@")(cast(void*)watcher.ptr_)("\n");
+                        dumper(s)("socket ")(sock)(" start waiting in read with event@")(cast(void*)watcher.ptr_)("\n");
                     });
                 }
                 tAtt.delay(delegate void(){// add a timeout???
@@ -351,7 +351,7 @@ struct BasicSocket{
                 res=0;
                 version(LogReadWaits){
                     sinkTogether(sout,delegate void(CharSink s){
-                        dumper(s)("pippo socket ")(sock)(" did waiting in read\n");
+                        dumper(s)("socket ")(sock)(" did waiting in read\n");
                     });
                 }
             }
@@ -400,7 +400,7 @@ class SocketServer{
     
     static struct Handler{
         BasicSocket sock;
-        sockaddr addrOther;
+        sockaddr_storage addrOther;
         socklen_t addrLen;
         SocketServer server;
         PoolI!(Handler*) pool;
@@ -429,7 +429,7 @@ class SocketServer{
             auto toC=buf.length-lPort;
             char[]addrStr=buf[0..toC];
             char[]serviceStr=buf[toC..$];
-            if (getnameinfo(&addrOther,addrLen, addrStr.ptr, addrStr.length, serviceStr.ptr,serviceStr.length, 0)==0)
+            if (getnameinfo(cast(sockaddr*)&addrOther,addrLen, addrStr.ptr, cast(socklen_t)addrStr.length, serviceStr.ptr,cast(socklen_t)serviceStr.length, 0)==0)
             {
                 buf[$-1]=0;
                 res.host=addrStr[0..strlen(addrStr.ptr)];
@@ -563,10 +563,11 @@ class SocketServer{
                 s("server ")(serviceName)(" received request\n");
             });
         }
+        sockaddr_storage addrOther;
+        socklen_t addrLen=cast(socklen_t)addrOther.sizeof;
         auto sock=cast(socket_t)(w.ptr!(ev_io)().fd);
-        sockaddr address;
-        socklen_t addrLen=cast(socklen_t)address.sizeof;
-        auto newSock=blip.stdc.socket.accept(sock,&address,&addrLen);
+        auto newSock=blip.stdc.socket.accept(sock,cast(sockaddr*)&addrOther,&addrLen);
+        assert(addrLen<=addrOther.sizeof,"sockaddr overflow");
         if (newSock<=0){ // ignore lost connections? would be safer but in development it is probably better to crash...
             char[256] buf;
             auto errMsg=strerror_d(errno,buf);
@@ -585,14 +586,15 @@ class SocketServer{
                 s("too many pending connections, dropping connection immeditely on ")(serviceName)("\n");
             });
             BasicSocket(newSock).close();
+            BasicSocket(newSock).shutdownInput();
             return;
         }
         atomicAdd(pendingTasks,1);
         auto hh=Handler.gPool.getObj;
+        hh.addrOther=addrOther;
+        hh.addrLen=addrLen;
         hh.sock=BasicSocket(newSock);
         hh.server=this;
-        hh.addrOther=address;
-        hh.addrLen=addrLen;
         Task("acceptedSocket",&hh.doAction).appendOnFinish(&hh.giveBack).autorelease.submit(defaultTask);
     }
     /// stops the server

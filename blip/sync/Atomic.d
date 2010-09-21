@@ -597,7 +597,7 @@ in {
 /// no barriers implied, only atomicity!
 version(LDC){
     T atomicAdd(T,U)(ref T val, U incV_){
-	T incV=incV_;
+        T incV=incV_;
         static if (isPointerOrClass!(T))
         {
             return cast(T)llvm_atomic_load_add!(size_t)(cast(size_t*)&val, incV);

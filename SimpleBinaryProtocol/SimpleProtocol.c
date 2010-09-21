@@ -912,7 +912,7 @@ int sbpConnectTo32(socket_t *sock, char*address,uint32_t len){
     int err;
     char nullTermAddress[1026];
     char *nodeName=NULL,*serviceName=NULL;
-    struct sockaddr addrName;
+    struct sockaddr_storage addrName;
     struct addrinfo hints,*addressInfo=NULL,*addrAtt=NULL;
     
     *sock=-1;
@@ -1187,15 +1187,15 @@ int sbpAccept32(socket_t sock,socket_t *newSock,char*addrStr,uint32_t *addrStrLe
                 lS->lastISock=iSockAtt;
                 if (FD_ISSET(lS->socktable[iSockAtt],&readSock)){
                     char serviceBuf[80];
-                    struct sockaddr address;
+                    struct sockaddr_storage address;
                     socklen_t addrLen=(socklen_t)sizeof(address);
                     socklen_t addrStrLen2=(socklen_t)(*addrStrLen);
-                    *newSock=accept(lS->socktable[iSockAtt],&address,&addrLen);
+                    *newSock=accept(lS->socktable[iSockAtt],(sockaddr*)&address,&addrLen);
                     if (*newSock<=0){
                         perror("SBP accepting socket");
                         return 33;
                     }
-                    if (getnameinfo(&address, addrLen, addrStr, addrStrLen2, &serviceBuf[0],
+                    if (getnameinfo((sockaddr*)&address, addrLen, addrStr, addrStrLen2, &serviceBuf[0],
                         (socklen_t)sizeof(serviceBuf), 0))
                     {
                         addrStr[0]=0;

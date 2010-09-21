@@ -540,11 +540,6 @@ class StcpProtocolHandler: ProtocolHandler{
                 }
                 connection=new StcpConnection(this,tHost);
                 connections[tHost.dup]=connection;
-                sinkTogether(log,delegate void(CharSink s){
-                    auto td=tHost.dup;
-                    dumper(s)(taskAtt.val)(" pippo")(tHost)(",")(td)(":")(tHost==td)(tHost<td)(tHost>td)("\n");
-                });
-                
                 assert((tHost in connections)!is null,"host not in connections");
                 startHandler=true;
             }
@@ -579,9 +574,12 @@ class StcpProtocolHandler: ProtocolHandler{
     
     override void startServer(bool strict){
         if (server is null){
-            // now uses the "well known" ports as fallback, should use a narrower range or ports 24250-24320 that are unassigned (but should be registred...)??
-            ushort fallBackPortMin=48620;
-            ushort fallBackPortMax=49151; // this is exclusive...
+            // well known ports: 0-1023 (needs root)
+            // registered ports: 1024-49151 (should be registred at iana)
+            // dynamic ports: 49152-65535 (free usage)
+            // now uses the dynamic ports as fallback, should use a narrower range or ports 24250-24320 that are unassigned (but should be registred...)??
+            ushort fallBackPortMin=49152;
+            ushort fallBackPortMax=65535; // this is exclusive...
             char[] buf;
             char[] origPort=port;
             bool isBound=false;

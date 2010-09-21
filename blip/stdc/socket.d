@@ -20,7 +20,7 @@ version (Win32) {
 } else {
     
     // sys/socket.hostname
-    public import tango.stdc.posix.sys.socket: sockaddr,socklen_t;
+    public import tango.stdc.posix.sys.socket: sockaddr,sockaddr_storage,socklen_t;
     private typedef int socket_t = -1;
     extern(C){
         socket_t     accept(socket_t, sockaddr *restrict, socklen_t *restrict);
