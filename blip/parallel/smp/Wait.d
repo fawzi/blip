@@ -122,7 +122,7 @@ class WaitConditionT(bool oneAtTime=true){
                 waiting0=null;
             }
             if (waiting1!is null){
-                waiting1.resubmitDelayed(waiting0.delayLevel-1);
+                waiting1.resubmitDelayed(waiting1.delayLevel-1);
                 waiting1=null;
             }
             foreach(t;waiting){
