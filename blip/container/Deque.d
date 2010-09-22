@@ -43,10 +43,13 @@ class Deque(T):CopiableObjectI{
                     auto to1=start+nEl;
                     if (to1>baseArr.length){
                         auto nel1=baseArr.length-start;
+                        assert(nel1<=newArr.length && start+nel1<=baseArr.length);
                         memcpy(newArr.ptr,baseArr.ptr+start,nel1*T.sizeof);
+                        assert(nel1+(to1-baseArr.length)<=newArr.length && to1-baseArr.length<=baseArr.length);
                         memcpy(newArr.ptr+nel1,baseArr.ptr,(to1-baseArr.length)*T.sizeof);
                     } else {
-                        memcpy(newArr.ptr,baseArr.ptr+start,baseArr.length*T.sizeof);
+                        assert(nEl<=newArr.length && start+nEl<=baseArr.length);
+                        memcpy(newArr.ptr,baseArr.ptr+start,nEl*T.sizeof);
                     }
                     auto oldArr=baseArr;
                     baseArr=newArr;
