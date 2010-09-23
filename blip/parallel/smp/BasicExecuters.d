@@ -22,7 +22,8 @@ import blip.core.Thread;
 import blip.math.Math;
 import blip.math.random.Random;
 import blip.io.Console;
-import blip.util.TangoLog;import blip.io.BasicIO;
+import blip.util.TangoLog;
+import blip.io.BasicIO;
 import blip.container.GrowableArray;
 import blip.util.TemplateFu:ctfe_i2a;
 import blip.parallel.smp.SmpModels;
@@ -116,12 +117,18 @@ class ImmediateExecuter:ExecuterI,TaskSchedulerI{
         assert(cast(int)runLevel <=cast(int)level,"runLevel can only increase");
         runLevel=level;
     }
+    /// logging a message
+    void logMsg(char[]m){
+        log.info(m);
+    }
     /// adds a task to the scheduler queue
     void addTask(TaskI t){
         if (runLevel!=SchedulerRunLevel.Stopped){
             try{
-                log.info("Executer "~name~", thread "~Thread.getThis().name~" starting task "~
-                    (t is null?"*NULL*":t.taskName));
+                version(DetailedLog){
+                    sinkTogether(&logMsg,delegate void(CharSink s){
+                        dumper(s)("Executer ")(name)(", thread ")(Thread.getThis().name)(" starting task ")(t); });
+                }
                 if (t is null) {
                     log.warn("Executer "~name~", thread "~Thread.getThis().name~" stopped");
                     return;
@@ -129,7 +136,10 @@ class ImmediateExecuter:ExecuterI,TaskSchedulerI{
                 scheduler.subtaskActivated(t); // rm?
                 t.execute(true);
                 scheduler.subtaskDeactivated(t); // rm?
-                log.info("Main thread "~Thread.getThis().name~" finished task "~t.taskName);
+                version(DetailedLog){
+                    sinkTogether(&logMsg,delegate void(CharSink s){ // task retain release is ok???
+                        dumper(s)("Thread ")(Thread.getThis().name)(" finished task ")(t); });
+                }
             }
             catch(Exception e) {
                 log.error("exception in main thread ");
@@ -194,6 +204,10 @@ class PExecuter:ExecuterI{
     char[] name(){
         return _name;
     }
+    /// logs a message
+    void logMsg(char[]m){
+        log.info(m);
+    }
     TaskSchedulerI scheduler(){ return _scheduler; }
     /// creates a new executer
     this(char[] name,TaskSchedulerI scheduler=null,int nproc=-1,char[]loggerPath="blip.parallel.smp.exec"){
@@ -220,19 +234,30 @@ class PExecuter:ExecuterI{
     }
     /// the job of the worker threads
     void workThreadJob(){
-        log.info("Work thread "~Thread.getThis().name~" started");
+        sinkTogether(&logMsg,delegate void(CharSink s){
+            dumper(s)("Work thread ")(Thread.getThis().name)(" started");
+        });
         scope(exit){
-            log.info("Work thread ".dup~Thread.getThis().name~" stopped");
+            sinkTogether(&logMsg,delegate void(CharSink s){
+                dumper(s)("Work thread ")(Thread.getThis().name)(" stopped");
+            });
         }
         while(1){
             try{
                 TaskI t=scheduler.nextTask();
-                log.info("Work thread "~Thread.getThis().name~" starting task "~
-                    (t is null?"*NULL*":t.taskName));
+                version(DetailedLog){
+                    sinkTogether(&logMsg,delegate void(CharSink s){
+                        dumper(s)("Work thread ")(Thread.getThis().name)(" starting task ")(t);
+                    });
+                }
                 if (t is null) return;
                 t.execute(false);
                 scheduler.subtaskDeactivated(t);
-                log.info("Work thread "~Thread.getThis().name~" finished task "~t.taskName);
+                version(DetailedLog){
+                    sinkTogether(&logMsg,delegate void(CharSink s){
+                        dumper(s)("Work thread ")(Thread.getThis().name)(" finished task ")(t.taskName);
+                    });
+                }
             }
             catch(Exception e) {
                 log.error("exception in working thread ");

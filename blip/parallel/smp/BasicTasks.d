@@ -1277,8 +1277,10 @@ class RootTask: Task{
         this.warnSpawn=warnSpawn;
     }
     override void internalExe(){
-        log.error("root task '"~taskName~"' should not be executed");
-        assert(0,"root task '"~taskName~"' should not be executed");
+        auto msg =collectAppender(delegate void(CharSink s){
+            dumper(s)("root task ")(this)(" should not be executed"); });
+        log.error(msg);
+        assert(0,msg);
     }
     override void willSpawn(TaskI t){
         if (warnSpawn){

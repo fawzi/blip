@@ -64,6 +64,11 @@ struct StcpRequest{
         gPool=cachedPool(function StcpRequest*(PoolI!(StcpRequest*)p){
             auto res=new StcpRequest;
             res.pool=p;
+            version(TrackStcpRequests){
+                sinkTogether(sout,delegate void(CharSink s){
+                    dumper(s)("StcpRequest@")(cast(void*)res)(" created\n");
+                });
+            }
             return res;
         });
     }
@@ -83,9 +88,19 @@ struct StcpRequest{
         if (pool!is null){
             refCount=1;
             pool.giveBack(this);
+            version(TrackStcpRequests){
+                sinkTogether(sout,delegate void(CharSink s){
+                    dumper(s)("gave StcpRequest@")(cast(void*)this)(" to pool@")(cast(void*)pool)("\n");
+                });
+            }
         } else {
             clear();
             delete this;
+            version(TrackStcpRequests){
+                sinkTogether(sout,delegate void(CharSink s){
+                    dumper(s)("destroyed StcpRequest@")(cast(void*)this)("\n");
+                });
+            }
         }
     }
     mixin RefCountMixin!();
@@ -197,6 +212,11 @@ struct StcpRequest{
         void delegate(Unserializer)unserRes)
     {
         auto res=StcpRequest(connection,url,serArgs,unserRes);
+        version(TrackStcpRequests){
+            sinkTogether(sout,delegate void(CharSink s){
+                dumper(s)(&url.urlWriter)(" uses StcpRequest@")(cast(void*)res)("\n");
+            });
+        }
         res.doRequest();
         if (res.exception!is null)
             throw res.exception; // release? the exception might need this...

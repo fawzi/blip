@@ -237,6 +237,8 @@ class ParaException: Exception{
 }
 
 /// closure to resubmit a task safely (is now needed due to the recursive delay support)
+/// recursive delay support has shown to be of dubious utility, the ratio usefulness/complexity is not convincing
+/// probably it should be removed...
 struct Resubmitter{
     TaskI task;
     PoolI!(Resubmitter*)pool;

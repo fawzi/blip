@@ -65,6 +65,10 @@ class PriQTaskScheduler:TaskSchedulerI {
     Cache nnCache(){
         return _nnCache;
     }
+    /// logs a message
+    void logMsg(char[]m){
+        log.info(m);
+    }
     /// returns the root task
     TaskI rootTask(){ return _rootTask; }
     /// creates a new PriQTaskScheduler
@@ -82,7 +86,11 @@ class PriQTaskScheduler:TaskSchedulerI {
     void addTask(TaskI t){
         assert(t.status==TaskStatus.NonStarted ||
             t.status==TaskStatus.Started,"initial");
-        log.info("task "~t.taskName~" will be added to queue "~name);
+        debug(TrackQueues){
+            sinkTogether(&logMsg,delegate void(CharSink s){
+                dumper(s)("task ")(t)(" will be added to queue ")(this);
+            });
+        }
         if (shouldAddTask(t)){
             queue.insert(t.level,t);
         }
@@ -209,7 +217,7 @@ class PriQTaskScheduler:TaskSchedulerI {
         auto s=dumper(sink);
         s("<PriQTaskScheduler@"); writeOut(sink,cast(void*)this);
         if (shortVersion) {
-            s(" >");
+            s(", name:")(name)(" >");
             return;
         }
         s("\n");

@@ -156,18 +156,21 @@ class PriQScheduler:TaskSchedulerI {
         }
         waitingSince=Time.max;
     }
+    /// logs a message
+    void logMsg(char[]m){
+        log.info(m);
+    }
     void addTask0(TaskI t){
         assert(t.status==TaskStatus.NonStarted ||
             t.status==TaskStatus.Started,"initial");
         debug(TrackQueues){
-            log.info(collectAppender(delegate void(CharSink s){
-                s("pre PriQScheduler "); s(name); s(".addTask0:");writeStatus(s,4);
-            }));
-            log.info("task "~t.taskName~" will be added to queue "~name);
+            sinkTogether(&logMsg,delegate void(CharSink s){
+                dumper(s)("pre PriQScheduler ")(this,true)(".addTask0(")(t)("):");writeStatus(s,4);
+            });
             scope(exit){
-                log.info(collectAppender(delegate void(CharSink s){
-                    s("post PriQScheduler "); s(name); s(".addTask0:");writeStatus(s,4);
-                }));
+                sinkTogether(&logMsg,delegate void(CharSink s){
+                    dumper(s)("post PriQScheduler ")(this,true)(".addTask0:");writeStatus(s,4);
+                });
             }
         }
         if (t.scheduler!is this){
@@ -197,7 +200,9 @@ class PriQScheduler:TaskSchedulerI {
     void addTask(TaskI t){
         assert(t.status==TaskStatus.NonStarted ||
             t.status==TaskStatus.Started,"initial");
-        debug(TrackQueues) log.info("task "~t.taskName~" might be added to queue "~name);
+        debug(TrackQueues) log.info(collectAppender(delegate void(CharSink s){
+            dumper(s)("task ")(t)(" might be added to queue ")(name);
+        }));
         if (shouldAddTask(t)){
             addTask0(t);
         }
@@ -277,22 +282,17 @@ class PriQScheduler:TaskSchedulerI {
             return false;
         }
         debug(TrackQueues){
-            log.info(collectAppender(delegate void(CharSink sink){
-                                     sink("stolen task ");
-                                     writeOut(sink,cast(void*)t);
-                                     sink(" from scheduler ");
-                                     writeOut(sink,this,true);
-                                     sink(" for scheduler ");
-                                     writeOut(sink,targetScheduler,true);
-                                     sink("\n");
-                                 }));
+            sinkTogether(&logMsg,delegate void(CharSink sink){
+                dumper(sink)("stolen task ")(t)(" from scheduler ")(this,true)
+                    (" for scheduler ")(targetScheduler,true);
+            });
         }
         t.scheduler=targetScheduler;
         debug(TrackQueues){
-            log.info(collectAppender(delegate void(CharSink sink){
+            sinkTogether(&logMsg,delegate void(CharSink sink){
                 sink("stealing task "); writeOut(sink,t,true); sink(" from ");
                 writeOut(sink,this,true); sink(" to "); writeOut(sink,targetScheduler,true); sink("\n");
-            }));
+            });
         }
         targetScheduler.addTask0(t);
         // steal more
@@ -311,7 +311,7 @@ class PriQScheduler:TaskSchedulerI {
             }
             t2.scheduler=scheduler2;
             debug(TrackQueues){
-		log.info(collectAppender(delegate void(CharSink sink){
+            sinkTogether(&logMsg,delegate void(CharSink sink){
                     sink("stealing other task "); writeOut(sink,t2,true); sink(" from ");
                     writeOut(sink,this,true); sink(" to "); writeOut(sink,scheduler2,true); sink("\n");
                 }));
@@ -404,7 +404,7 @@ class PriQScheduler:TaskSchedulerI {
         auto s=dumper(sink);
         s("<PriQScheduler@"); writeOut(sink,cast(void*)this);
         if (shortVersion) {
-            s(" >");
+            s(", name:")(name)(" >");
             return;
         }
         s("\n");
@@ -549,20 +549,26 @@ class MultiSched:TaskSchedulerI {
         runLevel=SchedulerRunLevel.Running;
         zeroSem=new Semaphore();
     }
+    /// logs a message
+    void logMsg(char[]m){
+        log.info(m);
+    }
     /// adds a task to be executed without checking for starvation of other schedulers
     void addTask0(TaskI t){
         assert(t.status==TaskStatus.NonStarted ||
             t.status==TaskStatus.Started,"initial");
         debug(TrackQueues){
-            log.info(collectAppender(delegate void(CharSink s){
-                s("pre MultiSched ");s(name);s(".addTask0:");writeStatus(s,4);
-            }));
+            sinkTogether(&logMsg,delegate void(CharSink s){
+                dumper(s)("pre MultiSched ")(this,true)(".addTask0:");writeStatus(s,4);
+            });
             scope(exit){
-                log.info(collectAppender(delegate void(CharSink s){
-                    s("post MultiSched ");s(name);s(".addTask0:");writeStatus(s,4);
-                }));
+                sinkTogether(&logMsg,delegate void(CharSink s){
+                    dumper(s)("post MultiSched ")(this,true)(".addTask0:");writeStatus(s,4);
+                });
             }
-            log.info("task "~t.taskName~" will be added to a newly created queue in "~name);
+            sinkTogether(&logMsg,delegate void(CharSink s){
+                dumper(s)("task ")(t)(" will be added to a newly created queue in ")(this,true);
+            });
         }
         version(NoReuse){
             auto newS=new PriQScheduler(t.taskName,this);
@@ -650,9 +656,9 @@ class MultiSched:TaskSchedulerI {
     /// queue stop
     void queueStopped(PriQScheduler q){
         debug(TrackQueues){
-            log.info(collectAppender(delegate void(CharSink s){
-                s("scheduler "); s(q.name); s(" finished");
-            }));
+            sinkTogether(&logMsg,delegate void(CharSink s){
+                s("scheduler "); writeOut(s,q,true); s(" finished");
+            });
         }
         version(NoReuse){} else{
             insertAt(*pQSchedPool(_nnCache),q);
@@ -662,9 +668,9 @@ class MultiSched:TaskSchedulerI {
         synchronized(queue){
             if (queue.appendL(sched)==0){
                 debug(TrackQueues) {
-                    log.info(collectAppender(delegate void(CharSink s){
-                        s("MultiSched "); s(name); s(" added sched@"); writeOut(s,cast(void*)sched);
-                    }));
+                    sinkTogether(&logMsg,delegate void(CharSink s){
+                        s("MultiSched "); writeOut(s,this,true); s(" added sched@"); writeOut(s,cast(void*)sched);
+                    });
                 }
                 zeroSem.notify();
             }
@@ -777,7 +783,7 @@ class MultiSched:TaskSchedulerI {
         auto s=dumper(sink);
         s("<MultiSched@"); writeOut(sink,cast(void*)this);
         if (shortVersion) {
-            s(" >");
+            s(", name:")(name)(" >");
             return;
         }
         s("\n");
@@ -819,9 +825,9 @@ class MultiSched:TaskSchedulerI {
     /// actions executed on stop (tells the starvationManager)
     void onStop(){
         debug(TrackQueues){
-            log.info(collectAppender(delegate void(CharSink s){
-                s("MultiSched "); s(name); s(" stopped");
-            }));
+            sinkTogether(&logMsg,delegate void(CharSink s){
+                s("MultiSched "); writeOut(s,this,true); s(" stopped");
+            });
         }
         starvationManager.schedulerStopped(this);
     }
@@ -934,6 +940,10 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
         this.onStarvingSched=new OnStarvingScheduler(this);
         addStarvingSched(NumaNode(schedLevel,0));
     }
+    /// logs a message
+    void logMsg(char[]m){
+        log.info(m);
+    }
     
     /// root task execution in one of the schedulers
     TaskI rootTask(){
@@ -1036,14 +1046,14 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
     TaskI trySteal(MultiSched el,int stealLevel){
         TaskI t;
         debug(TrackQueues){
-            log.info(collectAppender(delegate void(CharSink s){
-                s("pre trySteal for "); s(el.name); s(" in "); s(name); s(":");writeStatus(s,4);
-            }));
+            sinkTogether(&logMsg,delegate void(CharSink s){
+                s("pre trySteal for "); writeOut(s,el,true); s(" in "); writeOut(s,this,true); s(":");writeStatus(s,4);
+            });
             scope(exit){
-                log.info(collectAppender(delegate void(CharSink s){
-                    dumper(s)("trySteal for ")(el.name)(" in ")(name)(" returns ")(t)(", status:");
+                sinkTogether(&logMsg,delegate void(CharSink s){
+                    dumper(s)("trySteal for ")(el.name)(" in ")(this,true)(" returns ")(t)(", status:");
                     writeStatus(s,4);
-                }));
+                });
             }
         }
         auto superN=el.numaNode;
@@ -1309,11 +1319,19 @@ class MExecuter:ExecuterI{
         });
         worker.start();
     }
+    /// logs a message
+    void logMsg(char[]m){
+        log.info(m);
+    }
     /// the job of the worker threads
     void workThreadJob(){
-        log.info("Work thread "~Thread.getThis().name~" started");
+        sinkTogether(&logMsg,delegate void(CharSink s){
+            dumper(s)("Work thread ")(Thread.getThis().name)(" started");
+        });
         scope(exit){
-            log.info("Work thread "~Thread.getThis().name~" stopped");
+            sinkTogether(&logMsg,delegate void(CharSink s){
+                dumper(s)("Work thread ")(Thread.getThis().name)(" stopped");
+            });
         }
         try{
             setDefaultCache(_scheduler.nnCache());
@@ -1330,17 +1348,22 @@ class MExecuter:ExecuterI{
         while(1){
             try{
                 TaskI t=scheduler.nextTask();
-                log.info("Work thread "~Thread.getThis().name~" starting task "~
-                    (t is null?"*NULL*":t.taskName));
+                version(DetailedLog){
+                    sinkTogether(&logMsg,delegate void(CharSink s){
+                        dumper(s)("Work thread ")(Thread.getThis().name)(" starting task ")(t);
+                    });
+                }
                 if (t is null) return;
                 auto schedAtt=t.scheduler; // the task scheduler can change just after execution, but before subtaskDeactivated is called...
                 auto tPos=cast(void*)cast(Object)t;
                 t.execute(false);
                 auto tName=t.taskName;
                 schedAtt.subtaskDeactivated(t);
-                sinkTogether(delegate void(char[]s){ log.info(s); },delegate void(CharSink s){
-                    dumper(s)("Work thread ")(Thread.getThis().name)(" finished task ")(tName)("@")(tPos);
-                });
+                version(DetailedLog){
+                    sinkTogether(&logMsg,delegate void(CharSink s){
+                        dumper(s)("Work thread ")(Thread.getThis().name)(" finished task ")(tName)("@")(tPos);
+                    });
+                }
             }
             catch(Exception e) {
                 log.error("exception in working thread ");
@@ -1386,12 +1409,16 @@ class MExecuter:ExecuterI{
             while(n.level<pinLevel){
                 n=topo.superNode(n);
             }
-            char[128] buf;
-            scope s=lGrowableArray!(char)(buf,0);
-            dumper(&s)("Work thread ")(Thread.getThis().name)(" pinned to");
-            writeOut(&s.appendArr,exeNode);
-            log.info(s.data);
-            topo.bindToNode(n);
+            auto res=topo.bindToNode(n);
+            sinkTogether(&logMsg,delegate void(CharSink s){
+                dumper(s)("Work thread ")(Thread.getThis().name);
+                if (res){
+                    s(" pinned to ");
+                } else {
+                    s(" *not* pinned to ");
+                }
+                writeOut(s,exeNode);
+            });
         }
     }
 }
