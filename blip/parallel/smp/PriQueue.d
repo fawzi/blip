@@ -197,6 +197,7 @@ class PriQueue(T){
                     assert(res!is null);
                     if (queue.entries.length==0){
                         PriQLevel nT=queue.next;
+                        queue.next=null;
                         lPool.giveBack(queue);
                         queue=nT;
                     }
@@ -231,28 +232,30 @@ class PriQueue(T){
             }
             size_t iblock=levels.length;
             while(ilevel!=0){
-                --ilevel;
-                --iblock;
                 if (iblock==0){
                     lAtt=queue;
-                    for (size_t iilev=ilevel+1;iilev!=0;--iilev){
+                    for (size_t iilev=ilevel;iilev!=0;--iilev){
                         levels[iilev%levels.length]=lAtt;
                         lAtt=lAtt.next;
                     }
                     iblock=levels.length;
                 }
+                --ilevel;
+                --iblock;
                 if (levels[ilevel%levels.length].entries.popBack(el,filter)){
                     --nEntries;
                     if (levels[ilevel%levels.length].entries.length==0){
-                        if (ilevel%levels.length>0){
-                            levels[ilevel%levels.length-1].next=levels[ilevel%levels.length].next;
-                        } else if (ilevel==0){
+                        if (ilevel==0){
                             queue=levels[0].next;
+                        } else if (iblock!=0){
+                            assert(levels[(ilevel-1)%levels.length].next is levels[ilevel%levels.length]);
+                            levels[(ilevel-1)%levels.length].next=levels[ilevel%levels.length].next;
                         } else {
                             auto lPrev=queue;
                             for (size_t iilev=ilevel;iilev!=0;--iilev){
                                 lPrev=lPrev.next;
                             }
+                            assert(lPrev.next is levels[ilevel%levels.length]);
                             lPrev.next=levels[ilevel%levels.length].next;
                         }
                         levels[ilevel%levels.length].next=null;
