@@ -36,5 +36,5 @@ T insertAt(T)(ref T head,T newHead){
 
 /// removes one element from the top of list
 T popFrom(T)(ref T list){
-    return atomicOp(list,delegate T(T val){ return ((val is null)?null:val.next); /+ do we need a barrier? only alpha needed a barrier for dependent loads... +/ });
+    return atomicOp(list,delegate T(T val){ memoryBarrier!(true,false,false,false)(); return ((val is null)?null:val.next); /+ do we really need a barrier? only alpha needed a barrier for dependent loads... +/ });
 }
