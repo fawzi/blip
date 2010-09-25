@@ -629,22 +629,21 @@ class MultiSched:TaskSchedulerI {
                 });
             }
         }
-        sinkTogether(&logMsg,delegate void(CharSink s){ s("addTask0_pippo1@"); writeOut(s,cast(void*)this); });
-        version(NoReuse){
-            auto newS=new PriQScheduler(t.taskName,this);
-        } else {
-            auto newS=PriQScheduler.gPool.getObj(_nnCache);
-            newS.reset(t.taskName,this);
+        // this large lock should not be needed, but somehow still is
+        // (crash when trySteal steals to x while a task gets redirected to x)
+        // should be investigated better...
+        synchronized(queue){
+            version(NoReuse){
+                auto newS=new PriQScheduler(t.taskName,this);
+            } else {
+                auto newS=PriQScheduler.gPool.getObj(_nnCache);
+                newS.reset(t.taskName,this);
+            }
+            if (t.scheduler is null || t.scheduler is this){
+                t.scheduler=newS;
+            }
+            newS.addTask0(t);
         }
-        sinkTogether(&logMsg,delegate void(CharSink s){ s("addTask0_pippo2@"); writeOut(s,cast(void*)this); s(" with PriQScheduler@"); writeOut(s,cast(void*)newS); });
-        if (t.scheduler is null || t.scheduler is this){
-            t.scheduler=newS;
-        }
-        sinkTogether(&logMsg,delegate void(CharSink s){ s("addTask0_pippo3@"); writeOut(s,cast(void*)this); });
-        Thread.sleep(0.001);
-        sinkTogether(&logMsg,delegate void(CharSink s){ s("addTask0_pippo3b@"); writeOut(s,cast(void*)this); s(" with PriQScheduler@"); writeOut(s,cast(void*)newS); });
-        newS.addTask0(t);
-        sinkTogether(&logMsg,delegate void(CharSink s){ s("addTask0_pippo4@"); writeOut(s,cast(void*)this); });
     }
     /// adds a task to be executed
     void addTask(TaskI t){
