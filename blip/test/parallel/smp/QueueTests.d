@@ -1,7 +1,7 @@
-/// tests for the parallel foreach loops
+/// tests for the smp queues
 /// author: fawzi
 //
-// Copyright 2008-2010 the blip developer group
+// Copyright 2010 the blip developer group
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
