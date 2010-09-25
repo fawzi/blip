@@ -102,16 +102,12 @@ class PriQTaskScheduler:TaskSchedulerI {
     /// returns nextTask if available, null if it should wait
     TaskI nextTaskImmediate(int stealLevel){
         TaskI t;
-        if (queue.nEntries==0){
-            if (stealLevel==0) return null;
-        } else {
-            t=queue.popNext(true);
-        }
-        if (stealLevel>level && t is null){
-            t=trySteal(stealLevel);
-        }
+        if (queue.nEntries==0 && stealLevel==0) return null;
+        t=queue.popNext(true);
         if (t !is null){
             subtaskActivated(t);
+        } else if (stealLevel>level){
+            t=trySteal(stealLevel);
         }
         return t;
     }

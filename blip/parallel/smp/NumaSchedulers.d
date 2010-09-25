@@ -39,6 +39,8 @@ import blip.container.BitVector;
 import blip.container.AtomicSLink;
 import blip.io.Console;
 import blip.sync.Atomic;
+import blip.container.Pool;
+import blip.util.RefCount;
 
 // locking order, be careful to change that to avoid deadlocks
 // especially addSched and redirectedTask are sensible
@@ -105,16 +107,29 @@ class PriQScheduler:TaskSchedulerI {
     Cache nnCache(){
         return _nnCache;
     }
+    PoolI!(PriQScheduler) pool;
     /// returns a random source for scheduling
     final RandomSync rand(){ return _rand; }
+    /// constructor for the pool
+    this(PoolI!(PriQScheduler)p,char[] loggerPath="blip.parallel.smp.queue"){
+        this._rand=new RandomSync();
+        this.inSuperSched=0;
+        log=Log.lookup(loggerPath);
+        runLevel=SchedulerRunLevel.Configuring;
+        stealLevel=int.max;
+        waitingSince=Time.max;
+        superScheduler=null;
+        _nnCache=null; // needs superScheduler
+        queue=null; // needs _nnCache
+        _rootTask=null; // needs _nnCache
+        pool=p;
+    }
     /// creates a new PriQScheduler
-    this(char[] name,MultiSched superScheduler,char[] loggerPath="blip.parallel.smp.queue",int level=0){
+    this(char[] name,MultiSched superScheduler,char[] loggerPath="blip.parallel.smp.queue"){
         this.name=name;
         assert(superScheduler!is null);
         this.superScheduler=superScheduler;
         this._nnCache=superScheduler.nnCache();
-        assert(_nnCache!is null,"null cache!");
-        assert(pQLevelPool!is null,"null pQLevelPool");
         version(NoReuse){
             queue=new PriQueue!(TaskI)();
         } else {
@@ -128,7 +143,7 @@ class PriQScheduler:TaskSchedulerI {
         if (runLevel < cast(int)newLev){
             runLevel=newLev;
             if (runLevel==SchedulerRunLevel.Stopped){
-		log.warn("adding task "~name~" to stopped scheduler...");
+                log.warn("adding task "~name~" to stopped scheduler...");
             }
         }
         stealLevel=int.max;
@@ -140,9 +155,19 @@ class PriQScheduler:TaskSchedulerI {
         assert(superScheduler!is null);
         this.superScheduler=superScheduler;
         this._nnCache=superScheduler.nnCache();
-        if (!queue.reset()){
-            throw new Exception("someone waiting on queue, this should neve happen (wait are only on MultiSched)",
-                __FILE__,__LINE__);
+        if (queue is null){
+            version(NoReuse){
+                queue=new PriQueue!(TaskI)();
+            } else {
+                assert(_nnCache!is null,"nnCache null 2");
+                assert(pQLevelPool!is null,"pQLevelPool null 2");
+                queue=new PriQueue!(TaskI)(pQLevelPool(_nnCache));
+            }
+        } else { // should update the pool used??
+            if (!queue.reset()){
+                throw new Exception("someone waiting on queue, this should neve happen (wait are only on MultiSched)",
+                    __FILE__,__LINE__);
+            }
         }
         stealLevel=int.max;
         inSuperSched=0;
@@ -155,21 +180,53 @@ class PriQScheduler:TaskSchedulerI {
             }
         }
         waitingSince=Time.max;
+        if (rootTask is null){
+            _rootTask=new RootTask(this,0,name~"RootTask");
+        }
     }
     /// logs a message
     void logMsg(char[]m){
         log.info(m);
+    }
+    void release0(){
+        if (pool!is null){
+            refCount=1;
+            debug(TrackQueues){
+                sinkTogether(&logMsg,delegate void(CharSink s){
+                    dumper(s)("giving back ")(this,false)(" to pool");
+                });
+            }
+            pool.giveBack(this);
+        } else {
+            debug(TrackQueues){
+                sinkTogether(&logMsg,delegate void(CharSink s){
+                    dumper(s)("deleting ")(this,false);
+                });
+            }
+            next=null;
+            runLevel=SchedulerRunLevel.Stopped;
+            queue=null;
+            _nnCache=null;
+            delete this;
+        }
+    }
+    debug(TrackQueues){
+        ~this(){
+            sinkTogether(sout,delegate void(CharSink s){
+                dumper(s)("destructor of PriQScheduler@")(cast(void*)this)(" refCount:")(refCount)("\n");
+            });
+        }
     }
     void addTask0(TaskI t){
         assert(t.status==TaskStatus.NonStarted ||
             t.status==TaskStatus.Started,"initial");
         debug(TrackQueues){
             sinkTogether(&logMsg,delegate void(CharSink s){
-                dumper(s)("pre PriQScheduler ")(this,true)(".addTask0(")(t)("):");writeStatus(s,4);
+                dumper(s)("will PriQScheduler ")(this,true)(".addTask0(")(t)("):");writeStatus(s,4);
             });
             scope(exit){
                 sinkTogether(&logMsg,delegate void(CharSink s){
-                    dumper(s)("post PriQScheduler ")(this,true)(".addTask0:");writeStatus(s,4);
+                    dumper(s)("did PriQScheduler@")(cast(void*)this)(".addTask0");
                 });
             }
         }
@@ -201,7 +258,7 @@ class PriQScheduler:TaskSchedulerI {
         assert(t.status==TaskStatus.NonStarted ||
             t.status==TaskStatus.Started,"initial");
         debug(TrackQueues) log.info(collectAppender(delegate void(CharSink s){
-            dumper(s)("task ")(t)(" might be added to queue ")(name);
+            dumper(s)("task ")(t)(" might be added to queue ")(this,true);
         }));
         if (shouldAddTask(t)){
             addTask0(t);
@@ -261,6 +318,7 @@ class PriQScheduler:TaskSchedulerI {
     }
     /// steals tasks from the current scheduler
     bool stealTask(int stealLevel,TaskSchedulerI targetScheduler){
+        assert(targetScheduler!is this);
         if (stealLevel>this.stealLevel) {
             return false;
         }
@@ -283,17 +341,11 @@ class PriQScheduler:TaskSchedulerI {
         }
         debug(TrackQueues){
             sinkTogether(&logMsg,delegate void(CharSink sink){
-                dumper(sink)("stolen task ")(t)(" from scheduler ")(this,true)
+                dumper(sink)("stealing task ")(t)(" from scheduler ")(this,true)
                     (" for scheduler ")(targetScheduler,true);
             });
         }
         t.scheduler=targetScheduler;
-        debug(TrackQueues){
-            sinkTogether(&logMsg,delegate void(CharSink sink){
-                sink("stealing task "); writeOut(sink,t,true); sink(" from ");
-                writeOut(sink,this,true); sink(" to "); writeOut(sink,targetScheduler,true); sink("\n");
-            });
-        }
         targetScheduler.addTask0(t);
         // steal more
         /+  pippo to do
@@ -404,7 +456,7 @@ class PriQScheduler:TaskSchedulerI {
         auto s=dumper(sink);
         s("<PriQScheduler@"); writeOut(sink,cast(void*)this);
         if (shortVersion) {
-            s(", name:")(name)(" >");
+            s(", name:")(name)(" rl:")(runLevel)(" >");
             return;
         }
         s("\n");
@@ -429,7 +481,7 @@ class PriQScheduler:TaskSchedulerI {
     /// writes the status of the queue in a compact and 
     void writeStatus(CharSink s,int intentL){
         synchronized(queue.queueLock){
-            s("{ \"sched@\":"); writeOut(s,cast(void*)this); s(", q:[");
+            s("{ \"sched@\":"); writeOut(s,cast(void*)this); s(", rl:"); writeOut(s,runLevel); s(", q:[");
             auto lAtt=queue.queue;
             while(lAtt !is null){
                 s("\n");
@@ -441,9 +493,7 @@ class PriQScheduler:TaskSchedulerI {
                     } else {
                         s("\"");
                     }
-                    s(e.taskName);
-                    s("@");
-                    writeOut(s,cast(void*)e);
+                    writeOut(s,e);
                 }
                 if (lAtt.entries.length>0) s("\"");
                 s("] }\n");
@@ -471,6 +521,11 @@ class PriQScheduler:TaskSchedulerI {
     }
     /// called when the queue stops
     void onStop(){
+        debug(TrackQueues){
+            sinkTogether(&logMsg,delegate void(CharSink s){
+                dumper(s)("PriQScheduler@")(cast(void*)this)(" stops");
+            });
+        }
         superScheduler.queueStopped(this);
     }
     /// scheduler logger
@@ -479,16 +534,23 @@ class PriQScheduler:TaskSchedulerI {
     bool manyQueued() { return queue.nEntries>15; }
     /// number of simple tasks wanted
     int nSimpleTasksWanted(){ return 4; }
-}
-
-class MultiSched:TaskSchedulerI {
-    static CachedT!(PriQScheduler*) pQSchedPool;
+    // add ref counting
+    mixin RefCountMixin!();
+    static CachedPool!(PriQScheduler) gPool;
     static this(){
-        pQSchedPool=new CachedT!(PriQScheduler*)("PriQScheduler_",function PriQScheduler*(){
-            auto res=cast(PriQScheduler*)cast(void*)new size_t;
+        gPool=cachedPoolNext(function PriQScheduler(PoolI!(PriQScheduler)p){
+            auto res=new PriQScheduler(p);
+            debug(TrackQueues){
+                sinkTogether(sout,delegate void(CharSink s){
+                    dumper(s)("new PriQScheduler@")(cast(void*)res)("\n");
+                });
+            }
             return res;
         });
     }
+}
+
+class MultiSched:TaskSchedulerI {
     /// random source for scheduling
     RandomSync _rand;
     /// queue for tasks to execute
@@ -559,31 +621,30 @@ class MultiSched:TaskSchedulerI {
             t.status==TaskStatus.Started,"initial");
         debug(TrackQueues){
             sinkTogether(&logMsg,delegate void(CharSink s){
-                dumper(s)("pre MultiSched ")(this,true)(".addTask0:");writeStatus(s,4);
+                dumper(s)("pre MultiSched ")(this,true)(".addTask0(")(t)("):");writeStatus(s,4);
             });
             scope(exit){
                 sinkTogether(&logMsg,delegate void(CharSink s){
                     dumper(s)("post MultiSched ")(this,true)(".addTask0:");writeStatus(s,4);
                 });
             }
-            sinkTogether(&logMsg,delegate void(CharSink s){
-                dumper(s)("task ")(t)(" will be added to a newly created queue in ")(this,true);
-            });
         }
+        sinkTogether(&logMsg,delegate void(CharSink s){ s("addTask0_pippo1@"); writeOut(s,cast(void*)this); });
         version(NoReuse){
             auto newS=new PriQScheduler(t.taskName,this);
         } else {
-            auto newS=popFrom(*pQSchedPool(_nnCache));
-            if (newS is null){
-                newS=new PriQScheduler(t.taskName,this);
-            } else {
-                newS.reset(t.taskName,this);
-            }
+            auto newS=PriQScheduler.gPool.getObj(_nnCache);
+            newS.reset(t.taskName,this);
         }
+        sinkTogether(&logMsg,delegate void(CharSink s){ s("addTask0_pippo2@"); writeOut(s,cast(void*)this); s(" with PriQScheduler@"); writeOut(s,cast(void*)newS); });
         if (t.scheduler is null || t.scheduler is this){
             t.scheduler=newS;
         }
+        sinkTogether(&logMsg,delegate void(CharSink s){ s("addTask0_pippo3@"); writeOut(s,cast(void*)this); });
+        Thread.sleep(0.001);
+        sinkTogether(&logMsg,delegate void(CharSink s){ s("addTask0_pippo3b@"); writeOut(s,cast(void*)this); s(" with PriQScheduler@"); writeOut(s,cast(void*)newS); });
         newS.addTask0(t);
+        sinkTogether(&logMsg,delegate void(CharSink s){ s("addTask0_pippo4@"); writeOut(s,cast(void*)this); });
     }
     /// adds a task to be executed
     void addTask(TaskI t){
@@ -598,9 +659,7 @@ class MultiSched:TaskSchedulerI {
     TaskI nextTaskImmediate(){
         TaskI t;
         PriQScheduler sched;
-        while (t is null){
-            if (runLevel==SchedulerRunLevel.Stopped) return null;
-            if (!queue.popFront(sched)) break;
+        while (t is null && runLevel!=SchedulerRunLevel.Stopped && queue.popFront(sched)){
             t=sched.nextTaskImmediate();
         }
         if (t !is null){
@@ -610,6 +669,12 @@ class MultiSched:TaskSchedulerI {
     }
     /// steals tasks from this scheduler
     bool stealTask(int stealLevel,TaskSchedulerI targetScheduler){
+        if (targetScheduler is this){
+            synchronized(queue){
+                if (queue.length>0) return true;
+            }
+            return false;
+        }
         if (stealLevel>this.stealLevel) {
             return false;
         }
@@ -634,6 +699,10 @@ class MultiSched:TaskSchedulerI {
                 if (pos>=queue.length) break;
                 sched=queue[pos];
                 assert(sched.inSuperSched!=0,"unexpected inSuperSched value");
+                sched.retain();
+            }
+            scope(exit){
+                sched.release();
             }
             if (sched.stealLevel>=stealLevel){
                 if (sched.stealTask(stealLevel,targetScheduler)){
@@ -661,7 +730,7 @@ class MultiSched:TaskSchedulerI {
             });
         }
         version(NoReuse){} else{
-            insertAt(*pQSchedPool(_nnCache),q);
+            q.release();
         }
     }
     void addSched(PriQScheduler sched){
@@ -674,13 +743,13 @@ class MultiSched:TaskSchedulerI {
                 }
                 zeroSem.notify();
             }
-            starvationManager.rmStarvingSched(this);
+            //starvationManager.rmStarvingSched(this); // starvation removed only when a task is actually taken. (change?)
         }
     }
     /// returns nextTask (blocks, returns null only when stopped)
     TaskI nextTask(){
         TaskI t;
-        bool activated=false;
+        bool starving=false;
         while(t is null){
             if (runLevel>=SchedulerRunLevel.StopNoTasks){
                 if (queue.length==0){
@@ -691,36 +760,26 @@ class MultiSched:TaskSchedulerI {
                         raiseRunlevel(SchedulerRunLevel.Stopped);
                     }
                 }
-                PriQScheduler sched;
-                if (queue.popFront(sched)){
-                    t=sched.nextTaskImmediate();
-                    if (t is null) continue;
-                }
-                if (acceptLevel>numaNode.level && t is null){
-                    t=starvationManager.trySteal(this,acceptLevel);
-                    if (t!is null) activated=true;
-                }
-                if (runLevel==SchedulerRunLevel.Stopped)
-                    return null;
             }
-            if (t is null) {
+            if (runLevel==SchedulerRunLevel.Stopped) break;
+            t=nextTaskImmediate(acceptLevel);
+            if (t !is null || runLevel==SchedulerRunLevel.Stopped) break;
+            if (!starving){
                 starvationManager.addStarvingSched(this);
-                // better close the gap in which added tasks are not redirected...
-                // remove this? imperfect redirection just leads to inefficency, not errors
-                t=starvationManager.trySteal(this,acceptLevel);
-                if (t!is null) activated=true;
+                starving=true;
+                t=nextTaskImmediate(acceptLevel);
+                if (t !is null || runLevel==SchedulerRunLevel.Stopped) break;
             }
-            if (t is null) {
-                zeroSem.wait();
-                synchronized(queue){
-                    if (queue.length>0 || runLevel==SchedulerRunLevel.Stopped){
-                        zeroSem.notify();
-                    }
+            zeroSem.wait();
+            synchronized(queue){
+                if (queue.length>0 || runLevel==SchedulerRunLevel.Stopped){
+                    zeroSem.notify();
                 }
             }
         }
-        if (!activated) 
-            subtaskActivated(t);
+        if (starving){
+            starvationManager.rmStarvingSched(this);
+        }
         return t;
     }
     /// description (for debugging)
@@ -1050,6 +1109,7 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
                 s("pre trySteal for "); writeOut(s,el,true); s(" in "); writeOut(s,this,true); s(":");writeStatus(s,4);
             });
             scope(exit){
+                sout(cast(void*)cast(Object)t)("pippo\n"); // pippo
                 sinkTogether(&logMsg,delegate void(CharSink s){
                     dumper(s)("trySteal for ")(el.name)(" in ")(this,true)(" returns ")(t)(", status:");
                     writeStatus(s,4);
@@ -1063,10 +1123,9 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
             superN=topo.superNode(superN);
             foreach(subN;randomSubnodesWithLevel(1,cast(Topology!(NumaNode))topo,superN,oldSuper)){
                 auto subP=numa2pos(subN);
-                if (subP<scheds.length && scheds[subP].stealTask(superN.level,el)){
+                if (subP<scheds.length && scheds[subP]!is el && scheds[subP].stealTask(superN.level,el)){
                     t=el.nextTaskImmediate();
                     if (t !is null) {
-                        rmStarvingSched(el);
                         return t;
                     }
                 }
@@ -1081,9 +1140,9 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
                 t=el.nextTaskImmediate();
             }
         }
-        if (t!is null){
-            rmStarvingSched(el);
-        }
+//        if (t!is null){
+//            rmStarvingSched(el); // to ensure that the scheduler is removed
+//        }
         return t;
     }
     bool redirectedTask(TaskI t,MultiSched sched,int stealLevelMax=int.max){
