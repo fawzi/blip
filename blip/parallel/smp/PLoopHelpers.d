@@ -349,7 +349,7 @@ class PLoopIter(T){
         }
         void giveBack(){
             if (pool) pool.giveBack(this);
-            //else delete this;
+            else delete this;
         }
     }
     
