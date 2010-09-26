@@ -1184,13 +1184,16 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
                 for(size_t pAtt=scheds.length;pAtt<=pos;++pAtt){
                     ++nRunningScheds;
                     auto nAtt=pos2numa(pAtt);
-                    scheds~=new MultiSched(name,nAtt,this);
+                    auto nSched=new MultiSched(name,nAtt,this);
+                    scheds~=nSched;
+                    assert(scheds[pAtt] is nSched);
+                    rmStarvingSched(nSched);
                     if (exeLevel<schedLevel){
                         foreach(subN;subnodesWithLevel(exeLevel,cast(Topology!(NumaNode))topo,nAtt)){
-                            startWorker(subN,scheds[pAtt]);
+                            startWorker(subN,nSched);
                         }
                     } else {
-                        startWorker(nAtt,scheds[pAtt]);
+                        startWorker(nAtt,nSched);
                     }
                 }
                 if (scheds.length<topo.nNodes(schedLevel)&&runLevel!=SchedulerRunLevel.Stopped){
