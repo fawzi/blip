@@ -55,6 +55,9 @@ version(Windows){
 } else {
     import tango.stdc.posix.sys.types:pid_t;
 }
+version(noHwloc){
+    import tango.core.Cpuid;
+}
 
 /// identifier for the processor (OS dependent)
 alias long proc_id_t;
