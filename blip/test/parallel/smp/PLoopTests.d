@@ -54,21 +54,30 @@ void testPLoopArray(T)(T[] arr1,SizeLikeNumber!(3,1) blockSize){
     delete copyArr;
 }
 
-void testPLoopIter(T)(T[] arr1){
-    T[] copyArr=new T[](arr1.length);
-    size_t nEl=0;
-    size_t ii=0;
-    foreach(i,ref e;pLoopIter(delegate bool(ref T*el){
-        if (ii<arr1.length){
-            el=&(arr1[ii]);
+struct ArrayIter(T){
+    T[] arr;
+    size_t ii;
+    bool iter(ref T*el){
+        if (ii<arr.length){
+            el=&(arr[ii]);
             ++ii;
             return true;
         }
         return false;
-    })){
+    }
+}
+void testPLoopIter(T)(T[] arr1){
+    T[] copyArr=new T[](arr1.length);
+    size_t nEl=0;
+    size_t ii=0;
+    auto iter=new ArrayIter!(T);
+    iter.arr=arr1;
+    iter.ii=0;
+    foreach(i,ref e;pLoopIter(&iter.iter)){
         copyArr[i]=e;
         atomicAdd(nEl,cast(size_t)1);
     }
+    assert(copyArr==arr1,"copy failed!");
     assert(nEl==arr1.length);
     foreach(i,e;arr1){
         if (copyArr[i] !is e){
@@ -79,7 +88,7 @@ void testPLoopIter(T)(T[] arr1){
     }
     nEl=0;
     ii=0;
-    foreach(ref e;pLoopIter(delegate bool(ref T*el){
+    foreach(ref T e;pLoopIter(delegate bool(ref T*el){
         if (ii<copyArr.length){
             el= &(copyArr[ii]);
             ++ii;
@@ -113,6 +122,7 @@ void testPLoopIter(T)(T[] arr1){
         atomicAdd(nEl,cast(size_t)1);
     }
     assert(nEl==arr1.length);
+    assert(copyArr==arr1);
     foreach(i,e;arr1){
         if (copyArr[i] !is e){
             throw new Exception(collectAppender(delegate void(CharSink sink){

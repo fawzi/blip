@@ -32,8 +32,6 @@ import blip.parallel.smp.WorkManager;
 version(NoPLoop){
     version=NoPLoopIter;
 }
-// ploop iter has/exposes a subtle bug that I did not fix yet, deactivating it
-version=NoPLoopIter;
 
 /// creates a context for a loop.
 /// ctxExtra should define a ctxName createNew() method, startLoop can define blockSize>0
