@@ -1114,7 +1114,6 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
                 s("pre trySteal for "); writeOut(s,el,true); s(" in "); writeOut(s,this,true); s(":");writeStatus(s,4);
             });
             scope(exit){
-                sout(cast(void*)cast(Object)t)("pippo\n"); // pippo
                 sinkTogether(&logMsg,delegate void(CharSink s){
                     dumper(s)("trySteal for ")(el.name)(" in ")(this,true)(" returns ")(t)(", status:");
                     writeStatus(s,4);
