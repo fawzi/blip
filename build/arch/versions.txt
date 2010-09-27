@@ -1,0 +1,37 @@
+Version and debug flags
+
+Debugging a parallel program can be really hard, sometime some logging might be the best
+solution to find an error. Here is the list of debug and version flags.
+
+parallel.smp
+# version DetailedLog: details log of task execution start/end...
+# debug TrackQueues: tracks queues in the tasks
+# version noReuse: avoid reusing Tasks, PriQSchedulers & co
+# debug TrackTasks: follows the tasks
+# debug TrackFibers: tracks fibers in the pools and tasks
+# version TrackCollections: tracks collections of PriQSchedulers and Tasks
+# version NoPLoops: deactivates PLoops (makes them sequential)
+# debug TrackDelayFlags: shows changes in the delay flags
+
+container
+# debug SafeDeque: avoid using memove & co in Deque
+# debug TrackPools: tracks the pools
+
+serialization
+# version UnserializationTrace: tracks unserialization
+# version SerializationTrace: tracks serialization
+
+io
+# version TrackBInReadSome: prints out buffer in read some
+# version TrackEvents: tracks libev events
+# version SocketEcho: echoes writes and reads from BasicSockets
+# version TrackSocketServer: prints out listining, accept,... of Socket server
+
+rpc
+# version TrackRpc: tracks remote procedure calls
+# version StcpTextualSerialization: uses Json serializer for the data sent though stcp (instead of Sbin) 
+# version StcpNoCache: does not use cache 
+# version TrackStcpRequests: writes out creation, distruction, transfer to pool of StcpRequests
+
+tests
+# version NoLog: removes logging from EchoServer and StressEchoServer
