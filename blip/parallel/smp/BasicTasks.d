@@ -47,6 +47,9 @@ debug(TrackFibers){
 debug(TrackDelayFlags){
     version=ImportConsole;
 }
+version(TrackCollections){
+    version=ImportConsole;
+}
 version(ImportConsole) import blip.io.Console;
 
 enum TaskFlags:uint{
@@ -376,14 +379,30 @@ class Task:TaskI{
     }
 
     /// empty constructor, task will need to be reset before using
-    this(){}
+    this(){
+        version(TrackCollections){
+            sinkTogether(sout,delegate void(CharSink s){
+                dumper(s)("creating Task@")(cast(void*)this)("\n");
+            });
+        }
+    }
     /// constructor (with single delegate)
     this(char[] name, void delegate() taskOp,TaskFlags f=TaskFlags.None){
+        version(TrackCollections){
+            sinkTogether(sout,delegate void(CharSink s){
+                dumper(s)("creating Task@")(cast(void*)this)("\n");
+            });
+        }
         reset(name,taskOp,cast(Fiber)null,cast(bool delegate())null,
             cast(TaskI delegate())null, f);
     }
     /// constructor with a possibly yieldable call
     this(char[] name, YieldableCall c){
+        version(TrackCollections){
+            sinkTogether(sout,delegate void(CharSink s){
+                dumper(s)("creating Task@")(cast(void*)this)("\n");
+            });
+        }
         reset(name,c);
     }
     void reset(char[] name, YieldableCall c){
@@ -392,23 +411,50 @@ class Task:TaskI{
     }
     /// constructor (with fiber)
     this(char[] name,Fiber fiber,TaskFlags f=TaskFlags.None){
+        version(TrackCollections){
+            sinkTogether(sout,delegate void(CharSink s){
+                dumper(s)("creating Task@")(cast(void*)this)("\n");
+            });
+        }
         reset(name,&runFiber,fiber,cast(bool delegate())null,
             cast(TaskI delegate())null, f);
     }
     /// constructor (with generator)
     this(char[] name, bool delegate() generator,TaskFlags f=TaskFlags.None){
+        version(TrackCollections){
+            sinkTogether(sout,delegate void(CharSink s){
+                dumper(s)("creating Task@")(cast(void*)this)("\n");
+            });
+        }
         reset(name,&runGenerator,cast(Fiber)null,generator,
             cast(TaskI delegate())null, f);
     }
     /// constructor (with generator)
     this(char[] name, TaskI delegate() generator2,TaskFlags f=TaskFlags.None){
+        version(TrackCollections){
+            sinkTogether(sout,delegate void(CharSink s){
+                dumper(s)("creating Task@")(cast(void*)this)("\n");
+            });
+        }
         reset(name,&runGenerator2,cast(Fiber)null,cast(bool delegate())null,
         generator2, f);
     }
     /// general constructor
     this(char[] name, void delegate() taskOp,Fiber fiber,
         bool delegate() generator,TaskI delegate() generator2, TaskFlags f=TaskFlags.None, FiberPool fPool=null){
+        version(TrackCollections){
+            sinkTogether(sout,delegate void(CharSink s){
+                dumper(s)("creating Task@")(cast(void*)this)("\n");
+            });
+        }
         reset(name,taskOp,fiber,generator,generator2,f,fPool);
+    }
+    version(TrackCollections){
+        ~this(){
+            sinkTogether(sout,delegate void(CharSink s){
+                dumper(s)("collecting Task@")(cast(void*)this)("\n");
+            });
+        }
     }
     void reset(char[] name, void delegate() taskOp,Fiber fiber,
         bool delegate() generator,TaskI delegate() generator2, TaskFlags f=TaskFlags.None, FiberPool fPool=null){

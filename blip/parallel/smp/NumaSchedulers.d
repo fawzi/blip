@@ -112,6 +112,11 @@ class PriQScheduler:TaskSchedulerI {
     final RandomSync rand(){ return _rand; }
     /// constructor for the pool
     this(PoolI!(PriQScheduler)p,char[] loggerPath="blip.parallel.smp.queue"){
+        version(TrackCollections){
+            sinkTogether(sout,delegate void(CharSink s){
+                dumper(s)("creating PriQScheduler@")(cast(void*)this)("\n");
+            });
+        }
         this._rand=new RandomSync();
         this.inSuperSched=0;
         log=Log.lookup(loggerPath);
@@ -126,6 +131,11 @@ class PriQScheduler:TaskSchedulerI {
     }
     /// creates a new PriQScheduler
     this(char[] name,MultiSched superScheduler,char[] loggerPath="blip.parallel.smp.queue"){
+        version(TrackCollections){
+            sinkTogether(sout,delegate void(CharSink s){
+                dumper(s)("creating PriQScheduler@")(cast(void*)this)("\n");
+            });
+        }
         this.name=name;
         assert(superScheduler!is null);
         this.superScheduler=superScheduler;
@@ -210,7 +220,7 @@ class PriQScheduler:TaskSchedulerI {
             delete this;
         }
     }
-    debug(TrackQueues){
+    version(TrackCollections){
         ~this(){
             sinkTogether(sout,delegate void(CharSink s){
                 dumper(s)("destructor of PriQScheduler@")(cast(void*)this)(" refCount:")(refCount)("\n");
@@ -629,21 +639,17 @@ class MultiSched:TaskSchedulerI {
                 });
             }
         }
-        // this large lock should not be needed, but somehow still is
-        // (crash when trySteal steals to x while a task gets redirected to x)
-        // should be investigated better...
-        synchronized(queue){
-            version(NoReuse){
-                auto newS=new PriQScheduler(t.taskName,this);
-            } else {
-                auto newS=PriQScheduler.gPool.getObj(_nnCache);
-                newS.reset(t.taskName,this);
-            }
-            if (t.scheduler is null || t.scheduler is this){
-                t.scheduler=newS;
-            }
-            newS.addTask0(t);
+        PriQScheduler newS;
+        version(NoReuse){
+            newS=new PriQScheduler(t.taskName,this);
+        } else {
+            newS=PriQScheduler.gPool.getObj(_nnCache);
+            newS.reset(t.taskName,this);
         }
+        if (t.scheduler is null || t.scheduler is this){
+            t.scheduler=newS;
+        }
+        newS.addTask0(t);
     }
     /// adds a task to be executed
     void addTask(TaskI t){
@@ -1147,7 +1153,9 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
     bool redirectedTask(TaskI t,MultiSched sched,int stealLevelMax=int.max){
         auto sLevel=min(min(sched.stealLevel,t.stealLevel),cast(int)starved.length-1);
         auto pos=numa2pos(sched.numaNode);
-        if (starved[sLevel][pos]){
+        bool ss;
+        ss=starved[sLevel][pos];
+        if (ss){
             auto superN=sched.numaNode;
             NumaNode oldSuper=superN;
             while (superN.level<sLevel){
@@ -1156,7 +1164,9 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
                     cast(Topology!(NumaNode))topo,superN,oldSuper))
                 {
                     auto pos2=numa2pos(subN);
-                    if (starved[schedLevel][pos2]){
+                    bool ss2;
+                    ss2=starved[schedLevel][pos2];
+                    if (ss2){
                         synchronized(this){
                             if (!starved[sLevel][pos] || starved[schedLevel][pos]){
                                 return false;
@@ -1225,7 +1235,9 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
             }
             if (!hasStarved) break;
             addIfNonExistent(pos);
-            if (starved[schedLevel][pos]) {
+            bool ss;
+            ss=starved[schedLevel][pos];
+            if (ss) {
                 t.scheduler=scheds[pos];
                 scheds[pos].addTask0(t);
                 return;
