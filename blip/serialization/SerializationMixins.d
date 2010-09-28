@@ -123,10 +123,10 @@ char[] serializeSome(char[] typeName1,char[]fieldsDoc,bool classAddPost=true){
         }`;
     if (classAddPost){
         res~=`
-        static if (!is(typeof(this.postSerialize(Serializer.init)))) {
+        static if (!is(typeof(SuperType.init.postSerialize(Serializer.init)))) {
             void postSerialize(Serializer s){ }
         }
-        static if (!is(typeof(this.postUnserialize(Unserializer.init)))) {
+        static if (!is(typeof(SuperType.init.postUnserialize(Unserializer.init)))) {
             typeof(this) postUnserialize(Unserializer s){ return this; }
         }`;
     }
