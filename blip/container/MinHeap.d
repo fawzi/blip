@@ -30,7 +30,7 @@ private import tango.core.Exception;
 
 bool minHeapCompare(T)(T a, T b) {return a <= b;}
 bool maxHeapCompare(T)(T a, T b) {return a >= b;}
-void defaultHeapSwap(T)(T t, uint index) {}
+//void defaultHeapSwap(T)(T t, uint index) {}
 
 /** A heap is a data structure where you can insert items in random order and extract them in sorted order. 
   * Pushing an element into the heap takes O(lg n) and popping the top of the heap takes O(lg n). Heaps are 
@@ -52,7 +52,7 @@ void defaultHeapSwap(T)(T t, uint index) {}
   *               times per insertion or removal.
 */
 
-struct Heap (T, alias Compare = minHeapCompare!(T), alias Move = defaultHeapSwap!(T))
+struct Heap (T, alias Compare = minHeapCompare!(T)/+, alias Move = defaultHeapSwap!(T)+/)
 {
         alias pop       remove;
         alias push      opCatAssign;
@@ -87,7 +87,7 @@ struct Heap (T, alias Compare = minHeapCompare!(T), alias Move = defaultHeapSwap
                        heap.length = 2 * heap.length + 32;
 
                 heap [index] = t;
-                Move (t, index);
+                //Move (t, index);
                 fixup (index);
         }
 
@@ -99,7 +99,14 @@ struct Heap (T, alias Compare = minHeapCompare!(T), alias Move = defaultHeapSwap
 
                 foreach (t; array) push (t);
         }
-
+        /// returns the next smallest element
+        bool popNext(ref T el){
+            if (next!=0){
+                el=removeAt(0);
+                return true;
+            }
+            return false;
+        }
         /** Removes the top of this heap and returns it. */
         T pop ()
         {
@@ -151,7 +158,7 @@ struct Heap (T, alias Compare = minHeapCompare!(T), alias Move = defaultHeapSwap
                 if (next > index)
                 {
                         heap[index] = heap[next];
-                        Move(heap[index], index);
+                        //Move(heap[index], index);
                         fixdown(index);
 
                         // added via ticket 1885 (kudos to wolfwood)
@@ -268,9 +275,9 @@ struct Heap (T, alias Compare = minHeapCompare!(T), alias Move = defaultHeapSwap
                 auto t1 = heap[a];
                 auto t2 = heap[b];
                 heap[a] = t2;
-                Move(t2, a);
+                //Move(t2, a);
                 heap[b] = t1;
-                Move(t1, b);
+                //Move(t1, b);
         }
 }
 
@@ -340,6 +347,11 @@ class MinHeapSync(T){
     T pop(){
         synchronized(this){
             return heap.pop();
+        }
+    }
+    bool popNext(ref T el){
+        synchronized(this){
+            return heap.popNext(el);
         }
     }
     /// returns the minimal energy elements, waits if no elements is available until some becomese available
