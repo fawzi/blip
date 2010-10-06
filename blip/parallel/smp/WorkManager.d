@@ -229,7 +229,7 @@ static this(){
     } else {
         version(NoNuma){
             sequentialTask=immediateTask;
-        } else { // pippo to do sequential task is broken
+        } else {
             sequentialTask=new SequentialTask("sequentialWorkManager",defaultTask,true);
         }
     }

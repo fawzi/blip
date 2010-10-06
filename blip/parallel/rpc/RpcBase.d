@@ -746,7 +746,15 @@ class ProtocolHandler{
         assert(handler!is null,"unhandled protocol for url "~objectUrl);
         return handler.proxyForPUrl(pUrl,proxyName);
     }
-    
+    /// nicer to use method to get a prxy of the given type
+    static T proxyForUrlT(T)(char[]objectUrl,char[]proxyName=null){
+        auto p=proxyForUrl(objectUrl,proxyName);
+        auto res=cast(T)cast(Object)p;
+        if (res is null){
+            throw new Exception("proxy "~objectUrl~" cannot be casted to "~T.stringof);
+        }
+        return res;
+    }
     // dynamic part
     Publisher publisher;
     char[]_handlerUrl;

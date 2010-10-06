@@ -75,7 +75,6 @@ char[] loopCtxMixin(char[]ctxName,char[]ctxExtra,char[] startLoop,char[]loopOp,c
         `~ctxName~` *createNew(){
             assert(gPool!is null,"invalid gPool (forgot addGPool call?)");
             auto res=gPool.getObj();
-            //auto res=new `~ctxName~`; // pippo
             auto p=res.pool;
             *res=*this;
             res.pool=p;
