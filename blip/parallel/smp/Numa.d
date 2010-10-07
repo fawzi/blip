@@ -50,6 +50,9 @@ import blip.io.BasicIO;
 import blip.io.Console;
 import blip.stdc.stdlib:abort;
 import blip.container.GrowableArray:collectAppender;
+import blip.container.Cache;
+import blip.container.Pool;
+
 version(Windows){
     
 } else {
@@ -603,7 +606,7 @@ version(noHwloc){} else {
         LevelMap[] levelMapping; /// mapping numa level -> hwloc depth
         int backMapping[]; /// mapping hwloc depth -> numa level
     
-        class CousinIterator:SimpleIteratorI!(NumaNode){
+        static class CousinIterator:SimpleIteratorI!(NumaNode){
             HwlocTopology topo;
             hwloc_obj_t pos;
         
@@ -614,7 +617,7 @@ version(noHwloc){} else {
         
             bool next(ref NumaNode res){
                 if (pos!is null){
-                    res=NumaNode(backMapping[pos.depth],pos.logical_index);
+                    res=NumaNode(topo.backMapping[pos.depth],pos.logical_index);
                     pos=pos.next_cousin;
                     return true;
                 }
@@ -625,7 +628,7 @@ version(noHwloc){} else {
                 if (pos is null) return 0;
                 int nEl=hwloc_get_nbobjs_by_depth(topo.topology,pos.depth);
                 for (int i=pos.logical_index;i<nEl;++i){
-                    auto n=NumaNode(backMapping[pos.depth],i);
+                    auto n=NumaNode(topo.backMapping[pos.depth],i);
                     auto res=dlg(n);
                     if (res) return res;
                 }
@@ -636,7 +639,7 @@ version(noHwloc){} else {
                 int nEl=hwloc_get_nbobjs_by_depth(topo.topology,pos.depth);
                 size_t ii=0;
                 for (int i=pos.logical_index;i<nEl;++i){
-                    auto n=NumaNode(backMapping[pos.depth],i);
+                    auto n=NumaNode(topo.backMapping[pos.depth],i);
                     auto res=dlg(ii,n);
                     if (res) return res;
                     ++ii;
@@ -649,7 +652,7 @@ version(noHwloc){} else {
                 int nEl=hwloc_get_nbobjs_by_depth(topo.topology,pos.depth);
                 for (int i=pos.logical_index;i<nEl;++i){
                     assert(pos!is null);
-                    auto n=NumaNode(backMapping[pos.depth],i);
+                    auto n=NumaNode(topo.backMapping[pos.depth],i);
                     auto res=dlg(n,pos);
                     if (res) return res;
                     pos=pos.next_cousin;
@@ -658,14 +661,19 @@ version(noHwloc){} else {
             }
         }
 
-        class RandomChildernIterator:SimpleIteratorI!(NumaNode){
+        static class RandomChildernIterator:SimpleIteratorI!(NumaNode){
             HwlocTopology topo;
             hwloc_obj_t[][] childrens;
             int[] pos;
             int[] left;
+            hwloc_obj_t[][] childrensBuf;
+            int[] posBuf;
+            int[] leftBuf;
             int lastStack;
             int level; /// the maximum level of the childrens
             int depth2,maxDepth;
+            PoolI!(RandomChildernIterator) pool;
+            static PoolI!(RandomChildernIterator) gPool;
         
             bool descend(){
                 if (left[lastStack]==0) return false;
@@ -685,19 +693,33 @@ version(noHwloc){} else {
                     return false;
                 }
             }
-                    
+            
+            this (PoolI!(RandomChildernIterator) p){
+                pool=p;
+            }
             this(HwlocTopology topo,hwloc_obj_t[] childrens,uint start,int level){
+                reset(topo,childrens,start,level);
+            }
+            RandomChildernIterator reset(HwlocTopology topo,hwloc_obj_t[] childrens,uint start,int level){
                 this.topo=topo;
                 this.level=level;
-                
+                size_t newLen=1;
                 if (childrens.length>0 && level>=0){
-                    depth2=levelMapping[level].depth;
-                    maxDepth=hwloc_topology_get_depth(topology);
-                    this.childrens.length=maxDepth-levelMapping[level+1].depth+1;
+                    depth2=topo.levelMapping[level].depth;
+                    maxDepth=hwloc_topology_get_depth(topo.topology);
+                    newLen=maxDepth-topo.levelMapping[level+1].depth+1;
+                }
+                if (newLen>childrensBuf.length){
+                    childrensBuf.length=newLen;
+                    posBuf.length=newLen;
+                    leftBuf.length=newLen;
+                }
+                this.childrens=childrensBuf[0..newLen];
+                this.pos=posBuf[0..newLen];
+                this.left=leftBuf[0..newLen];
+                if (childrens.length>0 && level>=0){
                     this.childrens[0]=childrens;
                     lastStack=0;
-                    pos.length =this.childrens.length;
-                    left.length=this.childrens.length;
                     left[0]=childrens.length;
                     pos[0]=start%(childrens.length);
                     start/=childrens.length;
@@ -708,11 +730,37 @@ version(noHwloc){} else {
                 } else {
                     this.childrens=[[]];
                     lastStack=0;
-                    pos=[0];
-                    left=[0];
+                    pos[0]=0;
+                    left[0]=0;
+                }
+                return this;
+            }
+            static RandomChildernIterator opCall(HwlocTopology topo,hwloc_obj_t[] childrens,uint start,int level){
+                auto res=gPool.getObj();
+                res.reset(topo,childrens,start,level);
+                return res;
+            }
+            static this(){
+                gPool=cachedPool(function RandomChildernIterator(PoolI!(RandomChildernIterator)p){
+                    return new RandomChildernIterator(p);
+                });
+            }
+            void giveBack(){
+                if (pool!is null){
+                    pool.giveBack(this);
+                } else {
+                    if (childrensBuf!is null) delete childrensBuf;
+                    if (posBuf!is null) delete posBuf;
+                    if (leftBuf!is null) delete leftBuf;
+                    delete this;
                 }
             }
-        
+            void clear(){
+                topo=null;
+                childrens=null;
+                pos=null;
+                left=null;
+            }
             bool next(ref NumaNode res,ref hwloc_obj_t obj){
                 while(true){
                     while (left[lastStack]<=0){
@@ -741,7 +789,7 @@ version(noHwloc){} else {
                         // unfortunately in the general case we have to check
                         // all possible objects in here...
                         for (int ilevel=level;ilevel>=0;--ilevel){
-                            if (cAtt.depth==levelMapping[ilevel].depth){
+                            if (cAtt.depth==topo.levelMapping[ilevel].depth){
                                 res=NumaNode(ilevel,cAtt.logical_index);
                                 obj=cAtt;
                                 return true;
@@ -768,6 +816,7 @@ version(noHwloc){} else {
                     auto res=dlg(n);
                     if (res!=0) return res;
                 }
+                giveBack();
                 return 0;
             }
 
@@ -779,6 +828,7 @@ version(noHwloc){} else {
                     if (res!=0) return res;
                     ++ii;
                 }
+                giveBack();
                 return 0;
             }
         
@@ -789,6 +839,7 @@ version(noHwloc){} else {
                     auto res=dlg(n,obj);
                     if (res!=0) return res;
                 }
+                giveBack();
                 return 0;
             }
         }
@@ -937,7 +988,7 @@ version(noHwloc){} else {
                 }),__FILE__,__LINE__); // return an empty iterator?
             }
             auto childrens=obj.children[0..obj.arity];
-            return new RandomChildernIterator(this,childrens,0,node.level-1);
+            return RandomChildernIterator(this,childrens,0,node.level-1);
         }
         /// loops on the subnodes, but perform at least a random
         /// rotation on them and tries to avoid the subnodes of skip
@@ -964,7 +1015,7 @@ version(noHwloc){} else {
                 }
                 if (subN.depth!=depthAtt || subN.logical_index!=skipSubnode.pos) break;
             }
-            return new RandomChildernIterator(this,childrens,start,node.level-1);
+            return RandomChildernIterator(this,childrens,start,node.level-1);
         }
     
     /+    static ClassMetaInfo metaI;
