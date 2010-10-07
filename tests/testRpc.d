@@ -232,7 +232,7 @@ void rpcTests(){
             sout("gc collect!\n");
             GC.collect();
             sout("gc did collect!\n");
-            s("tt:")(tNat/tNat)(" ")(tLocP1/tNat)(" ")(tLocP2/tNat)(tLoopBack/tNat)("\n");
+            s("tt:")(tNat/tNat)(" ")(tLocP1/tNat)(" ")(tLocP2/tNat)(" ")(tLoopBack/tNat)("\n");
 
             rpc1.log("rpc1:\n");
         }
