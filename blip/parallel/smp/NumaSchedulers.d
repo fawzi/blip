@@ -41,6 +41,7 @@ import blip.io.Console;
 import blip.sync.Atomic;
 import blip.container.Pool;
 import blip.util.RefCount;
+import blip.core.stacktrace.StackTrace;
 
 // locking order, be careful to change that to avoid deadlocks
 // especially addSched and redirectedTask are sensible
@@ -181,7 +182,15 @@ class PriQScheduler:TaskSchedulerI {
         }
         stealLevel=int.max;
         inSuperSched=0;
-        runLevel=SchedulerRunLevel.Running;
+        version(NoReuse){
+            runLevel=SchedulerRunLevel.Running;
+        } else {
+            version(ReusePriQSched){
+                runLevel=SchedulerRunLevel.StopNoTasks;
+            } else {
+                runLevel=SchedulerRunLevel.Running;
+            }
+        }
         auto levelN=this.superScheduler.runLevel;
         if (runLevel < cast(int)levelN){
             runLevel=levelN;
@@ -192,6 +201,13 @@ class PriQScheduler:TaskSchedulerI {
         waitingSince=Time.max;
         if (rootTask is null){
             _rootTask=new RootTask(this,0,name~"RootTask");
+        }
+    }
+    bool noActiveTasks(){
+        synchronized(queue.queueLock){
+            synchronized(this){
+                return queue.nEntries==0 && activeTasks.length==0;
+            }
         }
     }
     /// logs a message
@@ -232,7 +248,7 @@ class PriQScheduler:TaskSchedulerI {
             t.status==TaskStatus.Started,"initial");
         debug(TrackQueues){
             sinkTogether(&logMsg,delegate void(CharSink s){
-                dumper(s)("will PriQScheduler ")(this,true)(".addTask0(")(t)("):");writeStatus(s,4);
+                dumper(s)("will PriQScheduler ")(this,true)(".addTask0(")(t)(",with superTask:")(t.superTask)(" in task ")(taskAtt.val)("):");writeStatus(s,4);
             });
             scope(exit){
                 sinkTogether(&logMsg,delegate void(CharSink s){
@@ -260,6 +276,11 @@ class PriQScheduler:TaskSchedulerI {
                     }
                 }
             }
+            if (runLevel==SchedulerRunLevel.Stopped){
+                throw new Exception(collectAppender(delegate void(CharSink s){
+                        dumper(s)("addTask0 to stopped PriQScheduler@")(cast(void*)this);
+                    }));
+            }
         }
         if (addToSuperSched) superScheduler.addSched(this);
     }
@@ -277,51 +298,71 @@ class PriQScheduler:TaskSchedulerI {
     /// returns nextTask if available, null if it should wait
     /// adds this to the super scheduler if task is not null
     TaskI nextTaskImmediate(){
+        return nextTaskImmediate(true);
+    }
+    TaskI nextTaskImmediate(bool checkEnd){
+        if (runLevel==SchedulerRunLevel.Stopped){
+            return null;
+        }
         TaskI t;
-        if (runLevel>=SchedulerRunLevel.StopNoTasks){
-            if (queue.nEntries==0){
-                if (runLevel==SchedulerRunLevel.StopNoQueuedTasks){
-                    raiseRunlevel(SchedulerRunLevel.Stopped);
-                } else if (runLevel==SchedulerRunLevel.StopNoTasks &&
-                    queue.nEntries==0 && activeTasks.length==0){
-                    raiseRunlevel(SchedulerRunLevel.Stopped);
+        bool callReuse=false;
+        synchronized(queue.queueLock){ // ugly, but needed to close the hole between pop and activation...
+            t=queue.popNext(true);
+            if (t is null) {
+                inSuperSched=0;
+                if (checkEnd && runLevel>=SchedulerRunLevel.StopNoTasks){
+                    if (runLevel==SchedulerRunLevel.StopNoQueuedTasks){
+                        callReuse=raiseRunlevelB(SchedulerRunLevel.Stopped);
+                    } else if (runLevel==SchedulerRunLevel.StopNoTasks && noActiveTasks){
+                        callReuse=raiseRunlevelB(SchedulerRunLevel.Stopped);
+                    }
                 }
-            }
-            if (runLevel==SchedulerRunLevel.Stopped){
-                synchronized(queue.queueLock){
-                    // empty the queue?
-                    inSuperSched=0;
-                }
-                return null;
+            } else {
+                subtaskActivated(t);
             }
         }
-        t=queue.popNext(true);
-        if (t is null){
-            synchronized(queue.queueLock){
-                t=queue.popNext(true);
-                if (t is null) inSuperSched=0;
-            }
+        if (callReuse){
+            reuse();
+            return null;
         }
         if (t !is null){
             superScheduler.addSched(this);
-            subtaskActivated(t);
         }
         return t;
     }
     /// returns nextTask (blocks, returns null only when stopped)
     TaskI nextTask(){
         TaskI t;
-        t=this.nextTaskImmediate();
-        if (t is null){
-            if (runLevel!=SchedulerRunLevel.Stopped){
-                t=queue.popNext(false);
+        t=this.nextTaskImmediate(false);
+        if (t is null && runLevel!=SchedulerRunLevel.Stopped){
+            bool callReuse=false;
+            synchronized(queue.queueLock){
+                t=queue.popNext(true);
+                if (t is null) {
+                    inSuperSched=0;
+                    if (runLevel>=SchedulerRunLevel.StopNoTasks){
+                        if (runLevel==SchedulerRunLevel.StopNoQueuedTasks){
+                            callReuse=raiseRunlevelB(SchedulerRunLevel.Stopped);
+                        } else if (runLevel==SchedulerRunLevel.StopNoTasks && noActiveTasks){
+                            callReuse=raiseRunlevelB(SchedulerRunLevel.Stopped);
+                        }
+                    }
+                } else {
+                    subtaskActivated(t);
+                }
             }
-            if (t !is null){
-                superScheduler.addSched(this);
-                subtaskActivated(t);
-            } else {
-                assert(runLevel==SchedulerRunLevel.Stopped);
-                inSuperSched=0;
+            if (callReuse){
+                assert(inSuperSched==0);
+                reuse();
+                return null;
+            }
+            if (t is null){
+                t=queue.popNext(false);
+                if (t !is null){
+                    superScheduler.addSched(this);
+                    subtaskActivated(t);
+                }
+                assert(false,"hole between activation ad popping!"); // at the moment this method is not used...
             }
         }
         return t;
@@ -333,19 +374,10 @@ class PriQScheduler:TaskSchedulerI {
             return false;
         }
         TaskI t;
-        if (runLevel>=SchedulerRunLevel.StopNoTasks){
-            if (queue.nEntries==0){
-                if (runLevel==SchedulerRunLevel.StopNoQueuedTasks){
-                    raiseRunlevel(SchedulerRunLevel.Stopped);
-                } else if (runLevel==SchedulerRunLevel.StopNoTasks &&
-                    queue.nEntries==0 && activeTasks.length==0){
-                    raiseRunlevel(SchedulerRunLevel.Stopped);
-                }
-            }
-            if (runLevel==SchedulerRunLevel.Stopped){
-                return false;
-            }
+        if (runLevel==SchedulerRunLevel.Stopped){
+            return false;
         }
+        bool callReuse=false;
         if (!queue.popBack(t,delegate bool(TaskI task){ return task.stealLevel>=stealLevel; })){
             return false;
         }
@@ -361,7 +393,7 @@ class PriQScheduler:TaskSchedulerI {
         /+  pippo to do
         // in general this is dangerous, as the scheduler might get reused in the meantime...
         // should be rewritten for example collecting first all tasks and adding them at once
-        // (adding a addTasks0 method)
+        // (adding a addTasks0 method) or changing the runlevel before adding them...
 
         auto scheduler2=t.scheduler;
         if(scheduler2 is null) scheduler2=targetScheduler;
@@ -398,7 +430,7 @@ class PriQScheduler:TaskSchedulerI {
     }
     /// subtask has started execution (automatically called by nextTask)
     void subtaskActivated(TaskI st){
-        synchronized(this){
+        synchronized(queue.queueLock){
             if (st in activeTasks){
                 activeTasks[st]+=1;
             } else {
@@ -406,33 +438,33 @@ class PriQScheduler:TaskSchedulerI {
             }
             waitingSince=Time.max;
         }
+        superScheduler.subtaskActivated(st);
     }
     /// subtask has stopped execution (but is not necessarily finished)
     /// this has to be called by the executer
     void subtaskDeactivated(TaskI st){
-        bool checkRunLevel=false;
-        synchronized(this){
+        bool callReuse=false;
+        synchronized(queue.queueLock){
             if (activeTasks[st]>1){
                 activeTasks[st]-=1;
             } else {
                 activeTasks.remove(st);
                 if (runLevel>=SchedulerRunLevel.StopNoTasks && queue.nEntries==0){
-                    checkRunLevel=true;
+                    if (runLevel==SchedulerRunLevel.StopNoQueuedTasks){
+                        callReuse=raiseRunlevelB(SchedulerRunLevel.Stopped);
+                    } else if (runLevel==SchedulerRunLevel.StopNoTasks && noActiveTasks){
+                        callReuse=raiseRunlevelB(SchedulerRunLevel.Stopped) && inSuperSched==0;
+                    }
                 }
                 if (activeTasks.length==0){
                     waitingSince=Clock.now;
                 }
             }
         }
-        if (checkRunLevel){
-            if (runLevel==SchedulerRunLevel.StopNoQueuedTasks){
-                raiseRunlevel(SchedulerRunLevel.Stopped);
-            } else if (runLevel==SchedulerRunLevel.StopNoTasks &&
-                activeTasks.length==0){
-                raiseRunlevel(SchedulerRunLevel.Stopped);
-            }
-        }
         superScheduler.subtaskDeactivated(st);
+        if (callReuse){
+            reuse();
+        }
     }
     /// returns wether the current task should be added
     bool shouldAddTask(TaskI t){
@@ -466,7 +498,7 @@ class PriQScheduler:TaskSchedulerI {
         auto s=dumper(sink);
         s("<PriQScheduler@"); writeOut(sink,cast(void*)this);
         if (shortVersion) {
-            s(", name:")(name)(" rl:")(runLevel)(" >");
+            s(", name:")(name)(" runLevel:")(runLevel)(" >");
             return;
         }
         s("\n");
@@ -514,29 +546,27 @@ class PriQScheduler:TaskSchedulerI {
     }
     /// changes the current run level of the scheduler
     /// the level can be only raised and the highest run level is "stopped"
-    void raiseRunlevel(SchedulerRunLevel level){
-        bool callOnStop=false;
+    bool raiseRunlevelB(SchedulerRunLevel level){
+        bool callReuse=false;
         synchronized(this){
             if (runLevel < cast(int)level){
                 runLevel=level;
-                if (runLevel==SchedulerRunLevel.Stopped){
-                    callOnStop=true;
-                }
+                return true;
             }
         }
-        if (callOnStop){
-            queue.stop();
-            onStop();
-        }
+        return false;
+    }
+    void raiseRunlevel(SchedulerRunLevel level){
+        raiseRunlevelB(level);
     }
     /// called when the queue stops
-    void onStop(){
+    void reuse(){
         debug(TrackQueues){
             sinkTogether(&logMsg,delegate void(CharSink s){
-                dumper(s)("PriQScheduler@")(cast(void*)this)(" stops");
+                dumper(s)("PriQScheduler@")(cast(void*)this)(" reused");
             });
         }
-        superScheduler.queueStopped(this);
+        release();
     }
     /// scheduler logger
     Logger logger(){ return log; }
@@ -667,10 +697,12 @@ class MultiSched:TaskSchedulerI {
         while (t is null && runLevel!=SchedulerRunLevel.Stopped && queue.popFront(sched)){
             t=sched.nextTaskImmediate();
         }
-        if (t !is null){
-            subtaskActivated(t);
-        }
         return t;
+    }
+    bool noActiveTasks(){
+        synchronized(this){
+            return activeTasks.length==0;
+        }
     }
     /// steals tasks from this scheduler
     bool stealTask(int stealLevel,TaskSchedulerI targetScheduler){
@@ -688,7 +720,7 @@ class MultiSched:TaskSchedulerI {
                 if (runLevel==SchedulerRunLevel.StopNoQueuedTasks){
                     raiseRunlevel(SchedulerRunLevel.Stopped);
                 } else if (runLevel==SchedulerRunLevel.StopNoTasks &&
-                    queue.length==0 && activeTasks.length==0){
+                    queue.length==0 && noActiveTasks){
                     raiseRunlevel(SchedulerRunLevel.Stopped);
                 }
             }
@@ -727,17 +759,6 @@ class MultiSched:TaskSchedulerI {
         }
         return t;
     }
-    /// queue stop
-    void queueStopped(PriQScheduler q){
-        debug(TrackQueues){
-            sinkTogether(&logMsg,delegate void(CharSink s){
-                s("scheduler "); writeOut(s,q,true); s(" finished");
-            });
-        }
-        version(NoReuse){} else{
-            q.release();
-        }
-    }
     void addSched(PriQScheduler sched){
         synchronized(queue){
             if (queue.appendL(sched)==0){
@@ -761,7 +782,7 @@ class MultiSched:TaskSchedulerI {
                     if (runLevel==SchedulerRunLevel.StopNoQueuedTasks){
                         raiseRunlevel(SchedulerRunLevel.Stopped);
                     } else if (runLevel==SchedulerRunLevel.StopNoTasks &&
-                        queue.length==0 && activeTasks.length==0){
+                        queue.length==0 && noActiveTasks){
                         raiseRunlevel(SchedulerRunLevel.Stopped);
                     }
                 }

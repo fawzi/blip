@@ -63,7 +63,7 @@ enum TaskFlags:uint{
     Resubmit=1<<6,               /// the task should be resubmitted
     ThreadPinned=1<<7,           /// the task should stay pinned to the same thread
     WaitingSubtasks=1<<10,       /// the task is waiting for subtasks to end
-    ImmediateSyncSubtasks=0,// deactivated for now 1<<11, /// subtasks submitted with spawnTaskSync are executed immediately if possible
+    ImmediateSyncSubtasks=0,// deactivated for now 1<<11, /// subtasks submitted with spawnTaskSync are executed immediately if possible, at the moment the problem is that by not going though addTask and the work thread they might have issues (MultiSched vs PriQSched, missing subtaskActivated subtaskDeactivated), should be fixed
 }
 
 class TaskPoolT(int batchSize=16):Pool!(Task,batchSize){
@@ -593,6 +593,7 @@ class Task:TaskI{
     /// the subtasks..
     void startWaiting(){
         assert(status==TaskStatus.Started);
+        scheduler.subtaskActivated(this); // finishTask might want to add tasks, so this task has to be seen as active even if it is not in any queue
         bool callOnFinish=false;
         version(NoTaskLock){
             if (0==flagGet(spawnTasks)){
@@ -655,6 +656,7 @@ class Task:TaskI{
         if (superTask !is null){
             superTask.subtaskEnded(this);
         }
+        scheduler.subtaskDeactivated(this); // pairs with startWaiting activation
         release();
     }
     /// tries to give back the task for later reuse
@@ -783,21 +785,26 @@ class Task:TaskI{
                     default: assert(0);
                 }
             }
+            volatile auto sched=scheduler;
             if (resub){
                 debug(TrackDelayFlags){
                     sinkTogether(sout,delegate void(CharSink s){
                         dumper(s)("preResubmit add task back ")(delayLevel_)(", flags:")(delayFlags,"x")("\n");
                     });
                 }
-                volatile auto sched=scheduler;
                 sched.addTask(this);
             }
+            sched.subtaskDeactivated(this);
             debug(TrackDelayFlags){
                 sinkTogether(sout,delegate void(CharSink s){
                     dumper(s)("postResubmit ")(delayLevel_)(", flags:")(delayFlags,"x")("\n");
                 });
             }
         }
+    }
+    /// resubmits a task that was delayed just once
+    void resubmitDelayedSingle(){
+        resubmitDelayed(delayLevel-1);
     }
     /// delays the current task (which should be yieldable)
     /// opStart is executed after the task has been flagged as delayed, but before
@@ -879,6 +886,7 @@ class Task:TaskI{
                     dumper(s)("delay preYield, flags:")(delayFlags,"x")("\n");
                 });
             }
+            scheduler.subtaskActivated(this);
             if (do_yield) {
                 scheduler.yield();
             }
@@ -928,7 +936,7 @@ class Task:TaskI{
     }
     /// operation that spawn the given task as subtask of this one
     void spawnTask(TaskI task){
-        spawnTask(task,delegate void(){ volatile auto sched=scheduler; sched.addTask(task); });
+        spawnTask(task,delegate void(){ volatile auto sched=task.scheduler; sched.addTask(task); });
     }
     /// spawn a task and waits for its completion
     void spawnTaskSync(TaskI task){
@@ -947,11 +955,16 @@ class Task:TaskI{
             tAtt.delay(delegate void(){
                 if ((flags & TaskFlags.ImmediateSyncSubtasks)!=0){
                     // add something like && rand.uniform!(bool)() to avoid excessive task length?
-                    this.spawnTask(task,delegate void(){ task.execute(); });
+                    this.spawnTask(task,delegate void(){
+                        volatile auto sched=task.scheduler; // this is wrong if sched is a MultiScheduler...
+                        sched.subtaskActivated(task);
+                        task.execute();
+                        sched.subtaskDeactivated(task);
+                    });
                 } else {
                     // to do: allowing the task to be stolen here introduces some problems
                     // not sure why, should investigate (probably connected with scheduler change)
-                    spawnTask(task,delegate void(){ volatile auto sched=scheduler; sched.addTask0(task); });
+                    spawnTask(task,delegate void(){ volatile auto sched=task.scheduler; sched.addTask0(task); });
                 }
             });
         }
@@ -1345,6 +1358,7 @@ class RootTask: Task{
 /// (i.e. a task submitted in this queue should not wait on another task submitted in this queue)
 /// sub-sub-tasks are scheduled normally (unless they influence scheduling) using the scheduler 
 /// of this task (i.e. normally in parallel, this is probably what one wants, and avoids deadlocks)
+/// the scheduler must not be reused when no tasks are executing...
 class SequentialTask:RootTask{
     Deque!(TaskI) queue; // FIFO queue
     TaskI executingTask; // the single task executing now
@@ -1430,6 +1444,7 @@ class SequentialTask:RootTask{
             tAtt.delay(delegate void(){
                 if (toExe!is null){
                     super.spawnTask(toExe,{ toExe.execute(); }); // could even loop until task is executed... but might give subtle priority problems
+                    assert(false,"to setup/cleanup to fix");
                 } else {
                     spawnTask(task);
                 }

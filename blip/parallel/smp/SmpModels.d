@@ -126,7 +126,7 @@ interface TaskSchedulerI:BasicObjectI {
     Logger logger();
     /// yields the current fiber if the scheduler is not sequential
     void yield();
-    /// maybe yields the current fiber (use this to avoid creating too many tasks)
+    /// maybe yields the current fiber (use this to avoid creating too many tasks while reducing context switches)
     void maybeYield();
     /// root task, the easy way to add tasks to this scheduler
     TaskI rootTask();
@@ -210,6 +210,8 @@ interface TaskI:SubtaskNotificationsI{
     /// stopping the current execution. Use it to start the operation that will resume
     /// the task (so that it is not possible to resume before the delay is effective)
     void delay(void delegate()opStart=null);
+    /// resubmit a task that was delayed just once
+    void resubmitDelayedSingle();
     /// resubmit a delayed task, the value is the delayLevel at which the task will return
     /// (thus you should use delayLevel-1 from within the delay task)
     void resubmitDelayed(int);
