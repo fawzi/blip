@@ -653,7 +653,7 @@ class Task:TaskI{
                 }
             }
         }
-        if (superTask !is null){
+        if (superTask !is null && superTask !is this){
             superTask.subtaskEnded(this);
         }
         scheduler.subtaskDeactivated(this); // pairs with startWaiting activation
