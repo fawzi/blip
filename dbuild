@@ -139,7 +139,7 @@ case `uname` in
   *)
   die "unknown platform, you need to set extra_libs_os"
 esac
-extra_libs="${linkFlag}-L${D_HOME}/lib ${linkFlag}-ltango-user-${compShort}$libExt  ${linkFlag}-lblip-${compShort}${mpiVersion}$libExt $mpiFlags $extra_libs_os"
+extra_libs="${linkFlag}-L${D_HOME}/lib ${linkFlag}-lblip-${compShort}${mpiVersion}$libExt ${linkFlag}-ltango-user-${compShort}$libExt $mpiFlags $extra_libs_os"
 
 case $version in
     opt)
@@ -173,7 +173,7 @@ if [ -n "$remote" ] ; then
   MAIN_DIR=`pwd`
 fi
 
-cmd="xfbuild +c$compiler $compFlags +xtango +xblip +xstd +xldc +xgobo +xxf.omg +Ddeps_${out_name} +Oobjs_${out_name} $verbose +o_$out_name $MAIN_DIR/$main_d -I$MAIN_DIR -I$BLIP_HOME -I$DCHEM_HOME $flags $extra_libs $*"
+cmd="xfbuild +c$compiler $compFlags +xtango +xblip +xstd +xldc +Ddeps_${out_name} +Oobjs_${out_name} $verbose +o_$out_name $MAIN_DIR/$main_d -I$MAIN_DIR -I$BLIP_HOME -I$DCHEM_HOME $flags $extra_libs $*"
 
 if [ -n "$verbose" ] ; then
     echo "$cmd"
