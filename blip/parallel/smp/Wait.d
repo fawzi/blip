@@ -180,7 +180,6 @@ class WaitConditionT(bool oneAtTime=true){
                         }
                     }
                 });
-                checkCondition();
             } else {
                 if (sem is null){
                     synchronized(this){
@@ -198,9 +197,8 @@ class WaitConditionT(bool oneAtTime=true){
                     mySem.notify();
                 }
             }
-        } else {
-            checkCondition();
         }
+        checkCondition();
     }
     /// checks periodically if the condition (up to at least maxT milliseconds)
     void poll(uint maxT=uint.max){
