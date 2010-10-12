@@ -61,10 +61,7 @@ class A{
         sout("in voidMethod\n");
     }
     this(){}
-    pragma(msg,rpcMixin("A","tst.A","","iVal|setIVal|b|mult|div|notify:oneway|voidMethod",true));
     mixin(rpcMixin("A","tst.A","","iVal|setIVal|b|mult|div|notify:oneway|voidMethod",true));
-    ///__________
-    ///__________
 }
 
 void rpcTests(){
