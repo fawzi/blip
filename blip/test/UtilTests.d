@@ -20,6 +20,9 @@ import blip.core.Array;
 import blip.rtest.RTest;
 import blip.io.BasicIO;
 import blip.container.GrowableArray;
+import blip.util.NotificationCenter;
+import blip.sync.Atomic;
+import blip.parallel.smp.WorkManager;
 
 void checkLb(T)(T[]arr,T val,size_t lb,size_t ub){
     auto lb1=lBound(arr,val,lb,ub);
@@ -42,6 +45,7 @@ void checkLb(T)(T[]arr,T val,size_t lb,size_t ub){
         }),__FILE__,__LINE__,e);
     }
 }
+
 
 void checkUb(T)(T[]arr,T val,size_t lb,size_t ub){
     auto ub1=uBound(arr,val,lb,ub);
@@ -94,10 +98,66 @@ void testLUBounds(uint[]arr,uint maxVal,uint bound1,uint bound2){
     }
 }
 
+class Summer{
+    int sum;
+    LocalGrowableArray!(int) log;
+    char[] name;
+    void callBack(char[] n,Callback* cl,Variant v){
+        assert(n==name);
+        atomicAdd(sum,v.get!(int)());
+        synchronized(this){
+            log(v.get!(int)());
+        }
+    }
+    this(char[]n){
+        name=n;
+    }
+}
+class DoNotify{
+    int msg;
+    char[] name;
+    NotificationCenter nc;
+    void doNotify(){
+        nc.notify(name,Variant(msg));
+    }
+    this(NotificationCenter nc,char[] n,int m){
+        this.nc=nc;
+        name=n;
+        msg=m;
+    }
+}
+
+void testNotificationCenter(char[] notName,int[] notf){
+    auto nc=new NotificationCenter();
+    auto summer1=new Summer(notName);
+    auto summer2=new Summer(notName);
+    auto summer3=new Summer(notName);
+    auto summer4=new Summer(notName);
+    nc.registerCallback(notName,&summer1.callBack,Callback.Flags.None);
+    nc.registerCallback(notName,&summer2.callBack,Callback.Flags.Resubmit);
+    nc.registerCallback(notName,&summer3.callBack,Callback.Flags.Resubmit|Callback.Flags.ReceiveWhenInProcess);
+    nc.registerCallback(notName,&summer4.callBack,Callback.Flags.ReceiveAll);
+    int mySum=0;
+    Task("notifyAll",delegate void(){
+        for (size_t i=0;i<notf.length;++i){
+            auto notifier=new DoNotify(nc,notName,notf[i]);
+            Task("notify",&notifier.doNotify).autorelease.submit();
+            mySum+=notf[i];
+        }
+    }).autorelease.executeNow();
+    assert(summer4.sum==mySum);
+    assert(summer4.log.length==notf.length);
+    assert(summer3.log.length<=notf.length);
+    assert(summer2.log.length<=notf.length);
+    assert(summer1.log.length==1);
+    assert(summer1.log[0]==summer1.sum);
+}
+
 /// all tests for util, as template so that they are not instantiated if not used
 TestCollection utilTests()(TestCollection superColl=null){
     TestCollection coll=new TestCollection("util",__LINE__,__FILE__,superColl);
     
     autoInitTst.testNoFailF("testLUBounds",&testLUBounds,__LINE__,__FILE__,coll);
+    autoInitTst.testNoFailF("testNotificationCenter",&testNotificationCenter,__LINE__,__FILE__,coll);
     return coll;
 }
