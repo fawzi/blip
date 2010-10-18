@@ -222,7 +222,7 @@ struct BasicSocket{
         return opCall(t.host,t.port);
     }
     /// writes at least one byte (unless src.length==0), but possibly less than src.length
-    final size_t writeSome(void[] src){
+    final size_t writeSomeTout(void[] src,LoopHandlerI loop){
         while(true){
             ptrdiff_t wNow;
             for (int itry=0;itry<eagerTries;++itry){
@@ -252,17 +252,21 @@ struct BasicSocket{
             }
             if (wNow<0){
                 auto tAtt=taskAtt.val;
-                auto watcher=GenericWatcher.ioCreate(cast(int)sock,EV_WRITE,EventHandler(tAtt,tAtt.delayLevel));
+                auto watcher=GenericWatcher.ioCreate(cast(int)sock,EV_WRITE);
                 // implement blocking for non present or non yieldable tasks? it might be dangerous (deadlocks)
-                tAtt.delay(delegate void(){// add a timeout???
-                    defaultWatcher.addWatcher(watcher);
-                });
+                if (!loop.waitForEvent(watcher)){
+                    throw new Exception("timeout while writing",__FILE__,__LINE__);
+                }
                 wNow=0;
             }
         }
     }
+    /// ditto
+    final size_t writeSome(void[] src){
+        return writeSomeTout(src,noToutWatcher);
+    }
     
-    final void writeExact(void[] src){
+    final void writeExactTout(void[] src,LoopHandlerI loop){
         size_t written=0;
         while(written<src.length){
             ptrdiff_t wNow;
@@ -288,11 +292,11 @@ struct BasicSocket{
             }
             if (wNow<0){
                 auto tAtt=taskAtt.val;
-                auto watcher=GenericWatcher.ioCreate(cast(int)sock,EV_WRITE,EventHandler(tAtt,tAtt.delayLevel));
+                auto watcher=GenericWatcher.ioCreate(cast(int)sock,EV_WRITE);
                 // implement blocking for non present or non yieldable tasks? it might be dangeroues (deadlocks)
-                tAtt.delay(delegate void(){// add a timeout???
-                    defaultWatcher.addWatcher(watcher);
-                });
+                if (!loop.waitForEvent(watcher)){
+                    throw new Exception("timeout while writing",__FILE__,__LINE__);
+                }
                 wNow=0;
             }
             version(SocketEcho){
@@ -303,8 +307,11 @@ struct BasicSocket{
             written+=wNow;
         }
     }
+    final void writeExact(void[] src){
+        writeExactTout(src,noToutWatcher);
+    }
     
-    final size_t rawReadInto(void[] dst){
+    final size_t rawReadIntoTout(void[] dst,LoopHandlerI loop){
         ptrdiff_t res;
         while(true){
             for (int itry=0;itry<eagerTries;++itry){
@@ -338,16 +345,16 @@ struct BasicSocket{
             }
             if (res<0){
                 auto tAtt=taskAtt.val;
-                auto watcher=GenericWatcher.ioCreate(cast(int)sock,EV_READ,EventHandler(tAtt,tAtt.delayLevel));
+                auto watcher=GenericWatcher.ioCreate(cast(int)sock,EV_READ);
                 // implement blocking for non present or non yieldable tasks? it might be dangeroues (deadlocks)
                 version(LogReadWaits){
                     sinkTogether(sout,delegate void(CharSink s){
                         dumper(s)("socket ")(sock)(" start waiting in read with event@")(cast(void*)watcher.ptr_)("\n");
                     });
                 }
-                tAtt.delay(delegate void(){// add a timeout???
-                    defaultWatcher.addWatcher(watcher);
-                });
+                if (!loop.waitForEvent(watcher)){
+                    throw new Exception("timeout in read",__FILE__,__LINE__);
+                }
                 res=0;
                 version(LogReadWaits){
                     sinkTogether(sout,delegate void(CharSink s){
@@ -356,6 +363,9 @@ struct BasicSocket{
                 }
             }
         }
+    }
+    final size_t rawReadInto(void[] dst){
+        return rawReadIntoTout(dst,noToutWatcher);
     }
     
     void rawReadExact(void[] buf){
@@ -546,8 +556,8 @@ class SocketServer{
         if (socks.length==0){
             throw new BIONoBindException("no bind sucessful for "~serviceName,__FILE__,__LINE__);
         }
-        defaultWatcher.watchersToAdd.append(watchers);
-        defaultWatcher.notifyAdd();
+        noToutWatcher.watchersToAdd.append(watchers);
+        noToutWatcher.notifyAdd();
     }
 
     bool isStarted(){
@@ -600,31 +610,16 @@ class SocketServer{
     /// stops the server
     void stop(){
         if (!isStarted) return;
-        auto tAtt=taskAtt.val;
-        Semaphore sem;
         void stopWatchers(){
             foreach (w;watchers){
-                w.stop(defaultWatcher.loop);
+                w.stop(noToutWatcher.loop);
             }
             watchers=[];
             foreach (s;socks){
                 close(s);
             }
             socks=[];
-            if (sem){
-                sem.notify();
-            } else {
-                tAtt.resubmitDelayed(tAtt.delayLevel-1);
-            }
         }
-        if (tAtt!is null && tAtt.mightYield()){
-            tAtt.delay({
-                defaultWatcher.addAction(&stopWatchers);
-            });
-        } else {
-            sem=new Semaphore();
-            defaultWatcher.addAction(&stopWatchers);
-            sem.wait();
-        }
+        waitLoopOp(&stopWatchers,&noToutWatcher.addAction);
     }
 }

@@ -61,7 +61,7 @@ class A{
         sout("in voidMethod\n");
     }
     this(){}
-    mixin(rpcMixin("A","tst.A","","iVal|setIVal|b|mult|div|notify:oneway|voidMethod",true));
+    mixin(rpcMixin("tst.A","","iVal|setIVal|b|mult|div|notify:oneway|voidMethod",true,"A"));
 }
 
 void rpcTests(){

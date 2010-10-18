@@ -34,16 +34,20 @@ version(TrackEvents){
 struct EventHandler{
     TaskI task; // this allow nicer errors than inlineAction... but adds some dependencies...
     void delegate() inlineAction;
+    void delegate(bool) inlineActionTout;
     void delegate(ev_loop_t*,GenericWatcher,EventHandler*) callback;
     PoolI!(EventHandler*) pool;
     int delayLevel;
     
-    mixin(descSome("blip.ev.EventHandler","task|delayLevel|inlineAction|callback"));
+    mixin(descSome("blip.ev.EventHandler","task|delayLevel|inlineAction|inlineActionTout|callback"));
     
-    /// the default callback: stops the watcher, executes inlineAction in this thread, then
-    /// starts or resumes the task (if given). Finally recicles the handler and watcher
+    /// the default callback: stops the watcher, executes inlineActionTout in this thread, then
+    /// inlineAction, and starts or resumes the task (if given). Finally recicles the handler and watcher
     void defaultCallbackOnce(ev_loop_t*l,GenericWatcher w,EventHandler*h){
         w.stop(l);
+        if (inlineActionTout !is null){
+            inlineActionTout(true);
+        }
         if (inlineAction !is null){
             inlineAction();
         }
@@ -57,23 +61,27 @@ struct EventHandler{
         w.giveBack();
         giveBack();
     }
-    /// the default repeating callback: executes inlineAction in this thread, then
-    /// starts or resumes the task (if given).
+    /// the default repeating callback: executes inlineActionTout in this thread, then
+    /// inlineAction, Resuming or starting a task periodically is normally wrong, as
+    /// one cannot expect the task to be suspended
     void defaultCallbackRepeat(ev_loop_t*l,GenericWatcher w,EventHandler*h){
+        if (inlineActionTout !is null){
+            inlineActionTout(true);
+        }
         if (inlineAction !is null){
             inlineAction();
         }
         if (task!is null){
-            if (task.status>=TaskStatus.Started){
-                task.resubmitDelayed(delayLevel);
-            } else {
-                task.submit();
-            }
+            throw new Exception(collectAppender(delegate void(CharSink s){
+                dumper(s)("cannot resume or start a task periodically for task ")(task)
+                    (" and watcher ")(w);
+            }));
         }
     }
     void clear(){
         task=null;
         inlineAction=null;
+        inlineActionTout=null;
         callback=&this.defaultCallbackOnce;
     }
     void giveBack(){
@@ -105,9 +113,11 @@ struct EventHandler{
     }
     /// creates a callback that executes the inlineAction (in the io thread, it should be short!)
     /// then starts or resumes the task t (if given)
-    static EventHandler*opCall(void delegate() inlineAction,TaskI t=null, int delayLevel=int.min,bool repeat=false){
+    static EventHandler*opCall(void delegate() inlineAction,TaskI t=null, int delayLevel=int.min,bool repeat=false,
+        void delegate(bool) inlineActionTout=null){
         auto res=gPool.getObj();
         res.inlineAction=inlineAction;
+        res.inlineActionTout=inlineActionTout;
         res.task=t;
         if (delayLevel==int.min && t!is null){
             res.delayLevel=t.delayLevel-1;
@@ -122,13 +132,21 @@ struct EventHandler{
         }
         return res;
     }
+    /// ditto
+    static EventHandler*opCall(void delegate(bool) inlineActionTout,TaskI t=null, int delayLevel=int.min,bool repeat=false,
+        void delegate() inlineAction=null){
+        return EventHandler.opCall(inlineAction,t,delayLevel,repeat,inlineActionTout);
+    }
     /// creates a callback that executes the given callback passing this structure containing task and
     /// inlineAction as last argument
     static EventHandler*opCall(void delegate(ev_loop_t*,GenericWatcher,EventHandler*)callback,
-        void delegate() inlineAction=null,TaskI task=null,int delayLevel=int.min){
+        void delegate(bool) inlineActionTout=null,void delegate() inlineAction=null,TaskI task=null,
+        int delayLevel=int.min)
+    {
         auto res=gPool.getObj();
         res.callback=callback;
         res.inlineAction=inlineAction;
+        res.inlineActionTout=inlineActionTout;
         res.task=task;
         if (delayLevel==int.min && task!is null){
             res.delayLevel=task.delayLevel-1;
@@ -151,72 +169,4 @@ struct EventHandler{
         eH.callback(loop,gWatcher,eH);
     }
 }
-
-/+
-/// A class that handles all events that share a timeout time
-/// I haven't needed this yet, but here is more or less its API
-class TimeoutManager{
-    ev_tstamp timeout;
-    struct TimedEvent{
-        GenericWatcher event;
-        void delegate(bool) eventOp;
-        void delegate() resumeOp;
-        PoolI!(TimedEvent*) pool;
-        TaskI task;
-        TimeoutManager timeoutManager;
-        void delegate() timeoutOp;
-        ev_tstamp endTime;
-        int delayLevel;
-        equals_t opEquals(ref TimedEvent t2){}
-        int opCmp(ref TimedEvent t2){}
-        hash_t toHash(){
-        }
-        void giveBack(){
-        }
-        void start(ev_loop_t* loop){
-
-        }
-        void stop(ev_loop_t* loop){
-
-        }
-        static extern(C) void cCallback(ev_loop_t*loop, ev_watcher *w, int revents){
-            auto gWatcher=GenericWatcher(w,revents);
-            auto eH=gWatcher.data!(TimedEvent*)();
-            if (eH.timeoutManager !is null) {
-                eH.timeoutManager.removeEvent(eH);
-            }
-            assert(eH!is null);
-            if (eventOp)
-            eH.callback(loop,gWatcher,eH);
-        }
-
-        void doTimeout(ev_loop_t* ev_loop){
-            if (endTime<ev_now(ev_loop)){
-                event.stop(ev_loop);
-                if (timeoutOp !is null) timeoutOp();
-                if (task!is null){
-                    if (task.status>=TaskStatus.Started){
-                        task.resubmitDelayed(delayLevel);
-                    } else {
-                        task.submit();
-                    }
-                }
-            }
-        }
-        static PoolI!(TimedEvent*) gPool;
-        static this(){
-            gPool=...;
-        }
-    }
-    MinHeap!(TimedEvent*) timedEvents;
-    ev_loop_t loop;
-    
-    // add new: if none pending add also a new timer. when it "rings", check the endTime of all the events past due, execute them and then set a timer for the next element
-    
-    /// executes timeoutOp if a timeout has occurred, normalOp otherwise normalOp and then resumes toResume (if given)
-    void addNewTimedEvent(GenericWatcher w,Task toResume,void delegate() timeoutOp,void delegate() normalOp=null);
-    /// calls eventOp with true if a timeout occurred, then resumes toResume (if given)
-    void addNewTimedEvent(GenericWatcher w,Task toResume,void delegate(bool) eventOp);
-}
-+/
 

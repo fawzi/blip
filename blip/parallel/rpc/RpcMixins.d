@@ -29,7 +29,7 @@ public import blip.io.BasicIO;
 /// main mixin, creates proxies (possibly also local) and vendor, called 'name~"Proxy"', 'name~"LocalProxy"',
 /// 'name~"Vendor"', extName is used to build the serializer and proxy registration names, it defaults to
 /// the mangleof.
-char[] rpcMixin(char[] name,char[] extName, char[] extraProxyInterfaces,char[]functions,bool localProxy=true){
+char[] rpcMixin(char[] extName, char[] extraProxyInterfaces,char[]functions,bool localProxy=true,char[] name="Default"){
     assert(name.length>0,"name cannot be empty");
     auto functionsComments=extractFieldsAndDocs(functions);
     char[] res;

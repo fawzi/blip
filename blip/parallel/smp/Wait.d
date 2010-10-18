@@ -29,6 +29,7 @@ import blip.container.AtomicSLink;
 import blip.container.Deque;
 import blip.container.GrowableArray;
 import blip.io.BasicIO;
+import blip.bindings.ev.DLibev;
 
 /// an smp parallelization friendly semaphore
 /// uses a LIFO queue, change to FIFO (slighlty more costly)?

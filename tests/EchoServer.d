@@ -80,7 +80,7 @@ class ConnectionHandler{
                     }
                     if (doStop){
                         serv.stop();
-                        defaultWatcher.stopLoop();
+                        noToutWatcher.stopLoop();
                     }
                 }
                 if (read==Eof) break;
@@ -129,7 +129,7 @@ void main(char[][] argv)
         dumper(s)("starting server on port ")(port)("\n");
     });
     serv.start();
-    defaultWatcher.moveLoopHere();
+    noToutWatcher.moveLoopHere();
     sout("main thread finished...\n");
     Thread.sleep(0.1);
     exit(0);

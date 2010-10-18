@@ -241,10 +241,16 @@ struct GenericWatcher{
     int kind;
     PoolI!(GenericWatcher) pool; // should be set only if it is based on any_watcher
     
+    void desc(void delegate(char[])s){
+        dumper(s)("<GenericWatcher@")(ptr_)(" kind:")(kind)(">");
+    }
+    
     void giveBack(){
         if (pool!is null && ptr_!is null){
             pool.giveBack(*this);
         }
+        ptr_=null;
+        kind=Kind.none;
     }
     equals_t opEqual(GenericWatcher w2){
         return (ptr_ is w2.ptr_);
@@ -315,15 +321,20 @@ struct GenericWatcher{
         } else {
             alias T TT;
         }
-        static if (is(T == function)){
+        static if (is(T==watcherCbF)){
+            ev_cb_set(ptrP!(ev_watcher*)(),callback);
+        } else static if (is(T == function)){
             static if (is(T U==arguments)){
                 ev_cb_set(ptrP!(U[1])(),callback);
             } else {
                 static assert(0,"could not extract callback for "~T.stringof);
             }
+        } else static if (is(typeof(&TT.cCallback)== watcherCbF)){
+            ev_set_cb!(ev_watcher*)(ptrP!(ev_watcher*)(),&TT.cCallback);
+            data!(T)(callback);
         } else static if (is(typeof(&TT.cCallback)== function)){
             static if (is(typeof(&TT.cCallback) U==arguments)){
-                ev_cb_set(ptrP!(U[1])(),&TT.cCallback);
+                ev_set_cb(ptrP!(U[1])(),&TT.cCallback);
             }
             data!(T)(callback);
         } else {
@@ -332,11 +343,12 @@ struct GenericWatcher{
     }
     /// Returns the callback currently set on the watcher.
     T cb(T=watcherCbF)(){
-        static if (is(T U==arguments)){
+        return cast(T)ev_cb(ptrP!(ev_watcher*)());
+        /+static if (is(T U==arguments)){
             return ev_cb(ptrP!(U[1])());
         } else {
             static assert(0,"could not extract type for "~T.stringof);
-        }
+        }+/
     }
 
     /// Set and query the priority of the watcher. The priority is a small integer between EV_MAXPRI (default: 2) and EV_MINPRI (default: -2). Pending watchers with higher priority will be invoked before watchers with lower priority, but priority will not keep watchers from being executed (except for ev_idle watchers).
@@ -456,7 +468,7 @@ struct GenericWatcher{
         }
     }
     /// returns the content as a pointer to type T
-    T* ptr(T)(){
+    T* ptr(T=void*)(){
         assert(canCastTo!(T)(kind),collectAppender(delegate void(CharSink s){
             dumper(s)("invalid cast of kind ")(kind)(" to ")(T.stringof);
         }));
@@ -502,6 +514,21 @@ struct GenericWatcher{
     static if (EV_ASYNC_ENABLED){
         mixin(mixinInitAndCreate("async","",""));
     }
+}
+
+/// represents an objects that takes care of an event loop and to which event watchers can be added
+interface LoopHandlerI{
+    /// adds and start an event watcher in this LoopHandlerI (actual adding will probably be posted to be
+    /// executed in this loop). If inlineOp is given it is used as operation to execute
+    /// when the event is triggered, pssing false to it if the timeout was reached
+    void addWatcher(GenericWatcher w,void delegate(bool)inlineOp=null);
+    /// adds an action that will be executed in the loop thread
+    void addAction(void delegate()w);
+    /// utility method to wait for a non repeating GenericWatcher suspending the current task
+    /// returns true if the event was fired, false if a timeout was encountred
+    bool waitForEvent(GenericWatcher w,void delegate(bool)inlineOp=null);
+    /// returns the loop of this LoopHandlerI
+    ev_loop_t*loop();
 }
 
 /// watchers that are currently active (to avoid gc collection, ugly hack)
