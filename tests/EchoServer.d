@@ -29,11 +29,12 @@ import blip.io.BufferIn;
 import blip.core.Thread; //pippo
 import blip.stdc.stdlib:exit;
 import blip.util.IgnoreSigpipe;
-version=ReadTimeOut;
+
 class ConnectionHandler{
     SocketServer serv;
     int status=0;
     bool cached=true;
+    bool timeout=false;
     this(){}
     void handleConnection(ref SocketServer.Handler h){
         auto s=h.sock;
@@ -55,7 +56,7 @@ class ConnectionHandler{
                 if (cached){
                     read=readIn.readSome(buf);
                 } else {
-                    version(ReadTimeOut){
+                    if (timeout){
                         read=s.rawReadIntoTout(buf,sToutWatcher);
                     } else {
                         read=s.rawReadInto(buf);
@@ -132,6 +133,10 @@ void main(char[][] argv)
         if (argv[2].length>0 && argv[2][0]!='c'){
             sout("no cache\n");
             c.cached=false;
+            if (argv[2].length>0 && argv[2][0]=='t'){
+                sout("timeout on read\n");
+                c.timeout=true;
+            }
         }
     }
     auto serv=new SocketServer(port,&c.handleConnection,sout.call);
