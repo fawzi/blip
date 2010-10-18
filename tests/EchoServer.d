@@ -29,7 +29,7 @@ import blip.io.BufferIn;
 import blip.core.Thread; //pippo
 import blip.stdc.stdlib:exit;
 import blip.util.IgnoreSigpipe;
-
+version=ReadTimeOut;
 class ConnectionHandler{
     SocketServer serv;
     int status=0;
@@ -42,10 +42,10 @@ class ConnectionHandler{
                 dumper(sink)("received connection ")(s.sock)(" from ")(h.otherHost)("\n");
             });
         }
+        char[256] buf;
+        BufferedBinStream outStream;
+        BufferIn!(void) readIn;
         try{
-            char[256] buf;
-            BufferedBinStream outStream;
-            BufferIn!(void) readIn;
             if (cached){
                 outStream=new BufferedBinStream(&h.sock.writeExact,2048,&h.sock.flush,&h.sock.close);
                 readIn=new BufferIn!(void)(&h.sock.rawReadInto);
@@ -55,7 +55,11 @@ class ConnectionHandler{
                 if (cached){
                     read=readIn.readSome(buf);
                 } else {
-                    read=s.rawReadInto(buf);
+                    version(ReadTimeOut){
+                        read=s.rawReadIntoTout(buf,sToutWatcher);
+                    } else {
+                        read=s.rawReadInto(buf);
+                    }
                 }
                 if (read>=5 && buf[0..5]=="close"){
                     version(NoLog){} else {
@@ -106,6 +110,13 @@ class ConnectionHandler{
                 sinkTogether(sout,delegate void(CharSink sink){
                     dumper(sink)("Exception in connection")(cast(int)s.sock)(":")(e)("\n");
                 });
+            }
+            if (cached){
+                if (outStream) outStream.close();
+                if (readIn) readIn.shutdownInput();
+            } else {
+                s.close();
+                s.shutdownInput();
             }
         }
     }

@@ -26,7 +26,7 @@ import blip.bindings.ev.Libev;
 import blip.core.Traits;
 import blip.util.TemplateFu;
 public import blip.bindings.ev.Libev: EV_PERIODIC_ENABLED, EV_STAT_ENABLED, EV_IDLE_ENABLED, EV_FORK_ENABLED,
-    EV_EMBED_ENABLED, EV_ASYNC_ENABLED, EV_WALK_ENABLED,ev_loop_t, EV_READ, EV_WRITE;
+    EV_EMBED_ENABLED, EV_ASYNC_ENABLED, EV_WALK_ENABLED,ev_loop_t, EV_READ, EV_WRITE, ev_tstamp;
 import blip.container.HashSet;
 version(TrackEvents){
     import blip.io.Console;
@@ -529,6 +529,8 @@ interface LoopHandlerI{
     bool waitForEvent(GenericWatcher w,void delegate(bool)inlineOp=null);
     /// returns the loop of this LoopHandlerI
     ev_loop_t*loop();
+    /// returns the current time in the loop
+    ev_tstamp now();
 }
 
 /// watchers that are currently active (to avoid gc collection, ugly hack)

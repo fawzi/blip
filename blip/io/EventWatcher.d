@@ -269,6 +269,12 @@ class EventWatcher:LoopHandlerI{
         }
         return true;
     }
+    /// returns the current time
+    /// this seems to work correctly also from multiple threads (i.e. the update is atomic).
+    /// Should it fail one should probably switch to ev_time()
+    final ev_tstamp now(){
+        return ev_now(loop);
+    }
 }
 
 /// A class that handles all events that share a timeout time
@@ -331,11 +337,11 @@ class TimeoutManager:LoopHandlerI{
                 event.start(timeoutManager.loop);
                 next=timeoutManager.list.next;
                 prev=&timeoutManager.list;
+                timeoutManager.list.next=this;
+                next.prev=this;
                 if (next is prev) { // the list was empty
                     timeoutManager.maybeSetTimer();
                 }
-                timeoutManager.list.next=this;
-                next.prev=this;
                 break;
             case Status.TimedOut:
                 release();
@@ -493,6 +499,7 @@ class TimeoutManager:LoopHandlerI{
             res.timeoutManager=t;
             res.event=w;
             res.eventOp=op;
+            res.endTime=res.timeoutManager.now+res.timeoutManager.timeout;
             return res;
         }
     }
@@ -500,7 +507,7 @@ class TimeoutManager:LoopHandlerI{
     
     static extern(C) void cCallback(ev_loop_t*loop, ev_watcher *w, int revents){
         auto gWatcher=GenericWatcher(w,revents);
-        auto tm=gWatcher.data!(TimeoutManager*)();
+        auto tm=gWatcher.data!(TimeoutManager)();
         tm.doTimeout();
     }
 
@@ -510,7 +517,7 @@ class TimeoutManager:LoopHandlerI{
         if (list.prev is &list){
             throw new Exception("list should not be empty in maybeSetTimer",__FILE__,__LINE__);
         }
-        amount=list.prev.endTime-ev_now(watcher.loop);
+        amount=max(list.prev.endTime-ev_now(watcher.loop),0.000000001);
         if (timer.ptr() is null){
             timer=GenericWatcher.timerCreate(0,0,this);
         }
@@ -530,7 +537,7 @@ class TimeoutManager:LoopHandlerI{
         if (list.prev is &list){
             timer.stop(loop);
         } else{
-            ev_tstamp amount=list.prev.endTime-ev_now(watcher.loop);
+            ev_tstamp amount=max(list.prev.endTime-ev_now(watcher.loop),0.000000001);
             timer.ptr!(ev_timer)().repeat=amount;
             timer.again(loop);
         }
@@ -556,6 +563,9 @@ class TimeoutManager:LoopHandlerI{
     bool waitForEvent(GenericWatcher w,void delegate(bool)inlineOp=null){
         auto t=TimedEvent(this,w,inlineOp);
         return t.startAndWait();
+    }
+    final ev_tstamp now(){
+        return watcher.now();
     }
     void stopAction(){
         TimedEvent *pos=list.prev;
