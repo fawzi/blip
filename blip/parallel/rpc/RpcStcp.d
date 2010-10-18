@@ -44,6 +44,7 @@ import blip.container.Cache;
 import blip.util.RefCount;
 import blip.core.Variant;
 import blip.stdc.string:strlen;
+import blip.io.EventWatcher;
 
 /// represents a request to another handler
 ///
@@ -247,17 +248,28 @@ class StcpConnection{
     Status status=Status.Setup;
     size_t lastReqId;
     CharSink log;
+    LoopHandlerI loop;
+    
     size_t nextRequestId(){
         synchronized(this){
             lastReqId=protocolHandler.newRequestId.next();
             return lastReqId;
         }
     }
-    
+    final void writeExact(void[] src){
+        this.sock.writeExactTout(src,loop);
+    }
+    final size_t rawReadInto(void[] dest){
+        return this.sock.rawReadIntoTout(dest,loop);
+    }
+    final void rawReadExact(void[]dest){
+        readExact(&this.rawReadInto,dest);
+    }
     this(StcpProtocolHandler protocolHandler,TargetHost targetHost,BasicSocket sock){
         this.protocolHandler=protocolHandler;
         this.targetHost=targetHost;
         this.sock=sock;
+        this.loop=protocolHandler.loop;
         version(StcpNoCache){}
         else {
             this.sock.noDelay(true); // use no delay to reduce the latency
@@ -265,18 +277,18 @@ class StcpConnection{
         //this.sock.keepalive(true);
         serTask=new SequentialTask("stcpSerTask",defaultTask,true);
         // should limit buffer to 1280 or 1500 or multiples of them? (jumbo frames)
-        outStream=new BufferedBinStream(&this.sock.writeExact,3000,&this.sock.flush,&this.sock.close);
-        readIn=new BufferIn!(void)(&this.sock.rawReadInto);
+        outStream=new BufferedBinStream(&this.writeExact,3000,&this.sock.flush,&this.sock.close);
+        readIn=new BufferIn!(void)(&this.rawReadInto);
         version(StcpTextualSerialization){
-            auto r=new BufferIn!(char)(cast(size_t delegate(char[]))&this.sock.rawReadInto);
+            auto r=new BufferIn!(char)(cast(size_t delegate(char[]))&this.rawReadInto);
             //ReinterpretReader!(void,char) r=readIn.reinterpretReader!(char)();
             charReader=r;
             serializer=new JsonSerializer!(char)(outStream.charSink());
             unserializer=new JsonUnserializer!(char)(charReader);
         } else {
             version(StcpNoCache){
-                serializer=new SBinSerializer(&this.sock.writeExact);
-                unserializer=new SBinUnserializer(&this.sock.rawReadExact);
+                serializer=new SBinSerializer(&this.writeExact);
+                unserializer=new SBinUnserializer(&this.rawReadExact);
             } else {
                 serializer=new SBinSerializer(outStream.binSink());
                 unserializer=new SBinUnserializer(readIn);
@@ -412,7 +424,7 @@ class StcpProtocolHandler: ProtocolHandler{
     static char[][] selfHostnames;
     CharSink log;
     RandomSync rand;
-    
+    LoopHandlerI loop;
     
     static StcpProtocolHandler[char[]] stcpProtocolHandlers;
     
@@ -463,6 +475,7 @@ class StcpProtocolHandler: ProtocolHandler{
         }
         super();
         log=serr.call;
+        loop=noToutWatcher;
         rand=new RandomSync();
         connections=new HashMap!(TargetHost,StcpConnection)();
     }
