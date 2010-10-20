@@ -76,12 +76,12 @@ class ConnectionHandler{
                     break;
                 } else if (read>=4 && buf[0..4]=="stop"){
                     sout("detected stop, stopping server...\n");
-                    bool doStop=true; // a bit of overkill :)
+                    bool doStop=false; // a bit of overkill :)
                     synchronized(this){
                         if (status==0){
                             status=1;
+                            doStop=true;
                         }
-                        doStop=true;
                     }
                     if (doStop){
                         serv.stop();
