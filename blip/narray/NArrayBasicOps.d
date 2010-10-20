@@ -987,32 +987,33 @@ NArray!(T,rank) axisUnfilter1(T,int rank,V,int rank2,S...)
 
 // -------------- norm/compare -------------
 /// feqrel version more forgiving close to 0
-/// if you sum values you cannot expect better than T.epsilon absolute error.
-/// feqrel compares relative error, and close to 0 (where the density of floats is high) it is
-/// much more stringent.
-/// To guarantee T.epsilon absolute error one should use shift=1.0, here we are more stingent
-/// and we use T.mant_dig/4 digits more when close to 0.
-int feqrel2(T)(T x,T y){
+/// if you sum values you cannot expect better than magnitude*T.epsilon absolute error.
+/// feqrel compares relative error, and close to 0 (where the density of floats is high)
+/// it is much more stringent.
+/// To guarantee T.epsilon absolute error one should use magnitude=1.0.
+/// by default we are more stingent and we use T.mant_dig/4 digits more when close to 0.
+int feqrel2(T,U=RealTypeOf!(T))(T x,T y,U magnitude_=ctfe_powI(0.5,T.mant_dig/4)){
+    RealTypeOf!(T) magnitude=cast(RealTypeOf!(T))magnitude_;
+    assert(magnitude>=0,"magnitude should be non negative");
     static if(isComplexType!(T)){
         return min(feqrel2(x.re,y.re),feqrel2(x.im,y.im));
     } else {
-        const T shift=ctfe_powI(0.5,T.mant_dig/4);
         if (x<0){
-            return feqrel(x-shift,y-shift);
+            return feqrel(x-magnitude,y-magnitude);
         } else {
-            return feqrel(x+shift,y+shift);
+            return feqrel(x+magnitude,y+magnitude);
         }
     }
 }
 
 /// returns the minimum number of significand bits in common between array a and b
 /// using feqrel2
-int minFeqrel2(T,int rank)(NArray!(T,rank) a,NArray!(T,rank) b)
+int minFeqrel2(T,int rank,U=RealTypeOf!(T))(NArray!(T,rank) a,NArray!(T,rank) b,U magnitude=ctfe_powI(0.5,T.mant_dig/4))
 in { assert(b.shape==a.shape,"array need to have the same size in minFeqrel"); }
 body {
     int minEq=T.mant_dig;
     mixin(sLoopPtr(rank,["a","b"],
-        "int diffAtt=feqrel2(*aPtr0,*bPtr0); if (diffAtt<minEq) minEq=diffAtt;","i"));
+        "int diffAtt=feqrel2!(T)(*aPtr0,*bPtr0,magnitude); if (diffAtt<minEq) minEq=diffAtt;","i"));
     return minEq;
 }
 
