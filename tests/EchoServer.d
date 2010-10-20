@@ -145,8 +145,8 @@ void main(char[][] argv)
         dumper(s)("starting server on port ")(port)("\n");
     });
     serv.start();
-    noToutWatcher.moveLoopHere();
+    noToutWatcher.moveLoopHere(); // avoids having a thread blocked just waiting...
     sout("main thread finished...\n");
     Thread.sleep(0.1);
-    exit(0);
+    exit(0); // just to be sure (in case there are still listening sockets in other threads)
 }
