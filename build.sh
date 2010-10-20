@@ -10,6 +10,7 @@ build_dir=
 noopt=
 nodbg=
 BLIP_HOME=$PWD
+mpi=
 
 die() {
     echo "$1"
@@ -39,6 +40,7 @@ do
             echo "  --verbose       verbose building"
             echo "  --d-home x      uses x as d home (default $D_HOME )"
             echo "  --blip-home x   uses x as blip home (defaults to $PWD )"
+            echo "  --mpi           compiles the mpi version"
             echo "  --no-tests      does not compile the tests"
             echo "  --no-opt        does not compile the opt version"
             echo "  --no-dbg        does not compile the dbg version"
@@ -75,6 +77,9 @@ do
             shift
             BLIP_HOME=$1
             ;;
+        --mpi)
+            mpi=1
+            ;;
         --no-tests)
             tests=0
             ;;
@@ -108,15 +113,27 @@ fi
 case $compShort in
     dmd)
     linkFlag="-L"
+    versionFlag="-version="
     extra_libs_comp=""
     ;;
     ldc)
     linkFlag="-L="
+    versionFlag="-d-version="
     extra_libs_comp=
     ;;
     *)
     die "unsupported compiler"
 esac
+mpiVersion=
+mpiFlags=
+if [ -n "$mpi" ] ; then
+    mpiFlags=
+    for f in `mpicc --showme:link` ; do
+        mpiFlags="$mpiFlags ${linkFlag}$f"
+    done
+    mpiFlags="$mpiFlags ${versionFlag}mpi"
+    mpiVersion="_mpi"
+fi
 case `uname` in
   Darwin)
   extra_libs_os="${linkFlag}-lhwloc ${linkFlag}-lev ${linkFlag}-framework ${linkFlag}Accelerate ${linkFlag}-lz ${linkFlag}-lbz2"
@@ -131,8 +148,8 @@ case `uname` in
   *)
   die "unknown platform, you need to set extra_libs_os"
 esac
-extra_libs_opt="${linkFlag}-L${D_HOME}/lib ${linkFlag}-ltango-user-${compShort} $extra_libs_os $extra_libs_comp"
-extra_libs_dbg="${linkFlag}-L${D_HOME}/lib ${linkFlag}-ltango-user-${compShort}-dbg $extra_libs_os $extra_libs_comp"
+extra_libs_opt="${linkFlag}-L${D_HOME}/lib ${linkFlag}-ltango-user-${compShort} $extra_libs_os $extra_libs_comp $mpiFlags"
+extra_libs_dbg="${linkFlag}-L${D_HOME}/lib ${linkFlag}-ltango-user-${compShort}-dbg $extra_libs_os $extra_libs_comp $mpiFlags"
 case $version in
     opt)
     extra_libs="$extra_libs_opt"
@@ -142,7 +159,7 @@ case $version in
     ;;
     *)
     echo "unknown version, guessing extra_libs"
-    extra_libs="${linkFlag}-L${D_HOME}/lib ${linkFlag}-ltango-user-${compShort}-dbg $extra_libs_os $extra_libs_comp"
+    extra_libs="${linkFlag}-L${D_HOME}/lib ${linkFlag}-ltango-user-${compShort}-dbg $extra_libs_os $extra_libs_comp $mpiFlags"
 esac
 makeFlags="$silent $build_dir"
 if [ -n "$clean" ]; then
@@ -150,13 +167,13 @@ if [ -n "$clean" ]; then
     rm -f libs/libblip-*
 fi
 if [ -z "$noopt" ]; then
-    $make $makeFlags EXTRA_LIBS="$extra_libs_opt" VERSION=opt lib || die "error building the opt version"
+    $make $makeFlags EXTRA_LIBS="$extra_libs_opt" VERSION=opt${mpiVersion} lib || die "error building the opt version"
 fi
 if [ -z "$nodbg" ]; then
-    $make $makeFlags EXTRA_LIBS="$extra_libs_dbg" VERSION=dbg lib || die "error building the dbg version"
+    $make $makeFlags EXTRA_LIBS="$extra_libs_dbg" VERSION=dbg${mpiVersion} lib || die "error building the dbg version"
 fi
 if [ -n "$tests" ] ; then
-    $make $makeFlags EXTRA_LIBS="$extra_libs" VERSION=$version || die "error building the tests"
+    $make $makeFlags EXTRA_LIBS="$extra_libs" VERSION=$version${mpiVersion} || die "error building the tests"
 fi
 installDir=`dirname $compiler`/../lib
 for l in libs/libblip-* ; do

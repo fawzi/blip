@@ -55,7 +55,7 @@ char[] rpcProxyMixin(char[] name,char[] extName,char[] extraInterfaces,char[][] 
     char[] res=`
     alias typeof(this) `~name~`ProxiedType;`;
     res~=`
-    final static class `~name~`Proxy: `~extraInterfaces~` BasicProxy{
+    final static class `~name~`Proxy: BasicProxy`~((extraInterfaces.length!=0)?",":" ")~extraInterfaces~` {
         this(char[]name,char[]url){
             if (name.length==0)
                 name=`~extNameProxy~`;
@@ -121,7 +121,7 @@ char[] rpcProxyMixin(char[] name,char[] extName,char[] extraInterfaces,char[][] 
     `;
     if (localProxy){
         res~=`
-    final static class `~name~`ProxyLocal:`~extraInterfaces~((extraInterfaces.length==0)?` `:`,`)~`BasicProxy,LocalProxy{
+    final static class `~name~`ProxyLocal: BasicProxy`~((extraInterfaces.length==0)?` `:`,`)~extraInterfaces~`,LocalProxy {
         `~name~`ProxiedType _targetObj;
         TaskI _objTask;
         Object targetObj(){

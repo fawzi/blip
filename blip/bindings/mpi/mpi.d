@@ -527,7 +527,7 @@ struct ompi_predefined_communicator_t {
  extern extern(C) ompi_predefined_datatype_t ompi_mpi_cxx_bool;
  extern extern(C) ompi_predefined_datatype_t ompi_mpi_2cplex, ompi_mpi_2dblcplex;
 /* other MPI2 datatypes */
- extern extern(C) ompi_predefined_datatype_t ompi_mpi_logical1;
+/+ extern extern(C) ompi_predefined_datatype_t ompi_mpi_logical1;
  extern extern(C) ompi_predefined_datatype_t ompi_mpi_logical2;
  extern extern(C) ompi_predefined_datatype_t ompi_mpi_logical4;
  extern extern(C) ompi_predefined_datatype_t ompi_mpi_logical8;
@@ -540,8 +540,7 @@ struct ompi_predefined_communicator_t {
  extern extern(C) ompi_predefined_datatype_t ompi_mpi_real16;
  extern extern(C) ompi_predefined_datatype_t ompi_mpi_complex8;
  extern extern(C) ompi_predefined_datatype_t ompi_mpi_complex16;
- extern extern(C) ompi_predefined_datatype_t ompi_mpi_complex32;
- 
+ extern extern(C) ompi_predefined_datatype_t ompi_mpi_complex32;+/
  enum{ PREDEFINED_ERRHANDLER_PAD=1024 }
 
  struct ompi_predefined_errhandler_t {
@@ -709,24 +708,24 @@ MPI_Errhandler MPI_ERRORS_RETURN;
 static this(){
  MPI_CHARACTER = cast(MPI_Datatype)&ompi_mpi_character;
  MPI_LOGICAL = cast(MPI_Datatype)&ompi_mpi_logic;
- MPI_LOGICAL1 = cast(MPI_Datatype)&ompi_mpi_logical1;
+/+ MPI_LOGICAL1 = cast(MPI_Datatype)&ompi_mpi_logical1;
  MPI_LOGICAL2 = cast(MPI_Datatype)&ompi_mpi_logical2;
  MPI_LOGICAL4 = cast(MPI_Datatype)&ompi_mpi_logical4;
- MPI_LOGICAL8 = cast(MPI_Datatype)&ompi_mpi_logical8;
+ MPI_LOGICAL8 = cast(MPI_Datatype)&ompi_mpi_logical8;+/
  MPI_INTEGER = cast(MPI_Datatype)&ompi_mpi_integer;
- MPI_INTEGER1 = cast(MPI_Datatype)&ompi_mpi_integer1;
+/+ MPI_INTEGER1 = cast(MPI_Datatype)&ompi_mpi_integer1;
  MPI_INTEGER2 = cast(MPI_Datatype)&ompi_mpi_integer2;
  MPI_INTEGER4 = cast(MPI_Datatype)&ompi_mpi_integer4;
- MPI_INTEGER8 = cast(MPI_Datatype)&ompi_mpi_integer8;
+ MPI_INTEGER8 = cast(MPI_Datatype)&ompi_mpi_integer8;+/
  MPI_REAL = cast(MPI_Datatype)&ompi_mpi_real;
- MPI_REAL4 = cast(MPI_Datatype)&ompi_mpi_real4;
+/+ MPI_REAL4 = cast(MPI_Datatype)&ompi_mpi_real4;
  MPI_REAL8 = cast(MPI_Datatype)&ompi_mpi_real8;
- MPI_REAL16 = cast(MPI_Datatype)&ompi_mpi_real16;
+ MPI_REAL16 = cast(MPI_Datatype)&ompi_mpi_real16;+/
  MPI_DOUBLE_PRECISION = cast(MPI_Datatype)&ompi_mpi_dblprec;
  MPI_COMPLEX = cast(MPI_Datatype)&ompi_mpi_cplex;
- MPI_COMPLEX8 = cast(MPI_Datatype)&ompi_mpi_complex8;
+/+ MPI_COMPLEX8 = cast(MPI_Datatype)&ompi_mpi_complex8;
  MPI_COMPLEX16 = cast(MPI_Datatype)&ompi_mpi_complex16;
- MPI_COMPLEX32 = cast(MPI_Datatype)&ompi_mpi_complex32;
+ MPI_COMPLEX32 = cast(MPI_Datatype)&ompi_mpi_complex32;+/
  MPI_DOUBLE_COMPLEX = cast(MPI_Datatype)&ompi_mpi_dblcplex;
  MPI_2REAL = cast(MPI_Datatype)&ompi_mpi_2real;
  MPI_2DOUBLE_PRECISION = cast(MPI_Datatype)&ompi_mpi_2dblprec;

@@ -250,6 +250,14 @@ class StcpConnection{
     CharSink log;
     LoopHandlerI loop;
     
+    override equals_t opEquals(Object o){
+        return this is o;
+    }
+    override int opCmp(Object o){
+        size_t a=cast(size_t)cast(void*)this;
+        size_t b=cast(size_t)cast(void*)o;
+        return ((a<b)?-1:((a==b)?0:1));
+    }
     size_t nextRequestId(){
         synchronized(this){
             lastReqId=protocolHandler.newRequestId.next();

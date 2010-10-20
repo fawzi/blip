@@ -17,12 +17,10 @@ do
             exit 0
             ;;
         --compiler)
-            shift
             compiler=2
             if [ "version" == "1" ] ; then version=0; fi
             ;;
         --version)
-            shift
             version=2
             if [ "compiler" == "1" ] ; then compiler=0; fi
             ;;

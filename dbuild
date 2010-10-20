@@ -95,12 +95,6 @@ if [ -z "$compiler" ]; then
 fi
 compShort=`$BLIP_HOME/build/tools/guessCompiler.sh $compiler`
 
-if [ "$version" == "opt" ]; then
-    libExt=
-else
-    libExt="-$version"
-fi
-
 case $compShort in
     dmd)
     linkFlag="-L"
@@ -123,7 +117,17 @@ if [ -n "$mpi" ] ; then
         mpiFlags="$mpiFlags ${linkFlag}$f"
     done
     mpiFlags="$mpiFlags ${versionFlag}mpi"
-    mpiVersion="-mpi"
+    mpiVersion="_mpi"
+fi
+if [ "${version}" == "opt" ]; then
+    libExt=
+else
+    libExt="-${version}"
+fi
+if [ "${version}${mpiVersion}" == "opt" ]; then
+    libExtB=
+else
+    libExtB="-${version}${mpiVersion}"
 fi
 case `uname` in
   Darwin)
@@ -139,7 +143,7 @@ case `uname` in
   *)
   die "unknown platform, you need to set extra_libs_os"
 esac
-extra_libs="${linkFlag}-L${D_HOME}/lib ${linkFlag}-lblip-${compShort}${mpiVersion}$libExt ${linkFlag}-ltango-user-${compShort}$libExt $mpiFlags $extra_libs_os"
+extra_libs="${linkFlag}-L${D_HOME}/lib ${linkFlag}-lblip-${compShort}$libExtB ${linkFlag}-ltango-user-${compShort}$libExt $mpiFlags $extra_libs_os"
 
 case $version in
     opt)

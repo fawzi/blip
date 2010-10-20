@@ -39,6 +39,9 @@ import blip.io.Console;
 import blip.container.Pool;
 import blip.container.Cache;
 import blip.parallel.smp.WorkManager;
+import blip.container.RedBlack;
+import blip.container.Deque;
+import blip.core.Traits: cmp;
 
 alias void delegate(ubyte[] reqId,void delegate(Serializer) sRes) SendResHandler;
 
@@ -694,6 +697,112 @@ class Publisher{
     }
 }
 
+/// handles failures of remote hosts
+class FailureManager{
+    alias RedBlack!(char[],void delegate(char[])) Node;
+    Node* failureCallbacks;
+    alias void delegate(char[]baseUrl,bool delegate(char[])realFail) FailureHandler;
+    Deque!(FailureHandler) failureHandlers;
+    this(){
+        failureHandlers=new Deque!(FailureHandler)();
+    }
+    /// register a url to be watched for failures
+    void addFailureCallback(char[]url,void delegate(char[])failureOp){
+        synchronized(this){
+            if (failureCallbacks is null){
+                failureCallbacks=new Node;
+                failureCallbacks.value=url;
+                failureCallbacks.attribute=failureOp;
+            } else {
+                auto t = failureCallbacks;
+                auto newEl=new Node;
+                newEl.value=url;
+                newEl.attribute=failureOp;
+                for (;;) {
+                    int diff = cmp(url, t.value);
+                    if (diff <= 0) {
+                        if (t.left){
+                            t = t.left;
+                        } else {
+                            t.insertLeft(newEl,failureCallbacks);
+                            break;
+                        }
+                    } else {
+                        if (t.right){
+                            t = t.right;
+                        } else {
+                            failureCallbacks = t.insertRight (newEl, failureCallbacks);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    void rmFailureCallback(char[]url,void delegate(char[])failureOp){
+        synchronized(this){
+            if (failureCallbacks is null){
+                return;
+            } else {
+                auto t=failureCallbacks.find(url,function int(ref char[]a,ref char[]b){ return cmp(a,b); });
+                if (t!is null){
+                    if (t.attribute is failureOp){ // should use the callback to order same url?
+                        auto tPrev=t.predecessor;
+                        auto tNext=t.successor;
+                        t.remove(failureCallbacks);
+                        t=tPrev;
+                        while(t!is null && t.value==url){ // should be empty
+                            tPrev=t.predecessor;
+                            if (t.attribute is failureOp){
+                                t.remove(failureCallbacks);
+                            }
+                            t=tPrev;
+                        }
+                        t=tNext;
+                        while(t!is null && t.value==url){
+                            tNext=t.successor;
+                            if (t.attribute is failureOp){
+                                t.remove(failureCallbacks);
+                            }
+                            t=tNext;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    /// adds a failureHandler
+    void addFailureHandler(FailureHandler fh){
+        failureHandlers.pushBack(fh);
+    }
+    /// removes a failureHandler
+    void rmFailureHandler(FailureHandler fh){
+        failureHandlers.filterInPlace(delegate bool(FailureHandler f){ return f!is fh; });
+    }
+    /// notifies a failure of some url
+    void notifyFailure(char[]baseUrl,bool delegate(char[])realFail){
+        synchronized(this){
+            if (failureCallbacks!is null){
+                auto iter=failureCallbacks.findFirst(baseUrl,function int(ref char[]a,ref char[]b){ return cmp(a,b); },true);
+                while(iter!is null){
+                    char[] newK=iter.value;
+                    if (newK.length>baseUrl.length) newK=newK[0..baseUrl.length];
+                    if (newK>baseUrl) break;
+                    auto next=iter.successor;
+                    if (realFail(iter.value)){
+                        iter.attribute(iter.value); // spawn this in a subtask?
+                        iter.remove(failureCallbacks);
+                    }
+                    iter=next;
+                }
+            }
+        }
+        foreach(f;failureHandlers){
+            f(baseUrl,realFail);
+        }
+    }
+}
+
 /// handles vending (and possibly also receiving the results if using one channel for both)
 class ProtocolHandler{
     CharSink log;
@@ -720,6 +829,8 @@ class ProtocolHandler{
     }
     static ProxyCreators[char[]] proxyCreators;
     static Mutex proxyCreatorsLock;
+    FailureManager failureManager;
+    
     static this(){
         proxyCreatorsLock=new Mutex();
         ProtocolHandler.registerProxy("blip.BasicProxy",function Proxy(char[]name,char[]url){ return new BasicProxy(name,url); });
@@ -764,6 +875,7 @@ class ProtocolHandler{
         if (log is null)
             this.log=serr.call;
         publisher=new Publisher(this);
+        failureManager=new FailureManager();
     }
     
     // a function with no arguments returning a char[]
@@ -930,3 +1042,4 @@ class ProtocolHandler{
         return handlerUrl()~"/obj/"~objectName;
     }
 }
+
