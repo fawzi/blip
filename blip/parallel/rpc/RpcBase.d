@@ -805,6 +805,9 @@ class FailureManager{
 
 /// handles vending (and possibly also receiving the results if using one channel for both)
 class ProtocolHandler{
+    /// the default protocol handler (to vend objects)
+    /// this defaults to StcpProtocol handler if included
+    static ProtocolHandler defaultProtocol;
     CharSink log;
     // static part (move to a singleton?)
     

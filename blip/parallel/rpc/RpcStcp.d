@@ -433,6 +433,12 @@ class StcpProtocolHandler: ProtocolHandler{
     CharSink log;
     RandomSync rand;
     LoopHandlerI loop;
+    // well known ports: 0-1023 (needs root)
+    // registered ports: 1024-49151 (should be registred at iana)
+    // dynamic ports: 49152-65535 (free usage)
+    // now uses the dynamic ports as fallback, should use a narrower range or ports 24250-24320 that are unassigned (but should be registred...)??
+    ushort fallBackPortMin=49152;
+    ushort fallBackPortMax=65535; // this is exclusive...
     
     static StcpProtocolHandler[char[]] stcpProtocolHandlers;
     
@@ -615,12 +621,6 @@ class StcpProtocolHandler: ProtocolHandler{
     
     override void startServer(bool strict){
         if (server is null){
-            // well known ports: 0-1023 (needs root)
-            // registered ports: 1024-49151 (should be registred at iana)
-            // dynamic ports: 49152-65535 (free usage)
-            // now uses the dynamic ports as fallback, should use a narrower range or ports 24250-24320 that are unassigned (but should be registred...)??
-            ushort fallBackPortMin=49152;
-            ushort fallBackPortMax=65535; // this is exclusive...
             char[] buf;
             char[] origPort=port;
             bool isBound=false;
@@ -723,7 +723,13 @@ static this(){
         StcpProtocolHandler.selfHostnames=[buf[0..strlen(buf.ptr)].dup];
         sout("selfHostnames:")(StcpProtocolHandler.selfHostnames)("\n");
     }
-    // registers the stcp protocol
+    // registers the default stcp protocol
     ProtocolHandler.registerProtocolHandler("stcp",&StcpProtocolHandler.findHandlerForUrl);
+    if (ProtocolHandler.defaultProtocol!is null){
+        auto rpc1=new StcpProtocolHandler("","50000");
+        rpc1.register();
+        // rpc1.startServer(false); // does not start, so that it will require an explicit start. This ensures that no program will open a listening socket without being aware
+        ProtocolHandler.defaultProtocol=rpc1;
+    }
 }
 
