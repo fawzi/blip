@@ -41,10 +41,10 @@ class Dottable(T,int rank1,S,int rank2,bool scanAxis=false, bool randomLayout=fa
     NArray!(S,rank2) b;
     this(NArray!(T,rank1) a,NArray!(S,rank2) b,int axis1=startAxis1,int axis2=startAxis2)
     {
-        assert(-rank1<=axis1 && axis1<rank1,"axis1 out of bounds");
-        assert(-rank2<=axis2 && axis2<rank2,"axis2 out of bounds");
-        assert(a.shape[((axis1<0)?(rank1+axis1):axis1)]==b.shape[((axis2<0)?(rank2+axis2):axis2)],
-            "incompatible sizes");
+        if (!(-rank1<=axis1 && axis1<rank1)) throw new Exception("axis1 out of bounds",__FILE__,__LINE__);
+        if (!(-rank2<=axis2 && axis2<rank2,"axis2 out of bounds");
+        if (!(a.shape[((axis1<0)?(rank1+axis1):axis1)]==b.shape[((axis2<0)?(rank2+axis2):axis2)]))
+            throw new Exception("incompatible sizes",__FILE__,__LINE__);
         this.a=a;
         this.b=b;
         this.axis1=axis1;

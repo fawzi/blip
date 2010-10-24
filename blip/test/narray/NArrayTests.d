@@ -52,34 +52,34 @@ void checkLoop1(T,int rank)(NArray!(T,rank) a){
     {
         index_type optimalChunkSize_i=NArray!(T,rank).defaultOptimalChunkSize;
         mixin(pLoopIdx(rank,["a"],
-        "assert(*aPtr0=="~NArrayInLoop("a",rank,"i")~",\"pLoopIdx looping1 failed\");","i"));
+        "if (*aPtr0!="~NArrayInLoop("a",rank,"i")~") throw new Exception(\"pLoopIdx looping1 failed\",__FILE__,__LINE__);","i"));
     }
     {
         mixin(sLoopGenIdx(rank,["a"],
-        "assert(*aPtr0=="~NArrayInLoop("a",rank,"i")~",\"sLoopGenIdx looping1 failed\");","i"));
+        "if (*aPtr0!="~NArrayInLoop("a",rank,"i")~") throw new Exception(\"sLoopGenIdx looping1 failed\",__FILE__,__LINE__);","i"));
     }
     index_type[rank] iPos;
     const char[] loopBody1=`
-    assert(!did_wrap,"counter wrapped");
-    assert(a.arrayIndex(iPos)==*aPtr0,"sLoopPtr failed");
+    if (did_wrap) throw new Exception("counter wrapped",__FILE__,__LINE__);
+    if (a.arrayIndex(iPos)!=*aPtr0) throw new Exception("sLoopPtr failed",__FILE__,__LINE__);
     did_wrap=a.incrementArrayIdx(iPos);
     `;
     {
         bool did_wrap=false;
         iPos[]=cast(index_type)0;
         mixin(sLoopPtr(rank,["a"],loopBody1,"i"));
-        assert(did_wrap,"incomplete loop");
+        if (did_wrap) throw new Exception("incomplete loop",__FILE__,__LINE__);
     }
     const char[] loopBody2=`
-    assert(!did_wrap,"counter wrapped");
-    assert(a.arrayIndex(iPos)==*aPtr0,"sLoopIdx looping failed");
+    if (did_wrap) throw new Exception("counter wrapped",__FILE__,__LINE__);
+    if (a.arrayIndex(iPos)!=*aPtr0) throw new Exception("sLoopIdx looping failed",__FILE__,__LINE__);
     did_wrap=a.incrementArrayIdx(iPos);
     `;
     {
         bool did_wrap=false;
         iPos[]=cast(index_type)0;
         mixin(sLoopGenIdx(rank,["a"],loopBody2,"i"));
-        assert(did_wrap,"incomplete loop");
+        if (!did_wrap) throw new Exception("incomplete loop",__FILE__,__LINE__);
     }
 }
 
@@ -87,78 +87,81 @@ void checkeq(T,int rank,S)(NArray!(T,rank) a, S x)
 {
     static assert(is(S:T[]),"compare only to array of the same type");
     int i=0;
-    assert(a.size == x.length);
+    if (a.size != x.length) throw new Exception("error",__FILE__,__LINE__);
     foreach(i,v;a.pFlat){
-        assert(v==x[i]);
+        if (v!=x[i]) throw new Exception("error",__FILE__,__LINE__);
     }
 }
 
 void arangeTests(){
-    assert(arange(0.0,0.1,1.0)  .size==1);
-    assert(arange(0.0,1.1,1.0)  .size==2);
-    assert(arange(0.0,-0.1,-1.0).size==1);
-    assert(arange(0.0,-1.1,-1.0).size==2);
-    assert(arange(0,1,10)   .size==1);
-    assert(arange(0,11,10)  .size==2);
-    assert(arange(0,-1,-10) .size==1);
-    assert(arange(0,-11,-10).size==2);
-    assert(arange(0.0,0.9,1.0)  .size==1);
-    assert(arange(0.0,1.9,1.0)  .size==2);
-    assert(arange(0.0,-0.9,-1.0).size==1);
-    assert(arange(0.0,-1.9,-1.0).size==2);
-    assert(arange(0,1,10)   .size==1);
-    assert(arange(0,11,10)  .size==2);
-    assert(arange(0,-1,-10) .size==1);
-    assert(arange(0,-11,-10).size==2);
+    if (arange(0.0,0.1,1.0)  .size!=1) throw new Exception("error",__FILE__,__LINE__);
+    if (arange(0.0,1.1,1.0)  .size!=2) throw new Exception("error",__FILE__,__LINE__);
+    if (arange(0.0,-0.1,-1.0).size!=1) throw new Exception("error",__FILE__,__LINE__);
+    if (arange(0.0,-1.1,-1.0).size!=2) throw new Exception("error",__FILE__,__LINE__);
+    if (arange(0,1,10)   .size!=1)     throw new Exception("error",__FILE__,__LINE__);
+    if (arange(0,11,10)  .size!=2)     throw new Exception("error",__FILE__,__LINE__);
+    if (arange(0,-1,-10) .size!=1)     throw new Exception("error",__FILE__,__LINE__);
+    if (arange(0,-11,-10).size!=2)     throw new Exception("error",__FILE__,__LINE__);
+    if (arange(0.0,0.9,1.0)  .size!=1) throw new Exception("error",__FILE__,__LINE__);
+    if (arange(0.0,1.9,1.0)  .size!=2) throw new Exception("error",__FILE__,__LINE__);
+    if (arange(0.0,-0.9,-1.0).size!=1) throw new Exception("error",__FILE__,__LINE__);
+    if (arange(0.0,-1.9,-1.0).size!=2) throw new Exception("error",__FILE__,__LINE__);
+    if (arange(0,1,10)   .size!=1)     throw new Exception("error",__FILE__,__LINE__);
+    if (arange(0,11,10)  .size!=2)     throw new Exception("error",__FILE__,__LINE__);
+    if (arange(0,-1,-10) .size!=1)     throw new Exception("error",__FILE__,__LINE__);
+    if (arange(0,-11,-10).size!=2)     throw new Exception("error",__FILE__,__LINE__);
 }
 
 void test_iter()
 {
+    void aassert(bool v,long line){
+        if (!v) throw new Exception("aassert",__FILE__,line);
+    }
     alias NArray!(int,2) array;
     array a=a2NAC( [[1,2,3],[4,5,6]] );
 
     auto ii = a.flatIter();
-    assert(!ii.end);
-    assert(ii.ptr == a.data.ptr+0 && ii.value == 1); assert(ii.next && !ii.end);
-    assert(ii.ptr == a.data.ptr+1 && ii.value == 2); assert(ii.next && !ii.end);
-    assert(ii.ptr == a.data.ptr+2 && ii.value == 3); assert(ii.next && !ii.end);
-    assert(ii.ptr == a.data.ptr+3 && ii.value == 4); assert(ii.next && !ii.end);
-    assert(ii.ptr == a.data.ptr+4 && ii.value == 5); assert(ii.next && !ii.end);
-    assert(ii.ptr == a.data.ptr+5 && ii.value == 6);
-    assert(!ii.next && ii.end); assert(!ii.next && ii.end);
+    aassert(!ii.end,__LINE__);
+    aassert(ii.ptr == a.data.ptr+0 && ii.value == 1,__LINE__); aassert(ii.next && !ii.end,__LINE__);
+    aassert(ii.ptr == a.data.ptr+1 && ii.value == 2,__LINE__); aassert(ii.next && !ii.end,__LINE__);
+    aassert(ii.ptr == a.data.ptr+2 && ii.value == 3,__LINE__); aassert(ii.next && !ii.end,__LINE__);
+    aassert(ii.ptr == a.data.ptr+3 && ii.value == 4,__LINE__); aassert(ii.next && !ii.end,__LINE__);
+    aassert(ii.ptr == a.data.ptr+4 && ii.value == 5,__LINE__); aassert(ii.next && !ii.end,__LINE__);
+    aassert(ii.ptr == a.data.ptr+5 && ii.value == 6,__LINE__);
+    aassert(!ii.next && ii.end,__LINE__); aassert(!ii.next && ii.end,__LINE__);
 
     a=a.T(); // a now 3x2
     ii = a.flatIter();
-    assert(!ii.end);
-    assert(ii.ptr == a.data.ptr+0 && ii.value == 1); assert(ii.next && !ii.end);
-    assert(ii.ptr == a.data.ptr+3 && ii.value == 4); assert(ii.next && !ii.end);
-    assert(ii.ptr == a.data.ptr+1 && ii.value == 2); assert(ii.next && !ii.end);
-    assert(ii.ptr == a.data.ptr+4 && ii.value == 5); assert(ii.next && !ii.end);
-    assert(ii.ptr == a.data.ptr+2 && ii.value == 3); assert(ii.next && !ii.end);
-    assert(ii.ptr == a.data.ptr+5 && ii.value == 6); assert(!ii.next && ii.end);
-    assert(!ii.next && ii.end);
+    aassert(!ii.end,__LINE__);
+    aassert(ii.ptr == a.data.ptr+0 && ii.value == 1,__LINE__); aassert(ii.next && !ii.end,__LINE__);
+    aassert(ii.ptr == a.data.ptr+3 && ii.value == 4,__LINE__); aassert(ii.next && !ii.end,__LINE__);
+    aassert(ii.ptr == a.data.ptr+1 && ii.value == 2,__LINE__); aassert(ii.next && !ii.end,__LINE__);
+    aassert(ii.ptr == a.data.ptr+4 && ii.value == 5,__LINE__); aassert(ii.next && !ii.end,__LINE__);
+    aassert(ii.ptr == a.data.ptr+2 && ii.value == 3,__LINE__); aassert(ii.next && !ii.end,__LINE__);
+    aassert(ii.ptr == a.data.ptr+5 && ii.value == 6,__LINE__); aassert(!ii.next && ii.end,__LINE__);
+    aassert(!ii.next && ii.end,__LINE__);
 
     a=a.T(); // a now 2x3 again
     auto jj = a.T.flatIter();
-    assert(!jj.end);
-    assert(jj.ptr == a.data.ptr+0 && jj.value == 1); assert(jj.next && !jj.end);
-    assert(jj.ptr == a.data.ptr+3 && jj.value == 4); assert(jj.next && !jj.end);
-    assert(jj.ptr == a.data.ptr+1 && jj.value == 2); assert(jj.next && !jj.end);
-    assert(jj.ptr == a.data.ptr+4 && jj.value == 5); assert(jj.next && !jj.end);
-    assert(jj.ptr == a.data.ptr+2 && jj.value == 3); assert(jj.next && !jj.end);
-    assert(jj.ptr == a.data.ptr+5 && jj.value == 6); assert(!jj.next && jj.end);
-    assert(!jj.next && jj.end);
+    aassert(!jj.end,__LINE__);
+    aassert(jj.ptr == a.data.ptr+0 && jj.value == 1,__LINE__); aassert(jj.next && !jj.end,__LINE__);
+    aassert(jj.ptr == a.data.ptr+3 && jj.value == 4,__LINE__); aassert(jj.next && !jj.end,__LINE__);
+    aassert(jj.ptr == a.data.ptr+1 && jj.value == 2,__LINE__); aassert(jj.next && !jj.end,__LINE__);
+    aassert(jj.ptr == a.data.ptr+4 && jj.value == 5,__LINE__); aassert(jj.next && !jj.end,__LINE__);
+    aassert(jj.ptr == a.data.ptr+2 && jj.value == 3,__LINE__); aassert(jj.next && !jj.end,__LINE__);
+    aassert(jj.ptr == a.data.ptr+5 && jj.value == 6,__LINE__); aassert(!jj.next && jj.end,__LINE__);
+    aassert(!jj.next && jj.end,__LINE__);
 
     a=a.T(); // a now 3x2 again
     jj = a.T.flatIter();
-    assert(!jj.end);
-    assert(jj.ptr == a.data.ptr+0 && jj.value == 1); assert(jj.next && !jj.end);
-    assert(jj.ptr == a.data.ptr+1 && jj.value == 2); assert(jj.next && !jj.end);
-    assert(jj.ptr == a.data.ptr+2 && jj.value == 3); assert(jj.next && !jj.end);
-    assert(jj.ptr == a.data.ptr+3 && jj.value == 4); assert(jj.next && !jj.end);
-    assert(jj.ptr == a.data.ptr+4 && jj.value == 5); assert(jj.next && !jj.end);
-    assert(jj.ptr == a.data.ptr+5 && jj.value == 6); assert(!jj.next && jj.end);
-    assert(!jj.next && jj.end);
+    aassert(!jj.end,__LINE__);
+    aassert(jj.ptr == a.data.ptr+0 && jj.value == 1,__LINE__); aassert(jj.next && !jj.end,__LINE__);
+    aassert(jj.ptr == a.data.ptr+1 && jj.value == 2,__LINE__); aassert(jj.next && !jj.end,__LINE__);
+    aassert(jj.ptr == a.data.ptr+2 && jj.value == 3,__LINE__); aassert(jj.next && !jj.end,__LINE__);
+    aassert(jj.ptr == a.data.ptr+3 && jj.value == 4,__LINE__); aassert(jj.next && !jj.end,__LINE__);
+    aassert(jj.ptr == a.data.ptr+4 && jj.value == 5,__LINE__); aassert(jj.next && !jj.end,__LINE__);
+    aassert(jj.ptr == a.data.ptr+5 && jj.value == 6,__LINE__); aassert(!jj.next && jj.end,__LINE__);
+    aassert(!jj.next && jj.end,__LINE__);
 
     int[][] ainit = [[1,2,3,4],
                      [5,6,7,8],
@@ -223,7 +226,7 @@ void testSumAll(T,int rank)(NArray!(T,rank) a){
             s("refVal:"); writeOut(s,refVal); s("\n");
             s("dVal:"); writeOut(s,dVal); s("\n");
         }));
-        assert(false,"sumAll error too large");
+        throw new Exception("sumAll error too large",__FILE__,__LINE__);
     }
 }
 
@@ -247,10 +250,10 @@ void testSumAxis(T,int rank)(NArray!(T,rank) a, Rand r){
                 s("refVal:"); writeOut(s,refVal); s("\n");
                 s("dVal:"); writeOut(s,dVal); s("\n");
             }));
-            assert(false,"sumAxis error too large");
+            throw new Exception("sumAxis error too large",__FILE__,__LINE__);
         }
     } else {
-        assert(checkResDot(refVal,dVal),"sumAxis value too different from reference");
+        if (!checkResDot(refVal,dVal)) throw new Exception("sumAxis value too different from reference",__FILE__,__LINE__);
     }
 }
 
@@ -268,7 +271,7 @@ void testMultAll(T,int rank)(NArray!(T,rank) a){
             s("refVal:"); writeOut(s,refVal); s("\n");
             s("dVal:"); writeOut(s,dVal); s("\n");
         }));
-        assert(false,"sumAll error too large");
+        throw new Exception("sumAll error too large",__FILE__,__LINE__);
     }
 }
 
@@ -292,10 +295,10 @@ void testMultAxis(T,int rank)(NArray!(T,rank) a, Rand r){
                 s("refVal:"); writeOut(s,refVal); s("\n");
                 s("dVal:"); writeOut(s,dVal); s("\n");
             }));
-            assert(false,"sumAxis error too large");
+            throw new Exception("sumAxis error too large",__FILE__,__LINE__);
         }
     } else {
-        assert(checkResDot(refVal,dVal),"sumAxis value too different from reference");
+        if (!checkResDot(refVal,dVal)) throw new Exception("sumAxis value too different from reference",__FILE__,__LINE__);
     }
 }
 
@@ -304,13 +307,13 @@ void testFilterMask(T,int rank)(NArray!(T,rank) a, Rand r){
 
     auto b=filterMask(a, mask);
     auto c=unfilterMask(b,mask);
-    assert(c.shape==a.shape);
+    if (c.shape!=a.shape) throw new Exception("different shape",__FILE__,__LINE__);
     auto ia=a.flatIter, ic=c.flatIter;
     foreach (el;mask.flatIter){
         if (el){
-            assert(ia.value==ic.value,"different values in filterMask");
+            if (ia.value!=ic.value) throw new Exception("different values in filterMask",__FILE__,__LINE__);
         } else {
-            assert(ic.value==cast(T)0,"non zero outside mask");
+            if (ic.value!=cast(T)0) throw new Exception("non zero outside mask",__FILE__,__LINE__);
         }
         ia.next(); ic.next();
     }
@@ -321,7 +324,7 @@ void testAxisFilter(T,int rank)(NArray!(T,rank) a, NArray!(index_type,1)indexes)
     auto b=axisFilter!(T,rank,NArray!(index_type,1))(a,indexes);
     auto c=zeros!(T)(a.shape);
     auto d=axisUnfilter1(c,b,indexes);
-    assert(c.shape==a.shape);
+    if (c.shape!=a.shape) throw new Exception("different shape",__FILE__,__LINE__);
     foreach (el;indexes){
         if (!(a[el]==c[el])){
             writeOut(sout("b:").call,b); sout("\n");
@@ -330,7 +333,7 @@ void testAxisFilter(T,int rank)(NArray!(T,rank) a, NArray!(index_type,1)indexes)
             if (c) { c.printData(sout.call); sout("\n"); }
             writeOut(sout("d:").call,d); sout("\n");
             if (d) { d.printData(sout.call); sout("\n"); }
-            assert(false,"axisFilter failed");
+            throw new Exception("axisFilter failed",__FILE__,__LINE__);
         }
     }
 }
@@ -354,9 +357,9 @@ void testDot1x1(T,S)(Dottable!(T,1,S,1,true,true) d){
             sout("refVal=")(refVal)("\n");
             sout("error:")(err)("/")(U.mant_dig)("\n");
         }
-        assert(err>=2*U.mant_dig/3-tol,"error too large");
+        if (err<2*U.mant_dig/3-tol) throw new Exception("error too large",__FILE__,__LINE__);
     } else {
-        assert(refVal==v,"value different from reference");
+        if (refVal!=v) throw new Exception("value different from reference",__FILE__,__LINE__);
     }
 }
 
@@ -372,7 +375,7 @@ void testDot2x1(T,S)(Dottable!(T,2,S,1,true,true) d){
     }
     auto refVal=refValT.asType!(U)();
     auto v=dot(d.a,d.b,d.axis1,d.axis2);
-    assert(checkResDot(refVal,v),"value too different from reference");
+    if (!checkResDot(refVal,v)) throw new Exception("value too different from reference",__FILE__,__LINE__);
 }
 
 void testDot1x2(T,S)(Dottable!(T,1,S,2,true,true) d){
@@ -388,7 +391,7 @@ void testDot1x2(T,S)(Dottable!(T,1,S,2,true,true) d){
     }
     auto refVal=refValT.asType!(U)();
     auto v=dot(d.a,d.b,d.axis1,d.axis2);
-    assert(checkResDot(refVal,v),"value too different from reference");
+    if (!checkResDot(refVal,v)) throw new Exception("value too different from reference",__FILE__,__LINE__);
 }
 
 void testDot2x2(T,S)(Dottable!(T,2,S,2,true,true) d){
@@ -407,7 +410,7 @@ void testDot2x2(T,S)(Dottable!(T,2,S,2,true,true) d){
     }
     auto refVal=refValT.asType!(U)();
     auto v=dot(d.a,d.b,d.axis1,d.axis2);
-    assert(checkResDot(refVal,v),"value too different from reference");
+    if (!checkResDot(refVal,v)) throw new Exception("value too different from reference",__FILE__,__LINE__);
 }
 version(no_lapack){ }
 else {
@@ -419,26 +422,26 @@ else {
             auto b2=dot(d.a,x);
             auto err=minFeqrel2(d.b,b2);
             if (err<2*T.mant_dig/3-tol) {
-                assert(err>=1,"error too big");
+                if (err<1) throw new Exception("error too big",__FILE__,__LINE__);
                 // check other side
                 auto x2=solve(d.a,b2);
-                assert(checkResDot(x,x2,tol),"error too big (even in the x space)");
+                if (!checkResDot(x,x2,tol)) throw new Exception("error too big (even in the x space)",__FILE__,__LINE__);
             }
         } catch (LinAlgException l) {
-            assert(feqrel2(det(d.a),cast(T)0)>T.mant_dig/2,"solve failed with non 0 det");
+            if (feqrel2(det(d.a),cast(T)0)<=T.mant_dig/2) throw new Exception("solve failed with non 0 det",__FILE__,__LINE__);
         }
         try{
             x=solve(d.a,d.b);
             auto b2=dot(d.a,x);
             auto err=minFeqrel2(d.b,b2);
             if (err<2*T.mant_dig/3-tol) {
-                assert(err>=1,"error too big2");
+                if (err<1) throw new Exception("error too big2",__FILE__,__LINE__);
                 // check other side
                 auto x2=solve(d.a,b2);
-                assert(checkResDot(x,x2,tol),"error too big (even in the x space)2");
+                if (!checkResDot(x,x2,tol)) throw new Exception("error too big (even in the x space)2",__FILE__,__LINE__);
             }
         } catch (LinAlgException l) {
-            assert(feqrel2(det(d.a),cast(T)0)>T.mant_dig/2,"solve 2 failed with non 0 det");
+            if (feqrel2(det(d.a),cast(T)0)<=T.mant_dig/2) throw new Exception("solve 2 failed with non 0 det",__FILE__,__LINE__);
         }
     }
 
@@ -450,26 +453,26 @@ else {
             auto b2=dot(d.a,x);
             auto err=minFeqrel2(d.b,b2);
             if (err<2*T.mant_dig/3-tol) {
-                assert(err>=1,"error too big");
+                if (err<1) throw new Exception("error too big",__FILE__,__LINE__);
                 // check other side
                 auto x2=solve(d.a,b2);
-                assert(checkResDot(x,x2,tol),"error too big (even in the x space)");
+                if (!checkResDot(x,x2,tol)) throw new Exception("error too big (even in the x space)",__FILE__,__LINE__);
             }
         } catch (LinAlgException l) {
-            assert(feqrel2(det(d.a),cast(T)0)>T.mant_dig/2,"solve failed with non 0 det");
+            if (feqrel2(det(d.a),cast(T)0)<=T.mant_dig/2) throw new Exception("solve failed with non 0 det",__FILE__,__LINE__);
         }
         try{
             x=solve(d.a,d.b);
             auto b2=dot(d.a,x);
             auto err=minFeqrel2(d.b,b2);
             if (err<2*T.mant_dig/3-tol) {
-                assert(err>=1,"error too big2");
+                if (err<1) throw new Exception("error too big2",__FILE__,__LINE__);
                 // check other side
                 auto x2=solve(d.a,b2);
-                assert(checkResDot(x,x2,tol),"error too big (even in the x space)2");
+                if (!checkResDot(x,x2,tol)) throw new Exception("error too big (even in the x space)2",__FILE__,__LINE__);
             }
         } catch (LinAlgException l) {
-            assert(feqrel2(det(d.a),cast(T)0)>T.mant_dig/2,"solve 2 failed with non 0 det");
+            if (feqrel2(det(d.a),cast(T)0)<=T.mant_dig/2) throw new Exception("solve 2 failed with non 0 det",__FILE__,__LINE__);
         }
     }
 
@@ -488,8 +491,8 @@ else {
         auto diff2=norm2NA!(ComplexTypeOf!(T),2,real)(m1-m2)/n;
         auto err1=feqrel(diff1+1.0L,1.0L);
         auto err2=feqrel(diff2+1.0L,1.0L);
-        assert(norm2NA!(ComplexTypeOf!(T),2,real)(rightEVect)>0.5,"rightEVect too small");
-        assert(norm2NA!(ComplexTypeOf!(T),2,real)(leftEVect)>0.5,"leftEVect too small");
+        if (norm2NA!(ComplexTypeOf!(T),2,real)(rightEVect)<=0.5) throw new Exception("rightEVect too small",__FILE__,__LINE__);
+        if (norm2NA!(ComplexTypeOf!(T),2,real)(leftEVect)<=0.5,"leftEVect too small");
         if (err1<T.mant_dig*2/3-tol){
             sout("ev:");
             ev2.printData(sout.call,"F8,10"); sout("\n");
@@ -498,13 +501,13 @@ else {
             sout(collectAppender(delegate void(CharSink s){
                 s("error"); writeOut(s,err1); s("/"); writeOut(s,T.mant_dig); s("\n");
             }));
-            assert(false,"rightEVect error too large");
+            throw new Exception("rightEVect error too large",__FILE__,__LINE__);
         }
         if (err2<T.mant_dig*2/3-tol){
             sout(collectAppender(delegate void(CharSink s){
                 s("error"); writeOut(s,err2); s("/"); writeOut(s,T.mant_dig); s("\n");
             }));
-            assert(false,"leftEVect error too large");
+            throw new Exception("leftEVect error too large",__FILE__,__LINE__);
         }
         auto ev3=eig(d.a);
         auto diff3=norm2NA!(ComplexTypeOf!(T),1,real)(ev2-ev3)/sqrt(cast(real)n);
@@ -513,7 +516,7 @@ else {
             sout(collectAppender(delegate void(CharSink s){
                 s("error"); writeOut(s,err3); s("/"); writeOut(s,T.mant_dig); s("\n");
             }));
-            assert(false,"eigenvalues changed too much (from eval+evect)");
+            throw new Exception("eigenvalues changed too much (from eval+evect)",__FILE__,__LINE__);
         }
     }
 
@@ -551,19 +554,19 @@ else {
             sout(collectAppender(delegate void(CharSink s){
                 s("error1"); writeOut(s,err1); s("/"); writeOut(s,T.mant_dig); s("\n");
             }));
-            assert(false,"svd does not recover a");
+            throw new Exception("svd does not recover a",__FILE__,__LINE__);
         }
         if (err2<T.mant_dig*2/3-tol){
             sout(collectAppender(delegate void(CharSink s){
                 s("error2"); writeOut(s,err2); s("/"); writeOut(s,T.mant_dig); s("\n");
             }));
-            assert(false,"u non orthogonal");
+            throw new Exception("u non orthogonal",__FILE__,__LINE__);
         }
         if (err3<T.mant_dig*2/3-tol){
             sout(collectAppender(delegate void(CharSink s){
                 s("error3"); writeOut(s,err3); s("/"); writeOut(s,T.mant_dig); s("\n");
             }));
-            assert(false,"vt non orthogonal");
+            throw new Exception("vt non orthogonal",__FILE__,__LINE__);
         }
         auto s3=svd(d.a);
         auto diff4=norm2NA!(RealTypeOf!(T),1,real)(s2-s3)/sqrt(cast(real)n);
@@ -572,7 +575,7 @@ else {
             sout(collectAppender(delegate void(CharSink s){
                 s("error4"); writeOut(s,err4); s("/"); writeOut(s,T.mant_dig); s("\n");
             }));
-            assert(false,"singular values changed too much (from svd(u,s,vt))");
+            throw new Exception("singular values changed too much (from svd(u,s,vt))",__FILE__,__LINE__);
         }
     }
 
@@ -601,13 +604,13 @@ else {
             sout(collectAppender(delegate void(CharSink s){
                 s("error1"); writeOut(s,err1); s("/"); writeOut(s,T.mant_dig); s("\n");
             }));
-            assert(false,"diagonalization error too large");
+            throw new Exception("diagonalization error too large",__FILE__,__LINE__);
         }
         if (err2<T.mant_dig*2/3-tol){
             sout(collectAppender(delegate void(CharSink s){
                 s("error2"); writeOut(s,err2); s("/"); writeOut(s,T.mant_dig); s("\n");
             }));
-            assert(false,"non orto eVect error too large");
+            throw new Exception("non orto eVect error too large",__FILE__,__LINE__);
         }
         auto ev3=eigh(d.a);
         auto diff3=norm2NA!(RealTypeOf!(T),1,real)(ev2-ev3)/sqrt(cast(real)n);
@@ -616,7 +619,7 @@ else {
             sout(collectAppender(delegate void(CharSink s){
                 s("error"); writeOut(s,err3); s("/"); writeOut(s,T.mant_dig); s("\n");
             }));
-            assert(false,"hermitian eigenvalues changed too much (from eval+evect)");
+            throw new Exception("hermitian eigenvalues changed too much (from eval+evect)",__FILE__,__LINE__);
         }
     }
 }
@@ -624,10 +627,10 @@ else {
 void testConvolveNN(T,int rank,Border border)(NArray!(T,rank)inA,NArray!(T,rank)kernel){
     auto refVal=convolveNNRef!(T,rank,border)(kernel,inA);
     auto v=convolveNN!(T,rank,border)(kernel,inA);
-    assert(checkResDot(refVal,v),"value too different from reference");
+    if (!checkResDot(refVal,v)) throw new Exception("value too different from reference",__FILE__,__LINE__);
     refVal=convolveNNRef!(T,rank,border)(kernel,inA,refVal);
     v=convolveNN!(T,rank,border)(kernel,inA,v);
-    assert(checkResDot(refVal,v),"value too different from reference2");
+    if (!checkResDot(refVal,v)) throw new Exception("value too different from reference2",__FILE__,__LINE__);
 }
 
 void testSerial(T,int rank)(NArray!(T,rank)a){
@@ -727,13 +730,13 @@ void doNArrayFixTests(){
     NArray!(int,1) a2=NArray!(int,1).zeros([6]);
     auto a3=NArray!(int,2).zeros([5,6]);
     auto a4=NArray!(int,3).zeros([2,3,4]);
-    assert(a1!=a2,"should be different");
+    if (a1==a2) throw new Exception("should be different",__FILE__,__LINE__);
     a2[]=a1;
     a4[1,1,1]=10;
     foreach (i,ref v;a4.sFlat){
         v=cast(int)i;
     }
-    assert(a1==a2,"should be equal");
+    if (a1!=a2) throw new Exception("should be equal",__FILE__,__LINE__);
     checkLoop1(a1);
     checkLoop1(a2);
     checkLoop1(a3);
@@ -744,33 +747,34 @@ void doNArrayFixTests(){
     checkeq(a3[1],[1,0,2,0,3,0]);
     checkeq(a3[2],[0,0,0,0,0,0]);
     checkeq(a4[0,Range(1,3),Range(1,4,2)],[5,7,9,11]);
-    assert(collectAppender(delegate void(CharSink s){ s("a4:"); a4.printData(s,",6",10,"   "); s("\n");})==
+    if (collectAppender(delegate void(CharSink s){ s("a4:"); a4.printData(s,",6",10,"   "); s("\n");})!=
 `a4:[[[0     ,1     ,2     ,3     ],
      [4     ,5     ,6     ,7     ],
      [8     ,9     ,10    ,11    ]],
     [[12    ,13    ,14    ,15    ],
      [16    ,17    ,18    ,19    ],
      [20    ,21    ,22    ,23    ]]]
-`,"NArray.printData wrote unexpected value");
+`)
+    throw new Exception("NArray.printData wrote unexpected value",__FILE__,__LINE__);
     arangeTests;
     test_iter;
     auto a6=a4.dup;
     unaryOp!((inout int x){x*=2;},3,int)(a6);
     foreach (i,j,k,v;a4.pFlat){
-        assert(2*v==a6[i,j,k]);
+        if (2*v!=a6[i,j,k]) throw new Exception("error",__FILE__,__LINE__);
     }
     auto large1=reshape(arange(150),[15,10]);
     auto large2=large1[Range(10)];
     auto l2=large2.dup;
     auto large3=l2.T;
-    assert(large2.flags&ArrayFlags.Large);
+    if ((large2.flags&ArrayFlags.Large)==0) throw new Exception("error",__FILE__,__LINE__);
     unaryOp!((inout int x){x*=32;},2,int)(large2);
     foreach (i,j,v;large2.pFlat){
-        assert(v==32*l2[i,j]);
+        if (v!=32*l2[i,j]) throw new Exception("error",__FILE__,__LINE__);
     }
     binaryOp!((inout int x, int y){x/=y+1;},2,int,int)(large2,large3);
     foreach (i,j,v;large2.pFlat){
-        assert(v==(32*l2[i,j])/(large3[i,j]+1));
+        if (v!=(32*l2[i,j])/(large3[i,j]+1)) throw new Exception("error",__FILE__,__LINE__);
     }
     foreach (i,j,ref v;a3.pFlat){
         v+=i+j;
@@ -781,7 +785,7 @@ void doNArrayFixTests(){
         for (int j=0;j<a3.shape[1];++j)
             t[i]=t[i]+a3[i,j]*a2[j];
     foreach (i,v;r32){
-        assert(v==t[i]);
+        if (v!=t[i]) throw new Exception("error",__FILE__,__LINE__);
     }
     NArray!(double,2) a=NArray!(double,2).ones([3,4]);
     auto b=axisFilter(a,2,[3,2,1,1,0]);

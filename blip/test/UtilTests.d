@@ -28,16 +28,16 @@ void checkLb(T)(T[]arr,T val,size_t lb,size_t ub){
     auto lb1=lBound(arr,val,lb,ub);
     try{
         if (arr.length>0){
-            assert(lb1>=lb);
-            assert(lb1<=ub||ub<lb);
+            if (lb1<lb) throw new Exception("error",__FILE__,__LINE__);
+            if (!(lb1<=ub||ub<lb)) throw new Exception("error",__FILE__,__LINE__);
             if (lb1<ub){
-                assert(arr[lb1]>=val);
+                if (arr[lb1]<val) throw new Exception("error",__FILE__,__LINE__);
             }
             if (lb1>lb){
-                assert(arr[lb1-1]<val);
+                if (arr[lb1-1]>=val) throw new Exception("error",__FILE__,__LINE__);
             }
         } else {
-            assert(lb1==lb);
+            if (lb1!=lb) throw new Exception("error",__FILE__,__LINE__);
         }
     } catch(Exception e){
         throw new Exception(collectAppender(delegate void(CharSink s){
@@ -51,16 +51,16 @@ void checkUb(T)(T[]arr,T val,size_t lb,size_t ub){
     auto ub1=uBound(arr,val,lb,ub);
     try{
         if (arr.length>0){
-            assert(ub1>=lb);
-            assert(ub1<=ub||ub<lb);
+            if (ub1<lb) throw new Exception("error",__FILE__,__LINE__);
+            if (!(ub1<=ub||ub<lb)) throw new Exception("error",__FILE__,__LINE__);
             if (ub1<ub){
-                assert(arr[ub1]>val);
+                if (arr[ub1]<=val) throw new Exception("error",__FILE__,__LINE__);
             }
             if (ub1>lb){
-                assert(arr[ub1-1]<=val);
+                if (arr[ub1-1]>val) throw new Exception("error",__FILE__,__LINE__);
             }
         } else {
-            assert(ub1==lb);
+            if (ub1!=lb) throw new Exception("error",__FILE__,__LINE__);
         }
     } catch(Exception e){
         throw new Exception(collectAppender(delegate void(CharSink s){
@@ -103,7 +103,7 @@ class Summer{
     LocalGrowableArray!(int) log;
     char[] name;
     void callBack(char[] n,Callback* cl,Variant v){
-        assert(n==name);
+        if (n!=name) throw new Exception("error",__FILE__,__LINE__);
         atomicAdd(sum,v.get!(int)());
         synchronized(this){
             log(v.get!(int)());
@@ -145,12 +145,12 @@ void testNotificationCenter(char[] notName,int[] notf){
             mySum+=notf[i];
         }
     }).autorelease.executeNow();
-    assert(summer4.sum==mySum);
-    assert(summer4.log.length==notf.length);
-    assert(summer3.log.length<=notf.length);
-    assert(summer2.log.length<=notf.length);
-    assert(summer1.log.length==1);
-    assert(summer1.log[0]==summer1.sum);
+    if (!(summer4.sum==mySum)) throw new Exception("error",__FILE__,__LINE__);
+    if (!(summer4.log.length==notf.length)) throw new Exception("error",__FILE__,__LINE__);
+    if (!(summer3.log.length<=notf.length)) throw new Exception("error",__FILE__,__LINE__);
+    if (!(summer2.log.length<=notf.length)) throw new Exception("error",__FILE__,__LINE__);
+    if (!(summer1.log.length==1)) throw new Exception("error",__FILE__,__LINE__);
+    if (!(summer1.log[0]==summer1.sum)) throw new Exception("error",__FILE__,__LINE__);
 }
 
 /// all tests for util, as template so that they are not instantiated if not used

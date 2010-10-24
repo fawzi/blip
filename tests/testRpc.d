@@ -499,5 +499,6 @@ void main(char[][]args){
         Task("rpcTests",delegate void(){ rpcTests(); }).autorelease.executeNow();
     }
     sout("done!!\n");
+    Thread.sleep(3.0);
     exit(0);
 }

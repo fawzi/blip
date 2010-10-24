@@ -30,7 +30,7 @@ void testPLoopArray(T)(T[] arr1,SizeLikeNumber!(3,1) blockSize){
         copyArr[i]=e;
         atomicAdd(nEl,cast(size_t)1);
     }
-    assert(nEl==arr1.length);
+    if (nEl!=arr1.length) throw new Exception("wrong size",__FILE__,__LINE__);
     foreach(i,e;arr1){
         if (copyArr[i] !is e){
             throw new Exception(collectAppender(delegate void(CharSink sink){
@@ -43,7 +43,7 @@ void testPLoopArray(T)(T[] arr1,SizeLikeNumber!(3,1) blockSize){
         a=a+1;
         atomicAdd(nEl,cast(size_t)1);
     }
-    assert(nEl==arr1.length);
+    if (nEl!=arr1.length) throw new Exception("wrong size",__FILE__,__LINE__);
     foreach(i,e;arr1){
         if (copyArr[i] !is e+1){
             throw new Exception(collectAppender(delegate void(CharSink sink){
@@ -77,8 +77,8 @@ void testPLoopIter(T)(T[] arr1){
         copyArr[i]=e;
         atomicAdd(nEl,cast(size_t)1);
     }
-    assert(copyArr==arr1,"copy failed!");
-    assert(nEl==arr1.length);
+    if (copyArr!=arr1) throw new Exception("copy failed!",__FILE__,__LINE__);
+    if (nEl!=arr1.length) throw new Exception("wrong size",__FILE__,__LINE__);
     foreach(i,e;arr1){
         if (copyArr[i] !is e){
             throw new Exception(collectAppender(delegate void(CharSink sink){
@@ -99,7 +99,7 @@ void testPLoopIter(T)(T[] arr1){
         e=e+1;
         atomicAdd(nEl,cast(size_t)1);
     }
-    assert(nEl==arr1.length);
+    if (nEl!=arr1.length) throw new Exception("wrong size",__FILE__,__LINE__);
     foreach(i,e;arr1){
         if (copyArr[i] !is e+1){
             throw new Exception(collectAppender(delegate void(CharSink sink){
@@ -121,8 +121,8 @@ void testPLoopIter(T)(T[] arr1){
         copyArr[i]=e;
         atomicAdd(nEl,cast(size_t)1);
     }
-    assert(nEl==arr1.length);
-    assert(copyArr==arr1);
+    if (nEl!=arr1.length)throw new Exception("wrong length",__FILE__,__LINE__);
+    if (copyArr!=arr1) throw new Exception("copy is different",__FILE__,__LINE__);
     foreach(i,e;arr1){
         if (copyArr[i] !is e){
             throw new Exception(collectAppender(delegate void(CharSink sink){
@@ -151,7 +151,7 @@ void testPLoopIter(T)(T[] arr1){
         }
         atomicAdd(nEl,cast(size_t)1);
     }
-    assert(nEl==arr1.length);
+    if (nEl!=arr1.length) throw new Exception("wrong length",__FILE__,__LINE__);
     foreach(i,e;copyArr){
         if (copyArr[i] != 0){
             throw new Exception(collectAppender(delegate void(CharSink sink){

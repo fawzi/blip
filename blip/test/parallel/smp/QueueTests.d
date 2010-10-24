@@ -40,7 +40,7 @@ void testPriQueue(size_t[] els){
         queue.insert(levels[i],cast(void*)e);
     }
     foreach(e;sortedEls){
-        assert((cast(size_t)(queue.popNext(true)))==e);
+        if ((cast(size_t)(queue.popNext(true)))!=e) throw new Exception("error",__FILE__,__LINE__);
     }
     foreach(i,e;els){
         queue.insert(levels[i],cast(void*)e);
@@ -52,12 +52,13 @@ void testPriQueue(size_t[] els){
             size_t from=0;
             while(true){
                 auto pos=find(els[from..$],el)+from;
-                assert(pos<els.length);
+                if (pos>=els.length)  throw new Exception("error",__FILE__,__LINE__);
                 if (!popped[pos]){
                     popped[pos]=true;
                     break;
                 }
                 from=pos+1;
+                if (pos>=els.length) throw new Exception("error",__FILE__,__LINE__);
             }
         }
         size_t last=cast(size_t)(queue.popNext(true));
@@ -67,11 +68,11 @@ void testPriQueue(size_t[] els){
             markPopped(nextP);
             auto l1=cast(byte)(last&0xFF);
             auto l2=cast(byte)(nextP&0xFF);
-            assert(l1>l2||(l1==l2 && last<nextP));
+            if (!(l1>l2||(l1==l2 && last<nextP))) throw new Exception("error",__FILE__,__LINE__);
         }
-        assert(queue.nEntries==0);
+        if (!(queue.nEntries==0)) throw new Exception("error",__FILE__,__LINE__);
         foreach(b;popped){
-            assert(b);
+            if (!b) throw new Exception("error",__FILE__,__LINE__);
         }
     }
     foreach(i,e;els){
@@ -89,13 +90,13 @@ void testPriQueue(size_t[] els){
             return (((cast(size_t)v)&1)==0);
         }))
     {
-        assert(toSkip<sortedEls.length && (cast(size_t)poppedEl)==sortedEls[toSkip]);
+        if (!(toSkip<sortedEls.length && (cast(size_t)poppedEl)==sortedEls[toSkip]))  throw new Exception("error",__FILE__,__LINE__);
     } else {
-        assert(toSkip==sortedEls.length);
+        if (!(toSkip==sortedEls.length)) throw new Exception("error",__FILE__,__LINE__);
     }
     foreach(i,e;sortedEls){
         if (i!=toSkip)
-            assert((cast(size_t)(queue.popNext(true)))==e);
+            if (!((cast(size_t)(queue.popNext(true)))==e)) throw new Exception("error",__FILE__,__LINE__);
     }
 }
 

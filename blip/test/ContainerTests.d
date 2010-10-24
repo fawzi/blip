@@ -34,26 +34,26 @@ void testDeque(uint startPos,int[] arr1,int[] arr2){
     }
     foreach(e;arr2){
         d.pushFront(e);
-        assert(e==d.popFront);
+        if (e!=d.popFront) throw new Exception("error",__FILE__,__LINE__);
     }
     foreach(e;arr2){
         d.pushBack(e);
-        assert(e==d.popBack);
+        if (e!=d.popBack) throw new Exception("error",__FILE__,__LINE__);
     }
     foreach(e;arr1){
-        assert(e==d.popBack);
+        if (e!=d.popBack) throw new Exception("error",__FILE__,__LINE__);
     }
     int i;
-    assert(!d.popFront(i));
+    if (d.popFront(i)) throw new Exception("error",__FILE__,__LINE__);
     d.start=(startPos%d.baseArr.length);
     arr1~=arr2;
     foreach(e;arr1){
         d.pushFront(e);
     }
     foreach_reverse(e;arr1){
-        assert(e==d.popFront);
+        if (e!=d.popFront) throw new Exception("error",__FILE__,__LINE__);
     }
-    assert(!d.popBack(i));
+    if (d.popBack(i)) throw new Exception("error",__FILE__,__LINE__);
     d.start=(startPos%d.baseArr.length);
     foreach(e;arr1){
         d.pushFront(e);
@@ -68,19 +68,19 @@ void testDeque(uint startPos,int[] arr1,int[] arr2){
             }
         }
         if (popped){
-            assert(pos!=size_t.max);
-            assert(i==arr1[pos]);
+            if (pos==size_t.max) throw new Exception("error",__FILE__,__LINE__);
+            if (i!=arr1[pos]) throw new Exception("error",__FILE__,__LINE__);
         } else {
-            assert(pos==size_t.max);
+            if (pos!=size_t.max) throw new Exception("error",__FILE__,__LINE__);
         }
         size_t ii=0;
         while (ii<arr1.length){
             if (ii!=pos) {
-                assert(d.popBack()==arr1[ii]);
+                if (d.popBack()!=arr1[ii]) throw new Exception("error",__FILE__,__LINE__);
             }
             ++ii;
         }
-        assert(!d.popBack(i));
+        if (d.popBack(i)) throw new Exception("error",__FILE__,__LINE__);
         d.start=(startPos%d.baseArr.length);
     }
     foreach(e;arr1){
@@ -96,10 +96,10 @@ void testDeque(uint startPos,int[] arr1,int[] arr2){
             }
         }
         if (popped){
-            assert(pos!=size_t.max);
-            assert(i==arr1[pos]);
+            if (pos==size_t.max) throw new Exception("error",__FILE__,__LINE__);
+            if (i!=arr1[pos]) throw new Exception("error",__FILE__,__LINE__);
         } else {
-            assert(pos==size_t.max);
+            if (pos!=size_t.max) throw new Exception("error",__FILE__,__LINE__);
         }
         size_t ii=arr1.length;
         while (ii!=0){
@@ -107,10 +107,10 @@ void testDeque(uint startPos,int[] arr1,int[] arr2){
             if (ii==pos) {
                 if (ii==0) break;
             } else {
-                assert(d.popFront()==arr1[ii]);
+                if (d.popFront()!=arr1[ii]) throw new Exception("error",__FILE__,__LINE__);
             }
         }
-        assert(!d.popFront(i));
+        if (d.popFront(i)) throw new Exception("error",__FILE__,__LINE__);
         d.start=(startPos%d.baseArr.length);
     }
     foreach(e;arr1){
@@ -122,13 +122,13 @@ void testDeque(uint startPos,int[] arr1,int[] arr2){
         while (ii<arr1.length){
             if ((cast(uint)arr1[ii])%2==0) {
                 auto el=d.popBack();
-                assert(el==arr1[ii],collectAppender(delegate void(CharSink s){
+                if (el!=arr1[ii]) throw new Exception(collectAppender(delegate void(CharSink s){
                     dumper(s)(el)(" vs ")(arr1[ii])("\n");
-                }));
+                }),__FILE__,__LINE__);
             }
             ++ii;
         }
-        assert(!d.popFront(i));
+        if (d.popFront(i)) throw new Exception("error",__FILE__,__LINE__);
         d.start=(startPos%d.baseArr.length);
     }
 }
@@ -140,18 +140,18 @@ void testLoop(T)(T[] arr1,SizeLikeNumber!(3,1) s){
         barr[i]=v;
     }
     foreach(i,v;arr1){
-        assert(barr[i]==v,"BulkArray indexing test");
+        if (barr[i]!=v) throw new Exception("BulkArray indexing test",__FILE__,__LINE__);
     }
     size_t ii=0;
     foreach(v;barr){
-        assert(arr1[ii]==v,"BulkArray no index loop");
+        if (arr1[ii]!=v) throw new Exception("BulkArray no index loop",__FILE__,__LINE__);
         ++ii;
     }
     foreach(i,v;barr){
-        assert(arr1[i]==v,"BulkArray index loop");
+        if (arr1[i]!=v) throw new Exception("BulkArray index loop",__FILE__,__LINE__);
     }
     foreach(i,v;barr.pLoop(s.val)){
-        assert(arr1[i]==v,"BulkArray parallel index loop");
+        if (arr1[i]!=v) throw new Exception("BulkArray parallel index loop",__FILE__,__LINE__);
     }
     static if(is(typeof(T.init+T.init))){
         size_t count=0;
@@ -159,9 +159,9 @@ void testLoop(T)(T[] arr1,SizeLikeNumber!(3,1) s){
             v=v+v;
             atomicAdd!(size_t)(count,1);
         }
-        assert(count==arr1.length,"no index loop has wrong length");
+        if (count!=arr1.length) throw new Exception("no index loop has wrong length",__FILE__,__LINE__);
         foreach(i,v;barr.pLoop(s.val)){
-            assert(arr1[i]+arr1[i]==v,"BulkArray parallel no index loop update");
+            if (arr1[i]+arr1[i]!=v) throw new Exception("BulkArray parallel no index loop update",__FILE__,__LINE__);
         }
         if (arr1.length>0){
             barr[]=arr1[0];
@@ -169,7 +169,7 @@ void testLoop(T)(T[] arr1,SizeLikeNumber!(3,1) s){
                 v=v+arr1[i];
             }
             foreach(i,v;arr1){
-                assert(barr[i]==v+arr1[0],"BulkArray indexing test");
+                if (barr[i]!=v+arr1[0]) throw new Exception("BulkArray indexing test",__FILE__,__LINE__);
             }
         }
     }
