@@ -806,7 +806,7 @@ class TextParser(T) : InputFilter
     /// Set the provided stream as the scanning source
     TextParser setS(InputStream stream)
     {
-        assert (stream);
+        if (stream is null)throw new Exception("error",__FILE__,__LINE__);
         source = BufferedInput.create (stream);
         super.source = source;
         slice=[];
@@ -892,31 +892,31 @@ debug(UnitTest){
         wchar[] ws;
         dchar[] ds;
         s=p.readNCodePoints(4);
-        assert(s=="åbôd");
+        if (s!="åbôd") throw new Exception("error",__FILE__,__LINE__);
         s=p.readNCodePoints(3);
-        assert(s=="åbô");
+        if (s!="åbô") throw new Exception("error",__FILE__,__LINE__);
         s=p.readNCodePoints(12);
-        assert(s=="åbôdåbôdåbôd");
+        if (s!="åbôdåbôdåbôd") throw new Exception("error",__FILE__,__LINE__);
         p(i);
-        assert(i==12);
+        if (i!=12) throw new Exception("error",__FILE__,__LINE__);
         p(s)(ws);
-        assert(s=="tz_rk");
-        assert(ws=="tt"w);
+        if (s!="tz_rk") throw new Exception("error",__FILE__,__LINE__);
+        if (ws!="tt"w) throw new Exception("error",__FILE__,__LINE__);
         p(r)(ir)(cr);
-        assert(abs(r-23.4)<1.e-10);
-        assert(abs(ir-7.2i)<1.e-10);
-        assert(abs(cr-(6.4+3.2i))<1.e-10);
+        if (!(abs(r-23.4)<1.e-10)) throw new Exception("error",__FILE__,__LINE__);
+        if (!(abs(ir-7.2i)<1.e-10)) throw new Exception("error",__FILE__,__LINE__);
+        if (!(abs(cr-(6.4+3.2i))<1.e-10)) throw new Exception("error",__FILE__,__LINE__);
         p(s)(ds);
-        assert(s=="a string with space");
-        assert(ds==`escapedString"`d);
+        if (s!="a string with space") throw new Exception("error",__FILE__,__LINE__);
+        if (ds!=`escapedString"`) throw new Exception("error",__FILE__,__LINE__);
         p(s);
-        assert(s=="a");
+        if (s!="a") throw new Exception("error",__FILE__,__LINE__);
         s=p.getSeparator();
-        assert(s==",");
+        if (s!=",") throw new Exception("error",__FILE__,__LINE__);
         p(s);
-        assert(s=="b");
+        if (s!="b") throw new Exception("error",__FILE__,__LINE__);
         p(s);
-        assert(s=="c");
+        if (s!="c") throw new Exception("error",__FILE__,__LINE__);
     }
 }
 
