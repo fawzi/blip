@@ -90,7 +90,7 @@ void rpcTests(){
         sout("gc did collect!\n");
         auto localP0=ProtocolHandler.proxyForUrl(vendor.proxyObjUrl());
         auto localP=cast(A.AProxyLocal)localP0;
-        assert(localP!is null,"non local proxy");
+        if (localP is null) throw new Exception("non local proxy",__FILE__,__LINE__);
         sout("will call localProxy2\n");
         {
             auto res=localP.b(4);
@@ -124,7 +124,7 @@ void rpcTests(){
         });
         auto localP3=ProtocolHandler.proxyForUrl(vendor.proxyObjUrl());
         auto localP4=cast(A.AProxy)localP3;
-        assert(localP4 !is null,"loopBackProxy error");
+        if (localP4 is null) throw new Exception("loopBackProxy error",__FILE__,__LINE__);
         sinkTogether(sout,delegate void(CharSink s){
             dumper(s)("b thorugh local proxy2:")(ol.b(4))("\n");
         });
@@ -314,7 +314,7 @@ void rpcTestClient(char[] url){
         auto callH=ProtocolHandler.protocolForUrl(pUrl);
         auto localP3=ProtocolHandler.proxyForUrl(url);
         auto localP4=cast(A.AProxy)cast(Object)localP3;
-        assert(localP4 !is null,"Proxy error");
+        if (localP4 is null) throw new Exception("Proxy error",__FILE__,__LINE__);
         sout("will call Proxy\n");
         sout("gc collect3!\n");
         GC.collect();
@@ -422,7 +422,7 @@ void rpcTestClient(char[] url){
                             dumper(s)("proxyName:")(resN)("\n");
                         });
                     }
-                    assert(localP4.b(i)==5*i);
+                    if (localP4.b(i)!=5*i) throw new Exception("error",__FILE__,__LINE__);
                     x=localP4.mult(x,y);
                     x=localP4.div(x,y);
                     tot+=x;

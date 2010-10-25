@@ -281,7 +281,7 @@ void testJsonUnserial(T)(T a){
         sout(cast(char[])buf.slice)("\n");
         sout("-----\n");
     }
-    assert(a==sOut,"unserial error with "~T.stringof);
+    if (a!=sOut) throw new Exception("unserial error with "~T.stringof,__FILE__,__LINE__);
     version(UnserializationTrace) sout("passed test of unserialization of "~T.stringof~"\n");
 }
 /// unserialization test using native json
@@ -310,7 +310,7 @@ void testJson2Unserial(T)(T a){
         js2(sOut);
         sout("-----\n");
     }
-    assert(a==sOut,"unserial error with "~T.stringof);
+    if (a!=sOut) throw new Exception("unserial error with "~T.stringof,__FILE__,__LINE__);
     version(UnserializationTrace) sout("passed test of unserialization of "~T.stringof~"\n");
 }
 /// unserialization test
@@ -350,7 +350,7 @@ void testBinUnserial(T)(T a){
         js2(sOut);
         sout("-----\n");
     }
-    assert(a==sOut,"unserial error with "~T.stringof);
+    if (a!=sOut) throw new Exception("unserial error with "~T.stringof,__FILE__,__LINE__);
     version(UnserializationTrace) sout("passed test of unserialization of "~T.stringof~"\n");
 }
 
@@ -390,7 +390,7 @@ void testBin2Unserial(T)(T a){
         js2(sOut);
         sout("-----\n");
     }
-    assert(a==sOut,"unserial error with "~T.stringof);
+    if (a!=sOut) throw new Exception("unserial error with "~T.stringof,__FILE__,__LINE__);
     version(UnserializationTrace) sout("passed test of unserialization of "~T.stringof~"\n");
 }
 
@@ -654,7 +654,7 @@ void main(){
     jus(b2);
     version(UnserializationTrace) sout("XX unserialization finished\n");
     b2.l=b1.l;
-    assert(b1==b2,"reordering+comments+missing failed");
+    if (b1!=b2) throw new Exception("reordering+comments+missing failed",__FILE__,__LINE__);
     }
     
     sout("passed tests\n");

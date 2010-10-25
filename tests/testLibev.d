@@ -39,48 +39,54 @@ bool signal_done = false;
 bool eio_done = false;
 int child_pid = -1;
 
+void aassert(bool v,long line){
+    if (!v){
+        throw new Exception("aassert failed",__FILE__,line);
+    }
+}
+
 extern (C) static void cbprepare(ev_loop_t* loop, ev_prepare* w, int revents)
 {
     sout("ev_prepare\n");
-    assert (!prepare_done);
-    assert (!check_done);
-    assert (!idle_done);
-    assert (!timer_done);
-    assert (!io_done);
-    assert (!stat_done);
-    assert (!child_done);
-    assert (!signal_done);
-    assert (!eio_done);
+    aassert (!prepare_done,__LINE__);
+    aassert (!check_done,__LINE__);
+    aassert (!idle_done,__LINE__);
+    aassert (!timer_done,__LINE__);
+    aassert (!io_done,__LINE__);
+    aassert (!stat_done,__LINE__);
+    aassert (!child_done,__LINE__);
+    aassert (!signal_done,__LINE__);
+    aassert (!eio_done,__LINE__);
     prepare_done = true;
     ev_prepare_stop(loop, w);
 }
 extern (C) static void cbcheck(ev_loop_t* loop, ev_check* w, int revents)
 {
     sout("ev_check\n");
-    assert (prepare_done);
-    assert (!check_done);
-    assert (!idle_done);
-    assert (!timer_done);
-    assert (!io_done);
-    assert (!stat_done);
-    assert (!child_done);
-    assert (!signal_done);
-    assert (!eio_done);
+    aassert (prepare_done,__LINE__);
+    aassert (!check_done,__LINE__);
+    aassert (!idle_done,__LINE__);
+    aassert (!timer_done,__LINE__);
+    aassert (!io_done,__LINE__);
+    aassert (!stat_done,__LINE__);
+    aassert (!child_done,__LINE__);
+    aassert (!signal_done,__LINE__);
+    aassert (!eio_done,__LINE__);
     check_done = true;
     ev_check_stop(loop, w);
 }
 extern (C) static void cbidle(ev_loop_t* loop, ev_idle* w, int revents)
 {
     sout("ev_idle\n");
-    assert (prepare_done);
-    assert (check_done);
-    assert (!idle_done);
-    assert (!timer_done);
-    assert (!io_done);
-    assert (!stat_done);
-    assert (!child_done);
-    assert (!signal_done);
-    assert (!eio_done);
+    aassert (prepare_done,__LINE__);
+    aassert (check_done,__LINE__);
+    aassert (!idle_done,__LINE__);
+    aassert (!timer_done,__LINE__);
+    aassert (!io_done,__LINE__);
+    aassert (!stat_done,__LINE__);
+    aassert (!child_done,__LINE__);
+    aassert (!signal_done,__LINE__);
+    aassert (!eio_done,__LINE__);
     idle_done = true;
     ev_idle_stop(loop, w);
 }
@@ -88,15 +94,15 @@ extern (C) static void cbtimer(ev_loop_t* loop, ev_timer* w,
         int revents)
 {
     sout("ev_timer\n");
-    assert (prepare_done);
-    assert (check_done);
-    assert (idle_done);
-    assert (!timer_done);
-    assert (!io_done);
-    assert (!stat_done);
-    assert (!child_done);
-    assert (!signal_done);
-    assert (!eio_done);
+    aassert (prepare_done,__LINE__);
+    aassert (check_done,__LINE__);
+    aassert (idle_done,__LINE__);
+    aassert (!timer_done,__LINE__);
+    aassert (!io_done,__LINE__);
+    aassert (!stat_done,__LINE__);
+    aassert (!child_done,__LINE__);
+    aassert (!signal_done,__LINE__);
+    aassert (!eio_done,__LINE__);
     timer_done = true;
     ev_timer_stop(loop, w);
     sout("\tfiring ev_io\n");
@@ -105,51 +111,51 @@ extern (C) static void cbtimer(ev_loop_t* loop, ev_timer* w,
     sout("\t\twriting '")(TEST_TEXT)("' to pipe...\n");
     int n = unistd.write(pipe_fd, cast (void*) TEST_TEXT,
             TEST_TEXT.length);
-    assert (n == TEST_TEXT.length);
+    aassert (n == TEST_TEXT.length,__LINE__);
 }
 extern (C) static void cbio(ev_loop_t* loop, ev_io* w, int revents)
 {
     sout("ev_io\n");
-    assert (prepare_done);
-    assert (check_done);
-    assert (idle_done);
-    assert (timer_done);
-    assert (!io_done);
-    assert (!stat_done);
-    assert (!child_done);
-    assert (!signal_done);
-    assert (!eio_done);
+    aassert (prepare_done,__LINE__);
+    aassert (check_done,__LINE__);
+    aassert (idle_done,__LINE__);
+    aassert (timer_done,__LINE__);
+    aassert (!io_done,__LINE__);
+    aassert (!stat_done,__LINE__);
+    aassert (!child_done,__LINE__);
+    aassert (!signal_done,__LINE__);
+    aassert (!eio_done,__LINE__);
     io_done = true;
     ev_io_stop(loop, w);
     char[TEST_TEXT.length] buffer;
     sout("\treading ")(buffer.length)(" bytes from pipe...");
     int n = unistd.read(w.fd, cast (void*) buffer, buffer.length);
-    assert (n == TEST_TEXT.length);
-    assert (buffer.dup == TEST_TEXT.dup);
+    aassert (n == TEST_TEXT.length,__LINE__);
+    aassert (buffer.dup == TEST_TEXT.dup,__LINE__);
     sout("\tread '")(buffer)("'\n");
     sout("\tfiring ev_stat\n");
     sout("\t\topening file '")(STAT_FILE)("'\n");
     int fd = fcntl.open(toStringz(STAT_FILE),
             fcntl.O_WRONLY | fcntl.O_TRUNC | fcntl.O_CREAT);
-    assert (fd != -1);
+    aassert (fd != -1,__LINE__);
     sout("\t\tfd: ")(fd)("\n");
     n = unistd.write(fd, cast (void*) TEST_TEXT,
             TEST_TEXT.length);
-    assert (n == TEST_TEXT.length);
+    aassert (n == TEST_TEXT.length,__LINE__);
     unistd.close(fd);
 }
 extern (C) static void cbstat(ev_loop_t* loop, ev_stat* w, int revents)
 {
     sout("ev_stat\n");
-    assert (prepare_done);
-    assert (check_done);
-    assert (idle_done);
-    assert (timer_done);
-    assert (io_done);
-    assert (!stat_done);
-    assert (!child_done);
-    assert (!signal_done);
-    assert (!eio_done);
+    aassert (prepare_done,__LINE__);
+    aassert (check_done,__LINE__);
+    aassert (idle_done,__LINE__);
+    aassert (timer_done,__LINE__);
+    aassert (io_done,__LINE__);
+    aassert (!stat_done,__LINE__);
+    aassert (!child_done,__LINE__);
+    aassert (!signal_done,__LINE__);
+    aassert (!eio_done,__LINE__);
     stat_done = true;
     ev_stat_stop(loop, w);
     static void print_stat(ev_statdata* s)
@@ -197,15 +203,15 @@ extern (C) static void cbstat(ev_loop_t* loop, ev_stat* w, int revents)
 extern (C) static void cbchild(ev_loop_t* loop, ev_child* w, int revents)
 {
     sout("ev_child\n");
-    assert (prepare_done);
-    assert (check_done);
-    assert (idle_done);
-    assert (timer_done);
-    assert (io_done);
-    assert (stat_done);
-    assert (!child_done);
-    assert (!signal_done);
-    assert (!eio_done);
+    aassert (prepare_done,__LINE__);
+    aassert (check_done,__LINE__);
+    aassert (idle_done,__LINE__);
+    aassert (timer_done,__LINE__);
+    aassert (io_done,__LINE__);
+    aassert (stat_done,__LINE__);
+    aassert (!child_done,__LINE__);
+    aassert (!signal_done,__LINE__);
+    aassert (!eio_done,__LINE__);
     child_done = true;
     ev_child_stop(loop, w);
     static ubyte WEXITSTATUS(int s)
@@ -229,7 +235,7 @@ extern (C) static void cbchild(ev_loop_t* loop, ev_child* w, int revents)
         return cast(bool)(s & 0x80);
     }
     sout("\tthe child with pid ")(w.rpid)(" exited with status ")(w.rstatus)("\n");
-    assert (child_pid == w.rpid);
+    aassert (child_pid == w.rpid,__LINE__);
     if (WIFEXITED(w.rstatus))
         sout("\tchild exited normally with code ")
                 (WEXITSTATUS(w.rstatus))("\n");
@@ -240,7 +246,7 @@ extern (C) static void cbchild(ev_loop_t* loop, ev_child* w, int revents)
         if (WCOREDUMP(w.rstatus))
             sout("\tchild produced a core dump\n");
     }
-    assert (WIFEXITED(w.rstatus) && WEXITSTATUS(w.rstatus) == 5);
+    aassert (WIFEXITED(w.rstatus) && WEXITSTATUS(w.rstatus) == 5,__LINE__);
     sout("\tfiring ev_signal\n");
     sout("\t\tsending signal 2 (SIGINT)\n");
     signal.kill(unistd.getpid(), SIGINT);
@@ -248,15 +254,15 @@ extern (C) static void cbchild(ev_loop_t* loop, ev_child* w, int revents)
 extern (C) static void cbfork(ev_loop_t* loop, ev_fork* w, int revents)
 {
     sout("ev_fork\n");
-    assert (prepare_done);
-    assert (check_done);
-    assert (idle_done);
-    assert (timer_done);
-    assert (io_done);
-    assert (stat_done);
-    assert (!child_done);
-    assert (!signal_done);
-    assert (!eio_done);
+    aassert (prepare_done,__LINE__);
+    aassert (check_done,__LINE__);
+    aassert (idle_done,__LINE__);
+    aassert (timer_done,__LINE__);
+    aassert (io_done,__LINE__);
+    aassert (stat_done,__LINE__);
+    aassert (!child_done,__LINE__);
+    aassert (!signal_done,__LINE__);
+    aassert (!eio_done,__LINE__);
     ev_fork_stop(loop, w);
     sout("\texiting the child program with return "
             "code 5\n");
@@ -266,15 +272,15 @@ extern (C) static void cbsignal(ev_loop_t* loop, ev_signal* w,
         int revents)
 {
     sout("ev_signal\n");
-    assert (prepare_done);
-    assert (check_done);
-    assert (idle_done);
-    assert (timer_done);
-    assert (io_done);
-    assert (stat_done);
-    assert (child_done);
-    assert (!signal_done);
-    assert (!eio_done);
+    aassert (prepare_done,__LINE__);
+    aassert (check_done,__LINE__);
+    aassert (idle_done,__LINE__);
+    aassert (timer_done,__LINE__);
+    aassert (io_done,__LINE__);
+    aassert (stat_done,__LINE__);
+    aassert (child_done,__LINE__);
+    aassert (!signal_done,__LINE__);
+    aassert (!eio_done,__LINE__);
     signal_done = true;
     ev_signal_stop(loop, w);
     sout("\tfiring embeded ev_io...\n");
@@ -283,27 +289,27 @@ extern (C) static void cbsignal(ev_loop_t* loop, ev_signal* w,
     sout("\t\twriting '%s' to pipe...")(TEST_TEXT)("\n");
     int n = unistd.write(pipe_fd, cast(void*)TEST_TEXT,
             TEST_TEXT.length);
-    assert (n == TEST_TEXT.length);
+    aassert (n == TEST_TEXT.length,__LINE__);
 }
 extern (C) static void ecbio(ev_loop_t* loop, ev_io* w, int revents)
 {
     sout("embeded ev_io\n");
-    assert (prepare_done);
-    assert (check_done);
-    assert (idle_done);
-    assert (timer_done);
-    assert (io_done);
-    assert (stat_done);
-    assert (child_done);
-    assert (signal_done);
-    assert (!eio_done);
+    aassert (prepare_done,__LINE__);
+    aassert (check_done,__LINE__);
+    aassert (idle_done,__LINE__);
+    aassert (timer_done,__LINE__);
+    aassert (io_done,__LINE__);
+    aassert (stat_done,__LINE__);
+    aassert (child_done,__LINE__);
+    aassert (signal_done,__LINE__);
+    aassert (!eio_done,__LINE__);
     eio_done = true;
     //ev_io_stop(loop, w);
     char[TEST_TEXT.length] buffer;
     sout("\treading ")(buffer.length)(" bytes from pipe...\n");
     int n = unistd.read(w.fd, cast (void*) buffer, buffer.length);
-    assert (n == TEST_TEXT.length);
-    assert (buffer.dup == TEST_TEXT.dup);
+    aassert (n == TEST_TEXT.length,__LINE__);
+    aassert (buffer.dup == TEST_TEXT.dup,__LINE__);
     sout("\tread '")(buffer)("'\n");
     sout("\tstoping the loop\n");
     ev_unloop(loop, EVUNLOOP_ONE);
@@ -351,7 +357,7 @@ void main(){
     int[2] epipe;
     {
         int ret = unistd.pipe(epipe);
-        assert (ret == 0);
+        aassert (ret == 0,__LINE__);
     }
     ev_io_init(&ewio, &ecbio, epipe[0], EV_READ);
     ev_io_start(eloop, &ewio);
@@ -359,7 +365,7 @@ void main(){
     int[2] pipe;
     {
         int ret = unistd.pipe(pipe);
-        assert (ret == 0);
+        aassert (ret == 0,__LINE__);
     }
 
     ev_io_init(&wio, &cbio, pipe[0], EV_READ);
@@ -393,15 +399,15 @@ void main(){
 
     ev_loop(loop, 0);
 
-    assert (prepare_done);
-    assert (check_done);
-    assert (idle_done);
-    assert (timer_done);
-    assert (io_done);
-    assert (stat_done);
-    assert (child_done);
-    assert (signal_done);
-    assert (eio_done);
+    aassert (prepare_done,__LINE__);
+    aassert (check_done,__LINE__);
+    aassert (idle_done,__LINE__);
+    aassert (timer_done,__LINE__);
+    aassert (io_done,__LINE__);
+    aassert (stat_done,__LINE__);
+    aassert (child_done,__LINE__);
+    aassert (signal_done,__LINE__);
+    aassert (eio_done,__LINE__);
 
     sout("done!\n");
 }

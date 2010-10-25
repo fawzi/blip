@@ -42,7 +42,7 @@ class Dottable(T,int rank1,S,int rank2,bool scanAxis=false, bool randomLayout=fa
     this(NArray!(T,rank1) a,NArray!(S,rank2) b,int axis1=startAxis1,int axis2=startAxis2)
     {
         if (!(-rank1<=axis1 && axis1<rank1)) throw new Exception("axis1 out of bounds",__FILE__,__LINE__);
-        if (!(-rank2<=axis2 && axis2<rank2,"axis2 out of bounds");
+        if (!(-rank2<=axis2 && axis2<rank2)) throw new Exception("axis2 out of bounds",__FILE__,__LINE__);
         if (!(a.shape[((axis1<0)?(rank1+axis1):axis1)]==b.shape[((axis2<0)?(rank2+axis2):axis2)]))
             throw new Exception("incompatible sizes",__FILE__,__LINE__);
         this.a=a;

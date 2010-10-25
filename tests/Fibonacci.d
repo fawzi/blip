@@ -34,16 +34,19 @@ long fib(long n){
     return f1+f2;
 }
 
-int main(char[][] args){
-    long n=15;
-    if (args.length>1){
-        n=Integer.toInt(args[1]);
-    }
+void testFib(long n){
     for (int ii=0;ii<2;++ii){
         auto t0=realtimeClock();
         auto res=fib(n);
         auto t1=realtimeClock();
         sout("fib(")(n)(")=")(res)(" time=")(t1-t0)("\n");
     }
+}
+int main(char[][] args){
+    long n=15;
+    if (args.length>1){
+        n=Integer.toInt(args[1]);
+    }
+    Task("testFib",delegate void(){ testFib(n); }).autorelease.executeNow();
     return 0;
 }

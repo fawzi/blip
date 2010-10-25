@@ -33,6 +33,7 @@ class Gauss{
         alpha=new double[](n);
         r=new double[](3*n);
         res=new double[](n);
+        this.blockSize=blockSize;
     }
     
     void randomize(Random rand){

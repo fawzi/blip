@@ -68,7 +68,7 @@ void checkLoop1(T,int rank)(NArray!(T,rank) a){
         bool did_wrap=false;
         iPos[]=cast(index_type)0;
         mixin(sLoopPtr(rank,["a"],loopBody1,"i"));
-        if (did_wrap) throw new Exception("incomplete loop",__FILE__,__LINE__);
+        if (!did_wrap) throw new Exception("incomplete loop",__FILE__,__LINE__);
     }
     const char[] loopBody2=`
     if (did_wrap) throw new Exception("counter wrapped",__FILE__,__LINE__);
@@ -492,7 +492,7 @@ else {
         auto err1=feqrel(diff1+1.0L,1.0L);
         auto err2=feqrel(diff2+1.0L,1.0L);
         if (norm2NA!(ComplexTypeOf!(T),2,real)(rightEVect)<=0.5) throw new Exception("rightEVect too small",__FILE__,__LINE__);
-        if (norm2NA!(ComplexTypeOf!(T),2,real)(leftEVect)<=0.5,"leftEVect too small");
+        if (norm2NA!(ComplexTypeOf!(T),2,real)(leftEVect)<=0.5) throw new Exception("leftEVect too small",__FILE__,__LINE__);
         if (err1<T.mant_dig*2/3-tol){
             sout("ev:");
             ev2.printData(sout.call,"F8,10"); sout("\n");
