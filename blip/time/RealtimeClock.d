@@ -71,7 +71,7 @@ version (Win32){
     real realtimeClockPeriod(){
         mach_timebase_infoT ti;
         mach_timebase_info(&ti);
-        return cast(real)ti.numer/cast(real)ti.denom;
+        return 1.e-9*cast(real)ti.numer/cast(real)ti.denom;
     }
     /// realtime clock, need to be valid only on one cpu
     /// if the thread migrates from a cpu to another ther result might be bogus
@@ -82,7 +82,7 @@ version (Win32){
     real cpuClockPeriod(){
         mach_timebase_infoT ti;
         mach_timebase_info(&ti);
-        return cast(real)ti.numer/cast(real)ti.denom;
+        return 1.e-9*cast(real)ti.numer/cast(real)ti.denom;
     }
 
 } else version (Posix) {
@@ -97,9 +97,9 @@ version (Win32){
             clock_gettime(CLOCK_REALTIME,&ts);
             return cast(ulong)ts.tv_nsec+1_000_000_000UL*cast(ulong)ts.tv_sec;
         }
-        /// frequency (in seconds) of the systemwide realtime clock
-        real realtimeClockFreq(){
-            return 1_000_000_000UL;
+        /// period (in seconds) of the systemwide realtime clock
+        real realtimeClockPeriod(){
+            return 1.0e-9;
         }
     } else {
         /// systemwide realtime clock
@@ -111,9 +111,9 @@ version (Win32){
             return (cast(ulong) tv.tv_sec * 1_000_000) + tv.tv_usec;
         }
         
-        /// frequency (in seconds) of the systemwide realtime clock
+        /// period (in seconds) of the systemwide realtime clock
         ulong realtimeClockFreq(){
-            return 1_000_000UL;
+            return 1.0e-6;
         }
     }
     

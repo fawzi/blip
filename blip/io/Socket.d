@@ -312,6 +312,7 @@ struct BasicSocket{
     }
     
     final size_t rawReadIntoTout(void[] dst,LoopHandlerI loop){
+        assert(loop!is null);
         ptrdiff_t res;
         while(true){
             for (int itry=0;itry<eagerTries;++itry){

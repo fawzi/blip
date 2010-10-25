@@ -71,7 +71,7 @@ int main(char[][] args){
         auto t0=realtimeClock();
         g.calc();
         auto t1=realtimeClock();
-        sout("gauss(")(n)(",")(bSize)("), time=")(t1-t0)("\n");
+        sout("gauss(")(n)(",")(bSize)("), time=")((t1-t0)*realtimeClockPeriod())("\n");
     }
     return 0;
 }

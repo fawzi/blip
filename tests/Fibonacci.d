@@ -39,7 +39,7 @@ void testFib(long n){
         auto t0=realtimeClock();
         auto res=fib(n);
         auto t1=realtimeClock();
-        sout("fib(")(n)(")=")(res)(" time=")(t1-t0)("\n");
+        sout("fib(")(n)(")=")(res)(" time=")((t1-t0)*realtimeClockPeriod())("\n");
     }
 }
 int main(char[][] args){

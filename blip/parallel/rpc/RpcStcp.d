@@ -502,6 +502,7 @@ class StcpProtocolHandler: ProtocolHandler{
         super();
         this.log=log;
         if (log is null) this.log=serr.call;
+        loop=noToutWatcher;
         rand=new RandomSync();
         connections=new HashMap!(TargetHost,StcpConnection)();
         this.group=((group.length==0)?"."[]:group);
