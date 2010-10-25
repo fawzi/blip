@@ -245,7 +245,7 @@ class PLoopArray(T){
 /// returns a structure that does a parallel loop on the given array trying to do optimalBlockSize loops in each task
 /// loop on elements and loop with index are supported
 PLoopArray!(T) pLoopArray(T)(T arr,size_t optimalBlockSize=1){
-    assert(optimalBlockSize>0,"optimalBlockSize must be lareger than 0");
+    assert(optimalBlockSize>0,"optimalBlockSize must be larger than 0");
     PLoopArray!(T) res=new PLoopArray!(T)(arr,optimalBlockSize);
     return res;
 }
