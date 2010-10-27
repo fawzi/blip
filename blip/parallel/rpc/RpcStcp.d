@@ -726,7 +726,7 @@ static this(){
     }
     // registers the default stcp protocol
     ProtocolHandler.registerProtocolHandler("stcp",&StcpProtocolHandler.findHandlerForUrl);
-    if (ProtocolHandler.defaultProtocol!is null){
+    if (ProtocolHandler.defaultProtocol is null){
         auto rpc1=new StcpProtocolHandler("","50000");
         rpc1.register();
         // rpc1.startServer(false); // does not start, so that it will require an explicit start. This ensures that no program will open a listening socket without being aware

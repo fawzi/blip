@@ -664,7 +664,7 @@ class Publisher{
         o.remoteMainCall(fName,requestId,u,sendRes);
     }
     
-    char[] publishObject(ObjVendorI obj, char[]name,Flags flags=Flags.Public,bool makeUnique=false){
+    char[] publishObject(ObjVendorI obj, char[]name,bool makeUnique=false,Flags flags=Flags.Public){
         char[] myName=name;
         PublishedObject pObj;
         pObj.obj=obj;
