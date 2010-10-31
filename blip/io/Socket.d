@@ -475,7 +475,7 @@ class SocketServer{
     ///
     /// it seems that restaring a server might make it bind to only some of the socket/families/interfaces
     /// it should, which might bring *large* slowdowns in creating the connections.
-    /// At the moment no as long as one socket can be bound, the start is considered a success.
+    /// At the moment as long as one socket can be bound, the start is considered a success.
     /// maybe this should be tightened up
     void start(){
         addrinfo hints;
