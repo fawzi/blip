@@ -509,6 +509,12 @@ NArray!(S,rank-1) reduceAxis(int rank, T, S=T)
     return reduceAxisGen!((ref S x,T y){ x=foldOp(x,y); },(ref S x,S y){ x=mergeOp(x,y); },(S x){ return x0; }, T,rank,S)(a,axis,res);
 }
 
+/// sums along the given axis
+NArray!(S,rank-1) sumAxis(int rank, T, S=T) (int axis=-1, NArray!(S,rank-1) res=nullNArray!(S,rank-1))
+{
+    return reduceAxisGen!((ref S x,T y){ x+=y; },(ref S x,S y){ x+=y; },(S x){ return cast(S)0; }, T,rank,S)(a,axis,res);
+}
+
 /// sum of the whole array
 S sumAll(T,int rank,S=T)(NArray!(T,rank)a){
     return reduceAllGen!((ref S x,T y){x+=cast(S)y;},(ref S x,S y){x+=y;}, (S x){ return x;},
