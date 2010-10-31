@@ -61,6 +61,7 @@ import blip.sync.Atomic;
 import blip.parallel.smp.WorkManager;
 import blip.io.BasicIO;
 import cstdlib = blip.stdc.stdlib : free, malloc;
+import blip.util.Convert;
 
 //version=RefCount;
 
@@ -494,14 +495,14 @@ else {
             static if(isAtomicType!(V)){
                 memset(res.startPtrArray,0,cast(size_t)(cast(size_t)res.nElArray*V.sizeof));
             } else {
-                res.startPtrArray[0..cast(size_t)res.nElArray]=cast(V)0;
+                res.startPtrArray[0..cast(size_t)res.nElArray]=convertTo!(V)(0);
             }
             return res;
         }
         /// returns an array initialized to 1 of the requested shape
         static NArray ones(index_type[rank] shape, bool fortran=false){
             NArray res=empty(shape,fortran);
-            res.startPtrArray[0..cast(size_t)res.nElArray]=cast(V)1;
+            res.startPtrArray[0..cast(size_t)res.nElArray]=convertTo!(V)(1);
             return res;
         }
         
@@ -1369,10 +1370,12 @@ else {
         }
 
         /// Add another array onto this one in place with scaling
-        void axpby(S,int rank2)(NArray!(S,rank2) o,S alpha=1,V beta=1)
+        void opBypax(S,int rank2,T=S,U=V)(NArray!(S,rank2) o,T alpha_=1,U beta_=1)
         in { assert(!(flags&Flags.ReadOnly),"ReadOnly array cannot be assigned"); }
         body { 
-            static assert(rank==rank2,"axpby accepts only identically shaped arrays");
+            S alpha=cast(S)alpha_;
+            V beta=cast(S)beta_;
+            static assert(rank==rank2,"opBypax accepts only identically shaped arrays");
             if (beta==1){
                 if (alpha==1){
                     binaryOpStr!("*aPtr0 += cast("~V.stringof~")(*bPtr0);",rank,V,S)(this,o);

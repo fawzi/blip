@@ -29,6 +29,7 @@ private {
     import blip.core.Traits : isFloatingPointType,ctfe_i2a;
     import blip.serialization.Serialization;
     import blip.serialization.SerializationMixins;
+    import blip.util.Convert;
 }
 
 /// mixin to loop on vectors and matrixes
@@ -137,8 +138,8 @@ struct Vector(flt_, int dim_) {
 
     static if (4 == dim) const static Vector unitW = { x : cscalar!(flt, 0), y : cscalar!(flt, 0), z : cscalar!(flt, 0), w : cscalar!(flt, 1) };
     
-    void axpby(V)(V x,flt a=cscalar!(flt,1),flt b=cscalar!(flt,1)){
-        static assert(is(V==Vector!(V.flt,dim)),"axpby only between vectors with the same size, not "~V.stringof);
+    void opBypax(V)(V x,flt a=cscalar!(flt,1),flt b=cscalar!(flt,1)){
+        static assert(is(V==Vector!(V.flt,dim)),"opBypax only between vectors with the same size, not "~V.stringof);
         if (b==cscalar!(flt,1)){
             mixin(vectMLoopMixin(["this","x"],"*thisPtr += a*(*xPtr);"));
         } else {
@@ -646,8 +647,8 @@ struct Matrix(flt_, int rows_, int cols_) {
     
     alias vectMLoopMixin simpleLoopMixin;
     
-    void axpby(U)(U x,flt a=cscalar!(flt,1),flt b=cscalar!(flt,1)){
-        static assert(is(U==Matrix!(U.flt,rows,cols)),"axpby only between matrix with the same struct, not "~U.stringof);
+    void opBypax(U)(U x,flt a=cscalar!(flt,1),flt b=cscalar!(flt,1)){
+        static assert(is(U==Matrix!(U.flt,rows,cols)),"opBypax only between matrix with the same struct, not "~U.stringof);
         if (b==cscalar!(flt,1)){
             mixin(vectMLoopMixin(["this","x"],"*thisPtr += scalar!(flt)(a*(*xPtr));"));
         } else {
@@ -1332,6 +1333,14 @@ struct Quaternion(flt_) {
     
     const static Quaternion identity = { x: cscalar!(flt, 0), y: cscalar!(flt, 0), z: cscalar!(flt, 0), w: cscalar!(flt, 1) };
     
+    static Quaternion from(T)(Quaternion!(T) q){
+        Quaternion res;
+        res.x=convertTo!(flt_)(q.x);
+        res.y=convertTo!(flt_)(q.y);
+        res.z=convertTo!(flt_)(q.z);
+        res.w=convertTo!(flt_)(q.w);
+        return res;
+    }
 
     bool ok() {
         if (isNaN(x)) return false;
@@ -1621,8 +1630,8 @@ struct Quaternion(flt_) {
         return res;
     }
     
-    void axpby(V)(V v,flt a=cscalar!(flt,1),flt b=cscalar!(flt,1)){
-        static assert(is(U==Quaternion!(U.flt)),"axpby only between quaternions, not "~V.stringof);
+    void opBypax(V)(V v,flt a=cscalar!(flt,1),flt b=cscalar!(flt,1)){
+        static assert(is(U==Quaternion!(U.flt)),"opBypax only between quaternions, not "~V.stringof);
         if (b==cscalar!(flt,1)){
             x+=a*v.x;
             y+=a*v.y;

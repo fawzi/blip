@@ -33,7 +33,7 @@ import blip.narray.NArrayBasicOps;
 import blip.math.Math:min,max,round,sqrt,ceil,abs;
 import blip.stdc.string:memcpy;
 import blip.util.TemplateFu: nArgs;
-import blip.core.Traits:isComplexType,isImaginaryType,ComplexTypeOf,RealTypeOf;
+import blip.core.Traits:isComplexType,isImaginaryType,ComplexTypeOf,RealTypeOf,isAtomicType;
 //import tango.util.log.Trace; //pippo
 
 /// return type of the generic dot operation
@@ -134,7 +134,7 @@ TypeOfDot!(T,U,S).ResType dot(T,U,S...)(T t,U u,S args){
 
 /// return type of the generic outer multiplication operation
 template TypeOfOuter(T,U,S...){
-    struct dummy{ T t; U u; S args; } // .init sometime fails (for tuples of complex types for example), thus going this way
+    struct dummyS{ T t; U u; S args; } // .init sometime fails (for tuples of complex types for example), thus going this way
     static if (is(typeof(T.outerOp(dummyS.init.t,dummyS.init.u,dummyS.init.args)))){ // static T.outerOp
         alias typeof(T.outerOp(dummyS.init.t,dummyS.init.u,dummyS.init.args)) ResType;
     } else static if (is(typeof(U.outerOp(dummyS.init.t,dummyS.init.u,dummyS.init.args)))){ // static U.outerOp
@@ -145,15 +145,20 @@ template TypeOfOuter(T,U,S...){
         alias typeof(dummyS.init.u.opOuter_r(dummyS.init.t,dummyS.init.args)) ResType;
     } else static if (is(typeof(outerNA(dummyS.init.t,dummyS.init.u,dummyS.init.args)))){ // NArray outer
         alias typeof(outerNA(dummyS.init.t,dummyS.init.u,dummyS.init.args)) ResType;
-    } else static if(nArgs!(S)==0 && isAtomicType!(T) && isAtomicType!(U) && is(typeof(dummyS.init.t*dummyS.init.u))){ // multiplication (for scalars)
-        // extend support to all opMul? dot and outer are the same *only* for scalars... not (for example) for matrix multiplication
+    } else static if(nArgs!(S)==0 && (isAtomicType!(T) || isAtomicType!(U)) && is(typeof(dummyS.init.t*dummyS.init.u))){
         alias typeof(dummyS.init.t*dummyS.init.u) ResType;
+    } else static if ((nArgs!(S)==1 || nArgs!(S)==2 || nArgs!(S)==3) && isAtomicType!(U) && is(typeof(bypax(dummyS.init.args[0],dummyS.init.t,dummyS.init.args[1..$])))){
+        alias S[0] ResType;
+    } else static if ((nArgs!(S)==1 || nArgs!(S)==2 || nArgs!(S)==3) && isAtomicType!(T) && is(typeof(bypax(dummyS.init.args[0],dummyS.init.u,dummyS.init.args[1..$])))){
+        alias S[0] ResType;
     } else {
         alias void ResType;
     }
 }
 
 /// generic op outer
+/// normally it should be like (tensorA,tensorB[[,targetTensor],scaleAB=1,scaleTarget=1])
+/// and will return the result
 TypeOfOuter!(T,U,S).ResType outer(T,U,S...)(T t,U u,S args){
     static if (is(typeof(T.outerOp(t,u,args)))){ // static T.outerOp
         static if(is(typeof(T.outerOp(t,u,args))==void)){
@@ -185,82 +190,56 @@ TypeOfOuter!(T,U,S).ResType outer(T,U,S...)(T t,U u,S args){
         /// unfortunaley (by design?) the only "free" templates that are picked up are those that are
         /// locally visible where the template is defined. To have other ones a mixin is needed...
         return outerNA(t,u,args);
-    } else static if(nArgs!(S)==0 && isAtomicType!(T) && isAtomicType!(U) && is(typeof(t*u))){ // multiplication (for scalars), enlarge support to all opMul? dot and outer are the same *only* for scalars... not (for example) for matrix multiplication
-        static if(is(typeof(t*u)==void)){
-            t*u;
-        } else {
-            return t*u;
-        }
+    } else static if(nArgs!(S)==0 && (isAtomicType!(T) || isAtomicType!(U)) && is(typeof(t*u))){ // multiplication (for scalars), enlarge support to all opMul? dot and outer are the same *only* for scalars... not (for example) for matrix multiplication
+        return t*u;
+    } else static if (nArgs!(S)==1 && isAtomicType!(U) && is(typeof(bypax(args[0],t,u)))){
+        bypax(args[0],t,u);
+        return args[0];
+    } else static if (nArgs!(S)==2 && isAtomicType!(U) && is(typeof(bypax(args[0],t,u*args[1])))){
+        bypax(args[0],t,u*args[1]);
+        return args[0];
+    } else static if (nArgs!(S)==3 && isAtomicType!(U) && is(typeof(bypax(args[0],t,u*args[1],args[2])))){
+        bypax(args[0],t,u*args[1],args[2]);
+        return args[0];
+    } else static if (nArgs!(S)==1 && isAtomicType!(T) && is(typeof(bypax(args[0],u,t)))){
+        bypax(args[0],u,t);
+        return args[0];
+    } else static if (nArgs!(S)==2 && isAtomicType!(T) && is(typeof(bypax(args[0],u,t*args[1])))){
+        bypax(args[0],u,t*args[1]);
+        return args[0];
+    } else static if (nArgs!(S)==3 && isAtomicType!(T) && is(typeof(bypax(args[0],u,t*args[1],args[2])))){
+        bypax(args[0],u,t*args[1],args[2]);
+        return args[0];
     } else {
         static assert(0,"could not find a valid definition of outer with the following arguments:"~
             T.stringof~","~U.stringof~","~S.stringof);
     }
 }
 
-/// return type of the generic axpby
-template TypeOfAxpby(T,U,S...){
-    struct dummy{ T t; U u; S args; } // .init sometime fails (for tuples of complex types for example), thus going this way
-    static if (is(typeof(T.axpby(dummyS.init.t,dummyS.init.u,dummyS.init.args)))){ // static T.outerOp
-        alias typeof(T.axpby(dummyS.init.t,dummyS.init.u,dummyS.init.args)) ResType;
-    } else static if (is(typeof(U.axpby(dummyS.init.t,dummyS.init.u,dummyS.init.args)))){ // static U.outerOp
-        alias typeof(U.axpby(dummyS.init.t,dummyS.init.u,dummyS.init.args)) ResType;
-    } else static if (is(typeof(dummyS.init.t.axpby(dummyS.init.u,dummyS.init.args)))){ // t.opOuter
-        alias typeof(dummyS.init.t.axpby(dummyS.init.u,dummyS.init.args)) ResType;
-    } else static if (is(typeof(dummyS.init.u.axpby_r(dummyS.init.t,dummyS.init.args)))){ // u.opOuter_r
-        alias typeof(dummyS.init.u.axpby_r(dummyS.init.t,dummyS.init.args)) ResType;
-    } else static if (nArgs!(S)==0 && is(typeof(dummyS.init.t+=dummyS.init.u))){
-        alias typeof(dummyS.init.t+=dummyS.init.u) ResType;
-    } else static if (nArgs!(S)==0 && is(typeof(dummyS.init.t=dummyS.init.t+dummyS.init.u))){
-        alias typeof(dummyS.init.t=dummyS.init.t+dummyS.init.u) ResType;
-    } else static if (nArgs!(S)==1 && is(typeof(dummyS.init.t+=dummyS.init.u*args[0]))){
-        alias typeof(dummyS.init.t+=dummyS.init.u*args[0]) ResType;
-    } else static if (nArgs!(S)==1 && is(typeof(dummyS.init.t=dummyS.init.t+dummyS.init.u*args[0]))){
-        alias typeof(dummyS.init.t=dummyS.init.t+dummyS.init.u*args[0]) ResType;
-    } else static if (nArgs!(S)==2 && is(typeof(dummyS.init.t=dummyS.init.args[1]*dummyS.init.t+args[0]*dummyS.init.u))){
-        alias typeof(dummyS.init.t=dummyS.init.args[1]*dummyS.init.t+args[0]*dummyS.init.u) ResType;
-    } else {
-        alias void ResType;
-    }
-}
 
-/// generic axpby
-TypeOfOuter!(T,U,S).ResType axpby(T,U,S...)(T t,U u,S args){
-    static if (is(typeof(T.axpby(t,u,args)))){ // static T.outerOp
-        static if(is(typeof(T.axpby(t,u,args))==void)){
-            T.axpby(t,u,args);
-        } else {
-            return T.axpby(t,u,args);
-        }
-    } else static if (is(typeof(U.axpby(t,u,args)))){ // static U.outerOp
-        static if(is(typeof(U.axpby(t,u,args))==void)){
-            U.axpby(t,u,args);
-        } else {
-            return U.axpby(t,u,args);
-        }
-    } else static if (is(typeof(t.axpby(u,args)))){ // t.opOuter
-        static if(is(typeof(t.axpby(u,args))==void)){
-            t.axpby(u,args);
-        } else {
-            return t.axpby(u,args);
-        }
-    } else static if (is(typeof(u.axpby_r(t,args)))){ // u.opOuter_r
-        static if(is(typeof(u.axpby_r(t,args))==void)){
-            u.axpby_r(t,args);
-        } else {
-            return u.axpby_r(t,args);
-        }
+/// generic bypax, this is like blas axpy: but the modified argument is the the first one, y
+/// so that bypax(y,x) is equivalent to y.opBypax(x)
+void bypax(T,U,S...)(ref T t,U u,S args){
+    static if (is(typeof(T.bypaxOp(t,u,args)))){ // static T.outerOp
+        T.bypaxOp(t,u,args);
+    } else static if (is(typeof(U.bypaxOp(t,u,args)))){
+        U.bypaxOp(t,u,args);
+    } else static if (is(typeof(t.opBypax(u,args)))){
+        t.opBypax(u,args);
+    } else static if (is(typeof(u.opBypax_r(t,args)))){
+        u.opBypax_r(t,args);
     } else static if (nArgs!(S)==0 && is(typeof(t+=u))){
-        return t+=u;
-    } else static if (nArgs!(S)==0 && is(typeof(t=t+u))){
-        return t=t+u;
+        t+=u;
+    } else static if (nArgs!(S)==0 && is(typeof(t=u+t))){
+        t=u+t;
     } else static if (nArgs!(S)==1 && is(typeof(t+=u*args[0]))){
-        return t+=u*args[0];
+        t+=u*args[0];
     } else static if (nArgs!(S)==1 && is(typeof(t=t+u*args[0]))){
-        return t=t+u*args[0];
+        t=t+u*args[0];
     } else static if (nArgs!(S)==2 && is(typeof(t=args[1]*t+args[0]*u))){
-        return t=args[1]*t+args[0]*u;
+        t=args[1]*t+args[0]*u;
     } else {
-        static assert(0,"could not find a valid definition of outer with the following arguments:"~
+        static assert(0,"could not find a valid definition of bypax with the following arguments:"~
             T.stringof~","~U.stringof~","~S.stringof);
     }
 }
