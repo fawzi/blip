@@ -26,10 +26,10 @@ template convertTo(T){
             return T.from(x);
         } else static if (is(typeof(x.to!(T)())==T)){
             return x.to!(T)();
-        } else static if (is(V:T)){
+        } else static if (is(typeof(cast(T)x))){
             return cast(T)x;
         } else {
-            assert(0,"cannot convert "~V.stringof~" to "~T.stringof);
+            static assert(0,"cannot convert "~V.stringof~" to "~T.stringof);
         }
     }
 }
