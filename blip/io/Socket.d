@@ -422,17 +422,11 @@ class SocketServer{
                 throw new Exception("error in pending tasks",__FILE__,__LINE__);
         }
         void giveBack(){
-//            sinkTogether(sout,delegate void(CharSink s){
-//                dumper(s)(taskAtt.val)(" giving back Handler ")(cast(void*)this)(",")(cast(void*)this.pool)("\n");
-//            });
             if (pool!is null){
                 pool.giveBack(this);
             } else {
                 //tryDeleteT(this);
             }
-//            sinkTogether(sout,delegate void(CharSink s){
-//                dumper(s)(taskAtt.val)(" done give back Handler\n");
-//            });
         }
         TargetHost otherHost(char[] buf){
             TargetHost res;
