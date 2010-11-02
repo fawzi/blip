@@ -32,7 +32,7 @@ import blip.container.HashSet;
 import blip.container.Pool;
 import blip.container.Cache;
 import blip.util.RefCount;
-public import blip.bindings.ev.DLibev: GenericWatcher, LoopHandlerI;
+public import blip.bindings.ev.DLibev: GenericWatcher, LoopHandlerI, ev_tstamp;
 
 /// helper struct to wait for an action in an event loop
 struct WaitLoopOp{
