@@ -112,7 +112,7 @@ version (Win32){
         }
         
         /// period (in seconds) of the systemwide realtime clock
-        ulong realtimeClockFreq(){
+        real realtimeClockPeriod(){
             return 1.0e-6;
         }
     }
