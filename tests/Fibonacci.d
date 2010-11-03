@@ -29,7 +29,7 @@ long fib(long n){
     long f1;
     long f2;
     Task("f1",delegate void(){ f1=fib(n-1); }).autorelease.submitYield();
-    Task("f2",delegate void(){ f1=fib(n-2); }).autorelease.submit();
+    Task("f2",delegate void(){ f2=fib(n-2); }).autorelease.submit();
     (cast(Task)cast(Object)tAtt).finishSubtasks();
     return f1+f2;
 }
