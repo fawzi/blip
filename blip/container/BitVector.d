@@ -17,7 +17,7 @@
 // limitations under the License.
 module blip.container.BitVector;
 private import blip.core.BitManip;
-alias uint internal_t; // at the moment there are places where this is hardcoded (bitsize=32)
+alias size_t internal_t; // at the moment there are places where this is hardcoded (bitsize=32)
 
 struct BitVector(size_t len){
     internal_t[(len+internal_t.sizeof*8-1)/(internal_t.sizeof*8)] data;
@@ -194,17 +194,17 @@ struct BitVector(size_t len){
      */
     int opEquals( BitVector rhs )
     {
-        uint* p1 = this.ptr;
-        uint* p2 = rhs.ptr;
-        size_t n = len / 32;
+        internal_t* p1 = this.ptr;
+        internal_t* p2 = rhs.ptr;
+        size_t n = len / (internal_t.sizeof*8);
         size_t i;
         for( i = 0; i < n; ++i )
         {
             if( p1[i] != p2[i] )
             return 0; // not equal
         }
-        int rest = cast(int)(len & cast(size_t)31u);
-        uint mask = ~((~0u)<<rest);
+        int rest = cast(int)(len & cast(size_t)(internal_t.sizeof*8-1));
+        internal_t mask = ~((~cast(internal_t)0)<<rest);
         return (rest == 0) || (p1[i] & mask) == (p2[i] & mask);
     }
     
@@ -217,7 +217,7 @@ struct BitVector(size_t len){
         result.data[]=0;
         
         internal_t* p = this.ptr;
-        size_t n = len / 32;
+        size_t n = len / (internal_t.sizeof*8);
         size_t i;
         for( i = 0; i < n; ++i )
         {
@@ -226,8 +226,8 @@ struct BitVector(size_t len){
                 return result;
             }
         }
-        int rest = cast(int)(len & cast(size_t)31u);
-        uint mask = ~((~0u)<<rest);
+        int rest = cast(int)(len & cast(size_t)(internal_t.sizeof*8-1));
+        internal_t mask = ~((~cast(internal_t)0)<<rest);
         if (rest!=0 && (mask&p[n])!=0){
             result.ptr[n]=(cast(internal_t)1)<<bsr(p[n]);
         }
@@ -250,7 +250,7 @@ struct BitVector(size_t len){
     {
         internal_t* p1 = this.ptr;
         internal_t* p2 = rhs.ptr;
-        size_t n = len / 32;
+        size_t n = len / (internal_t.sizeof*8);
         size_t i;
         for( i = 0; i < n; ++i )
         {
@@ -258,11 +258,11 @@ struct BitVector(size_t len){
                 return ((p1[i] < p2[i])?-1:1);
             }
         }
-        int rest=cast(int)(len & cast(size_t) 31u);
+        int rest=cast(int)(len & cast(size_t)(internal_t.sizeof*8-1));
         if (rest>0) {
-            uint mask=~((~0u)<<rest);
-            uint v1=p1[i] & mask;
-            uint v2=p2[i] & mask;
+            internal_t mask=~((~cast(internal_t)0)<<rest);
+            internal_t v1=p1[i] & mask;
+            internal_t v2=p2[i] & mask;
             if (v1 != v2) return ((v1<v2)?-1:1);
         }
         return ((this.length<rhs.length)?-1:((this.length==rhs.length)?0:1));
@@ -294,8 +294,8 @@ struct BitVector(size_t len){
         BitVector result;
         for( size_t i = 0; i < dim; ++i )
             result.ptr[i] = ~this.ptr[i];
-        if( len & 31 )
-            result.ptr[dim - 1] &= ~(~0 << (len & 31));
+        if((len & (internal_t.sizeof*8-1))!=0)
+            result.ptr[dim - 1] &= ~((~(cast(internal_t)0)) << (len & 31));
         return result;
     }
 
@@ -452,7 +452,7 @@ struct BitVector(size_t len){
         return false;
 /+        int rest=cast(int)(len & cast(size_t) (internal_t.sizeof*8-1));
         if (rest>0) {
-            uint mask=~((~0u)<<rest);
+            internal_t mask=~((~cast(internal_t)0)<<rest);
             p1[i] = v & mask;
         }+/
     }
@@ -462,7 +462,7 @@ struct BitVector(size_t len){
         data[]=v;
         int rest=cast(int)(len & cast(size_t) (internal_t.sizeof*8-1));
         if (rest>0) {
-            internal_t mask=~((~(cast(size_t)0))<<rest);
+            internal_t mask=~((~(cast(internal_t)0))<<rest);
             data[$-1] = v & mask;
         }
     }
