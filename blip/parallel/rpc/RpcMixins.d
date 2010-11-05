@@ -301,7 +301,7 @@ char[] rpcVendorMixin(char[] name,char[] extName_, char[][] functionsComments){
         extName=name~`Vendor.mangleof`;
     }
     char[] res=`
-    static class `~name~`Vendor:BasicVendor{
+    final static class `~name~`Vendor:BasicVendor{
         `~name~`ProxiedType obj;
         override `~name~`ProxiedType targetObj(){ return obj; }
         static struct Closure{
