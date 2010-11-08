@@ -474,7 +474,7 @@ class JsonUnserializer(T=char) : Unserializer {
                 return true;
             } else if (metaI is null || metaI.className!=className){
                 metaI=SerializationRegistry().getMetaInfo(className);
-                assert(metaI!is null,"could not find meta info for "~className);
+                assert(metaI!is null,"could not find meta info for '"~className~"'");
             }
         } else if (reader.skipString2("id",false)){
             reader.skipString(":");
