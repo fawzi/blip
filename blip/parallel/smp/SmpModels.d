@@ -181,6 +181,8 @@ interface TaskI:SubtaskNotificationsI{
     bool mightYield();
     /// waits for task completion
     void wait();
+    /// yields until the subtasks have finished (or waits if Yielding is not possible),
+    void finishSubtasks();
     /// retains the task (call it if you want to avoid reuse of the task before you release it)
     TaskI retain();
     /// releases the task (call it when you don't need the task anymore)
