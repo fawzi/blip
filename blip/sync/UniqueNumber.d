@@ -17,6 +17,7 @@
 module blip.sync.UniqueNumber;
 import blip.sync.Atomic;
 import blip.core.sync.Mutex;
+import blip.io.BasicIO;
 
 static if (LockVersion){
     /// fast unique number (that handles well the absence of atomic ops)
@@ -60,6 +61,13 @@ static if (LockVersion){
                 _val+=v;
             }
         }
+        void desc(CharSink s){
+            T mVal;
+            synchronized(m){
+                mVal=_val;
+            }
+            dumper(s)("<UniqueNumber@")(cast(void*)&_val)(" nextValue:")(mVal)(">");
+        }
     }
 } else {
     /// fast unique number (that handles well the absence of atomic ops)
@@ -83,6 +91,10 @@ static if (LockVersion){
         /// increases the stored number by the given number
         void opAddAssign(T val){
             atomicAdd(_val,val);
+        }
+        void desc(CharSink s){
+            auto mVal=_val;
+            dumper(s)("<UniqueNumber@")(cast(void*)&_val)(" nextValue:")(mVal)(">");
         }
     }
 }
