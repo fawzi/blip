@@ -103,7 +103,7 @@ case $compShort in
     ;;
     ldc)
     linkFlag="-L="
-    compFlags="+q"
+    compFlags="-disable-d-passes +q"
     versionFlag="-d-version="
     ;;
     *)
