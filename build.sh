@@ -9,6 +9,7 @@ tests=1
 build_dir=
 noopt=
 nodbg=
+noTangoUser=
 BLIP_HOME=$PWD
 mpi=
 
@@ -41,14 +42,29 @@ do
             echo "  --d-home x      uses x as d home (default $D_HOME )"
             echo "  --blip-home x   uses x as blip home (defaults to $PWD )"
             echo "  --mpi           compiles the mpi version"
+            echo "  --no-tango-user does not link the tango-user library"
             echo "  --no-tests      does not compile the tests"
             echo "  --no-opt        does not compile the opt version"
             echo "  --no-dbg        does not compile the dbg version"
             echo "  --build-dir X   uses X as build dir (you *really* want to use a local"
-            echo "                  filesystem like /tmp/$USER/build for building if possible)"
+            echo "                  filesystem like /tmp/$USER/build for building if possible"
+            if [ -n "$D_BUILD_DIR" ] ; then
+                echo "                  defaults to $D_BUILD_DIR )"
+            else
+                echo "                  defaults to $D_HOME/build )"
+            fi
             echo ""
             echo "The script uses '$'DC as compiler if set"
             echo "or the first compiler found if not set."
+            echo "important environment variables are:"
+            echo " D_HOME: the default --d-home value"
+            echo " D_BUILD_DIR: the default build dir (you should use a local filesystem)"
+            echo " DFLAGS_ADD: adds the given D flags"
+            echo " CFLAGS_ADD: adds the given C flags"
+            echo " DFLAGS: as environment variable is not changed"
+            echo " CFLAGS: adds the given C flags"
+            echo " EXTRA_LIBS: add the given link flags (to link lapack for example)"
+            echo " MKLROOT: if sets links the mkl library on linux x86_64"
             exit 0
             ;;
         --version)
@@ -79,6 +95,9 @@ do
             ;;
         --mpi)
             mpi=1
+            ;;
+        --no-tango-user)
+            noTangoUser=1
             ;;
         --no-tests)
             tests=0
@@ -148,8 +167,12 @@ case `uname` in
   *)
   die "unknown platform, you need to set extra_libs_os"
 esac
-extra_libs_opt="${linkFlag}-L${D_HOME}/lib ${linkFlag}-ltango-user-${compShort} $extra_libs_os $extra_libs_comp $mpiFlags"
-extra_libs_dbg="${linkFlag}-L${D_HOME}/lib ${linkFlag}-ltango-user-${compShort}-dbg $extra_libs_os $extra_libs_comp $mpiFlags"
+if [ -z "$noTangoUser" ]; then
+    tangoUserOpt="${linkFlag}-ltango-user-${compShort}"
+    tangoUserDbg="${linkFlag}-ltango-user-${compShort}-dbg"
+fi
+extra_libs_opt="${linkFlag}-L${D_HOME}/lib $tangoUserOpt $extra_libs_os $extra_libs_comp $mpiFlags"
+extra_libs_dbg="${linkFlag}-L${D_HOME}/lib $tangoUserDbg $extra_libs_os $extra_libs_comp $mpiFlags"
 case $version in
     opt)
     extra_libs="$extra_libs_opt"
@@ -159,7 +182,7 @@ case $version in
     ;;
     *)
     echo "unknown version, guessing extra_libs"
-    extra_libs="${linkFlag}-L${D_HOME}/lib ${linkFlag}-ltango-user-${compShort}-dbg $extra_libs_os $extra_libs_comp $mpiFlags"
+    extra_libs="${linkFlag}-L${D_HOME}/lib $tangoUserDbg $extra_libs_os $extra_libs_comp $mpiFlags"
 esac
 makeFlags="$silent $build_dir"
 if [ -n "$clean" ]; then
@@ -167,13 +190,13 @@ if [ -n "$clean" ]; then
     rm -f libs/libblip-*
 fi
 if [ -z "$noopt" ]; then
-    $make $makeFlags EXTRA_LIBS="$extra_libs_opt" VERSION=opt${mpiVersion} lib || die "error building the opt version"
+    $make $makeFlags EXTRA_LIBS="$EXTRA_LIBS $extra_libs_opt" VERSION=opt${mpiVersion} lib || die "error building the opt version"
 fi
 if [ -z "$nodbg" ]; then
-    $make $makeFlags EXTRA_LIBS="$extra_libs_dbg" VERSION=dbg${mpiVersion} lib || die "error building the dbg version"
+    $make $makeFlags EXTRA_LIBS="$EXTRA_LIBS $extra_libs_dbg" VERSION=dbg${mpiVersion} lib || die "error building the dbg version"
 fi
 if [ -n "$tests" ] ; then
-    $make $makeFlags EXTRA_LIBS="$extra_libs" VERSION=$version${mpiVersion} || die "error building the tests"
+    $make $makeFlags EXTRA_LIBS="$EXTRA_LIBS $extra_libs" VERSION=$version${mpiVersion} || die "error building the tests"
 fi
 installDir=`dirname $compiler`/../lib
 for l in libs/libblip-* ; do
