@@ -1,7 +1,11 @@
 Blip is undergoing a reorganization, so building might be a little more complex than it should:
-* you need the trunk of tango to build blip (or the older frozen version http://github.com/fawzi/oldTango ), the next release of tango will be supported
-* 
-Git repositories is available at
+ * you need the trunk of tango to build blip (or the older frozen version http://github.com/fawzi/oldTango ), the next release of tango will be supported. There are useful scripts to build tango trunk in the buildTango directory. They assume that the runtime directory is called libtango-base-dmd.a or libtango-base-ldc.a, edit your dmd.conf/ldc.cof file accordingly (-defaultlib=libtango-base-xxx.a -debuglib=libtango-base-xxx.a), and remember to add tango and tango/core/vendor to the search path of the compiler.
+ * you need hwloc 1.x from http://www.open-mpi.org/projects/hwloc/
+ * you need libev 3.6 from http://software.schmorp.de/pkg/libev.html
+ * blas/lapack is required (and used for NArray operations) by default the Accelerate framework is used on mac, and MKL library on linux (just define MKL_ROOT to use it).
+If you want to avoid installing it add "-version=no_blas -version=no_lapack" to the DFLAGS_COMP of your platform in the build/arch directory
+
+For blip itself, the git repository is available at
     http://github.com/fawzi/
 
 If you have git you can
@@ -9,39 +13,15 @@ If you have git you can
     git clone git://github.com/fawzi/blip.git
 
 to install
-    cd tango/build
-    ./build.sh
-    cd ../..
-    
     cd blip
     ./build.sh
     cd ..
-    
-blas/lapack wrappers are used by default, and are part of the distribution, they come from the 
-    http://dsource.org/projects/multiarray
-project, but the blas and lapack library themselves have to be installed by yourself (mkl is a good choice, some versions of goto2 have a threading problem)
 
-you can also use the included makefile, for example on mac I do
+this should build the blip library, and the test programs (in lib and exe)
+see ./build.sh --help for help with the flags of the build script
+to compile your programs if you use xfbuild you can try to use the dbuild script (that automatically links all the needed stuff).
 
-  make EXTRA_LIBS="-L=-ltango-user-ldc -L=-framework -L=Accelerate" TANGO_HOME=$HOME/d/tango
-
-to deactivate them you need
-    -version=no_blas       // deactivates blas calling in dot product
-    -version=no_lapack     // deactivates lapack derived LinAlg routines (solve,eig,eigh,svd,...)
-
-so if you do not want to link blas/lapack do something like
-
-  make EXTRA_LIBS="-L=-ltango-user-ldc" DFLAGS_ADD="-d-version=no_lapack \
-    -d-version=no_blas" TANGO_HOME=$HOME/d/tango
-
-other useful flags are
-    -debug=TestNArray   // activates extra internal consistency checks in NArray
-    -version=multiarray // in perf_test times also multiarray performace (that you need to install separately)
-
-mpi has wrappers to the open mpi routines, but that has to be activated (openmpi is a good choice).
-
-To have maximum speed compile with -release -O, but as it is quite new you might want to 
-first compile it with checks.
+mpi has wrappers to the open mpi routines, but that has to be activated (has been tested with openmpi).
 
 The code has a comprehensive battery of test.
 By default all of them are built, which especially for testNArray might take some time, 
