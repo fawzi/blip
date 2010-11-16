@@ -29,6 +29,8 @@ import Integer=tango.text.convert.Integer;
 import tango.core.Tuple;
 import blip.io.EventWatcher;
 
+version=TestRpcNoOneway;
+
 version(NoTrace){} else { import blip.core.stacktrace.TraceExceptions; }
 
 class A{
@@ -146,7 +148,9 @@ void rpcTests(){
         sinkTogether(sout,delegate void(CharSink s){
             dumper(s)("loopBackProxy dif:")(r)("\n");
         });
-        localP4.notify(3);
+        version(TestRpcNoOneway){} else {
+            localP4.notify(3);
+        }
         sinkTogether(sout,delegate void(CharSink s){
             dumper(s)("loopBackProxy notify\n");
         });
@@ -171,7 +175,9 @@ void rpcTests(){
                     x=A.globalA.mult(x,y);
                     x=A.globalA.div(x,y);
                     tot+=x;
-                    if (i%100==0) A.globalA.notify(i);
+                    version(TestRpcNoOneway){} else {
+                        if (i%100==0) A.globalA.notify(i);
+                    }
                 }
                 auto t1=realtimeClock();
                 s("native single thread:")(t1-t0)(", ")(tot)("\n");
@@ -188,7 +194,9 @@ void rpcTests(){
                     x=ol.mult(x,y);
                     x=ol.div(x,y);
                     tot+=x;
-                    if (i%100==0) ol.notify(i);
+                    version(TestRpcNoOneway){} else {
+                        if (i%100==0) ol.notify(i);
+                    }
                 }
                 auto t1=realtimeClock();
                 s("localProxy1:")(t1-t0)(", ")(tot)(" err: ")(tot-totRef)("\n");
@@ -204,7 +212,9 @@ void rpcTests(){
                     x=localP.mult(x,y);
                     x=localP.div(x,y);
                     tot+=x;
-                    if (i%100==0) localP.notify(i);
+                    version(TestRpcNoOneway){} else {
+                        if (i%100==0) localP.notify(i);
+                    }
                 }
                 auto t1=realtimeClock();
                 s("localProxy2:")(t1-t0)(", ")(tot)(" err: ")(tot-totRef)("\n");
@@ -220,7 +230,9 @@ void rpcTests(){
                     x=localP4.mult(x,y);
                     x=localP4.div(x,y);
                     tot+=x;
-                    if (i%100==0) localP4.notify(i);
+                    version(TestRpcNoOneway){} else {
+                        if (i%100==0) localP4.notify(i);
+                    }
                 }
                 auto t1=realtimeClock();
                 s("loopBackProxy:")(t1-t0)(", ")(tot)(" err: ")(tot-totRef)("\n");
@@ -354,7 +366,9 @@ void rpcTestClient(char[] url){
         sinkTogether(sout,delegate void(CharSink s){
             dumper(s)("Proxy div:")(r)("\n");
         });
-        localP4.notify(3);
+        version(TestRpcNoOneway){} else {
+            localP4.notify(3);
+        }
         sinkTogether(sout,delegate void(CharSink s){
             dumper(s)("Proxy notify\n");
         });
@@ -379,7 +393,9 @@ void rpcTestClient(char[] url){
                     x=A.globalA.mult(x,y);
                     x=A.globalA.div(x,y);
                     tot+=x;
-                    if (i%100==0) A.globalA.notify(i);
+                    version(TestRpcNoOneway){} else {
+                        if (i%100==0) A.globalA.notify(i);
+                    }
                 }
                 auto t1=realtimeClock();
                 s("native single thread:")(t1-t0)(", ")(tot)("\n");
@@ -426,7 +442,9 @@ void rpcTestClient(char[] url){
                     x=localP4.mult(x,y);
                     x=localP4.div(x,y);
                     tot+=x;
-                    if (i%100==0) localP4.notify(i);
+                    version(TestRpcNoOneway){} else {
+                        if (i%100==0) localP4.notify(i);
+                    }
                 }
                 auto t1=realtimeClock();
                 s("Proxy:")(t1-t0)(", ")(tot)(" err: ")(tot-totRef)("\n");
