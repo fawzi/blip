@@ -7,7 +7,7 @@ The aim was to build a new basis for my development of computational programs, e
 The tango library http://dsource.org/projects/tango gave an excellent starting point for many things, but was missing some basic things, so blip was born.
 It is possible that some pieces of blip will end up into tango, and in fact the random number generation already did the jump: it used to be in blip.random and now it is tango.math.random just like the Atomic module.
 
-In several places blip wraps a bit tango, that is done in purpose to insulate a bit a program from changes in tango, something that has been shown to be useful. This would also help porting blip to phobos for example if the need should arise.
+In several places blip wraps tango, that is done in purpose to insulate a bit from changes in tango, something that has been shown to be useful. This would also help porting blip to phobos for example if the need should arise.
 
 == Contributors ==
 
