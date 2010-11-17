@@ -18,7 +18,29 @@
 module blip.Version;
 
 enum BlipVersion{
-    Major=0,
-    Minor=5,
-    Sub  =0, // even numbers are releases, odd are the between releases
+    Major=0, /// changes might be incompatible
+    Minor=5, /// changes should be backward compatible
+    Sub  =0, /// even numbers are releases, odd are the between releases
+}
+
+/// compares the given version to the actual version, returns
+/// -1 if the current version is smaller
+/// 0 if the versions are equal
+/// 1 if the current version is larger than the requested
+/// ctfe safe
+int blipVersionCompare(int major,int minor,int sub){
+    if (major>BlipVersion.Major){
+        return -1;
+    } else if (major==BlipVersion.Major){
+        if (minor>BlipVersion.Minor){
+            return -1;
+        } else if (minor==BlipVersion.Minor){
+            if (sub>BlipVersion.Sub){
+                return -1;
+            } else if (sub==BlipVersion.Sub){
+                return 0;
+            }
+        }
+    }
+    return 1;
 }
