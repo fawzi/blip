@@ -3,6 +3,8 @@
 an overview of the parallelization strategies available in the blip library
     by Fawzi Mohamed
 
+Note that there is a preprint of an article about this at https://github.com/fawzi/blip/raw/master/paraArt.pdf
+
 == Parallelization hierarchy ==
 
  * smp is the first level in the parallelization hierarchy/methods supported in
