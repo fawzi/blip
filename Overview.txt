@@ -366,7 +366,7 @@ whereas if a test fails then it will print out something like this
 }}}
 from it you should see the arguments that made the test fail, and you can re-run it.
 
-== Blip Overview: Serialization (from blip.serialization.Serialization)==
+== Blip Overview: Serialization (from blip.serialization.Serialization) ==
 
 Serialization is somewhat connected to output, but has another goal, it tries to save 
 some in memory objects to a stream, or to generate in memory objects reading a stream.
@@ -388,7 +388,7 @@ class A{
  int _y;
  int y(){ return _y; }
  void y(int v){ _y=v; }
- 
+ this(){}
  mixin(serializeSome("A",`
  x: coordinates x in pixels
  y: coordinate y in pixels`));
