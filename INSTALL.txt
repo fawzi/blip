@@ -23,6 +23,7 @@ If you are new to D you should start by installing a D compiler. You have a few 
 http://www.digitalmars.com/d/1.0/dmd-osx.html or http://www.digitalmars.com/d/1.0/dmd-linux.html
 
  * LDC http://dsource.org/projects/ldc compiler uses the LLVM machinery as backend and the DMD frontend. It is actively developed and works well on linux x86_64.
+ WARNING: current ldc tip with llvm 2.8 has a bug ( http://dsource.org/projects/ldc/ticket/440 ) in one of the d specific optimization passes, add -disable-d-passes to your ldc.conf if you want to use the latest version!
 
  * GDC http://bitbucket.org/goshawk/gdc/wiki/Home compiler uses the DMD frontend and the gcc backend. Is stable compiles and optimizes well, its development has been resumed recently, and support in tango recently added back, so you might have some small issues. Can be used on many platforms
 
