@@ -24,6 +24,10 @@ import blip.parallel.smp.WorkManager;
 import blip.bindings.mpi.mpi;
 public import blip.bindings.mpi.mpi: MPI_Op, MPI_MAX, MPI_MIN, MPI_SUM, MPI_PROD, MPI_LAND, MPI_BAND, MPI_LOR,
     MPI_BOR, MPI_LXOR, MPI_BXOR, MPI_MAXLOC, MPI_MINLOC, MPI_REPLACE;
+import blip.util.LocalMem;
+import blip.container.GrowableArray;
+import blip.serialization.SBinSerialization;
+import blip.core.Array:sort;
 
 enum :int{
     AnyTag=int.max
@@ -82,6 +86,9 @@ interface Cart(int dimG){
 
 /// collective operations, represents an mpi communicator, 1D
 interface LinearComm:BasicObjectI{
+    enum {
+        maxTagMask=0x7FFF, /// smallest valid value for MPI_TAG_UB defined in the standard
+    }
     char[] name();
     void name(char[] n);
     
@@ -154,3 +161,363 @@ interface LinearComm:BasicObjectI{
     void registerHandler(ChannelHandler handler,int tag);
 }
 
+template isBasicMpiType(T){
+    enum:bool { isBasicMpiType=(is(T==double)||is(T==int)||is(T==ubyte)) }
+}
+template isBasicMpiArrType(T){
+    enum:bool { isBasicMpiArrType=(is(T:double[])||is(T:int[])||is(T:ubyte[])) }
+}
+
+/// utility method switching to faster sends for standard types (assumed of *known* length)
+/// use Channel.sendTag for unknown length objects
+void mpiSendT(T)(Channel c,T val,int tag=0){
+    static if (isBasicMpiArrType!(T)){
+        c.send(val,tag);
+    } else static if(isBasicMpiType!(T)){
+        c.send([val],tag);
+    } else static if (is(T==struct) && is(typeof(T.isSimpleData)) && T.isSimpleData){
+        auto arr=(cast(ubyte*)&val)[0..T.sizeof];
+        c.send(arr,tag);
+    } else static if (is(typeof(val.serBlockSize))){
+        auto bSize=serBlockSize();
+        ubyte[256] _buf;
+        ubyte[] buf;
+        if (bSize<=_buf.length) {
+            buf=_buf[0..bSize];
+        } else {
+            buf=new ubyte[](bSize);
+        }
+        auto arr=lGrowableArray(buf,0);
+        scope s=new SBinSerializer(&arr.appendArr); // use cache???
+        s(val);
+        s.close();
+        assert(arr.length>bSize,"unexpected length");
+        assert(arr.ptr==buf.ptr,"unexpected storage");
+        c.send(buf,tag);
+        if (bSize>_buf.length) delete buf;
+    } else {
+        scope s=c.sendTag(tag);
+        s(val);
+        s.close();
+    }
+}
+/// paired receive method using faster receive for standard types (assumed of *known* length)
+/// use recvTag for unknown length objects
+void mpiRecvT(T)(Channel c,ref T val,int tag=0){
+    static if (isBasicMpiArrType!(T)){
+        c.recv(val,tag);
+    } else static if(isBasicMpiType!(T)){
+        auto r=(&val)[0..1];
+        c.recv(r,tag);
+        assert(r.length==1 && r.ptr=&val);
+    } else static if (is(T==struct) && is(typeof(T.isSimpleData)) && T.isSimpleData){
+        auto arr=(cast(ubyte*)&val)[0..T.sizeof];
+        c.recv(arr,tag);
+        assert(r.length==T.sizeof && r.ptr=&val);
+    } else static if (is(typeof(val.serBlockSize))){
+        auto bSize=serBlockSize();
+        ubyte[256] _buf;
+        ubyte[] buf;
+        if (bSize<=_buf.length) {
+            buf=_buf[0..bSize];
+        } else {
+            buf=new ubyte[](bSize);
+        }
+        auto rest=buf;
+        c.recv(buf,tag);
+        scope s=new SBinUnserializer(delegate void(void[] dest){
+            if (dest.length<=rest.length){
+                dest[]=rest[0..dest.length];
+                rest=rest[dest.length..$];
+            } else {
+                throw new Exception("unexpected read request",__FILE__,__LINE__);
+            }
+        });
+        s(val);
+        s.close();
+        if (bSize>_buf.length) delete buf;
+    } else {
+        scope s=c.recvTag(tag);
+        s(val);
+        s.close();
+    }
+}
+/// utility method for 
+void mpiBcastT(T)(LinearComm para,ref T val,int target,int tag=0){
+    static if (isBasicMpiType!(T)||isBasicMpiArrType!(T)){
+        para.bcast(val,target,tag);
+    } else static if (is(T==struct) && is(typeof(T.isSimpleData)) && T.isSimpleData){
+        auto arr=(cast(ubyte*)&val)[0..T.sizeof];
+        para.bcast(arr,target,tag);
+    } else static if (is(typeof(val.serBlockSize))){
+        size_t size=cast(size_t)val.serBlockSize;
+        ubyte[256] _buf;
+        ubyte[] buf;
+        if (size<=_buf.length){
+            buf=_buf[0..size];
+        } else {
+            buf=new ubyte[](size);
+        }
+        if (para.myRank==target){
+            auto arr=lGrowableArray(_buf,0);
+            auto s=new SBinSerializer(&arr.appendArr); // use cache???
+            s(val);
+            assert(arr.length==buf.length,"unexpected length");
+            assert(cast(ubyte*)arr.ptr is buf.ptr,"unexpected storage");
+        }
+        para.bcast(buf,target,tag);
+        auto us=new SBinUnserializer(delegate void(void[] data){
+            assert(data.length<buf.length);
+            data[]=buf[0..data.length];
+            buf=buf[data.length..$];
+        }); // use cache???
+        us(val);
+    } else {
+        ubyte[256] _buf;
+        ubyte[] buf;
+        int size;
+        if (para.myRank==target){
+            auto arr=lGrowableArray(_buf,0,GASharing.GlobalNoFree);
+            auto s=new SBinSerializer(&arr.appendVoid); // use cache???
+            s(val);
+            size=arr.length;
+            para.bcast(size,target,tag);
+            auto arrV=arr.data;
+            para.bcast(arrV,target,tag);
+            buf=arr.takeData;
+        } else {
+            para.bcast(size,target,tag);
+            if (size<=_buf.length){
+                buf=_buf[0..size];
+            } else {
+                buf=new ubyte[](size);
+            }
+            para.bcast(buf,target,tag);
+        }
+        auto buf0=buf;
+        auto us=new SBinUnserializer(delegate void(void[] data){
+            assert(data.length<buf.length);
+            data[]=buf[0..data.length];
+            buf=buf[data.length..$];
+        }); // use cache???
+        us(val);
+        if (size>_buf.length){
+            delete buf0;
+        }
+    }
+}
+
+void mpiAllGatherT(U,T)(LinearComm para,U valOut, T valIn,int tag=0,int[] inCounts=null){
+    alias typeof(valIn[0]) ElType;
+    static if (isBasicMpiArrType!(T)){
+        if (inCounts.length==0){
+            static if (is(U==T)){
+                para.allGather(valOut,valIn,tag);
+            } else {
+                static assert(is(U[]==T),"unexpected valIn type "~U.stringof~" in allGatherT with valOut of type "~T.stringof);
+                para.allGather((&valOut)[0..1],valIn,tag);
+            }
+        } else {
+            int[128] buf;
+            int[] inStarts;
+            if (inCounts.length<=buf.length){
+                inStarts=buf[0..inCounts.length];
+            } else {
+                inStarts=new int[](inCounts.length);
+            }
+            int pos=0;
+            foreach(i,j;inCounts){
+                inStarts[i]=pos;
+                pos+=j;
+            }
+            static if (is(U==T)){
+                para.allGather(valOut,valIn,inStarts,inCounts,tag);
+            } else {
+                para.allGather((&valOut)[0..1],valIn,inStarts,inCounts,tag);
+            }
+            if (inCounts.length>buf.length){
+                delete inStarts;
+            }
+        }
+    } else static if (is(ElType == struct) && is(typeof(ElType.isSimpleData):bool) && ElType.isSimpleData){
+        if (inCounts.length==0){
+            static if (is(U==T)){
+                para.allGather((cast(ubyte*)valOut.ptr)[0..valOut.length*ElType.sizeof],
+                    (cast(ubyte*)valIn.ptr)[0..valIn.length*ElType.sizeof],tag);
+            } else {
+                static assert(is(U[]==T),"unexpected valIn type "~U.stringof~" in allGatherT with valOut of type "~T.stringof);
+                para.allGather((cast(ubyte*)&valOut)[0..ElType.sizeof],
+                    (cast(ubyte*)valIn.ptr)[0..valIn.length*ElType.sizeof],tag);
+            }
+        } else {
+            int[256] buf;
+            auto lMem=LocalMem(buf);
+            int[] inStarts=lMem.allocArr!(int)(inCounts.length);
+            int[] inCounts2=lMem.allocArr!(int)(inCounts.length);
+            foreach(i,j;inCounts){
+                inCounts2[i]=j*ElType.sizeof;
+            }
+            int pos=0;
+            foreach(i,j;inCounts2){
+                inStarts[i]=pos;
+                pos+=j;
+            }
+            static if (is(U==T)){
+                para.allGather((cast(ubyte*)valOut.ptr)[0..valOut.length*ElType.sizeof],
+                    (cast(ubyte*)valIn.ptr)[0..valIn.length*ElType.sizeof],inStarts,inCounts2,tag);
+            } else {
+                // don't accept this?
+                para.allGather((cast(ubyte*)&valOut)[0..ElType.sizeof],
+                    (cast(ubyte*)valIn.ptr)[0..valIn.length*ElType.sizeof],inStarts,inCounts2,tag);
+            }
+            lMem.deallocArr(inStarts);
+            lMem.deallocArr(inCounts2);
+        }
+    } else {
+        ubyte[256] buf;
+        ubyte[256] buf2;
+        int size;
+        auto arr=lGrowableArray(buf,0,GASharing.GlobalNoFree);
+        auto s=new SBinSerializer(&arr.appendVoid); // use cache???
+        s(valOut);
+        auto lMem=LocalMem(buf2);
+        int[] inCounts2=lMem.allocArr!(int)(para.dim);
+        int[1] myCount=[cast(int)arr.length];
+        para.allGather(myCount,inCounts2,tag);
+        int[] inStarts=lMem.allocArr!(int)(para.dim);
+        int pos=0;
+        foreach(i,j;inCounts2){
+            inStarts[i]=pos;
+            pos+=j;
+        }
+        auto resData=lMem.allocArr!(ubyte)(pos);
+        para.allGather(arr.data,resData,inStarts,inCounts2,tag);
+        auto leftData=resData;
+        auto us=new SBinUnserializer(delegate void(void[] data){
+            assert(data.length<=leftData.length);
+            data[]=leftData[0..data.length];
+            leftData=leftData[data.length..$];
+        }); // use cache???
+        foreach(i,ref v;valIn){
+            leftData=resData[inStarts[i]..inStarts[i]+inCounts2[i]];
+            us(v);
+        }
+        lMem.deallocArr(resData);
+        lMem.deallocArr(inStarts);
+        lMem.deallocArr(inCounts2);
+    }
+}
+
+void mpiGatherT(U,T)(LinearComm para,U valOut, T valIn,int root,int tag=0,int[] inCounts=null){
+    alias typeof(valIn[0]) ElType;
+    static if (isBasicMpiArrType!(T)){
+        if (inCounts.length==0){
+            static if (is(U==T)){
+                para.gather(valOut,valIn,root,tag);
+            } else {
+                static assert(is(U[]==T),"unexpected valIn type "~U.stringof~" in gatherT with valOut of type "~T.stringof);
+                para.gather(valOut,(&valIn)[0..1],root,tag);
+            }
+        } else {
+            int[128] buf;
+            int[] inStarts;
+            if (inCounts.length<=buf.length){
+                inStarts=buf[0..inCounts.length];
+            } else {
+                inStarts=new int[](inCounts.length);
+            }
+            pos=0;
+            foreach(i,j;inCounts){
+                inStarts[i]=pos;
+                pos+=j;
+            }
+            static if (is(U==T)){
+                para.gather(valOut,valIn,inStarts,inCounts,root,tag);
+            } else {
+                para.gather((&valOut)[0..1],valIn,inStarts,inCounts,root,tag);
+            }
+            if (inCounts.length>buf.length){
+                delete inStarts;
+            }
+        }
+    } else static if (is(ElType == struct) && is(typeof(ElType.isSimpleData):bool) && ElType.isSimpleData){
+        if (inCounts.length==0){
+            static if (is(U==T)){
+                para.gather((cast(ubyte*)valOut.ptr)[0..valOut.length*ElType.sizeof],
+                    (cast(ubyte*)valIn.ptr)[0..valIn.length*ElType.sizeof],root,tag);
+            } else {
+                static assert(U[]==T,"unexpected valIn type "~U.stringof~" in gatherT with valOut of type "~T.stringof);
+                para.gather((cast(ubyte*)valOut.ptr)[0..valOut.length*ElType.sizeof],
+                    (cast(ubyte*)&valIn)[0..ElType.sizeof],root,tag);
+            }
+        } else {
+            int[256] buf;
+            auto lMem=LocalMem(buf);
+            int[] inStarts=lMem.allocArr!(int)(inCounts.length);
+            int[] inCounts2=lMem.allocArr!(int)(inCounts.length);
+            foreach(i,j;inCounts){
+                inCounts2[i]=j*ElType.sizeof;
+            }
+            int pos=0;
+            foreach(i,j;inCounts2){
+                inStarts[i]=pos;
+                pos+=j;
+            }
+            static if (is(U==T)){
+                para.gather((cast(ubyte*)valOut.ptr)[0..valOut.length*ElType.sizeof],
+                    (cast(ubyte*)valIn.ptr)[0..valIn.length*ElType.sizeof],inStarts,inCounts2,root,tag);
+            } else {
+                // don't accept this?
+                para.gather((cast(ubyte*)&valOut)[0..ElType.sizeof],
+                    (cast(ubyte*)valIn.ptr)[0..valIn.length*ElType.sizeof],inStarts,inCounts2,root,tag);
+            }
+            lMem.deallocArr(inStarts);
+            lMem.deallocArr(inCounts2);
+        }
+    } else {
+        int[256] buf;
+        int[256] buf2;
+        int size;
+        auto arr=lGrowableArray(buf,0,GASharing.GlobalNoFree);
+        auto s=new SBinSerializer(&arr.appendArr); // use cache???
+        s(valIn);
+        auto lMem=LocalMem(buf2);
+        int[] inCounts2=lMem.allocArr!(int)(para.dim);
+        int[1] myCount=[cast(int)arr.length];
+        para.gather(myCount,inCounts2,root,tag);
+        if (para.myRank==target){
+            int[] inStarts=lMem.allocArr!(int)(para.dim);
+            int pos=0;
+            foreach(i,j;inCounts2){
+                inStarts[i]=pos;
+                pos+=j;
+            }
+            resData=lMem.allocArr!(ubyte)(pos);
+            para.gather(arr.data,resData,inStarts,inCounts2,root,tag);
+            auto leftData=resData;
+            auto us=new SBinUnserializer(delegate void(void[] data){
+                assert(data.length<leftData.length);
+                data[]=leftData[0..data.length];
+                buf=leftData[data.length..$];
+            }); // use cache???
+            foreach(i,ref v;valIn){
+                leftData=data[inStarts[i]..inStarts[i]+inCounts2[i]];
+                us(v);
+            }
+            lMem.deallocArr(resData);
+            lMem.deallocArr(inStarts);
+        } else {
+            para.gather([],arr.data,[],[],root,tag);
+        }
+        lMem.deallocArr(inCounts2);
+    }
+}
+
+void mpiScatterT(T,U)(T dataOut,U dataOut,int root,tag=0,int[] outCounts=null){
+    alias typeof(dataOut[0])ElType;
+    assert(0,"to do");
+}
+
+void mpiAlltoallT(T)(T[] dataOut,T[] dataIn,int tag=0,int[]outCount=null,int[]inCount=null){
+    assert(0,"to do");
+}
