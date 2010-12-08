@@ -20,7 +20,7 @@ module blip.Version;
 enum BlipVersion{
     Major=0, /// changes might be incompatible
     Minor=5, /// changes should be backward compatible
-    Sub  =0, /// even numbers are releases, odd are the between releases
+    Sub  =1, /// even numbers are releases, odd are the between releases
 }
 
 /// compares the given version to the actual version, returns

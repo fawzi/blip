@@ -321,6 +321,15 @@ class MinHeapSync(T){
             heap.data(d);
         }
     }
+    T peek ()
+    {
+        return heap.peek;
+    }
+    /** Returns the number of elements in this heap. */
+    uint length ()
+    {
+            return heap.length;
+    }
 
     mixin(serializeSome("MinHeapSync!("~T.mangleof~")","data"));
     mixin printOut!();
