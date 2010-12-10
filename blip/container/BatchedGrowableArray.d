@@ -29,6 +29,7 @@ import blip.container.Pool;
 import blip.container.Cache;
 import blip.math.Math;
 import blip.stdc.stdlib;
+import blip.Comp;
 
 private int nextPower2(int i){
     int res=1;

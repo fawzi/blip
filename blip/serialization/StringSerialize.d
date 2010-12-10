@@ -19,7 +19,7 @@ import blip.serialization.JsonSerialization;
 import blip.serialization.SBinSerialization;
 import blip.serialization.SerializationBase;
 import blip.container.GrowableArray;
-import blip.Comp;
+public import blip.Comp;
 
 /// utility method to serialize just one object to an array of the given type
 U[] serializeToArray(T,U=char)(T t,U[] buf=cast(U[])null){
