@@ -3,9 +3,9 @@ TANGO_HOME=../../tango
 if [ $# -gt 0 ]; then
     TANGO_HOME=$1
 fi
-$TANGO_HOME/build/bin/linux64/bob -v -r=ldc -c=ldc -p=linux -l=libtango-base-ldc -o="-O3 -release -inline -disable-d-passes"  $TANGO_HOME
-$TANGO_HOME/build/bin/linux64/bob -v -u -c=ldc -p=linux -l=libtango-user-ldc -o="-g -O3 -release -inline -disable-d-passes"  $TANGO_HOME
-$TANGO_HOME/build/bin/linux64/bob -v -u -c=ldc -p=linux -l=libtango-user-ldc-dbg -o="-g -O -inline -disable-d-passes"  $TANGO_HOME
+$TANGO_HOME/build/bin/linux64/bob -v -r=ldc -c=ldc -p=linux -l=libtango-base-ldc -o="-O3 -release -inline"  $TANGO_HOME
+$TANGO_HOME/build/bin/linux64/bob -v -u -c=ldc -p=linux -l=libtango-user-ldc -o="-g -O3 -release -inline"  $TANGO_HOME
+$TANGO_HOME/build/bin/linux64/bob -v -u -c=ldc -p=linux -l=libtango-user-ldc-dbg -o="-g -O -inline"  $TANGO_HOME
 $TANGO_HOME/build/bin/linux64/bob -v -u -c=ldc -p=linux -l=libtango-user-ldc-tst -o="-d -d-version=UnitTest -d-debug=UnitTest -unittest -g -L-ltango-dbg"  $TANGO_HOME
 rm *.o
 dirldc="`which ldc`"
