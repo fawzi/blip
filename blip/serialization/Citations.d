@@ -19,13 +19,14 @@ module blip.serialization.Citations;
 import blip.io.BasicIO;
 import tango.util.container.HashSet;
 import tango.text.Util;
+import blip.Comp;
 
 /// a citation of an article
 class Citation{
-    char[] key;
-    char[] citation;
-    char[][] refs;
-    this(char[]key,char[]citation,char[][]refs=[]){
+    string key;
+    string citation;
+    string [] refs;
+    this(string key,string citation,string []refs=[]){
         this.key=key;
         this.citation=citation;
     }
@@ -38,7 +39,7 @@ class Citation{
             throw new Exception("comparing Citation to an incompatible class: "~o.classinfo.name);
         }
     }
-    void desc(void delegate(char[]) sink){
+    void desc(void delegate(cstring) sink){
         auto s=dumper(sink);
         s("[")(key)("] ")(citation);
         if (refs.length>0){
@@ -54,14 +55,14 @@ class Citation{
 
 /// database of citations
 class CitationDB{
-    Citation[char[]] citations;
+    Citation[string ] citations;
     HashSet!(Citation) toPrint;
     /// adds a citation to the DB
     this(){
         toPrint=new HashSet!(Citation)();
     }
     /// returns the citation for the given key
-    Citation opIndex(char[]key){
+    Citation opIndex(string key){
         return citations[key];
     }
     /// default instance
@@ -70,14 +71,14 @@ class CitationDB{
         defaultDb=new CitationDB();
     }
     /// add citation of an article
-    void addCitation(char[] key,char[] citation){
+    void addCitation(string key,string citation){
         synchronized(this){
             assert(!(key in citations),"citation already exists");
             citations[key]=new Citation(key,citation);
         }
     }
     /// adds a reference to a citation
-    void addRef(char[] key,char[] reference){
+    void addRef(string key,string reference){
         synchronized(this){
             Citation *a=key in citations;
             assert(a!is null,"reference to non existing key '"~key~"'");
@@ -92,7 +93,7 @@ class CitationDB{
         }
     }
     /// adds the given key for printing
-    void cite(char[]key,char[] reference=""){
+    void cite(string key,string reference=""){
         auto c=citations[key];
         toPrint.add(c);
         if (reference.length>0){
@@ -105,7 +106,7 @@ class CitationDB{
         }
     }
     /// prints the references that have been cited
-    void printCited(void delegate(char[]) sink){
+    void printCited(void delegate(cstring) sink){
         auto cits=toPrint.toArray();
         cits.sort;
         foreach(c;cits){

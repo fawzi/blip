@@ -19,6 +19,7 @@
 module blip.serialization.SimpleWrappers;
 import blip.serialization.SerializationBase;
 version(SerializationTrace) import blip.io.Console;
+import blip.Comp;
 
 // wrapper to write out an array
 struct LazyArray(T) {
@@ -99,6 +100,9 @@ struct LazyArray(T) {
 
 // wrapper to write out an associative array
 struct LazyAA(K,V) {
+    alias K KeyType;
+    alias V ValueType;
+    alias Unqual!(K) K2;
     ulong size; /// output size
     int delegate(int delegate(ref K,ref V)) loopOp; /// output loop
     void delegate(K,V) addOp; /// add one element
@@ -148,7 +152,7 @@ struct LazyAA(K,V) {
             valMetaInfoP=&valMetaInfo;
         }
         auto ac=s.writeDictStart(null,size,
-            is(K==char[])||is(K==wchar[])||is(K==dchar[]));
+            is(K2==char[])||is(K2==wchar[])||is(K2==dchar[]));
         loopOp(delegate int(ref K key, ref V value){
             version(SerializationTrace) sout("X serializing associative array entry\n");
             version(PseudoFieldMetaInfo){
@@ -171,7 +175,7 @@ struct LazyAA(K,V) {
         valMetaInfo.pseudo=true;
         K key;
         V value;
-        auto ac=s.readDictStart(null,is(K==char[])||is(K==wchar[])||is(K==dchar[]));
+        auto ac=s.readDictStart(null,is(K2==char[])||is(K2==wchar[])||is(K2==dchar[]));
         if (setLen !is null) {
             setLen(ac.sizeHint()); // use ac.length?
         }

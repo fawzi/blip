@@ -8,8 +8,9 @@ static if (Tango.Major==1) {
 } else {
     public import tango.core.stacktrace.StackTrace;
 }
+import blip.Comp;
 
-void printTrace(void delegate(char[]) sink,char[] msg){
+void printTrace(void delegate(cstring) sink,cstring msg){
     auto tInfo=basicTracer();
     sink("=======\n");
     sink(msg);

@@ -18,6 +18,7 @@
 module blip.text.String;
 import blip.text.StringConversions;
 import blip.io.BasicIO;
+import blip.Comp;
 
 struct String{
     void* ptr;
@@ -32,7 +33,7 @@ struct String{
             alias Encoding.Utf8 encodingOfT;
         } else static if(is(T==wchar)){
             alias Encoding.Utf16 encodingOfT;
-        } else static if(is(T==wchar)){
+        } else static if(is(T==dchar)){
             alias Encoding.Utf32 encodingOfT;
         } else {
             static assert(0,"unknown encoding for type "~T.stringof);
@@ -54,7 +55,7 @@ struct String{
             enum :int{ BitshiftForT=0 }
         } else static if(is(T==wchar)){
             enum :int{ BitshiftForT=1 }
-        } else static if(is(T==wchar)){
+        } else static if(is(T==dchar)){
             enum :int{ BitshiftForT=2 }
         } else {
             static assert(0,"unknown encoding for type "~T.stringof);
@@ -76,7 +77,7 @@ struct String{
         return cast(int)(_l>>BitsLen);
     }
     /// builds a string from encoded data
-    static String opCall(char[] s){
+    static String opCall(cstring s){
         assert((s.length&~MaskLen)==0);
         String res;
         res.ptr=s.ptr;
@@ -84,7 +85,7 @@ struct String{
         return res;
     }
     /// ditto
-    static String opCall(wchar[] s){
+    static String opCall(cstringw s){
         assert((s.length&~(MaskLen>>1))==0);
         String res;
         res.ptr=s.ptr;
@@ -92,7 +93,7 @@ struct String{
         return res;
     }
     /// ditto
-    static String opCall(char[] s){
+    static String opCall(cstringd s){
         assert((s.length&~(MaskLen>>2))==0);
         String res;
         res.ptr=s.ptr;
@@ -105,10 +106,21 @@ struct String{
         if (e==encodingOfT!(T)) {
             return (cast(T*)ptr)[0..(len>>BitshiftForT!(T))];
         }
-        return toStringT!(T)((cast(T*)ptr)[0..(len>>BitshiftForT!(T))]);
+        switch (e){
+        case Encoding.Utf8:
+            return toStringT!(T)((cast(Const!(char)*)ptr)[0..(len>>BitshiftForT!(char))]);
+        case Encoding.Utf16:
+            return toStringT!(T)((cast(Const!(wchar)*)ptr)[0..(len>>BitshiftForT!(wchar))]);
+        case Encoding.Utf32:
+            return toStringT!(T)((cast(Const!(dchar)*)ptr)[0..(len>>BitshiftForT!(dchar))]);
+        default:
+            assert(0,"unknown encoding for type "~T.stringof);
+        }
+        
     }
     /// utility internal casting (use only if you know the encoding to be T)
     T[] asT(T)(){
+        assert(encodingOfT!(T)==encodingOfT);
         return (cast(T*)ptr)[0..(len>>BitshiftForT!(T))];
     }
     /// sinks the string in the requested encoding
@@ -127,7 +139,18 @@ struct String{
             throw new Exception("unexpected encoding",__FILE__,__LINE__);
         }
     }
-
+    /// description (used when passing this to a dumper)
+    void desc(void delegate(cstring) sink){
+        sink(asStringT!(char));
+    }
+    /// ditto
+    void desc(void delegate(cstringw) sink){
+        sink(asStringT!(wchar));
+    }
+    /// ditto
+    void desc(void delegate(cstringd) sink){
+        sink(asStringT!(dchar));
+    }
     // implement common python/java/obj-c string ops
     // indexing: define two indexing types? codepoint,native?
     

@@ -100,7 +100,7 @@
 ///         return coll;
 ///     }
 ///     
-///     void main(char[][] args){
+///     void main(string [] args){
 ///         sout(rand.toString()); sout("\n");
 ///         auto tests=allTests();
 ///         // it would be possible to simply call
@@ -173,24 +173,25 @@ import blip.io.Console;
 import blip.io.BasicIO;
 import blip.stdc.stdlib: exit;
 import blip.parallel.smp.WorkManager;
+import blip.Comp;
 
 mixin testInit!() autoInitTst; 
 
-int[] parseIArray(char[] str){
+int[] parseIArray(cstring str){
     uint start=locate(str,'[');
     uint end=locate(str,']');
     if (start==str.length || end==str.length || start>=end){
         sout("'")(str)("'"); writeOut(sout.call,start); sout(" ")(end)("\n");
         throw new Exception("IArray parsing failed");
     }
-    char[] core=str[start+1..end];
+    cstring core=str[start+1..end];
     return to!(int[])(split(core,","));
 }
 
-int mainTestFun(char[][] argStr,SingleRTest testSuite){
-    char[] cmdName="./test";
+int mainTestFun(string [] argStr,SingleRTest testSuite){
+    string cmdName="./test";
     if (argStr.length>0 && argStr[0].length>0) cmdName=argStr[0];
-    char[] helpStr=cmdName~` [--help] [--runs=n] [--trace] [--test='testName'] [--counter='[n,...]'] 
+    string helpStr=cmdName~` [--help] [--runs=n] [--trace] [--test='testName'] [--counter='[n,...]'] 
         [--seed='seed'] [--on-failure=[continue|stop-test|stop-all|throw]]
         [--print-level=[error|skip|all-short|all-verbose]]
      --help print this message
@@ -202,8 +203,8 @@ int mainTestFun(char[][] argStr,SingleRTest testSuite){
      --on-failure sets the action to perform after a test fails (default stop-test)
      --print-level sets the print level (default all-short)`;
 
-    char[] seed=null;
-    char[] test=null;
+    string seed=null;
+    string test=null;
     int runs=1;
     int[] counter=null;
     bool help=false;
@@ -214,12 +215,12 @@ int mainTestFun(char[][] argStr,SingleRTest testSuite){
     static if (Tango.Major==1){
         auto args=new Arguments;
         args("help").bind(delegate void(){ help=true; });
-        args("runs").bind(delegate char[](char[] arg){ runs=to!(int)(arg[1..$]); return null; });
+        args("runs").bind(delegate string (string arg){ runs=to!(int)(arg[1..$]); return null; });
         args("trace").bind(delegate void(){ trace=true; });
-        args("seed").bind(delegate char[](char[] arg){ seed=arg[1..$].dup; return null; });
-        args("counter").bind(delegate char[](char[] arg){ counter=parseIArray(arg[1..$]); return null; });
-        args("test").bind(delegate char[](char[] arg){ test=arg[1..$].dup; return null; });
-        args("on-failure").bind(delegate char[](char[] arg){
+        args("seed").bind(delegate string (string arg){ seed=arg[1..$].dup; return null; });
+        args("counter").bind(delegate string (string arg){ counter=parseIArray(arg[1..$]); return null; });
+        args("test").bind(delegate string (string arg){ test=arg[1..$].dup; return null; });
+        args("on-failure").bind(delegate string (string arg){
             if (arg.length==0) throw new Exception("expected an argument after --on-failure");
             if (arg[0]=='=') arg=arg[1..$];
             switch(arg){
@@ -236,7 +237,7 @@ int mainTestFun(char[][] argStr,SingleRTest testSuite){
             }
             return null;
         });
-        args("print-level").bind(delegate char[](char[]arg){
+        args("print-level").bind(delegate string (string arg){
             if (arg[0]=='=') arg=arg[1..$];
             switch(arg){
                 case "Error", "error": printLevel=TextController.PrintLevel.Error; break;
@@ -256,12 +257,12 @@ int mainTestFun(char[][] argStr,SingleRTest testSuite){
     } else {
         ArgParser args = new ArgParser();
         args.bind("--","help",delegate void(){ help=true; });
-        args.bind("--","runs",delegate(char[] arg){ runs=to!(int)(arg[1..$]); });
+        args.bind("--","runs",delegate(cstring arg){ runs=to!(int)(arg[1..$]); });
         args.bind("--","trace",delegate void(){ trace=true; });
-        args.bind("--","seed",delegate(char[] arg){ seed=arg[1..$].dup; });
-        args.bind("--","counter",delegate(char[] arg){ counter=parseIArray(arg[1..$]); });
-        args.bind("--","test",delegate void(char[] arg){ test=arg[1..$].dup; });
-        args.bind("--","on-failure",delegate void(char[] arg){
+        args.bind("--","seed",delegate(cstring arg){ seed=arg[1..$].dup; });
+        args.bind("--","counter",delegate(cstring arg){ counter=parseIArray(arg[1..$]); });
+        args.bind("--","test",delegate void(cstring arg){ test=arg[1..$].dup; });
+        args.bind("--","on-failure",delegate void(cstring arg){
             if (arg.length==0) throw new Exception("expected an argument after --on-failure");
             if (arg[0]=='=') arg=arg[1..$];
             switch(arg){
@@ -277,7 +278,7 @@ int mainTestFun(char[][] argStr,SingleRTest testSuite){
                     exit(-1);
             }
         });
-        args.bind("--","print-level",delegate void(char[]arg){
+        args.bind("--","print-level",delegate void(cstringarg){
             if (arg[0]=='=') arg=arg[1..$];
             switch(arg){
                 case "Error", "error": printLevel=TextController.PrintLevel.Error; break;
@@ -328,7 +329,7 @@ debug(UnitTest){
     arg1=specialNrs[arg1_i]; arg1_nEl=specialNrs.length;`) combNrTst; // combinatorial cases
 
     unittest{
-        CharSink nullPrt=delegate void(char[]){};
+        CharSink nullPrt=delegate void(cstring){};
         // nullPrt=sout;
         SingleRTest.defaultTestController=new TextController("",TextController.OnFailure.StopTest,
             TextController.PrintLevel.AllShort,nullPrt,nullPrt);

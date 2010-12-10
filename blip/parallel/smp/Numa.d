@@ -52,6 +52,7 @@ import blip.stdc.stdlib:abort;
 import blip.container.GrowableArray:collectAppender;
 import blip.container.Cache;
 import blip.container.Pool;
+import blip.Comp;
 
 version(Windows){
     
@@ -142,7 +143,7 @@ struct NumaNode{
     void unserialize(Unserializer s){
         serial(s);
     }
-    char[] toString(){
+    string toString(){
         return serializeToArray(this);
     }
     mixin printOut!();
@@ -174,8 +175,8 @@ struct MemoryInfo{
 
 struct MachineInfo{
     NumaNode attachedTo;
-    char[]dmi_board_vendor;       /**< \brief DMI board vendor name */
-    char[]dmi_board_name;         /**< \brief DMI board model name */
+    string dmi_board_vendor;       /**< \brief DMI board vendor name */
+    string dmi_board_name;         /**< \brief DMI board model name */
     MemoryInfo memory;
     mixin(serializeSome("",`attachedTo|dmi_board_vendor|dmi_board_name|memory`));
     mixin printOut!();
@@ -323,7 +324,7 @@ interface NumaTopology: Topology!(NumaNode){
     SocketInfo nextSocket(NumaNode);
 }
 
-void writeOutTopo(NodeType)(void delegate(char[]) sink,Topology!(NodeType) topo){
+void writeOutTopo(NodeType)(void delegate(cstring) sink,Topology!(NodeType) topo){
     auto s=dumper(sink);
     for (int ilevel=topo.maxLevel;ilevel!=0;--ilevel){
         s("level(")(ilevel)("){");

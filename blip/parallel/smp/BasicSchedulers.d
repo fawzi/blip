@@ -31,6 +31,7 @@ import blip.parallel.smp.BasicTasks;
 import blip.BasicModels;
 import blip.math.random.Random;
 import blip.container.Cache;
+import blip.Comp;
 
 /// task scheduler that tries to perform a depth first reduction of the task
 /// using the maximum parallelization available.
@@ -47,7 +48,7 @@ class PriQTaskScheduler:TaskSchedulerI {
     /// logger for problems/info
     Logger log;
     /// name of the scheduler
-    char[] name;
+    string name;
     /// root Task
     TaskI _rootTask;
     /// runLevel of the scheduler
@@ -66,13 +67,13 @@ class PriQTaskScheduler:TaskSchedulerI {
         return _nnCache;
     }
     /// logs a message
-    void logMsg(char[]m){
+    void logMsg(cstring m){
         log.info(m);
     }
     /// returns the root task
     TaskI rootTask(){ return _rootTask; }
     /// creates a new PriQTaskScheduler
-    this(char[] name,char[] loggerPath="blip.parallel.smp.queue",int level=0){
+    this(string name,string loggerPath="blip.parallel.smp.queue",int level=0){
         this.name=name;
         queue=new PriQueue!(TaskI)();
         this._rand=new RandomSync();
@@ -140,8 +141,8 @@ class PriQTaskScheduler:TaskSchedulerI {
     }
     /// description (for debugging)
     /// non threadsafe
-    char[] toString(){
-        return collectAppender(cast(OutWriter)&desc);
+    string toString(){
+        return cast(string)collectAppender(cast(OutWriter)&desc);
     }
     /// locks the scheduler (to perform task reorganization)
     /// if you call this then toString is threadsafe
@@ -205,11 +206,11 @@ class PriQTaskScheduler:TaskSchedulerI {
         return _executer;
     }
     /// description (for debugging)
-    void desc(void delegate(char[]) s){ return desc(s,false); }
+    void desc(void delegate(cstring) s){ return desc(s,false); }
     /// description (for debugging)
     /// (might not be a snapshot if other threads modify it while printing)
     /// non threadsafe
-    void desc(void delegate(char[]) sink,bool shortVersion){
+    void desc(void delegate(cstring) sink,bool shortVersion){
         auto s=dumper(sink);
         s("<PriQTaskScheduler@"); writeOut(sink,cast(void*)this);
         if (shortVersion) {

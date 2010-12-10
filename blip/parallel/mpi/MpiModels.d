@@ -28,6 +28,7 @@ import blip.util.LocalMem;
 import blip.container.GrowableArray;
 import blip.serialization.SBinSerialization;
 import blip.core.Array:sort;
+import blip.Comp;
 
 enum :int{
     AnyTag=int.max
@@ -45,13 +46,13 @@ interface Channel{
     /// can be called from any task
     Serializer sendTag(int tag=0,ubyte[] buf=null);
     /// should be called from the sendTask
-    void send(double[],int tag=0);
+    void send(Const!(double[]),int tag=0);
     /// should be called from the sendTask
-    void send(int[],int tag=0);
+    void send(Const!(int[]),int tag=0);
     /// should be called from the sendTask
-    void send(ubyte[],int tag=0);
+    void send(Const!(ubyte[]),int tag=0);
     /// should be called from the sendTask
-    void sendStr(char[],int tag=0);
+    void sendStr(Const!(cstring),int tag=0);
     /// send close to the serializer to possibly reuse the unserializer
     /// can be called from any task
     Unserializer recvTag(ref int tag,ubyte[] buf=null);
@@ -89,16 +90,16 @@ interface LinearComm:BasicObjectI{
     enum {
         maxTagMask=0x7FFF, /// smallest valid value for MPI_TAG_UB defined in the standard
     }
-    char[] name();
-    void name(char[] n);
+    string name();
+    void name(string n);
     
     int dim();
     int myRank();
     Channel opIndex(int rank);
     LinearComm split(int color,int newRank);
-    Cart!(2) mkCart(char[]name,int[2] dims,int[2] periodic, bool reorder);
-    Cart!(3) mkCart(char[]name,int[3] dims,int[3] periodic, bool reorder);
-    Cart!(4) mkCart(char[]name,int[4] dims,int[4] periodic, bool reorder);
+    Cart!(2) mkCart(string name,int[2] dims,int[2] periodic, bool reorder);
+    Cart!(3) mkCart(string name,int[3] dims,int[3] periodic, bool reorder);
+    Cart!(4) mkCart(string name,int[4] dims,int[4] periodic, bool reorder);
     int nextTag();
     
     void bcast(ref double,int,int tag=0);

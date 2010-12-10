@@ -22,6 +22,8 @@
 module blip.container.GrowableArray;
 import blip.util.Grow;
 import blip.io.BasicIO: dumper; // needed just for the desc method
+import blip.Comp;
+
 enum GASharing{
     Local, /// local, don't free
     GlobalNoFree, /// global, don't free, don't grow
@@ -90,7 +92,7 @@ struct LocalGrowableArray(T){
         guaranteeCapacity(c);
         dataLen=c;
     }
-    void desc(void delegate(char[])sink){
+    void desc(void delegate(cstring)sink){
         // this is the only dependency on BasicIO...
         auto s=dumper(sink);
         s("<GrowableArray@")(cast(void*)this.dataPtr)(" len:")(this.dataLen);
@@ -245,10 +247,18 @@ LocalGrowableArray!(T) lGrowableArray(T)(T[]buf=null,size_t len=size_t.max,GASha
     return res;
 }
 
+template MutableEl(T){
+    static if(is(T U:U[])){
+        alias Unqual!(U) MutableEl;
+    } else {
+        static assert(false,T.stringof~" is not an array");
+    }
+}
 /// collects what is appended by the appender in a single array and returns it
 /// it buf is provided the appender tries to use it (but allocates if extra space is needed)
-T[] collectAppender(T)(void delegate(void delegate(T[])) appender,char[] buf=null){
-    T[512/T.sizeof] buf2;
+MutableEl!(T)[] collectAppender(T,U=MutableEl!(T))(void delegate(void delegate(T)) appender,U[] buf=null){
+    static assert(is(U==MutableEl!(T)));
+    MutableEl!(T)[512/T.sizeof] buf2;
     if (buf.length==0) buf=buf2;
     auto arr=lGrowableArray(buf,0,((buf.ptr is buf2.ptr)?GASharing.Local:GASharing.GlobalNoFree));
     arr(appender);
@@ -256,8 +266,9 @@ T[] collectAppender(T)(void delegate(void delegate(T[])) appender,char[] buf=nul
 }
 
 /// collects what is appended by the appender and adds it at once to the given sink
-void sinkTogether(U,T)(U sink,void delegate(void delegate(T[])) appender,char[] buf=null){
-    T[512/T.sizeof] buf2;
+void sinkTogether(U,T,V=MutableEl!(T))(U sink,void delegate(void delegate(T)) appender,V[] buf=null){
+    static assert(is(V==MutableEl!(T)));
+    MutableEl!(T)[512/T.sizeof] buf2;
     if (buf.length==0) buf=buf2;
     auto arr=lGrowableArray(buf,0,((buf.ptr is buf2.ptr)?GASharing.Local:GASharing.GlobalNoFree));
     arr(appender);

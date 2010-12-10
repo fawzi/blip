@@ -45,6 +45,7 @@ import blip.util.RefCount;
 import blip.core.Variant;
 import blip.stdc.string:strlen;
 import blip.io.EventWatcher;
+import blip.Comp;
 
 /// represents a request to another handler
 ///
@@ -180,7 +181,7 @@ struct StcpRequest{
             }
                 break;
             default:
-                exception=new RpcException("unknown resKind "~to!(char[])(resKind)~
+                exception=new RpcException("unknown resKind "~to!(string )(resKind)~
                     " calling "~url.url(),__FILE__,__LINE__);
             }
         } catch (Exception o){
@@ -288,7 +289,7 @@ class StcpConnection{
         outStream=new BufferedBinStream(&this.writeExact,3000,&this.sock.flush,&this.sock.close);
         readIn=new BufferIn!(void)(&this.rawReadInto);
         version(StcpTextualSerialization){
-            auto r=new BufferIn!(char)(cast(size_t delegate(char[]))&this.rawReadInto);
+            auto r=new BufferIn!(char)(cast(size_t delegate(cstring))&this.rawReadInto);
             //ReinterpretReader!(void,char) r=readIn.reinterpretReader!(char)();
             charReader=r;
             serializer=new JsonSerializer!(char)(outStream.charSink());
@@ -429,7 +430,7 @@ class StcpConnection{
 
 /// handles vending (and possibly also receiving the results if using one channel for both)
 class StcpProtocolHandler: ProtocolHandler{
-    static char[][] selfHostnames;
+    static string [] selfHostnames;
     CharSink log;
     RandomSync rand;
     LoopHandlerI loop;
@@ -440,7 +441,7 @@ class StcpProtocolHandler: ProtocolHandler{
     ushort fallBackPortMin=49152;
     ushort fallBackPortMax=65535; // this is exclusive...
     
-    static StcpProtocolHandler[char[]] stcpProtocolHandlers;
+    static StcpProtocolHandler[string ] stcpProtocolHandlers;
     
     /// those that can actually handle the given protocol
     static ProtocolHandler findHandlerForUrl(ParsedUrl url){
@@ -448,8 +449,8 @@ class StcpProtocolHandler: ProtocolHandler{
             throw new RpcException("unexpected protocol instead of stcp in "~url.url(),
                 __FILE__,__LINE__);
         }
-        char[] port=url.port;
-        char[] group;
+        string port=url.port;
+        string group;
         auto gStart=find(port,'.');
         if (gStart<port.length) {
             group=port[gStart..$];
@@ -476,8 +477,8 @@ class StcpProtocolHandler: ProtocolHandler{
     
     HashMap!(TargetHost,StcpConnection) connections;
     StcpConnection[] doubleConnections;
-    char[] group;
-    char[] port;
+    string group;
+    string port;
     UniqueNumber!(size_t) newRequestId;
     SocketServer server;
 
@@ -493,7 +494,7 @@ class StcpProtocolHandler: ProtocolHandler{
         rand=new RandomSync();
         connections=new HashMap!(TargetHost,StcpConnection)();
     }
-    this(char[]group,char[]port,void delegate(char[]) log=null){
+    this(string group,string port,void delegate(cstring) log=null){
         version(TrackRpc){
             sinkTogether(sout,delegate void(CharSink s){
                 dumper(s)("creating StcpProtocolHandler@")(cast(void*)this)(" for group '")(group)("' and port: ")(port)("\n");
@@ -539,7 +540,7 @@ class StcpProtocolHandler: ProtocolHandler{
             auto p=pUrl.port;
             if (p.length==0) return true;
             auto sep=find(p,'.');
-            char[] group;
+            string group;
             if (sep<p.length)
                 group=p[sep..$];
             else
@@ -623,7 +624,7 @@ class StcpProtocolHandler: ProtocolHandler{
     override void startServer(bool strict){
         if (server is null){
             char[] buf;
-            char[] origPort=port;
+            string origPort=port;
             bool isBound=false;
             server=new SocketServer(port,&this.handleConnection,log);
             Exception bindE;
@@ -643,7 +644,7 @@ class StcpProtocolHandler: ProtocolHandler{
                 if (buf.length==0) buf=new char[](30);
                 auto arr=lGrowableArray(buf,0,GASharing.Global);
                 writeOut(&arr.appendArr,newP);
-                port=arr.takeData();
+                port=cast(string)arr.takeData();
                 server.serviceName=port;
             }
             if (!isBound) {
@@ -710,7 +711,7 @@ class StcpProtocolHandler: ProtocolHandler{
         });
     }
 
-    override char[] proxyObjUrl(char[] objectName){
+    override string proxyObjUrl(string objectName){
         return handlerUrl()~"/obj/"~objectName;
     }
 }

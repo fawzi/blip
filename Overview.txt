@@ -14,7 +14,7 @@ it introduces a third approach ;-)
 Things are not so bad though, because it introduces a very light weight approach that can
 be wrapped around other approaches, or used "natively".
 
- * based on CharSink, i.e. a void delegate(char[])
+ * based on CharSink, i.e. a void delegate(cstring)
     * easy to define new sinks and wrap around things
     * can be used also a low level without introducing dependencies
  * writeOut(sink,obj,args) is a template that tries to write out obj to sink, formatting it using args.
@@ -62,9 +62,9 @@ void main(){
     collector(" and bla ");
     collector(&a.desc);
     writeOut(&collector.appendArr,nullA);
-    char[] heapAllocStr=collector.takeData;
+    string heapAllocStr=collector.takeData;
     sout(heapAllocStr)("\n");
-    char[] heapAllocStr2=collectAppender(delegate void(CharSink sink){
+    string heapAllocStr2=collectAppender(delegate void(CharSink sink){
         dumper(sink)("An easier way to collect data:")([1,2,4])(" in a heap allocated string (for example to generate an exception message)\n");
     });
     sout(heapAllocStr2);
@@ -323,7 +323,7 @@ For simplicity here we use really simple tests, in this case a possible use is:
         return coll;
     }
     
-    void main(char[][] args){
+    void main(string [] args){
         sout(rand.toString()); sout("\n");
         auto tests=allTests();
         // it would be possible to simply call

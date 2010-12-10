@@ -25,12 +25,13 @@ import tango.text.json.JsonEscape: unescape,escape;
 import blip.core.Traits: RealTypeOf, ImaginaryTypeOf, ElementTypeOfArray;
 import blip.math.Math;
 import tango.io.model.IConduit;
-import tango.text.Regex;
+import tango.text.Regex:RegExpT;
 import blip.io.BasicIO;
 import blip.container.GrowableArray;
 import blip.text.UtfUtils;
 import blip.BasicModels;
 import blip.io.StreamConverters: ReadHandler,toReaderChar;
+import blip.Comp;
 
 /// a class that does a stream parser, for things in which white space amount
 /// is not relevant (it is just a separator)
@@ -64,7 +65,7 @@ class TextParser(T) : InputFilter
     }+/
     
     /// position of the parsed token
-    void parserPos(void delegate(char[]) s){
+    void parserPos(void delegate(cstring) s){
         dumper(s)("line:")(oldLine)(" col:")(oldCol)(" token:\"")(convertToString!(char)(escape(slice)))("\"\n");
         T[] txt;
         if (source!is null){
@@ -86,28 +87,28 @@ class TextParser(T) : InputFilter
     }
     /// exception during parsing (adds parser position info)
     static class ParsingException:Exception{
-        this(TextParser p,char[]desc,char[]filename,long line,Exception next=null){
+        this(TextParser p,string desc,string filename,long line,Exception next=null){
             super(collectAppender(delegate void(CharSink s){ s(desc); s(" parsing "); p.parserPos(s); }),filename,line,next);
         }
     }
     /// exception for when the cached part is too small
     static class SmallCacheException:ParsingException{
-        this(TextParser p,char[]desc,char[]filename,long line){
+        this(TextParser p,string desc,string filename,long line){
             super(p,desc,filename,line);
         }
     }
     /// exception for when eof is found unexpectedly
     static class EofException:ParsingException{
-        this(TextParser p,char[]desc,char[]filename,long line){
+        this(TextParser p,string desc,string filename,long line){
             super(p,desc,filename,line);
         }
     }
     /// raises a parse exception
-    void parseError(char[]desc,char[]filename,long line,Exception next=null){
+    void parseError(string desc,string filename,long line,Exception next=null){
         throw new ParsingException(this,desc,filename,line,next);
     }
     /// raises a SmallCacheException
-    void smallCacheError(char[]desc,char[]filename,long line){
+    void smallCacheError(string desc,string filename,long line){
         throw new SmallCacheException(this,desc,filename,line);
     }
     /// updates the position of the parser in the file
@@ -852,7 +853,7 @@ class TextParser(T) : InputFilter
     /// peeks what is found by the given scanner. If noRaise is true exception are catched,
     /// if zeroOnFail is false when an exception is raised the full slice evaluated at that moment is
     /// returned (useful to get the beginning of a very long line that overflows the buffer)
-    char[] peek(size_t delegate (T[] data,SliceExtent se) scanner,bool noRaise=true,bool zeroOnFail=true){
+    cstring peek(size_t delegate (Const!(T[]) data,SliceExtent se) scanner,bool noRaise=true,bool zeroOnFail=true){
         Peeker p;
         p.scanner=scanner;
         p.noRaise=noRaise;

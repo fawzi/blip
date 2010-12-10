@@ -29,6 +29,7 @@ import blip.io.BasicIO;
 import blip.parallel.smp.Tls;
 import blip.container.Pool;
 import blip.core.Traits;
+import blip.Comp;
 
 enum EntryFlags{
     Keep=0, /// will never be purged
@@ -48,7 +49,7 @@ interface CacheElFactory{
     Variant createEl();
     void deleteEl(Variant);
     EntryFlags flags();
-    char[] name();
+    string name();
     CKey key();// this should be constant!!!
 }
 
@@ -246,10 +247,10 @@ void setDefaultCache(Cache c){
 /// base class for object that are cached (make the use of the cache easier)
 class Cached:CacheElFactory{
     CKey _key;
-    char[] _name;
+    string _name;
     EntryFlags _flags;
     
-    this(char[] name="", EntryFlags flags=EntryFlags.Purge){
+    this(string name="", EntryFlags flags=EntryFlags.Purge){
         this._key=cacheKey.next();
         if (name.length==0){
             this._name=collectAppender(delegate void(CharSink sink){
@@ -274,7 +275,7 @@ class Cached:CacheElFactory{
     EntryFlags flags(){
         return _flags;
     }
-    char[] name(){
+    string name(){
         return _name;
     }
     final CKey key(){
@@ -301,7 +302,7 @@ final class CachedT(T):Cached{
     EntryFlags _flags;
     /// creates a new cached value with c as creation function, freeing if d is not given defaults
     /// to call stopCaching if available, doing nothing otherwise
-    this(char[] name,T function()c,void function(T)d=null,EntryFlags flags=EntryFlags.Purge)
+    this(string name,T function()c,void function(T)d=null,EntryFlags flags=EntryFlags.Purge)
     {
         super(((name.length==0)?"cache_"~T.stringof~"_":name),flags);
         this.createOp=c;

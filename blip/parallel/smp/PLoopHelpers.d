@@ -28,6 +28,7 @@ import blip.container.Pool;
 import blip.container.Cache;
 import blip.core.sync.Mutex;
 import blip.parallel.smp.WorkManager;
+import blip.Comp;
 
 version(NoPLoop){
     version=NoPLoopIter;
@@ -36,7 +37,7 @@ version(NoPLoop){
 /// creates a context for a loop.
 /// ctxExtra should define a ctxName createNew() method, startLoop can define blockSize>0
 /// no exception handlers are set up, you can set them up with startLoop and endLoop
-char[] loopCtxMixin(char[]ctxName,char[]ctxExtra,char[] startLoop,char[]loopOp,char[] endLoop){
+string loopCtxMixin(string ctxName,string ctxExtra,string startLoop,string loopOp,string endLoop){
     return `
     struct `~ctxName~`{
         size_t start,end;

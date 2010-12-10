@@ -477,7 +477,7 @@ class BatchedGrowableArray(T,int batchSize=((2048/T.sizeof>128)?2048/T.sizeof:12
         }
     }
     
-    void desc(void delegate(char[])sink){
+    void desc(void delegate(cstring)sink){
         // this is the only dependency on BasicIO...
         auto s=dumper(sink);
         s("<BatchedGrowableArray@")(cast(void*)this)(" len:")(this.data.length);

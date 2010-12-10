@@ -42,6 +42,7 @@ import blip.sync.Atomic;
 import blip.container.Pool;
 import blip.util.RefCount;
 import blip.core.stacktrace.StackTrace;
+import blip.Comp;
 
 // locking order, be careful to change that to avoid deadlocks
 // especially addSched and redirectedTask are sensible
@@ -80,7 +81,7 @@ class PriQScheduler:TaskSchedulerI {
     /// logger for problems/info
     Logger log;
     /// name of the scheduler
-    char[] name;
+    string name;
     /// root Task
     TaskI _rootTask;
     /// runLevel of the scheduler
@@ -112,7 +113,7 @@ class PriQScheduler:TaskSchedulerI {
     /// returns a random source for scheduling
     final RandomSync rand(){ return _rand; }
     /// constructor for the pool
-    this(PoolI!(PriQScheduler)p,char[] loggerPath="blip.parallel.smp.queue"){
+    this(PoolI!(PriQScheduler)p,string loggerPath="blip.parallel.smp.queue"){
         version(TrackCollections){
             sinkTogether(sout,delegate void(CharSink s){
                 dumper(s)("creating PriQScheduler@")(cast(void*)this)("\n");
@@ -131,7 +132,7 @@ class PriQScheduler:TaskSchedulerI {
         pool=p;
     }
     /// creates a new PriQScheduler
-    this(char[] name,MultiSched superScheduler,char[] loggerPath="blip.parallel.smp.queue"){
+    this(string name,MultiSched superScheduler,string loggerPath="blip.parallel.smp.queue"){
         version(TrackCollections){
             sinkTogether(sout,delegate void(CharSink s){
                 dumper(s)("creating PriQScheduler@")(cast(void*)this)("\n");
@@ -161,7 +162,7 @@ class PriQScheduler:TaskSchedulerI {
         waitingSince=Time.max;
         _rootTask=new RootTask(this,0,name~"RootTask");
     }
-    void reset(char[] name,MultiSched superScheduler){
+    void reset(string name,MultiSched superScheduler){
         this.name=name;
         assert(superScheduler!is null);
         this.superScheduler=superScheduler;
@@ -211,7 +212,7 @@ class PriQScheduler:TaskSchedulerI {
         }
     }
     /// logs a message
-    void logMsg(char[]m){
+    void logMsg(cstring m){
         log.info(m);
     }
     void release0(){
@@ -416,7 +417,7 @@ class PriQScheduler:TaskSchedulerI {
     }
     /// description (for debugging)
     /// non threadsafe
-    char[] toString(){
+    string toString(){
         return collectAppender(cast(OutWriter)&desc);
     }
     /// locks the scheduler (to perform task reorganization)
@@ -490,11 +491,11 @@ class PriQScheduler:TaskSchedulerI {
         return _executer;
     }
     /// description (for debugging)
-    void desc(void delegate(char[]) s){ return desc(s,false); }
+    void desc(void delegate(cstring) s){ return desc(s,false); }
     /// description (for debugging)
     /// (might not be a snapshot if other threads modify it while printing)
     /// non threadsafe
-    void desc(void delegate(char[]) sink,bool shortVersion){
+    void desc(void delegate(cstring) sink,bool shortVersion){
         auto s=dumper(sink);
         s("<PriQScheduler@"); writeOut(sink,cast(void*)this);
         if (shortVersion) {
@@ -602,7 +603,7 @@ class MultiSched:TaskSchedulerI {
     /// logger for problems/info
     Logger log;
     /// name of the scheduler
-    char[] name;
+    string name;
     /// root Task
     TaskI _rootTask;
     /// runLevel of the scheduler
@@ -630,9 +631,9 @@ class MultiSched:TaskSchedulerI {
     /// returns a random source for scheduling
     final RandomSync rand(){ return _rand; }
     /// creates a new PriQScheduler
-    this(char[] name,NumaNode numaNode,
+    this(string name,NumaNode numaNode,
         StarvationManager starvationManager,
-        char[] loggerPath="blip.parallel.smp.queue")
+        string loggerPath="blip.parallel.smp.queue")
     {
         this.name=collectAppender(delegate void(CharSink s){
             s(name); s("_"); writeOut(s,numaNode.level); s("_"); writeOut(s,numaNode.pos);
@@ -652,7 +653,7 @@ class MultiSched:TaskSchedulerI {
         zeroSem=new Semaphore();
     }
     /// logs a message
-    void logMsg(char[]m){
+    void logMsg(cstring m){
         log.info(m);
     }
     /// adds a task to be executed without checking for starvation of other schedulers
@@ -810,7 +811,7 @@ class MultiSched:TaskSchedulerI {
     }
     /// description (for debugging)
     /// non threadsafe
-    char[] toString(){
+    string toString(){
         return collectAppender(cast(OutWriter)&desc);
     }
     /// subtask has started execution (automatically called by nextTask)
@@ -860,11 +861,11 @@ class MultiSched:TaskSchedulerI {
         return _executer;
     }
     /// description (for debugging)
-    void desc(void delegate(char[]) s){ return desc(s,false); }
+    void desc(void delegate(cstring) s){ return desc(s,false); }
     /// description (for debugging)
     /// (might not be a snapshot if other threads modify it while printing)
     /// non threadsafe
-    void desc(void delegate(char[]) sink,bool shortVersion){
+    void desc(void delegate(cstring) sink,bool shortVersion){
         auto s=dumper(sink);
         s("<MultiSched@"); writeOut(sink,cast(void*)this);
         if (shortVersion) {
@@ -944,7 +945,7 @@ class MultiSched:TaskSchedulerI {
 /// but it is fast, as incorrectness just leads to suboptimal work loading
 class StarvationManager: TaskSchedulerI,ExecuterI{
     enum :int{ MaxScheds=64 }
-    char[] name; /// name of the StarvationManager
+    string name; /// name of the StarvationManager
     NumaTopology topo; /// numa topology
     MultiSched[] scheds; /// schedulers (at the moment from just one level, normally 1 or 0)
     TaskI _rootTask; /// root task
@@ -1007,9 +1008,9 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
         }
         s("]}");
     }
-    this(char[] name,NumaTopology topo,int schedLevel=1,int exeLevel=0,
-        char[] loggerPath="blip.parallel.smp.queue",
-        char[]exeLoggerPath="blip.parallel.smp.exec"){
+    this(string name,NumaTopology topo,int schedLevel=1,int exeLevel=0,
+        string loggerPath="blip.parallel.smp.queue",
+        string exeLoggerPath="blip.parallel.smp.exec"){
         _rootTask=new RootTask(this,0,name~"RootTask");
         this.name=name;
         this.topo=topo;
@@ -1026,7 +1027,7 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
         addStarvingSched(NumaNode(schedLevel,0));
     }
     /// logs a message
-    void logMsg(char[]m){
+    void logMsg(cstring m){
         log.info(m);
     }
     
@@ -1296,7 +1297,7 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
     }
     /// description (for debugging)
     /// non threadsafe
-    char[] toString(){
+    string toString(){
         return collectAppender(cast(OutWriter)&desc);
     }
     /// subtask has started execution (not meaningful for this scheduler)
@@ -1326,11 +1327,11 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
         return _executer;
     }
     /// description (for debugging)
-    void desc(void delegate(char[]) s){ return desc(s,false); }
+    void desc(void delegate(cstring) s){ return desc(s,false); }
     /// description (for debugging)
     /// (might not be a snapshot if other threads modify it while printing)
     /// non threadsafe
-    void desc(void delegate(char[]) sink,bool shortVersion){
+    void desc(void delegate(cstring) sink,bool shortVersion){
         auto s=dumper(sink);
         s("<StarvationManager@"); writeOut(sink,cast(void*)this);
         if (shortVersion) {
@@ -1393,14 +1394,14 @@ class MExecuter:ExecuterI{
     /// logger for problems/info
     Logger log;
     /// name of the executer
-    char[] _name;
+    string _name;
     /// name accessor
-    char[] name(){
+    string name(){
         return _name;
     }
     TaskSchedulerI scheduler(){ return _scheduler; }
     /// creates a new executer
-    this(char[] name,NumaNode exeNode, MultiSched scheduler){
+    this(string name,NumaNode exeNode, MultiSched scheduler){
         this._name=name;
         this._scheduler=scheduler;
         this.exeNode=exeNode;
@@ -1413,7 +1414,7 @@ class MExecuter:ExecuterI{
         worker.start();
     }
     /// logs a message
-    void logMsg(char[]m){
+    void logMsg(cstring m){
         log.info(m);
     }
     /// the job of the worker threads
@@ -1468,7 +1469,7 @@ class MExecuter:ExecuterI{
     }
     /// description (for debugging)
     /// non threadsafe
-    char[] toString(){
+    string toString(){
         return collectAppender(cast(OutWriter)&desc);
     }
     /// description (for debugging)
@@ -1598,11 +1599,11 @@ class OnStarvingScheduler:TaskSchedulerI{
         return _rootTask;
     }
     /// description
-    void desc(void delegate(char[]) s){
+    void desc(void delegate(cstring) s){
         desc(s,false);
     }
     /// possibly short description
-    void desc(void delegate(char[]) s,bool shortVersion){
+    void desc(void delegate(cstring) s,bool shortVersion){
         s("<OnStarvingScheduler@");writeOut(s,cast(void*)this);
         if (shortVersion) {
             s(" >");

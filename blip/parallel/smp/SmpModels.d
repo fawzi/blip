@@ -24,6 +24,7 @@ import blip.container.Cache;
 import blip.container.Pool;
 import blip.math.random.Random;
 import blip.core.Traits: ctfe_i2a;
+import blip.Comp;
 
 enum TaskStatus:int{
     Building=-1,
@@ -35,7 +36,7 @@ enum TaskStatus:int{
 }
 
 /// conversion TaskStatus -> str
-char[] taskStatusStr(TaskStatus s){
+string taskStatusStr(TaskStatus s){
     switch(s){
         case TaskStatus.Building:
             return "Building";
@@ -55,7 +56,7 @@ char[] taskStatusStr(TaskStatus s){
 }
 
 /// conversion str -> TaskStatus
-TaskStatus taskStatusFromStr(char[] s){
+TaskStatus taskStatusFromStr(string s){
     switch(s){
     case "Building":
         return TaskStatus.Building;
@@ -70,7 +71,7 @@ TaskStatus taskStatusFromStr(char[] s){
     case "Finished":
         return TaskStatus.Finished;
     default:
-        char[] t="TaskStatus";
+        string t="TaskStatus";
         if (s.length>t.length && s[0..t.length]==t){
             long res=0;
             size_t i=t.length;
@@ -131,9 +132,9 @@ interface TaskSchedulerI:BasicObjectI {
     /// root task, the easy way to add tasks to this scheduler
     TaskI rootTask();
     /// description
-    void desc(void delegate(char[]) s);
+    void desc(void delegate(cstring) s);
     /// possibly short description
-    void desc(void delegate(char[]) s,bool shortVersion);
+    void desc(void delegate(cstring) s,bool shortVersion);
     /// if there are many queued tasks (and one should try not to queue too many of them)
     bool manyQueued();
     /// number of simple tasks wanted
@@ -170,11 +171,11 @@ interface TaskI:SubtaskNotificationsI{
     /// returns the scheduler of this task
     TaskSchedulerI scheduler();
     /// name of the task
-    char[] taskName();
+    string taskName();
     /// description
-    void desc(void delegate(char[]) s);
+    void desc(void delegate(cstring) s);
     /// possibly short description
-    void desc(void delegate(char[]) s,bool shortVersion);
+    void desc(void delegate(cstring) s,bool shortVersion);
     /// if this task might spawn
     bool mightSpawn();
     /// if this task might Yield
@@ -235,7 +236,7 @@ interface SubtaskNotificationsI:BasicObjectI {
 
 /// exception for parallelization problems
 class ParaException: Exception{
-    this(char[] msg, char[] file, size_t line, Exception next = null){
+    this(string msg, string file, size_t line, Exception next = null){
         super(msg,file,line,next);
     }
 }

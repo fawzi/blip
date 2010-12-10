@@ -27,6 +27,7 @@ private {
     import blip.serialization.Serialization;
     import blip.serialization.SerializationMixins;
     import blip.core.Traits;
+    import blip.Comp;
 }
 
 
@@ -179,8 +180,8 @@ struct fixed32T(int fracBits_) {
     }
 
 
-    char[] toString() {
-        return convTo!(char[])(cast(real)*this);
+    string toString() {
+        return convTo!(string )(cast(real)*this);
     }
     
     

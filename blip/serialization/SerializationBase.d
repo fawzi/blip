@@ -29,10 +29,11 @@ import blip.BasicModels;
 import tango.util.container.HashSet;
 import tango.text.Util;
 import blip.util.TemplateFu;
-import tango.text.Regex;
+import tango.text.Regex: Regex;
 import blip.container.GrowableArray;
 import blip.util.Grow;
 public import blip.core.Traits;
+import blip.Comp;
 
 version(SerializationTrace){
     version=STrace;
@@ -44,12 +45,12 @@ version(SerializationTrace){
 
 /// basic exception for serialization errors
 class SerializationException: Exception{
-    char[] pos;
-    this(char[]msg,char[] pos,char[]file,long line,Exception next=null){
+    string pos;
+    this(string msg,string pos,string file,long line,Exception next=null){
         super(msg,file,line,next);
         this.pos=pos;
     }
-    void writeOutMsg(void delegate(char[]s)sink){
+    void writeOutMsg(void delegate(cstring)sink){
         sink(msg);
         if (pos.length){
             sink(" parsing ");
@@ -72,12 +73,12 @@ enum SerializationLevel{
 /// meta informations for fields
 struct FieldMetaInfo {
     bool pseudo; /// if true this is a pseudo field of array or dictionary
-    char[] name; /// name of the propety
+    string name; /// name of the propety
     ClassMetaInfo metaInfo; /// expected meta info (used if not class)
     SerializationLevel serializationLevel; /// when to serialize
-    char[] doc; /// documentation of the field
+    string doc; /// documentation of the field
     /// creates a field meta info (normally one uses ClassMetaInfo.addFieldOfType)
-    static FieldMetaInfo opCall(char[] name,char[] doc,ClassMetaInfo metaInfo,
+    static FieldMetaInfo opCall(string name,string doc,ClassMetaInfo metaInfo,
         SerializationLevel l=SerializationLevel.normalLevel)
     {
         FieldMetaInfo res;
@@ -89,13 +90,13 @@ struct FieldMetaInfo {
         return res;
     }
     /// describes a field meta info
-    void desc(void delegate(char[]) s){
+    void desc(void delegate(cstring) s){
         s("<FieldMetaInfo name:'"); s(name); s("',");
         s("level:"); writeOut(s,serializationLevel); s(",");
         s("metaInfo:"); s((metaInfo is null) ? "*NULL*"[] : metaInfo.className); s(">");
     }
-    char[][]citationKeys(){
-        char[][] res=[];
+    string []citationKeys(){
+        string [] res=[];
         foreach(m; Regex(r"\[[a-zA-Z]\w*\]").search(doc))
             res~=m.match(0);
         return res;
@@ -110,7 +111,8 @@ template typeKindForType(T){
     } else static if(is(T:T[])){
         const typeKindForType=TypeKind.ArrayK;
     } else static if(isAssocArrayType!(T)){
-        static if (is(KeyTypeOfAA!(T)==char[])||is(KeyTypeOfAA!(T)==wchar[])||is(KeyTypeOfAA!(T)==dchar[])){
+        alias Unqual!(KeyTypeOfAA!(T)) kType;
+        static if (is(kType==char[])||is(kType==wchar[])||is(kType==dchar[])){
             const typeKindForType=TypeKind.DictK;
         } else {
             const typeKindForType=TypeKind.AAK;
@@ -150,7 +152,7 @@ struct ExternalSerializationHandlers{
 
 /// meta informations for a class
 class ClassMetaInfo {
-    char[] className;
+    string className;
     ClassMetaInfo superMeta;
     FieldMetaInfo[] fields;
     TypeKind kind;
@@ -167,7 +169,7 @@ class ClassMetaInfo {
         }
     }
     /// returns the field with the given name
-    FieldMetaInfo *fieldNamed(char[]name){
+    FieldMetaInfo *fieldNamed(cstring name){
         FieldMetaInfo* res;
         foreach (ref f;fields){
             if (f.name==name) return &f;
@@ -184,12 +186,12 @@ class ClassMetaInfo {
         fields~=f;
     }
     /// adds a field with given name and type
-    void addFieldOfType(T)(char[] name,char[] doc,
+    void addFieldOfType(T)(string name,string doc,
         SerializationLevel sLevel=SerializationLevel.normalLevel){
         addField(FieldMetaInfo(name,doc,getSerializationInfoForType!(T)(),sLevel));
     }
     /// constructor (normally use createForType)
-    this(char[] className,ClassMetaInfo superMeta,TypeInfo ti,ClassInfo ci,TypeKind kind,void* function(ClassMetaInfo)allocEl){
+    this(string className,ClassMetaInfo superMeta,TypeInfo ti,ClassInfo ci,TypeKind kind,void* function(ClassMetaInfo)allocEl){
         this.className=className;
         this.superMeta=superMeta;
         this.ti=ti;
@@ -200,7 +202,7 @@ class ClassMetaInfo {
     /// creates a new meta info for the given type and registers it
     /// if no name is given, T.mangleof is used.
     /// normally this is the best way to create a new MetaInfo
-    static ClassMetaInfo createForType(T)(char[]name="",
+    static ClassMetaInfo createForType(T)(string name="",
         void *function(ClassMetaInfo) allocEl=cast(void *function(ClassMetaInfo))null){
         static if(is(T==class)){
             ClassInfo newCi=T.classinfo;
@@ -248,7 +250,7 @@ class ClassMetaInfo {
         return fields.length;
     }
     /// description (for debugging purposes)
-    void desc(void delegate(char[]) sink){
+    void desc(void delegate(cstring) sink){
         auto s=dumper(sink);
         s("<ClassMetaInfo@"); writeOut(sink,cast(void*)this); s("\n");
         s(" className:'")(className)("',\n");
@@ -380,12 +382,12 @@ static this(){
         cast(void* function(ClassMetaInfo))null);
     SerializationRegistry().register!(int[])(arrayMetaInfo);
     SerializationRegistry().register!(int[int])(aaMetaInfo);
-    SerializationRegistry().register!(int[char[]])(dictMetaInfo);
+    SerializationRegistry().register!(int[string ])(dictMetaInfo);
     SerializationRegistry().register!(void*)(voidPtrMetaInfo);
 }
 
-char[] coreTypesMetaInfoMixStr(){
-    char[] res="".dup;
+string coreTypesMetaInfoMixStr(){
+    string res="";
     foreach(T;CoreTypes){
         res~="ClassMetaInfo "~strForCoreType!(T)~"MetaInfo;\n";
     }
@@ -433,7 +435,7 @@ struct PosCounter{
 
 class SerializationRegistry {
     ClassMetaInfo[Object] type2metaInfos;
-    ClassMetaInfo[char[]] name2metaInfos;
+    ClassMetaInfo[string ] name2metaInfos;
 
     Object keyOf(T)() {
         static if (is(T == class)) {
@@ -469,7 +471,7 @@ class SerializationRegistry {
         }
     }
 
-    ClassMetaInfo getMetaInfo(char[] name) {
+    ClassMetaInfo getMetaInfo(string name) {
         synchronized(this){
             auto ptr = name in name2metaInfos;
             if (ptr is null) return null;
@@ -521,7 +523,7 @@ class Serializer {
     
     objectId[void*]             ptrToObjectId;
     objectId                    lastObjectId;
-    Variant[char[]]             context;
+    Variant[string ]             context;
     SerializationLevel serializationLevel;
     bool removeCycles;
     bool structHasId;
@@ -892,6 +894,7 @@ class Serializer {
             else static if (isAssocArrayType!(T)) {
                 version(SerializationTrace) sout("X serializing associative array\n");
                 alias KeyTypeOfAA!(T) K;
+                alias Unqual!(K) K2;
                 alias ValTypeOfAA!(T) V;
                 version(PseudoFieldMetaInfo){
                     FieldMetaInfo keyMetaInfo=FieldMetaInfo("key","",getSerializationInfoForType!(K)());
@@ -900,8 +903,8 @@ class Serializer {
                     valMetaInfo.pseudo=true;
                 }
                 auto ac=writeDictStart(fieldMeta,t.length,
-                    is(K==char[])||is(K==wchar[])||is(K==dchar[]));
-                foreach (key, inout value; t) {
+                    is(K2==char[])||is(K2==wchar[])||is(K2==dchar[]));
+                foreach (key, ref value; t) {
                     version(SerializationTrace) sout("X serializing associative array entry\n");
                     version(PseudoFieldMetaInfo){
                         writeEntry(ac,{ this.field!(K)(&keyMetaInfo, key); },
@@ -1048,7 +1051,7 @@ class Serializer {
     /// utility method that throws an exception
     /// override this to give more info on parser position,...
     /// this method *has* to throw
-    void serializationError(char[]msg,char[]filename,long line,Exception e=null){
+    void serializationError(string msg,string filename,long line,Exception e=null){
         throw new SerializationException(msg,"",filename,line,e);
     }
 }
@@ -1062,7 +1065,7 @@ class Unserializer {
 
     void*[objectId]             objectIdToPtr;
     objectId                    lastObjectId;
-    Variant[char[]]             context;
+    Variant[string ]             context;
     SerializationLevel serializationLevel;
     bool recoverCycles=true;
     bool readStructProxy;
@@ -1073,10 +1076,10 @@ class Unserializer {
     
     struct StackEntry{
         TypeKind kind;
-        char[] labelToRead;
+        string labelToRead;
         int iFieldRead;
         ClassMetaInfo metaInfo;
-        HashSet!(char[]) missingLabels;
+        HashSet!(string ) missingLabels;
         Variant value;
         static StackEntry opCall(TypeKind k,Variant value,ClassMetaInfo metaInfo){
             StackEntry res;
@@ -1087,7 +1090,7 @@ class Unserializer {
             return res;
         }
         void setMissingLabels(FieldMetaInfo *mismatchCheck=null){
-            missingLabels=new HashSet!(char[])();
+            missingLabels=new HashSet!(string )();
             int i=0;
             --iFieldRead;
             foreach(f;metaInfo){
@@ -1543,14 +1546,15 @@ class Unserializer {
             else static if (isAssocArrayType!(T)) {
                 version(UnserializationTrace) sout("Y unserializing associative array\n");
                 alias KeyTypeOfAA!(T) K;
+                alias Unqual!(K) K2;
                 alias ValTypeOfAA!(T) V;
                 FieldMetaInfo keyMetaInfo=FieldMetaInfo("key","",getSerializationInfoForType!(K)());
                 keyMetaInfo.pseudo=true;
                 FieldMetaInfo valMetaInfo=FieldMetaInfo("val","",getSerializationInfoForType!(V)());
                 valMetaInfo.pseudo=true;
-                K key;
+                K2 key;
                 V value;
-                auto ac=readDictStart(fieldMeta,is(K==char[])||is(K==wchar[])||is(K==dchar[]));
+                auto ac=readDictStart(fieldMeta,is(K2==char[])||is(K2==wchar[])||is(K2==dchar[]));
                 int iPartial=0;
                 while (readEntry(ac,
                     {
@@ -1563,7 +1567,7 @@ class Unserializer {
                         this.field!(V)(&valMetaInfo, value);
                         if(++iPartial==2){
                             iPartial=0;
-                            t[key]=value;
+                            t[cast(K)key]=value;
                         }
                     })) { key=K.init; value=V.init; }
             } else static if (isPointerType!(T)) {
@@ -1729,7 +1733,7 @@ class Unserializer {
     /// utility method that throws an exception
     /// override this to give more info on parser position,...
     /// this method *has* to throw
-    void serializationError(char[]msg,char[]filename,long line,Exception next=null){
+    void serializationError(string msg,string filename,long line,Exception next=null){
         throw new SerializationException(msg,collectAppender(&handlers.parserPos),filename,line,next);
     }
 }

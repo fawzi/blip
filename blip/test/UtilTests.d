@@ -23,6 +23,7 @@ import blip.container.GrowableArray;
 import blip.util.NotificationCenter;
 import blip.sync.Atomic;
 import blip.parallel.smp.WorkManager;
+import blip.Comp;
 
 void checkLb(T)(T[]arr,T val,size_t lb,size_t ub){
     auto lb1=lBound(arr,val,lb,ub);
@@ -101,33 +102,33 @@ void testLUBounds(uint[]arr,uint maxVal,uint bound1,uint bound2){
 class Summer{
     int sum;
     LocalGrowableArray!(int) log;
-    char[] name;
-    void callBack(char[] n,Callback* cl,Variant v){
+    string name;
+    void callBack(string n,Callback* cl,Variant v){
         if (n!=name) throw new Exception("error",__FILE__,__LINE__);
         atomicAdd(sum,v.get!(int)());
         synchronized(this){
             log(v.get!(int)());
         }
     }
-    this(char[]n){
+    this(string n){
         name=n;
     }
 }
 class DoNotify{
     int msg;
-    char[] name;
+    string name;
     NotificationCenter nc;
     void doNotify(){
         nc.notify(name,Variant(msg));
     }
-    this(NotificationCenter nc,char[] n,int m){
+    this(NotificationCenter nc,string n,int m){
         this.nc=nc;
         name=n;
         msg=m;
     }
 }
 
-void testNotificationCenter(char[] notName,int[] notf){
+void testNotificationCenter(string notName,int[] notf){
     auto nc=new NotificationCenter();
     auto summer1=new Summer(notName);
     auto summer2=new Summer(notName);

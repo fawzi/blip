@@ -14,7 +14,7 @@
 /// Things are not so bad though, because it introduces a very light weight approach that can
 /// be wrapped around other approaches, or used "natively".
 /// 
-///  * based on CharSink, i.e. a void delegate(char[])
+///  * based on CharSink, i.e. a void delegate(cstring)
 ///     * easy to define new sinks and wrap around things
 ///     * can be used also a low level without introducing dependencies
 ///  * writeOut(sink,obj,args) is a template that tries to write out obj to sink, formatting it using args.
@@ -101,6 +101,7 @@ import blip.core.Array: find;
 import blip.core.Traits: isStaticArrayType;
 import blip.util.TemplateFu: nArgs;
 import blip.text.UtfUtils: convertToString;
+import blip.Comp;
 
 /// extent of a slice of a buffer
 enum SliceExtent{ Partial, Maximal, ToEnd }
@@ -108,20 +109,20 @@ enum SliceExtent{ Partial, Maximal, ToEnd }
 enum :size_t{Eof=size_t.max}
 
 /// a character sink
-alias void delegate(char[]) CharSink;
+alias void delegate(cstring) CharSink;
 /// a binary sink
 alias void delegate(void[]) BinSink;
 /// a delegate that will write out to a character sink
-alias void delegate(void delegate(char[]))  OutWriter;
+alias void delegate(void delegate(cstring))  OutWriter;
 /// a delegate that will write out to a binary sink
 alias void delegate(void delegate(void[]))  BinWriter;
 
 /// a basic character reader (can be used to build more advanced objects that can handle CharReader, see blip.io.BufferIn)
-alias size_t delegate(char[]) CharRead;
+alias size_t delegate(cstring) CharRead;
 /// a basic binary reader (can be used to build more advanced objects that can handle CharReader and BinReader)
 alias size_t delegate(void[]) BinRead;
 /// a delegate that reads in from a character source
-alias size_t delegate(char[], SliceExtent slice,out bool iterate) CharReader;
+alias size_t delegate(cstring, SliceExtent slice,out bool iterate) CharReader;
 /// a delegate that reads in from a binary source
 alias size_t delegate(void[], SliceExtent slice,out bool iterate) BinReader;
 /// a handler of CharReader, returns true if something was read
@@ -131,22 +132,22 @@ alias bool delegate(BinReader) BinReaderHandler;
 
 /// io exception
 class BIOException: Exception{
-    this(char[]msg,char[] file, long line,Exception next=null){
+    this(string msg,string file, long line,Exception next=null){
         super(msg,file,line,next);
     }
 }
 /// exception when the buffer is too small
 class SmallBufferException:BIOException{
-    this(char[]msg,char[]fileN,long lineN,Exception next=null){
+    this(string msg,string fileN,long lineN,Exception next=null){
         super(msg,fileN,lineN,next);
     }
 }
 
 /// output stream
 interface OutStreamI{
-    void rawWriteStr(char[]);
-    void rawWriteStr(wchar[]);
-    void rawWriteStr(dchar[]);
+    void rawWriteStr(cstring);
+    void rawWriteStr(cstringw);
+    void rawWriteStr(cstringd);
     void rawWrite(void[]);
     CharSink charSink();
     BinSink  binSink();
@@ -194,8 +195,8 @@ struct OutW(S...){
         }
         return &res.call;
     }
-    void call(void delegate(char[])sink){
-        writeOut!(void delegate(char[]),S)(sink,this.args);
+    void call(void delegate(cstring)sink){
+        writeOut!(void delegate(cstring),S)(sink,this.args);
     }
 }
 
@@ -222,7 +223,7 @@ private size_t parseInt(T)(T[]s,ref int i){
 }
 /// writes out the given amount of space
 void writeSpace(S)(S s,int amount){
-    const char[] tt="                ";
+    string tt="                ";
     int l=cast(int)tt.length;
     while(amount>l){
         s(tt);
@@ -237,12 +238,12 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
     static if(is(typeof(sink1 is null))){
         assert(!(sink1 is null),"null sink in writeOut");
     }
-    static if (is(typeof(sink1(" ")))){
-        alias char Char;
+    static if (is(typeof(sink1(" "c)))){
+        alias Const!(char) Char;
     } else static if (is(typeof(sink1(" "w)))){
-        alias wchar Char;
+        alias Const!(wchar) Char;
     } else static if (is(typeof(sink1(" "d)))){
-        alias dchar Char;
+        alias Const!(dchar) Char;
     } else {
         static assert(0,"invalid sink in writeOut");
     }
@@ -332,7 +333,7 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
     } else static if (is(T==char)){
         sink((&v)[0..1]);
     } else static if(is(T==wchar)||is(T==dchar)){
-        sink(cast(char[])[v]);
+        sink(cast(cstring)[v]);
     } else static if (is(T==byte)||is(T==ubyte)||is(T==short)||is(T==ushort)||
         is(T==int)||is(T==uint)||is(T==long)||is(T==ulong))
     {
@@ -494,20 +495,20 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
         } else static if(is(typeof(v.writeOut(sinkDlg)))){
             v.writeOut(sinkDlg);
         } else static if((nArgs!(S)==0 || (nArgs!(S)==1 && is(S[0]==Char[]))) && 
-            (is(typeof(v(sink))) || is(typeof(v(delegate void(char[]c){ }))) 
-            || is(typeof(v(delegate void(wchar[]c){ })))
-            || is(typeof(v(delegate void(dchar[]c){ }))) ) )
+            (is(typeof(v(sink))) || is(typeof(v(delegate void(cstring c){ }))) 
+            || is(typeof(v(delegate void(cstringw c){ })))
+            || is(typeof(v(delegate void(cstringd c){ }))) ) )
         {
             static if (is(typeof(v(sink)))){
                 v(sink);
             } else static if (is(typeof(v(sinkDlg)))){
                 v(sinkDlg);
-            } else static if (is(typeof(v(delegate void(char[]c){ })))){
-                v(delegate void(char[]c){ writeOut(sink,c); });
-            } else static if (is(typeof(v(delegate void(wchar[]c){ })))){
-                v(delegate void(wchar[]c){ writeOut(sink,c); });
-            } else static if (is(typeof(v(delegate void(dchar[]c){ }))) ){
-                v(delegate void(dchar[]c){ writeOut(sink,c); });
+            } else static if (is(typeof(v(delegate void(cstring c){ })))){
+                v(delegate void(cstring c){ writeOut(sink,c); });
+            } else static if (is(typeof(v(delegate void(cstringw c){ })))){
+                v(delegate void(cstringw c){ writeOut(sink,c); });
+            } else static if (is(typeof(v(delegate void(cstringd c){ }))) ){
+                v(delegate void(cstringd c){ writeOut(sink,c); });
             } else static assert(0,"internal writeOut error");
         } else static if (is(typeof(sink(v.toString())))){
             sink(v.toString());

@@ -8,10 +8,11 @@
 *******************************************************************************/
 module blip.io.NullStream;
 import tango.io.device.Conduit;
+import blip.Comp;
 
 /// a conduit that discards its input
 class NullConduit: Conduit{
-    char[] toString (){
+    string toString (){
         return "NullConduit";
     }
 

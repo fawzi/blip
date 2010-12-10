@@ -23,6 +23,7 @@ import blip.math.Math: round,sqrt,min,ceil;
 import blip.math.IEEE: feqrel;
 //import tango.core.Memory:GC;
 import cstdlib = blip.stdc.stdlib : free, malloc;
+import blip.Comp;
 
 
 /+ ---------------- structural ops -------------------- +/
@@ -195,8 +196,8 @@ body {
 /+ --------- array creation ---------- +/
 
 /// function to create free standing empty,zeros,ones
-char[] freeFunMixin(char[] opName){
-    char[] res="".dup;
+string freeFunMixin(string opName){
+    string res="".dup;
     res~="template "~opName~"(V){\n";
     res~="    template "~opName~"(T){\n";
     res~="        NArray!(V,rkOfShape!(T))"~opName~"(T shape, bool fortran=false){\n";
@@ -250,7 +251,7 @@ NArray!(T,1) arange(T)(T from, T to, T step=cast(T)1){
     }
     NArray!(T,1) res=NArray!(T,1).empty([n]);
     T x=from;
-    const char[] loopBody=`
+    const istring loopBody=`
     *resPtr0=x;
     x+=step;`;
     mixin(sLoopPtr(1,["res"],loopBody,"i"));
@@ -283,11 +284,11 @@ template a2NAof(V){
             checkShape!(T,rankOfArray!(T))(arr,shape);
         }
         body{
-            const int rank=rankOfArray!(T);
+            const Immutable!(int) rank=rankOfArray!(T);
             index_type[rank] shape;
             calcShapeArray!(T,rankOfArray!(T))(arr,shape);
             auto res=NArray!(V,cast(int)rankOfArray!(T)).empty(shape,fortran);
-            const char[] loop_body="*resPtr0=cast(V)"~arrayInLoop("arr",rank,"i")~";";
+            const istring loop_body="*resPtr0=cast(V)"~arrayInLoop("arr",rank,"i")~";";
             index_type optimalChunkSize_i=NArray!(V,cast(int)rankOfArray!(T)).defaultOptimalChunkSize;
             mixin(pLoopIdx(rank,["res"],loop_body,"i"));
             return res;
@@ -388,8 +389,8 @@ private void checkShape(T,uint rank)(T arr,index_type[] shape){
 }
 
 /// returns a D array indexed with the variables of a pLoopIdx or sLoopGenIdx (for a2NA)
-char[] arrayInLoop(char[] arrName,int rank,char[] ivarStr){
-    char[] res="".dup;
+string arrayInLoop(string arrName,int rank,string ivarStr){
+    string res="".dup;
     res~=arrName;
     for (int i=0;i<rank;++i)
         res~="["~ivarStr~"_"~ctfe_i2a(i)~"_]";
@@ -592,7 +593,7 @@ in {
             myFuse(&c,a.startPtrArray,a.bStrides[0],b.startPtrArray,
                 b.bStrides[0],a.shape[0]);
         } else {
-            const char [] innerLoop=`myFuse(c1Ptr0,tmp1Ptr0,a.bStrides[axis1],b.startPtrArray,
+            const istring innerLoop=`myFuse(c1Ptr0,tmp1Ptr0,a.bStrides[axis1],b.startPtrArray,
                 b.bStrides[0],b.shape[0]);`;
         }
     } else {
@@ -611,7 +612,7 @@ in {
         scope NArray!(S,rank2-1) tmp2=NArray!(S,rank2-1)(newstrides2,newshape2,b.startPtrArray,
             b.newFlags,b.newBase);
         scope NArray!(U,rank2-1) c2=NArray!(U,rank2-1)(newstrides2c,newshape2,null,c.newFlags);
-        const char [] innerLoop=pLoopPtr(rank2-1,["tmp2","c2"],
+        const istring innerLoop=pLoopPtr(rank2-1,["tmp2","c2"],
                 "myFuse(cast(U*)(cast(size_t)c2Ptr0+cast(size_t)c1Ptr0),tmp1Ptr0,a.bStrides[axis1],tmp2Ptr0,\n"~
                 "            b.bStrides[axis2],a.shape[axis1]);\n","j");
     }
@@ -693,7 +694,7 @@ body {
     
     index_type ii=0;
     
-    const char[] loopInstr=`
+    const istring loopInstr=`
     if (*maskPtr0){
         if (resP==resEnd)
         {
@@ -751,7 +752,7 @@ body {
     }
     T* elAtt=a.startPtrArray;
     index_type myStride=a.bStrides[0];
-    const char[] loopInstr=`
+    const istring loopInstr=`
     if (*maskPtr0){
         *resPtr0=*elAtt;
         elAtt=cast(T*)(cast(size_t)elAtt+myStride);
@@ -763,18 +764,18 @@ body {
 /// returns the reduction of the rank done by the arguments in the tuple
 /// allow also static arrays?
 template reductionFactorFilt(){
-    const int reductionFactorFilt=0;
+    const Immutable!(int) reductionFactorFilt=0;
 }
 /// ditto
 template reductionFactorFilt(T,S...){
     static if (is(T==int) || is(T==long)||is(T==uint)||is(T==ulong)){
-        const int reductionFactorFilt=1+reductionFactorFilt!(S);
+        const Immutable!(int) reductionFactorFilt=1+reductionFactorFilt!(S);
     } else static if (is(T==Range)){
-        const int reductionFactorFilt=reductionFactorFilt!(S);
+        const Immutable!(int) reductionFactorFilt=reductionFactorFilt!(S);
     } else static if (is(T:int[])||is(T:long[])||is(T:uint[])||is(T:ulong[])){
-        const int reductionFactorFilt=reductionFactorFilt!(S);
+        const Immutable!(int) reductionFactorFilt=reductionFactorFilt!(S);
     } else static if (is(T:NArray!(long,1))||is(T:NArray!(int,1))||is(T:NArray!(uint,1))||is(T:NArray!(ulong,1))){
-        const int reductionFactorFilt=reductionFactorFilt!(S);
+        const Immutable!(int) reductionFactorFilt=reductionFactorFilt!(S);
     } else {
         static assert(0,"ERROR: unexpected type <"~T.stringof~"> in reductionFactorFilt, this will fail");
     }
@@ -783,7 +784,7 @@ template reductionFactorFilt(T,S...){
 // creates an empty array of the requested shape for axis filtering (support function)
 NArray!(T,rank-reductionFactorFilt!(S)) arrayAxisFilter(T,int rank,S...)(NArray!(T,rank) a,S idx_tup)
 {
-    const int rank2=rank-reductionFactorFilt!(S);
+    const Immutable!(int) rank2=rank-reductionFactorFilt!(S);
     index_type from,to,step;
     index_type[rank2] newshape;
     int ii=0;
@@ -824,12 +825,12 @@ NArray!(T,rank-reductionFactorFilt!(S)) arrayAxisFilter(T,int rank,S...)(NArray!
 }
 
 // loops on filtered and non filtered array in parallel (support function)
-char[] axisFilterLoop(T,int rank,V,S...)(char[] loopBody)
+string axisFilterLoop(T,int rank,V,S...)(string loopBody)
 {
-    char[] res;
-    char[] indent;
+    string res;
+    string indent;
     indent~="    ";
-    static const int rank2=rank-reductionFactorFilt!(S);
+    static const Immutable!(int) rank2=rank-reductionFactorFilt!(S);
     res~=indent~"const int rank2=rank-reductionFactorFilt!(S);";
     res~=indent~"index_type from,to,step;\n";
     res~=indent~"T* aPtr"~ctfe_i2a(rank)~"=a.startPtrArray;\n";
@@ -878,7 +879,7 @@ char[] axisFilterLoop(T,int rank,V,S...)(char[] loopBody)
     }
     int ii=0;
     foreach(i,U;S){
-        char[] indent2=indent~"    ";
+        string indent2=indent~"    ";
         static if (is(U==int) || is(U==long)||is(U==uint)||is(U==ulong)){
             res~=indent~"{\n";
             res~=indent2~"T* aPtr"~ctfe_i2a(rank-i-1)~"=aPtr"~ctfe_i2a(rank-i)~";\n";
@@ -913,7 +914,7 @@ char[] axisFilterLoop(T,int rank,V,S...)(char[] loopBody)
         indent=indent2;
     }
     for (int i=rank2-ii;i>0;--i){
-        char[] indent2=indent~"    ";
+        string indent2=indent~"    ";
         res~=indent~"T* aPtr"~ctfe_i2a(i-1)~"=aPtr"~ctfe_i2a(i)~";\n";
         res~=indent~"T* bPtr"~ctfe_i2a(i-1)~"=bPtr"~ctfe_i2a(i)~";\n";
         res~=indent~"for (index_type iIn"~ctfe_i2a(i-1)~"=aShape"~ctfe_i2a(rank-i)~";iIn"~ctfe_i2a(i-1)~"!=0;--iIn"~ctfe_i2a(i-1)~"){\n";
@@ -922,7 +923,7 @@ char[] axisFilterLoop(T,int rank,V,S...)(char[] loopBody)
     res~=indent~loopBody~"\n";
     for (int i=0;i<rank2-ii;++i){
         assert(indent.length>=4);
-        char[] indent2=indent[0..(indent.length-4)];
+        string indent2=indent[0..(indent.length-4)];
         res~=indent~"aPtr"~ctfe_i2a(i)~"=cast(T*)(cast(size_t)aPtr"~ctfe_i2a(i)
             ~"+aStride"~ctfe_i2a(rank-1-i)~");\n";
         res~=indent~"bPtr"~ctfe_i2a(i)~"=cast(T*)(cast(size_t)bPtr"~ctfe_i2a(i)
@@ -932,7 +933,7 @@ char[] axisFilterLoop(T,int rank,V,S...)(char[] loopBody)
     }
     foreach_reverse(i,U;S){
         assert(indent.length>=4);
-        char[] indent2=indent[0..(indent.length-4)];
+        string indent2=indent[0..(indent.length-4)];
         static if (is(U==int) || is(U==long)||is(U==uint)||is(U==ulong)){
             res~=indent2~"}\n";
         } else static if (is(U==Range)){

@@ -17,7 +17,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 module blip.container.BitArray;
-private import blip.core.BitManip;
+import blip.core.BitManip;
+import blip.Comp;
 
 /// mixin that loops on a bit array.
 /// - opMask: operation on the bits selected by "mask" of ptr[iBlock]. valAtt contains the
@@ -25,8 +26,8 @@ private import blip.core.BitManip;
 /// - opEl: operation on the element ptr[iBlock], valAtt contains the elements of the right side.
 ///   ibit0 is the index of the first element of the element
 /// - opBit: operation on a single bit (as bool value), ibit is the the index to do the operation on
-char[] loopOpMixin(char[]opMask,char[] opEl, char[] opBit){
-    char[] res=`
+string loopOpMixin(string opMask,string opEl, string opBit){
+    string res=`
     {
         if (len<bitsPerEl){
             if (start==rhs.start){
@@ -218,7 +219,7 @@ struct BitArray
         return *this;
     }
     /// loops on the slice
-    int opApply( int delegate(inout bool) dg ){
+    int opApply( int delegate(ref bool) dg ){
         // to do: optimize with loopOpMixin
         int result;
 
@@ -233,7 +234,7 @@ struct BitArray
         return result;
     }
     /// ditto
-    int opApply( int delegate(inout size_t, inout bool) dg ){
+    int opApply( int delegate(ref size_t, ref bool) dg ){
         int result;
 
         for( size_t i = 0; i < len; ++i )

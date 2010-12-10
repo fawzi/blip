@@ -39,6 +39,7 @@ import blip.text.TextParser;
 import blip.text.UtfUtils;
 import blip.BasicModels;
 import blip.io.StreamConverters: ReadHandler;
+import blip.Comp;
 
 /// the non array core types
 template isBasicCoreType(T){
@@ -67,21 +68,21 @@ alias Tuple!(char[],wchar[],dchar[]) CoreStringTypes;
 template strForCoreType(T){
     static if (is(T S:S[])){
         static if (is(T==ubyte[])){
-            const char[]strForCoreType="binaryBlob";
+            const istring strForCoreType="binaryBlob";
         } else static if (is(T==void[])){
-            const char[]strForCoreType="binaryBlob2";
+            const istring strForCoreType="binaryBlob2";
         } else {
-            const char[]strForCoreType=S.stringof~"Str";
+            const istring strForCoreType=S.stringof~"Str";
         }
     } else{
-        const char[]strForCoreType=T.stringof;
+        const istring strForCoreType=T.stringof;
     }
 }
 
 /// generates a delegate for each type, this can be used to buid a kind of VTable
 /// and hide the use of templates
-char[] coreTypeDelegates(char[] indent="    "){
-    char[] res="".dup;
+string coreTypeDelegates(string indent="    "){
+    string res="".dup;
     foreach (T;CoreTypes){
         res~=indent~"void delegate(ref "~T.stringof~" el) coreHandler_"~strForCoreType!(T)~";\n";
     }
@@ -89,8 +90,8 @@ char[] coreTypeDelegates(char[] indent="    "){
 }
 
 /// transfers all template implementations to the "V-table"
-char[] coreHandlerSetFromTemplateMixinStr(char[] templateCall, char[] templateStr=null, char[] indent="    "){
-    char[] res="".dup;
+string coreHandlerSetFromTemplateMixinStr(string templateCall, string templateStr=null, string indent="    "){
+    string res="".dup;
     if (templateStr is null) templateStr=templateCall;
     res~=indent~"void setCoreHandlersFrom_"~templateStr~"(){\n";
     foreach (T;CoreTypes){
@@ -161,13 +162,13 @@ class WriteHandlers: CoreHandlers,OutStreamI{
         assert(0,"unimplemented");
     }
     /// writes a raw string
-    void rawWriteStr(char[]data){
+    void rawWriteStr(cstring data){
         assert(0,"unimplemented");
     }
-    void rawWriteStr(wchar[]data){
+    void rawWriteStr(cstringw data){
         assert(0,"unimplemented");
     }
-    void rawWriteStr(dchar[]data){
+    void rawWriteStr(cstringd data){
         assert(0,"unimplemented");
     }
     override void handleOutWriter(OutWriter w){
@@ -177,7 +178,7 @@ class WriteHandlers: CoreHandlers,OutStreamI{
         w(&rawWrite);
     }
     CharSink charSink(){
-        return cast(void delegate(char[]))&this.rawWriteStr;
+        return cast(void delegate(cstring))&this.rawWriteStr;
     }
     BinSink binSink(){
         return &this.rawWrite;
@@ -209,7 +210,7 @@ class ReadHandlers: CoreHandlers{
         assert(0,"unimplemented");
     }
     /// skips the given string from the input
-    bool skipString(char[]str,bool shouldThrow){
+    bool skipString(cstring str,bool shouldThrow){
         auto res=rawReadStr(nCodePoints(str));
         if (res!=str){
             if (shouldThrow)
@@ -231,7 +232,7 @@ class ReadHandlers: CoreHandlers{
         return true;
     }
     /// current read position (only informative)
-    void parserPos(void delegate(char[]) s){
+    void parserPos(void delegate(cstring) s){
     }
     void handleCharReader(CharReader r){
         throw new Exception("unimplemented",__FILE__,__LINE__);
@@ -348,17 +349,17 @@ final class BinaryWriteHandlers(bool SwapBytes=isSmallEndian):WriteHandlers{
     void rawWrite(void[] data){
         basicWrite(data);
     }
-    final void rawWriteStrD(char[]data){
+    final void rawWriteStrD(cstring data){
         writer(data);
     }
     /// writes a raw string
-    void rawWriteStr(char[]data){
+    void rawWriteStr(cstring data){
         writer(data);
     }
-    void rawWriteStr(wchar[]data){
+    void rawWriteStr(cstringw data){
         writer(data);
     }
-    void rawWriteStr(dchar[]data){
+    void rawWriteStr(cstringd data){
         writer(data);
     }
     CharSink charSink(){
@@ -496,7 +497,7 @@ final class BinaryReadHandlers(bool SwapBytes=isSmallEndian):ReadHandlers{
         return data;
     }
     /// the current position (for information purposes)
-    void parserPos(void delegate(char[]) s){
+    void parserPos(void delegate(cstring) s){
         long pos=0;
         try {
             if (tangoReader!is null)
@@ -569,13 +570,13 @@ class FormattedWriteHandlers(U=char): WriteHandlers{
             assert(0,"unsupported type "~T.stringof);
         }
     }
-    override void rawWriteStr(char[]s){
+    override void rawWriteStr(cstring s){
         writeStr(s);
     }
-    override void rawWriteStr(wchar[]s){
+    override void rawWriteStr(cstringw s){
         writeStr(s);
     }
-    override void rawWriteStr(dchar[]s){
+    override void rawWriteStr(cstringd s){
         writeStr(s);
     }
     CharSink charSink(){

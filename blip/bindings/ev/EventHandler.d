@@ -29,6 +29,7 @@ import blip.serialization.Serialization;
 version(TrackEvents){
     import blip.io.Console;
 }
+import blip.Comp;
 
 /// structure that performs simple (but flexible) callbacks
 struct EventHandler{

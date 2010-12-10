@@ -90,6 +90,7 @@ import blip.util.TemplateFu;
 import blip.math.Math;
 import blip.math.random.Random: Rand=Random;
 import blip.io.BasicIO;
+import blip.Comp;
 
 /// returns a positive number, most likely mean+hardMin, in [hardMin,hardMax]
 int generateSize(Rand r,int mean=4,int hardMin=0,int hardMax=-3) {
@@ -107,7 +108,7 @@ struct SizeLikeNumber(int mean=4,int hardMin=0,int hardMax=-3){
         res.val=generateSize(r,mean,hardMin,hardMax);
         return res;
     }
-    void desc(void delegate(char[])sink){
+    void desc(void delegate(cstring)sink){
         writeOut(sink,val);
     }
 }
@@ -152,7 +153,7 @@ V[K] addRandomEntriesToAA(V,K)(Rand r,V[K]a){
 }
 
 // valid chars (restrict to alphanumeric chars?)
-private char[] valid_chars=
+private string valid_chars=
     "abcdefghijklmnopqrstuwxyzABCDEFGHIJKLMNOPQRSTUWXYZ0123456789_+-*%&/()=?!$`'\"\\[]{}<>.:;, \t\n";
 
 template NonStaticArray(T){

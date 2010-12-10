@@ -17,6 +17,7 @@
 // limitations under the License.
 module blip.util.TemplateFu;
 import blip.core.Traits;
+import blip.Comp;
 
 /// returns the number of arguments in the tuple (its length)
 template nArgs(){
@@ -38,7 +39,7 @@ bool ctfe_isTokenChar(char c){
 }
 
 /// checks if code contains the given token
-bool ctfe_hasToken(char[] token,char[] code){
+bool ctfe_hasToken(string token,string code){
     bool outOfTokens=true;
     int i=0;
     while(i<code.length){
@@ -62,8 +63,8 @@ bool ctfe_hasToken(char[] token,char[] code){
 }
 
 /// replaces all occurrences of token in code with repl
-char[] ctfe_replaceToken(char[] token,char[] repl,char[] code){
-    char[] res="".dup;
+string ctfe_replaceToken(string token,string repl,string code){
+    string res="".dup;
     bool outOfTokens=true;
     int i=0,i0;
     while(i<code.length){

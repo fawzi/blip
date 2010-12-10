@@ -16,10 +16,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 module blip.BasicModels;
+import blip.Comp;
 
 /// interface of an object that can describe itself
 interface BasicObjectI{
-    void desc(void delegate(char[]) s);
+    void desc(void delegate(cstring) s);
 }
 
 /// basic interface for objects that can be copied (shallowly)

@@ -24,6 +24,7 @@ import blip.BasicModels;
 import blip.text.TextParser;
 import blip.container.GrowableArray;
 import blip.io.BasicIO;
+import blip.Comp;
 
 class SBinSerializer : Serializer {
     uint[void*] writtenMetaInfo;
@@ -195,7 +196,7 @@ class SBinSerializer : Serializer {
     }
     
     override void writeProtocolVersion(){
-        char[] s="BLIP_SBIN_1.0";
+        string s="BLIP_SBIN_1.0";
         writer.handle(s);
     }
 }
@@ -230,7 +231,7 @@ class SBinUnserializer: Unserializer {
         }
     }
     ClassMetaInfo readMetaInfo(){
-        char[] className;
+        string className;
         reader.handle(className);
         ClassMetaInfo metaInfo=SerializationRegistry().getMetaInfo(className);
         if (metaInfo is null)
@@ -270,8 +271,8 @@ class SBinUnserializer: Unserializer {
     }
     class FieldMismatchException:Exception{
         FieldMetaInfo *mismatchedField;
-        char[] actualField;
-        this(FieldMetaInfo *mismatchedField,char[] actualField,char[]desc,char[]filename,long line){
+        string actualField;
+        this(FieldMetaInfo *mismatchedField,string actualField,string desc,string filename,long line){
             super(collectAppender(delegate void(CharSink s){ s(desc); s(" at "); reader.parserPos(s); }),filename,line);
             this.actualField=actualField;
             this.mismatchedField=mismatchedField;
@@ -424,7 +425,7 @@ class SBinUnserializer: Unserializer {
     /// utility method that throws an exception
     /// override this to give more info on parser position,...
     /// this method *has* to throw
-    override void serializationError(char[]msg,char[]filename,long line,Exception e=null){
+    override void serializationError(string msg,string filename,long line,Exception e=null){
         throw new SerializationException(msg,collectAppender(&reader.parserPos),filename,line,e);
     }
     /// returns true if this is the SBIN protocol, otherwise throws

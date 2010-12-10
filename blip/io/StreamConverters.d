@@ -23,6 +23,7 @@ import blip.io.BasicIO: BIOException, SliceExtent,SmallBufferException,MultiRead
 import BIO=blip.io.BasicIO;
 import tango.io.stream.Buffered;
 import blip.io.IOArray;
+import blip.Comp;
 
 final class StreamWriter{
     OutputStream writer;
@@ -106,7 +107,7 @@ class StreamStrWriter(T){
         writeStr(src);
         writer.flush();
     }    
-    final void writeStrSync(char[] src){
+    final void writeStrSync(cstring src){
         synchronized(writer){
             writeStr(src);
         }
@@ -355,7 +356,7 @@ final class ConduitEmulator: IConduit
         return 512;
     }
 
-    char[] toString (){
+    string toString (){
         return "ConduitEmulator";
     }
 
@@ -365,7 +366,7 @@ final class ConduitEmulator: IConduit
 
     void detach (){ }
 
-    void error (char[] msg){
+    void error (cstring msg){
         sink(msg);
     }
 

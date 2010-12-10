@@ -37,6 +37,7 @@ import blip.container.Deque;
 import tango.core.Memory:GC;
 import tango.util.container.LinkedList;
 import blip.core.BitManip;
+import blip.Comp;
 
 debug(TrackTasks){
     version=ImportConsole;
@@ -70,7 +71,7 @@ class TaskPoolT(int batchSize=16):Pool!(Task,batchSize){
     this(size_t bufferSpace=8*batchSize, size_t maxEl=16*batchSize){
         super(null,bufferSpace,maxEl);
     }
-    Task getObj(char[] name, void delegate() taskOp,TaskFlags f=TaskFlags.None){
+    Task getObj(string name, void delegate() taskOp,TaskFlags f=TaskFlags.None){
         auto res=super.getObj();
         res.reset(name,taskOp,cast(Fiber)null,cast(bool delegate())null,
             cast(TaskI delegate())null, f);
@@ -78,14 +79,14 @@ class TaskPoolT(int batchSize=16):Pool!(Task,batchSize){
         return res;
     }
     /// constructor with a possibly yieldable call
-    Task getObj(char[] name, YieldableCall c){
+    Task getObj(string name, YieldableCall c){
         auto res=super.getObj();
         res.reset(name,c);
         res.tPool=this;
         return res;
     }
     /// constructor (with fiber)
-    Task getObj(char[] name,Fiber fiber,TaskFlags f=TaskFlags.None){
+    Task getObj(string name,Fiber fiber,TaskFlags f=TaskFlags.None){
         auto res=super.getObj();
         res.reset(name,&res.runFiber,fiber,cast(bool delegate())null,
             cast(TaskI delegate())null, f);
@@ -93,7 +94,7 @@ class TaskPoolT(int batchSize=16):Pool!(Task,batchSize){
         return res;
     }
     /// constructor (with generator)
-    Task getObj(char[] name, bool delegate() generator,TaskFlags f=TaskFlags.None){
+    Task getObj(string name, bool delegate() generator,TaskFlags f=TaskFlags.None){
         auto res=super.getObj();
         res.reset(name,&res.runGenerator,cast(Fiber)null,generator,
             cast(TaskI delegate())null, f);
@@ -101,7 +102,7 @@ class TaskPoolT(int batchSize=16):Pool!(Task,batchSize){
         return res;
     }
     /// constructor (with generator)
-    Task getObj(char[] name, TaskI delegate() generator2,TaskFlags f=TaskFlags.None){
+    Task getObj(string name, TaskI delegate() generator2,TaskFlags f=TaskFlags.None){
         auto res=super.getObj();
         res.reset(name,&res.runGenerator2,cast(Fiber)null,cast(bool delegate())null,
         generator2, f);
@@ -109,7 +110,7 @@ class TaskPoolT(int batchSize=16):Pool!(Task,batchSize){
         return res;
     }
     /// general constructor
-    Task getObj(char[] name, void delegate() taskOp,Fiber fiber,
+    Task getObj(string name, void delegate() taskOp,Fiber fiber,
         bool delegate() generator,TaskI delegate() generator2, TaskFlags f=TaskFlags.None, FiberPool fPool=null){
         auto res=super.getObj();
         res.reset(name,taskOp,fiber,generator,generator2,f,fPool);
@@ -225,7 +226,7 @@ class Task:TaskI{
     void delegate() onFinish1;// placeholder to have onFinish tasks without allocation
     
     TaskI _superTask; /// super task of this task
-    char[] _taskName; /// name of the task (might be null, for debugging purposes)
+    string _taskName; /// name of the task (might be null, for debugging purposes)
 
     TaskI[] holdedSubtasks; /// the subtasks on hold (debug, to remove)
     
@@ -321,7 +322,7 @@ class Task:TaskI{
     /// it the task might be yielded (i.e. if it is a fiber)
     bool mightYield(){ return !(flags & TaskFlags.NoYield) && (fiber !is null); }
     /// return the name of this task
-    char[] taskName(){ return _taskName; }
+    string taskName(){ return _taskName; }
     /// returns the the status of the task
     TaskStatus status(){ return _status; }
     /// sets the task status
@@ -337,7 +338,7 @@ class Task:TaskI{
     /// return the superTask of this task
     TaskI superTask(){ return _superTask; }
     /// sets the superTask of this task
-    void superTask(TaskI task){ assert(status==TaskStatus.Building,"unexpected status when setting superTask:"~to!(char[])(status)); _superTask=task; }
+    void superTask(TaskI task){ assert(status==TaskStatus.Building,"unexpected status when setting superTask:"~to!(string )(status)); _superTask=task; }
     /// return the scheduler of this task
     TaskSchedulerI scheduler(){ return _scheduler; }
     /// sets the scheduler of this task
@@ -346,32 +347,32 @@ class Task:TaskI{
     bool mightSpawn() { return !(flags & TaskFlags.NoSpawn); }
 
     /// efficient allocation constructor (with single delegate)
-    static Task opCall(char[] name, void delegate() taskOp,TaskFlags f=TaskFlags.None){
+    static Task opCall(string name, void delegate() taskOp,TaskFlags f=TaskFlags.None){
         auto tPool=defaultSchedulerPools().taskPool;
         return tPool.getObj(name,taskOp,f);
     }
     /// efficient allocation constructor with a possibly yieldable call
-    static Task opCall(char[] name, YieldableCall c){
+    static Task opCall(string name, YieldableCall c){
         auto tPool=defaultSchedulerPools().taskPool;
         return tPool.getObj(name,c);
     }
     /// efficient allocation constructor (with fiber)
-    static Task opCall(char[] name,Fiber fiber,TaskFlags f=TaskFlags.None){
+    static Task opCall(string name,Fiber fiber,TaskFlags f=TaskFlags.None){
         auto tPool=defaultSchedulerPools().taskPool;
         return tPool.getObj(name,fiber,f);
     }
     /// efficient allocation constructor (with generator)
-    static Task opCall(char[] name, bool delegate() generator,TaskFlags f=TaskFlags.None){
+    static Task opCall(string name, bool delegate() generator,TaskFlags f=TaskFlags.None){
         auto tPool=defaultSchedulerPools().taskPool;
         return tPool.getObj(name,generator,f);
     }
     /// efficient allocation constructor (with generator)
-    static Task opCall(char[] name, TaskI delegate() generator2,TaskFlags f=TaskFlags.None){
+    static Task opCall(string name, TaskI delegate() generator2,TaskFlags f=TaskFlags.None){
         auto tPool=defaultSchedulerPools().taskPool;
         return tPool.getObj(name,generator2,f);
     }
     /// efficient allocation general constructor
-    static Task opCall(char[] name, void delegate() taskOp,Fiber fiber,
+    static Task opCall(string name, void delegate() taskOp,Fiber fiber,
         bool delegate() generator,TaskI delegate() generator2, TaskFlags f=TaskFlags.None, FiberPool fPool=null)
     {
         auto tPool=defaultSchedulerPools().taskPool;
@@ -387,7 +388,7 @@ class Task:TaskI{
         }
     }
     /// constructor (with single delegate)
-    this(char[] name, void delegate() taskOp,TaskFlags f=TaskFlags.None){
+    this(string name, void delegate() taskOp,TaskFlags f=TaskFlags.None){
         version(TrackCollections){
             sinkTogether(sout,delegate void(CharSink s){
                 dumper(s)("creating Task@")(cast(void*)this)("\n");
@@ -397,7 +398,7 @@ class Task:TaskI{
             cast(TaskI delegate())null, f);
     }
     /// constructor with a possibly yieldable call
-    this(char[] name, YieldableCall c){
+    this(string name, YieldableCall c){
         version(TrackCollections){
             sinkTogether(sout,delegate void(CharSink s){
                 dumper(s)("creating Task@")(cast(void*)this)("\n");
@@ -405,12 +406,12 @@ class Task:TaskI{
         }
         reset(name,c);
     }
-    void reset(char[] name, YieldableCall c){
+    void reset(string name, YieldableCall c){
         reset(name,c.dlg,cast(Fiber)null,cast(bool delegate())null,
             cast(TaskI delegate())null, c.flags, c.fPool);
     }
     /// constructor (with fiber)
-    this(char[] name,Fiber fiber,TaskFlags f=TaskFlags.None){
+    this(string name,Fiber fiber,TaskFlags f=TaskFlags.None){
         version(TrackCollections){
             sinkTogether(sout,delegate void(CharSink s){
                 dumper(s)("creating Task@")(cast(void*)this)("\n");
@@ -420,7 +421,7 @@ class Task:TaskI{
             cast(TaskI delegate())null, f);
     }
     /// constructor (with generator)
-    this(char[] name, bool delegate() generator,TaskFlags f=TaskFlags.None){
+    this(string name, bool delegate() generator,TaskFlags f=TaskFlags.None){
         version(TrackCollections){
             sinkTogether(sout,delegate void(CharSink s){
                 dumper(s)("creating Task@")(cast(void*)this)("\n");
@@ -430,7 +431,7 @@ class Task:TaskI{
             cast(TaskI delegate())null, f);
     }
     /// constructor (with generator)
-    this(char[] name, TaskI delegate() generator2,TaskFlags f=TaskFlags.None){
+    this(string name, TaskI delegate() generator2,TaskFlags f=TaskFlags.None){
         version(TrackCollections){
             sinkTogether(sout,delegate void(CharSink s){
                 dumper(s)("creating Task@")(cast(void*)this)("\n");
@@ -440,7 +441,7 @@ class Task:TaskI{
         generator2, f);
     }
     /// general constructor
-    this(char[] name, void delegate() taskOp,Fiber fiber,
+    this(string name, void delegate() taskOp,Fiber fiber,
         bool delegate() generator,TaskI delegate() generator2, TaskFlags f=TaskFlags.None, FiberPool fPool=null){
         version(TrackCollections){
             sinkTogether(sout,delegate void(CharSink s){
@@ -456,7 +457,7 @@ class Task:TaskI{
             });
         }
     }
-    void reset(char[] name, void delegate() taskOp,Fiber fiber,
+    void reset(string name, void delegate() taskOp,Fiber fiber,
         bool delegate() generator,TaskI delegate() generator2, TaskFlags f=TaskFlags.None, FiberPool fPool=null){
         assert(taskOp !is null);
         this._status=TaskStatus.Building;
@@ -731,7 +732,7 @@ class Task:TaskI{
                     if (status==TaskStatus.WaitingEnd){
                         status=TaskStatus.PostExec;
                         callOnFinish=true;
-                        assert((flags & (TaskFlags.WaitingSubtasks))==0 && delayFlags==1,"flags="~to!(char[])(flags));
+                        assert((flags & (TaskFlags.WaitingSubtasks))==0 && delayFlags==1,"flags="~to!(string )(flags));
                     } else if ((flags & TaskFlags.WaitingSubtasks)!=0){
                         flags=flags & (~TaskFlags.WaitingSubtasks);
                         callOnFinish=true;
@@ -1165,17 +1166,17 @@ class Task:TaskI{
     }
     /// description (for debugging)
     /// non threadsafe
-    char[] toString(){
-        return collectAppender(cast(OutWriter)&desc);
+    string toString(){
+        return cast(string)collectAppender(cast(OutWriter)&desc);
     }
     /// description (for debugging)
-    void desc(void delegate(char[]) s){
+    void desc(void delegate(cstring) s){
         return desc(s,true);
     }
     /// description (for debugging)
     /// (might not be a snapshot if other threads modify it while printing)
     /// non threadsafe
-    void desc(void delegate(char[]) s,bool shortVersion){
+    void desc(void delegate(cstring) s,bool shortVersion){
         if (this is null){
             s("<Task *NULL*>");
         } else {
@@ -1192,7 +1193,7 @@ class Task:TaskI{
         }
     }
     /// prints the fields (superclasses can override this an call it through super)
-    void fieldsDesc(void delegate(char[]) sink){
+    void fieldsDesc(void delegate(cstring) sink){
         auto s=dumper(sink);
         s("  level=")(level)(",\n");
         s("  taskOp:");
@@ -1316,7 +1317,7 @@ class Task:TaskI{
 
 /// a task that does nothing
 class EmptyTask: Task{
-    this(char[] name="EmptyTask", TaskFlags f=TaskFlags.None){
+    this(string name="EmptyTask", TaskFlags f=TaskFlags.None){
         super(name,&internalExe,f);
     }
     override void internalExe(){ }
@@ -1327,7 +1328,7 @@ class EmptyTask: Task{
 class RootTask: Task{
     Logger log;
     bool warnSpawn;
-    this(TaskSchedulerI scheduler, int level=0, char[] name="RootTask", bool warnSpawn=false){
+    this(TaskSchedulerI scheduler, int level=0, string name="RootTask", bool warnSpawn=false){
         super(name,&internalExe,TaskFlags.None);
         this.scheduler=scheduler;
         this.level=level;
@@ -1363,7 +1364,7 @@ class SequentialTask:RootTask{
     Deque!(TaskI) queue; // FIFO queue
     TaskI executingTask; // the single task executing now
     
-    this(char[] name,TaskSchedulerI scheduler, int level=0,bool canBeImmediate=true){
+    this(string name,TaskSchedulerI scheduler, int level=0,bool canBeImmediate=true){
         super(scheduler,level,name,false);
         if (canBeImmediate){
             version(NoReuse){ } else {
@@ -1372,7 +1373,7 @@ class SequentialTask:RootTask{
         }
         queue=new Deque!(TaskI)();
     }
-    this(char[]name,TaskI t,bool canBeImmediate=true){
+    this(string name,TaskI t,bool canBeImmediate=true){
         if (t is null){
             throw new ParaException("sequential task with no super task",__FILE__,__LINE__);
         }

@@ -30,6 +30,7 @@ import blip.container.Deque;
 import blip.container.GrowableArray;
 import blip.io.BasicIO;
 import blip.bindings.ev.DLibev;
+import blip.Comp;
 
 /// an smp parallelization friendly semaphore
 /// uses a LIFO queue, change to FIFO (slighlty more costly)?
@@ -281,7 +282,7 @@ class RLock:Object.Monitor{
             (", lockLevel:")(lockLevel)(", waiting:")(waiting)(">");
     }
     /// to string
-    char[] toString(){
+    string toString(){
         return collectAppender(&desc);
     }
     /// locks the recursive lock
@@ -468,7 +469,7 @@ class RRLock:Object.Monitor{
             (", lockLevelStack:")(lockLevelStack)(", waiting:")(waiting)(", lastStack:")(lastStack)(">");
     }
     /// to string
-    char[] toString(){
+    string toString(){
         return collectAppender(&desc);
     }
     /// locks the recursive lock

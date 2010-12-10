@@ -23,6 +23,7 @@ import blip.BasicModels;
 import blip.util.Grow:growLength;
 import blip.container.Deque;
 import blip.container.AtomicSLink;
+import blip.Comp;
 
 /// a simple priority queue optimized for adding high priority tasks
 /// (otherwise a heap implementation would be better)
@@ -45,11 +46,11 @@ class PriQueue(T){
             this.next=next;
         }
         /// description (for debugging)
-        char[] toString(){
+        string toString(){
             return collectAppender(cast(OutWriter)&desc);
         }
         /// description (for debugging)
-        void desc(void delegate(char[]) s){
+        void desc(void delegate(cstring) s){
             s("<PriQLevel@"); writeOut(s,cast(void*)this); s(" level=");
             writeOut(s,level); s(" entries=");
             writeOut(s,entries);
@@ -77,11 +78,11 @@ class PriQueue(T){
             lastE=null;
         }
         /// description (for debugging)
-        char[] toString(){
+        string toString(){
             return collectAppender(cast(OutWriter)&desc);
         }
         /// description (for debugging)
-        void desc(void delegate(char[]) s){
+        void desc(void delegate(cstring) s){
             if (this is null){
                 s("<PriQPool *NULL*>");
             } else {
@@ -269,13 +270,13 @@ class PriQueue(T){
     }
     /// description (for debugging)
     /// non threadsafe
-    char[] toString(){
+    string toString(){
         return collectAppender(cast(OutWriter)&desc);
     }
     /// description (for debugging)
     /// (might not be a snapshot if other thread modify it while printing)
     /// non threadsafe
-    void desc(void delegate(char[]) s){
+    void desc(void delegate(cstring) s){
         if (this is null){
             s("<PriQueue *NULL*>\n");
         } else {

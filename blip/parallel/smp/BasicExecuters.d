@@ -33,6 +33,7 @@ import blip.parallel.smp.PriQueue;
 import blip.BasicModels;
 import blip.parallel.smp.Numa;
 import blip.container.Cache;
+import blip.Comp;
 
 static this(){
     version(DetailedLog){
@@ -53,13 +54,13 @@ class ImmediateExecuter:ExecuterI,TaskSchedulerI{
     ///  returns the root task
     TaskI rootTask(){ return _rootTask; }
     /// name of the executer
-    char[] _name;
+    string _name;
     Cache _nnCache;
     RandomSync _rand;
     /// returns a random source for scheduling
     final RandomSync rand(){ return _rand; }
     /// name accessor
-    char[] name(){
+    string name(){
         return _name;
     }
     Cache nnCache(){
@@ -78,7 +79,7 @@ class ImmediateExecuter:ExecuterI,TaskSchedulerI{
         }
     }
     /// creates a new executer
-    this(char[] name,char[]loggerPath="blip.parallel.smp.exec"){
+    this(string name,string loggerPath="blip.parallel.smp.exec"){
         this._name=name;
         log=Log.lookup(loggerPath);
         runLevel=SchedulerRunLevel.Running;
@@ -91,15 +92,15 @@ class ImmediateExecuter:ExecuterI,TaskSchedulerI{
     }
     /// description (for debugging)
     /// non threadsafe
-    char[] toString(){
+    string toString(){
         return collectAppender(cast(OutWriter)&desc);
     }
     /// description (for debugging)
-    void desc(void delegate(char[]) s){ desc(s,false); }
+    void desc(void delegate(cstring) s){ desc(s,false); }
     /// description (for debugging)
     /// (might not be a snapshot if other threads modify it while printing)
     /// non threadsafe
-    void desc(void delegate(char[]) s,bool shortVersion){
+    void desc(void delegate(cstring) s,bool shortVersion){
         s("<ImmediateExecuter@");
         writeOut(s,cast(void*)this);
         s(" ");
@@ -118,7 +119,7 @@ class ImmediateExecuter:ExecuterI,TaskSchedulerI{
         runLevel=level;
     }
     /// logging a message
-    void logMsg(char[]m){
+    void logMsg(cstring m){
         log.info(m);
     }
     /// adds a task to the scheduler queue
@@ -199,18 +200,18 @@ class PExecuter:ExecuterI{
     /// root task
     TaskSchedulerI _scheduler;
     /// name of the executer
-    char[] _name;
+    string _name;
     /// name accessor
-    char[] name(){
+    string name(){
         return _name;
     }
     /// logs a message
-    void logMsg(char[]m){
+    void logMsg(cstring m){
         log.info(m);
     }
     TaskSchedulerI scheduler(){ return _scheduler; }
     /// creates a new executer
-    this(char[] name,TaskSchedulerI scheduler=null,int nproc=-1,char[]loggerPath="blip.parallel.smp.exec"){
+    this(string name,TaskSchedulerI scheduler=null,int nproc=-1,string loggerPath="blip.parallel.smp.exec"){
         this._name=name;
         this._scheduler=scheduler;
         if (scheduler is null) {
@@ -269,7 +270,7 @@ class PExecuter:ExecuterI{
     }
     /// description (for debugging)
     /// non threadsafe
-    char[] toString(){
+    string toString(){
         return collectAppender(cast(OutWriter)&desc);
     }
     /// description (for debugging)

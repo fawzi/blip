@@ -22,8 +22,9 @@ import blip.io.BasicIO;
 import tango.math.random.Random;
 import blip.rtest.RTest;
 version(NoTrace){} else { import blip.core.stacktrace.TraceExceptions; import blip.util.TraceAll; }
+import blip.Comp;
 
-void main(char[][] args){
+void main(string [] args){
     sout(rand.toString()); sout("\n");
     mainTestFun(args,narrayTests!()());
 }

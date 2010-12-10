@@ -24,6 +24,7 @@
 ///
 ///  William Baxter wbaxter@gmail.com
 module blip.bindings.blas.Types;
+import blip.Comp;
 
 alias float f_float;
 alias double f_double;
@@ -32,7 +33,7 @@ alias cdouble f_cdouble;
 alias int f_int;
 
 template isBlasType(T){
-   const bool isBlasType=is(T==f_float)|| is(T==f_double) ||
+   const Immutable!(bool) isBlasType=is(T==f_float)|| is(T==f_double) ||
        is(T==f_cfloat) || is(T==f_cdouble);
 }
 

@@ -22,6 +22,7 @@ module blip.parallel.hwloc.cpuset;
 version(noHwloc){} else {
 import blip.stdc.config;
 import blip.stdc.stringz;
+import blip.Comp;
 /** \defgroup hwlocality_cpuset The Cpuset API
  *
  * For use in hwloc itself, a hwloc_cpuset_t represents a set of logical
@@ -69,8 +70,8 @@ struct hwloc_cpuset_t{
      * \return the number of character that were actually written if not truncating,
      * or that would have been written  (not including the ending \\0).
      */
-    int snprintf(char[]s){
-        return hwloc_cpuset_snprintf(s.ptr,s.length, *this);
+    int snprintf(string s){
+        return hwloc_cpuset_snprintf(cast(char*)s.ptr,cast(size_t)s.length, *this);
     }
     
     /** \brief Stringify a cpuset into a newly allocated string.
@@ -78,7 +79,7 @@ struct hwloc_cpuset_t{
      * \return the number of character that were actually written
      * (not including the ending \\0).
      */
-    char[] toString(){
+    string toString(){
         char *res;
         auto len=hwloc_cpuset_asprintf(&res, *this);
         return res[0..len];
@@ -88,7 +89,7 @@ struct hwloc_cpuset_t{
      *
      * Must start and end with a digit.
      */
-    hwloc_cpuset_t fromString(char[] s){
+    hwloc_cpuset_t fromString(cstring s){
        return hwloc_cpuset_from_string(toStringz(s));
     }
 

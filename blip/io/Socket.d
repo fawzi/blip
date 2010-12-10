@@ -36,12 +36,13 @@ import blip.parallel.smp.BasicTasks;
 import blip.sync.Atomic;
 import blip.core.sync.Semaphore;
 import blip.io.Console;
+import blip.Comp;
 
 struct TargetHost{
-    char[] host;
-    char[] port;
+    string host;
+    string port;
     
-    static TargetHost opCall(char[] host,char[] port){
+    static TargetHost opCall(string host,string port){
         TargetHost res;
         res.host=host;
         res.port=port;
@@ -79,7 +80,7 @@ struct BasicSocket{
         return res;
     }
     /// creates a socket
-    static BasicSocket opCall(char[]address,char[]service){
+    static BasicSocket opCall(string address,string service){
         BasicSocket res;
         int err;
         char buf[256];
@@ -390,14 +391,14 @@ struct BasicSocket{
 }
 
 class BIONoBindException:BIOException{
-    this(char[] msg,char[] file,long line,Exception next=null){
+    this(string msg,string file,long line,Exception next=null){
         super(msg,file,line,next);
     }
 }
 
 /// a server that listens on one port
 class SocketServer{
-    char[]serviceName;
+    string serviceName;
     size_t pos;
     socket_t[] socks;
     int[] sockfamile;
@@ -437,16 +438,16 @@ class SocketServer{
             if (getnameinfo(cast(sockaddr*)&addrOther,addrLen, addrStr.ptr, cast(socklen_t)addrStr.length, serviceStr.ptr,cast(socklen_t)serviceStr.length, 0)==0)
             {
                 buf[$-1]=0;
-                res.host=addrStr[0..strlen(addrStr.ptr)];
-                res.port=serviceStr[0..strlen(serviceStr.ptr)];
+                res.host=cast(string)(addrStr[0..strlen(addrStr.ptr)]);
+                res.port=cast(string)(serviceStr[0..strlen(serviceStr.ptr)]);
             }
             return res;
         }
         TargetHost otherHost(){
             char[512] buf;
             auto res=otherHost(buf);
-            res.host=res.host.dup;
-            res.port=res.port.dup;
+            res.host=Idup(res.host);
+            res.port=Idup(res.port);
             return res;
         }
         static PoolI!(Handler*)gPool;
@@ -460,7 +461,7 @@ class SocketServer{
     }
     void delegate (ref Handler) handler;
     
-    this(char[]serviceName,void delegate(ref Handler)handler,CharSink log){
+    this(string serviceName,void delegate(ref Handler)handler,CharSink log){
         this.serviceName=serviceName;
         this.handler=handler;
         this.log=log;

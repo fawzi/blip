@@ -25,6 +25,7 @@ import blip.math.Math: abs,min,max;
 import blip.rtest.RTest;
 import blip.parallel.smp.WorkManager;
 import blip.io.BasicIO;
+import blip.Comp;
 
 /// creates arrays that can be dotted with each other along the given axis
 /// useful mainly for random tests
@@ -102,8 +103,8 @@ class Dottable(T,int rank1,S,int rank2,bool scanAxis=false, bool randomLayout=fa
         }
         return new Dottable(a,b,axis1,axis2);
     }
-    void desc(void delegate(char[]) sink,char[] formatEl=",10", index_type elPerLine=10,
-        char[] indent=""){
+    void desc(void delegate(cstring) sink,string formatEl=",10", index_type elPerLine=10,
+        string indent=""){
         auto s=dumper(sink);
         s(indent)("Dottable{\n");
         s(indent)("axis1=")(this.axis1)("\n");
@@ -121,8 +122,8 @@ class Dottable(T,int rank1,S,int rank2,bool scanAxis=false, bool randomLayout=fa
         }
         s(indent)("}\n");
     }
-    char[] toString(){
-        return collectAppender(delegate void(void delegate(char[])s){ this.desc(s); });
+    string toString(){
+        return collectAppender(delegate void(void delegate(cstring)s){ this.desc(s); });
     }
 }
 
@@ -138,16 +139,16 @@ class SizedRandomNArray(T,int i){
         randNArray(r,res.arr);
         return res;
     }
-    void desc(void delegate(char[]) sink,char[] formatEl=",10", index_type elPerLine=10,
-        char[] indent=""){
+    void desc(void delegate(cstring) sink,string formatEl=",10", index_type elPerLine=10,
+        string indent=""){
         if (arr is null) {
             sink("*null*");
             return;
         }
         arr.printData(sink,formatEl,elPerLine,indent);
     }
-    char[] toString(){
-        return collectAppender(delegate void(void delegate(char[])s){ this.desc(s); });
+    string toString(){
+        return collectAppender(delegate void(void delegate(cstring)s){ this.desc(s); });
     }
 }
 /// a random 2D NArray type T and dimension i,j (in the arr attribute)
@@ -162,16 +163,16 @@ class SizedRandomNArray(T,int i,int j){
         randNArray(r,res.arr);
         return res;
     }
-    void desc(void delegate(char[]) sink,char[] formatEl=",10", index_type elPerLine=10,
-        char[] indent=""){
+    void desc(void delegate(cstring) sink,string formatEl=",10", index_type elPerLine=10,
+        string indent=""){
         if (arr is null) {
             sink("*null*");
             return;
         }
         arr.printData(sink,formatEl,elPerLine,indent);
     }
-    char[] toString(){
-        return collectAppender(delegate void(void delegate(char[])s){ this.desc(s); });
+    string toString(){
+        return collectAppender(delegate void(void delegate(cstring)s){ this.desc(s); });
     }
 }
 /// a random 3D NArray type T and dimension i,j,k (in the arr attribute)
@@ -186,15 +187,15 @@ class SizedRandomNArray(T,int i,int j,int k){
         randNArray(r,res.arr);
         return res;
     }
-    void desc(void delegate(char[]) sink,char[] formatEl=",10", index_type elPerLine=10,
-        char[] indent=""){
+    void desc(void delegate(cstring) sink,string formatEl=",10", index_type elPerLine=10,
+        string indent=""){
         if (arr is null) {
             sink("*null*");
             return;
         }
         arr.printData(sink,formatEl,elPerLine,indent);
     }
-    char[] toString(){
-        return collectAppender(delegate void(void delegate(char[])s){ this.desc(s); });
+    string toString(){
+        return cast(string)collectAppender(delegate void(void delegate(cstring)s){ this.desc(s); });
     }
 }

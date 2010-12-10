@@ -29,6 +29,7 @@
 // limitations under the License.
 module blip.parallel.smp.Tls;
 import blip.core.Thread;
+import blip.Comp;
 
 version(Win32){
     import tango.sys.win32.UserGdi;
@@ -42,7 +43,7 @@ version(Posix){
 }
 
 /// adds a thread local variable that can be accessed with varName(), and set with varName(x)
-char[] tlsMixin(char[] type,char[] varName){
+string tlsMixin(string type,string varName){
     version(TlsSupport){
         return `
         static __thread `~type~` _`~varName~`;

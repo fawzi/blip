@@ -26,22 +26,23 @@ import blip.core.sync.Mutex: Mutex;
 import blip.parallel.smp.WorkManager;
 import blip.core.Thread;
 public import blip.container.GrowableArray;
+import blip.Comp;
 
 /// exception that causes a test to skip
 class SkipException: Exception{
-    this(char [] message){ super(message); }
+    this(string message){ super(message); }
 }
 
 // a reasonably collision free, fast and small (seedwise) rng
 alias Random Rand;
 
 /// replaces arg0,... with arg[0]...
-char[] replaceArgI(S...)(char[] manualInit){
-    char[] manualInit2=manualInit;
+string replaceArgI(S...)(string manualInit){
+    string manualInit2=manualInit;
     foreach (i,T;S){
-        char[] argName="arg"~ctfe_i2a(i);
+        string argName="arg"~ctfe_i2a(i);
         if (ctfe_hasToken(argName,manualInit)){
-            char[] argRepl="arg["~ctfe_i2a(i)~"]";
+            string argRepl="arg["~ctfe_i2a(i)~"]";
             manualInit2=ctfe_replaceToken(argName,argRepl,manualInit2);
         }
     }
@@ -50,10 +51,10 @@ char[] replaceArgI(S...)(char[] manualInit){
 
 /// returns a string defining the arguments arg0...argN and a function bool doSetup(SingleRTest)
 /// that initializes them
-char[] completeInitStr(S...)(char[] checks,char[] manualInit,char[] indent="    "){
-    char[]res="".dup;
+string completeInitStr(S...)(string checks,string manualInit,string indent="    "){
+    string res="";
     res~=indent~"bool doSetup(SingleRTest test){\n";
-    char[]indent1=indent~"    ";
+    string indent1=indent~"    ";
     res~=indent1~"Rand r=test.r;\n";
     foreach (i,T;S){
         res~=indent1~"int arg"~ctfe_i2a(i)~"_nEl=-1;\n";
@@ -64,7 +65,7 @@ char[] completeInitStr(S...)(char[] checks,char[] manualInit,char[] indent="    
     res~=replaceArgI!(S)(manualInit);
     res~="\n";
     foreach (i,T;S){
-        char[] argName="arg"~ctfe_i2a(i);
+        string argName="arg"~ctfe_i2a(i);
         if (!ctfe_hasToken(argName,manualInit)){
             res~=indent1~"static if(isStaticArrayType!(S["~ctfe_i2a(i)~"])){\n";
             res~=indent1~"static if(is(typeof(genRandom!(S["~ctfe_i2a(i)~"])(new Rand(),arg0_i,arg0_nEl,acceptable)))){\n";
@@ -93,7 +94,7 @@ char[] completeInitStr(S...)(char[] checks,char[] manualInit,char[] indent="    
     // updateCounter
     res~=indent1~"int increase=1;\n";
     foreach (i,T;S){
-        char[] argNEl="arg"~ctfe_i2a(i)~"_nEl";
+        string argNEl="arg"~ctfe_i2a(i)~"_nEl";
         res~=indent1~"if ("~argNEl~"<0) test.hasRandom=true;\n";
         res~=indent1~"if (increase) {\n";
         res~=indent1~"    test.newCounter["~ctfe_i2a(i)~"]=test.counter["~ctfe_i2a(i)~"]+1;\n";
@@ -119,8 +120,8 @@ char[] completeInitStr(S...)(char[] checks,char[] manualInit,char[] indent="    
     return res;
 }
 /// calls the actual test function
-char[] callF(S...)(char[] retType){
-    char[] res="".dup;
+string callF(S...)(string retType){
+    string res="";
     if (retType=="void") {
         res~="test.baseDelegate.get!( void delegate(";
     } else {
@@ -135,8 +136,8 @@ char[] callF(S...)(char[] retType){
 }
 
 /// tries to print the arguments of the test
-char[] printArgs(int nargs,char[] printC="sout.call",char[] indent="    "){
-    char[] res="".dup;
+string printArgs(int nargs,string printC="sout.call",string indent="    "){
+    string res="";
     res~=indent~"try{\n";
     for (int i=0;i<nargs;++i){
         res~=indent~"    static if(is(typeof(writeOut("~printC~",arg["~ctfe_i2a(i)~"])))){\n";
@@ -146,7 +147,7 @@ char[] printArgs(int nargs,char[] printC="sout.call",char[] indent="    "){
         res~=indent~"    }\n";
     }
     res~=indent~"}catch (Exception e) {\n";
-    res~=indent~"    sout.call(collectAppender(delegate void(void delegate(char[])s){ s(\"\\nError: could not print arguments due to exception \"); writeOut(s,e); s(\"\\n\");}));\n";
+    res~=indent~"    sout.call(collectAppender(delegate void(void delegate(cstring)s){ s(\"\\nError: could not print arguments due to exception \"); writeOut(s,e); s(\"\\n\");}));\n";
     res~=indent~"}\n";
     return res;
 }
@@ -179,7 +180,7 @@ class TextController: TestControllerI{
     enum PrintLevel:int{ Error, Skip, AllShort, AllVerbose}
     PrintLevel printLevel;
     Rand r;
-    char[] exeName="";
+    string exeName="";
     
     Mutex writeLock(){ return _writeLock; }
     /// what to do upon failure
@@ -191,7 +192,7 @@ class TextController: TestControllerI{
     }
     OnFailure onFailure; /// what to do upon failure
     int testFactor; /// increase for a more throughly testing
-    this(char[] exeName="",OnFailure onFailure=OnFailure.Throw,PrintLevel printLevel=PrintLevel.Skip,
+    this(string exeName="",OnFailure onFailure=OnFailure.Throw,PrintLevel printLevel=PrintLevel.Skip,
         CharSink progressLog=sout.call,CharSink errorLog=sout.call,int testFactor=1,
         bool trace=false,Rand r=null){
         this.exeName=exeName;
@@ -226,7 +227,7 @@ class TextController: TestControllerI{
         test.testSize.nSetupMax=test.testSize.nSetupMax*testFactor;
         test.testSize.budgetMax=test.testSize.budgetMax*testFactor;
         if (trace) {
-            char[] state;
+            string state;
             if (test.initialState is null){
                 if (test.r is null) test.r=r.spawn();
                 state=test.r.toString;
@@ -408,10 +409,10 @@ struct TestSize{
 class RunTestsArgs{
     SingleRTest test;
     int testFactor;
-    char[] rngState;
+    string rngState;
     int[] counterVal;
     bool mightYield;
-    this(SingleRTest test,bool mightYield=true, int testFactor=1,char[] rngState=null,int[] counterVal=null){
+    this(SingleRTest test,bool mightYield=true, int testFactor=1,string rngState=null,int[] counterVal=null){
         this.test=test;
         this.testFactor=testFactor;
         this.rngState=rngState;
@@ -435,8 +436,8 @@ class SingleRTest{
     static this(){ defaultTestController=new TextController(); }
 
     /+  --- test info --- +/
-    char[] testName; /// name of the current test
-    char[]sourceFile; /// source file where the test was instantiated
+    string testName; /// name of the current test
+    string sourceFile; /// source file where the test was instantiated
     long sourceLine; /// source line at which the test was instantiated
     private TestResult delegate(SingleRTest) testDlg; /// the test
     /// number of tests to perform
@@ -464,7 +465,7 @@ class SingleRTest{
     
     /+  --- run machinery --- +/
     Rand r; /// random source
-    char[] initialState; /// last Rng state
+    string initialState; /// last Rng state
     int nArgs; /// number of arguments of the test (for counter)
     int[] counter; /// counter for exaustive (non random) coverage
     int[] newCounter; /// value of counter for the next iteration
@@ -505,7 +506,7 @@ class SingleRTest{
         return this;
     }
     // runs the tests possibly restarting them with the given rngState/counterVal
-    SingleRTest runTests(int testFactor=1,char[] rngState=null,int[] counterVal=null){
+    SingleRTest runTests(int testFactor=1,string rngState=null,int[] counterVal=null){
         if (this is null) throw new Exception("SingleRTest run on null test");
         initialState=rngState;
         if (counterVal !is null){
@@ -554,12 +555,12 @@ class SingleRTest{
         return this;
     }
     /// task that executes runTests
-    Task runTestsTask(int testFactor=1,char[] rngState=null,int[] counterVal=null){
+    Task runTestsTask(int testFactor=1,string rngState=null,int[] counterVal=null){
         auto closure=new RunTestsArgs(this,true,testFactor,rngState,counterVal);
         return Task(testName,closure.yieldableCall());
     }
     /// constructor
-    this(char[]testName,long sourceLine,char[]sourceFile,
+    this(string testName,long sourceLine,string sourceFile,
         int nargs,TestResult delegate(SingleRTest) testDlg,
         TestSize testSize=TestSize(),TestControllerI testController=null,
         CharSink failureLog=null, Rand r=null, Variant baseDelegate=Variant(null)){
@@ -581,7 +582,7 @@ class SingleRTest{
     }
     
     /// finds the requested test (for completness only)
-    SingleRTest findTest(char[] name){
+    SingleRTest findTest(string name){
         if (name==testName)
             return this;
         else
@@ -607,7 +608,7 @@ class TestCollection: SingleRTest, TestControllerI {
     /// lock for stats
     Mutex statLock;
     /// constructor
-    this(char[]testName,long sourceLine,char[]sourceFile,TestControllerI testController=null,
+    this(string testName,long sourceLine,string sourceFile,TestControllerI testController=null,
         SingleRTest[] subTests=[],CharSink failureLog=null, Rand r=null)
     {
         super(testName,sourceLine,sourceFile,1,null,TestSize(1,1,1.5), testController,
@@ -624,7 +625,7 @@ class TestCollection: SingleRTest, TestControllerI {
             }
         }
     }
-    SingleRTest findTest(char[] name){
+    SingleRTest findTest(string name){
         if (name==testName) return this;
         SingleRTest res=null;
         foreach(subT;subTests){
@@ -640,7 +641,7 @@ class TestCollection: SingleRTest, TestControllerI {
         return res;
     }
     // runs the tests possibly restarting them with the given rngState/counterVal
-    SingleRTest runTests(int testFactor=1,char[] rngState=null,int[] counterVal=null){
+    SingleRTest runTests(int testFactor=1,string rngState=null,int[] counterVal=null){
         if (this is null) throw new Exception("TestCollection run on null collection");
         assert(testFactor>0,"testFactor should be positive");
         if (!testController.willRunTests(this)) return this;
@@ -677,7 +678,7 @@ class TestCollection: SingleRTest, TestControllerI {
         }
     }
     /// task that executes runTests
-    Task runTestsTask(int testFactor=1,char[] rngState=null,int[] counterVal=null){
+    Task runTestsTask(int testFactor=1,string rngState=null,int[] counterVal=null){
         auto closure=new RunTestsArgs(this,true,testFactor,rngState,counterVal);
         auto res=Task(testName,&closure.exec,TaskFlags.TaskSet);
         res.appendOnFinish(&incrNCombTest);
@@ -790,11 +791,11 @@ template checkTestInitArgs(S...){
 ///     this variable whereas if argI_nEl<0 a random component in the generation is assumed
 ///   acceptable: variable that can be set to false if the actual configuration should be skipped
 ///     (never set it unconditionally true)
-template testInit(char[] checkInit="", char[] manualInit=""){
+template testInit(string checkInit="", string manualInit=""){
     
     /// creates a test that executes the given function and fails if it throws an exception
-    SingleRTest testNoFail(S...)(char[] testName, void delegate(S) testF,long sourceLine=-1,
-        char[] sourceFile="unknown",TestControllerI testController=null,
+    SingleRTest testNoFail(S...)(string testName, void delegate(S) testF,long sourceLine=-1,
+        string sourceFile="unknown",TestControllerI testController=null,
         TestSize testSize=TestSize(),CharSink failureLog=null,Rand r=null)
     {
         mixin checkTestInitArgs!(S);
@@ -810,7 +811,7 @@ template testInit(char[] checkInit="", char[] manualInit=""){
                 return TestResult.Skip;
             } catch (Exception e){
                 synchronized(test.testController.writeLock()){
-                    test.failureLog(collectAppender(delegate void(void delegate(char[]) s){
+                    test.failureLog(collectAppender(delegate void(void delegate(cstring) s){
                             dumper(s)("test`")(test.testName)("` failed with exception\n"); }));
                     //test.failureLog.flush();
                     e.writeOut(test.failureLog);
@@ -825,8 +826,8 @@ template testInit(char[] checkInit="", char[] manualInit=""){
             testSize, testController, failureLog, r,Variant(testF));
     }
     /// ditto
-    SingleRTest testNoFailF(S...)(char[] testName, void function(S) testF,long sourceLine=-1,
-        char[] sourceFile="unknown",TestControllerI testController=null,
+    SingleRTest testNoFailF(S...)(string testName, void function(S) testF,long sourceLine=-1,
+        string sourceFile="unknown",TestControllerI testController=null,
         TestSize testSize=TestSize(),CharSink failureLog=null,Rand r=null)
     {
         struct WrapF{
@@ -840,8 +841,8 @@ template testInit(char[] checkInit="", char[] manualInit=""){
     }
     
     /// creates a test that executes the given function and fails if no exception is raised
-    SingleRTest testFail(S...)(char[] testName, void delegate(S) testF,long sourceLine=-1L,
-        char[] sourceFile="unknown",TestControllerI testController=null,
+    SingleRTest testFail(S...)(string testName, void delegate(S) testF,long sourceLine=-1L,
+        string sourceFile="unknown",TestControllerI testController=null,
         TestSize testSize=TestSize(),CharSink failureLog=null,Rand r=null)
     {
         mixin checkTestInitArgs!(S);
@@ -870,8 +871,8 @@ template testInit(char[] checkInit="", char[] manualInit=""){
             testSize, testController, failureLog, r,Variant(testF));
     }
     /// ditto
-    SingleRTest testFailF(S...)(char[] testName, void function(S) testF,long sourceLine=-1,
-        char[] sourceFile="unknown",TestControllerI testController=null,
+    SingleRTest testFailF(S...)(string testName, void function(S) testF,long sourceLine=-1,
+        string sourceFile="unknown",TestControllerI testController=null,
         TestSize testSize=TestSize(),CharSink failureLog=null,Rand r=null)
     {
         struct WrapF{
@@ -885,8 +886,8 @@ template testInit(char[] checkInit="", char[] manualInit=""){
     }
     
     /// creates a test that checks that the given function returns true
-    SingleRTest testTrue(S...)(char[] testName, bool delegate(S) testF,long sourceLine=-1L,
-        char[] sourceFile="unknown",TestControllerI testController=null,
+    SingleRTest testTrue(S...)(string testName, bool delegate(S) testF,long sourceLine=-1L,
+        string sourceFile="unknown",TestControllerI testController=null,
         TestSize testSize=TestSize(),CharSink failureLog=null,Rand r=null)
     {
         mixin checkTestInitArgs!(S);
@@ -927,8 +928,8 @@ template testInit(char[] checkInit="", char[] manualInit=""){
             testSize, testController, failureLog, r,Variant(testF));
     }
     /// ditto
-    SingleRTest testTrueF(S...)(char[] testName, bool function(S) testF,long sourceLine=-1,
-        char[] sourceFile="unknown",TestControllerI testController=null,
+    SingleRTest testTrueF(S...)(string testName, bool function(S) testF,long sourceLine=-1,
+        string sourceFile="unknown",TestControllerI testController=null,
         TestSize testSize=TestSize(),CharSink failureLog=null,Rand r=null)
     {
         struct WrapF{
@@ -942,8 +943,8 @@ template testInit(char[] checkInit="", char[] manualInit=""){
     }
 
     /// creates a test that checks that the given function returns false
-    SingleRTest testFalse(S...)(char[] testName, bool delegate(S) testF,long sourceLine=-1L,
-        char[] sourceFile="unknown",TestControllerI testController=null,
+    SingleRTest testFalse(S...)(string testName, bool delegate(S) testF,long sourceLine=-1L,
+        string sourceFile="unknown",TestControllerI testController=null,
         TestSize testSize=TestSize(),CharSink failureLog=null,Rand r=null)
     {
         mixin checkTestInitArgs!(S);
@@ -987,8 +988,8 @@ template testInit(char[] checkInit="", char[] manualInit=""){
             testSize, testController, failureLog, r,Variant(testF));
     }
     /// ditto
-    SingleRTest testFalseF(S...)(char[] testName, bool function(S) testF,long sourceLine=-1,
-        char[] sourceFile="unknown",TestControllerI testController=null,
+    SingleRTest testFalseF(S...)(string testName, bool function(S) testF,long sourceLine=-1,
+        string sourceFile="unknown",TestControllerI testController=null,
         TestSize testSize=TestSize(),CharSink failureLog=null,Rand r=null)
     {
         struct WrapF{

@@ -3,6 +3,7 @@
 /// mainly wrapping of a tango module
 module blip.core.Traits;
 public import tango.core.Traits;
+import blip.Comp;
 
 int cmp(T,U)(T t,U u){
     static if (is(T:Object)&&is(U:Object)){
@@ -26,7 +27,8 @@ extern(C) hash_t rt_hash_str(void *bStart,size_t length, hash_t seed=0);
 extern(C) hash_t rt_hash_block(size_t *bStart,size_t length, hash_t seed=0);
 
 /// returns a valid hash for the given value, this might be different than the default D hash!
-int getHash(T)(T t){
+int getHash(U)(U t){
+    alias Unqual!(U) T;
     static if (is(typeof(t.toHash())==hash_t)){
         return t.toHash();
     } else static if (is(T==char[])||is(T==byte[])||is(T==ubyte[])||is(T==void[])){
@@ -38,10 +40,10 @@ int getHash(T)(T t){
     } else static if (is(T==long[])||is(T==ulong[])){
         return rt_hash_str(t.ptr,t.length*8);
     } else {
-        return typeid(T).getHash(&t);
+        return typeid(U).getHash(&t);
     }
 }
-/// returns a valid hash for the given value, and combines it with a previous hahs
+/// returns a valid hash for the given value, and combines it with a previous hash
 /// this might be different than the default D hash!
 int getHash(T,U)(T t,U hash){
     static assert(is(U==hash_t));
@@ -67,7 +69,7 @@ int getHash(T,U)(T t,U hash){
 }
 
 /// representation of a string so that evaluating ctfe_rep(s) generates the string s
-char[] ctfe_rep(char[] s){
+string ctfe_rep(string s){
     bool needsDquoteEscape=false;
     bool needsSQuoteEscape=false;
     foreach(c;s){
@@ -84,7 +86,7 @@ char[] ctfe_rep(char[] s){
     if (!needsDquoteEscape){
         return "\""~s~"\"";
     } if (needsSQuoteEscape){
-        char[] res="\"";
+        string res="\"";
         size_t i0=0;
         foreach(i,c;s){
             switch(c){
@@ -126,8 +128,8 @@ template PropType(T){
 }
 
 /// splits the string at the given splitChars
-char[][] ctfeSplit(char[] splitChars,char[]str,bool skipEmpty){
-    char[][]res;
+string[] ctfeSplit(string splitChars,string str,bool skipEmpty){
+    string[]res;
     size_t i=0;
     foreach(j,c;str){
         foreach (c2;splitChars){

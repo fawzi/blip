@@ -42,14 +42,15 @@ import blip.parallel.smp.WorkManager;
 import blip.container.RedBlack;
 import blip.container.Deque;
 import blip.core.Traits: cmp;
+import blip.Comp;
 
 alias void delegate(ubyte[] reqId,void delegate(Serializer) sRes) SendResHandler;
 
 class RpcException:Exception{
-    this(char[]msg,char[]file,long line){
+    this(string msg,string file,long line){
         super(msg,file,line);
     }
-    this(void delegate(void delegate(char[]))msg,char[]file,long line){
+    this(void delegate(void delegate(cstring))msg,string file,long line){
         super(collectAppender(msg),file,line);
     }
 }
@@ -59,31 +60,31 @@ class RpcException:Exception{
 /// represent an url parsed in its components
 /// protocol:[//]host:port/path/path?query&query#anchor
 struct ParsedUrl{
-    char[] protocol;
-    char[] host;
-    char[] port;
-    char[][4] pathBuf; // this is a hack for efficient appending to small paths
-    char[]* pathPtr;   // and still be able to copy the structure...
+    string protocol;
+    string host;
+    string port;
+    string [4] pathBuf; // this is a hack for efficient appending to small paths
+    string * pathPtr;   // and still be able to copy the structure...
     size_t pathLen;    //
-    char[][] query;
-    char[] anchor;
-    void fullPathWriter(void delegate(char[])sink){
+    string [] query;
+    string anchor;
+    void fullPathWriter(void delegate(cstring)sink){
         foreach (p;path){
             sink("/");
             sink(p);
         }
     }
-    char[][] path(){
+    string [] path(){
         if (pathPtr is null){
             return pathBuf[0..pathLen];
         }
         return pathPtr[0..pathLen];
     }
-    void path(char[][]p){
+    void path(string []p){
         pathPtr=p.ptr;
         pathLen=p.length;
     }
-    void urlWriter(void delegate(char[])sink){
+    void urlWriter(void delegate(cstring)sink){
         sink(protocol);
         sink("://");
         sink(host);
@@ -108,7 +109,7 @@ struct ParsedUrl{
             sink(anchor);
         }
     }
-    void pathAndRestWriter(void delegate(char[])sink){
+    void pathAndRestWriter(void delegate(cstring)sink){
         foreach (p;path){
             sink("/");
             sink(p);
@@ -147,7 +148,7 @@ struct ParsedUrl{
         host=null;
         port=null;
     }
-    void appendToPath(char[]segment){
+    void appendToPath(string segment){
         if (pathLen<pathBuf.length){
             if (pathLen!=0 && pathPtr !is null){
                 foreach (i,p;path){
@@ -172,7 +173,7 @@ struct ParsedUrl{
         clearHost();
         clearPath();
     }
-    static ParsedUrl parseUrl(char[] url){
+    static ParsedUrl parseUrl(string url){
         ParsedUrl res;
         auto len=res.parseUrlInternal(url);
         if (len!=url.length){
@@ -182,14 +183,14 @@ struct ParsedUrl{
         }
         return res;
     }
-    static ParsedUrl parsePath(char[] path){
+    static ParsedUrl parsePath(string path){
         ParsedUrl res;
         if (res.parsePathInternal(path)!=path.length){
             throw new RpcException("path parsing failed",__FILE__,__LINE__);
         }
         return res;
     }
-    size_t parseUrlInternal(char[] url){
+    size_t parseUrlInternal(string url){
         clearHost();
         size_t i=0;
         while (i<url.length){
@@ -223,7 +224,7 @@ struct ParsedUrl{
         return j+parsePathInternal(url[j..$]);
     }
     
-    size_t parsePathInternal(char[]fPath){
+    size_t parsePathInternal(string fPath){
         clearPath();
         if (fPath.length==0) return 0;
         size_t i=0;
@@ -257,31 +258,31 @@ struct ParsedUrl{
 
 /// at the moment just checks that no encoding is needed
 /// actually reallocate and do the encoding?
-char[] urlEncode(ubyte[]str,bool query=false){
+string urlEncode(ubyte[]str,bool query=false){
     for(size_t i=0;i<str.length;++i){
         char c=cast(char)str[i];
         if ((c<'a' || c>'z')&&(c<'A' || c>'Z')&&(c<'-' || c>'9' || c=='/') && c!='_'){
-            throw new Exception("only clean (not needing decoding) strings are supported, not '"~(cast(char[])str)~"' (more efficient)",
+            throw new Exception("only clean (not needing decoding) strings are supported, not '"~(cast(string )str)~"' (more efficient)",
                 __FILE__,__LINE__);
         }
     }
-    return cast(char[])str;
+    return cast(string )str;
 }
 /// safe encoding, never raises (switches to '' delimited hex encoding)
-char[] urlEncode2(ubyte[]str,bool query=false){
+cstring urlEncode2(Const!(ubyte[])str,bool query=false){
     for(size_t i=0;i<str.length;++i){
-        char c=cast(char)str[i];
+        auto c=cast(Const!(char))str[i];
         if ((c<'a' || c>'z')&&(c<'A' || c>'Z')&&(c<'-' || c>'9' || c=='/') && c!='_'){
             return collectAppender(delegate void(CharSink s){
                 dumper(s)("'")(str)("'");
             });
         }
     }
-    return cast(char[])str;
+    return cast(cstring )str;
 }
 
 /// ditto
-ubyte[] urlDecode(char[]str,bool query=false){
+Const!(ubyte)[] urlDecode(Const!(char[])str,bool query=false){
     for(size_t i=0;i<str.length;++i){
         char c=str[i];
         if ((c<'a' || c>'z')&&(c<'A' || c>'Z')&&(c<'-' || c>'9' || c=='/') && c!='_'){
@@ -295,26 +296,26 @@ ubyte[] urlDecode(char[]str,bool query=false){
 /// an objects that can be published (typically publishes another object)
 interface ObjVendorI{
     Object targetObj();
-    void proxyDescDumper(void delegate(char[]));
-    char[] proxyDesc();
-    char[] proxyName();
-    char[] objName();
-    void objName(char[] newVal);
-    char[] proxyObjUrl();
+    void proxyDescDumper(void delegate(cstring));
+    string proxyDesc();
+    string proxyName();
+    string objName();
+    void objName(string newVal);
+    string proxyObjUrl();
     Publisher publisher();
     void publisher(Publisher newP);
     TaskI objTask();
     void objTask(TaskI task);
-    void remoteMainCall(char[] functionName,ubyte[] requestId, Unserializer u, SendResHandler sendRes);
+    void remoteMainCall(string functionName,ubyte[] requestId, Unserializer u, SendResHandler sendRes);
 }
 
 class BasicVendor:ObjVendorI{
-    char[] _proxyName;
-    char[] _objName;
+    string _proxyName;
+    string _objName;
     Publisher _publisher;
     TaskI _objTask;
     
-    this(char[] pName=""){
+    this(string pName=""){
         _proxyName=pName;
         _objTask=defaultTask;
     }
@@ -322,22 +323,22 @@ class BasicVendor:ObjVendorI{
     Object targetObj(){
         return this;
     }
-    void proxyDescDumper(void delegate(char[])s){
-        s("char[] proxyDesc()\nchar[] proxyName()\nchar[]proxyObjUrl()\n");
+    void proxyDescDumper(void delegate(cstring)s){
+        s("string proxyDesc()\nstring proxyName()\nstring proxyObjUrl()\n");
     }
-    char[] proxyDesc(){
+    string proxyDesc(){
         return collectAppender(&proxyDescDumper);
     }
-    char[] proxyName(){
+    string proxyName(){
         return _proxyName;
     }
-    char[] proxyObjUrl(){
+    string proxyObjUrl(){
         return publisher.protocol.proxyObjUrl(_objName);
     }
-    char[] objName(){
+    string objName(){
         return _objName;
     }
-    void objName(char[] newVal){
+    void objName(string newVal){
         _objName=newVal;
     }
     Publisher publisher(){
@@ -448,7 +449,7 @@ class BasicVendor:ObjVendorI{
         Task("exceptionReplyBg",&cl.doOpExcept).appendOnFinish(&cl.giveBack).autorelease.submit(defaultTask);
     }
     
-    void remoteMainCall(char[] fName,ubyte[] reqId, Unserializer u, SendResHandler sendRes)
+    void remoteMainCall(string fName,ubyte[] reqId, Unserializer u, SendResHandler sendRes)
     {
         switch(fName){
         case "proxyDesc":
@@ -478,7 +479,7 @@ alias void delegate(ParsedUrl url,void delegate(Serializer) serArgs,
 /// one can get a proxy for that object
 interface Proxiable{
     /// returns the url to use to get a proxy to this object
-    char[] proxyObjUrl();
+    string proxyObjUrl();
 }
 
 /// a proxy of an object, exposes a partial interface, and communicate with the real
@@ -489,12 +490,12 @@ interface Proxy: Proxiable,Serializable{
     //// sets the call handler
     void rpcCallHandler(RpcCallHandler);
     /// name (class) of the proxy
-    char[]proxyName();
+    string proxyName();
     /// sets the url of the object this proxy connects to
-    void proxyObjUrl(char[]);
+    void proxyObjUrl(string );
     /// returns the url of the object this proxy connects to
     /// (repeating it because it seems that overloading between interfaces doesn't work)
-    char[] proxyObjUrl();
+    string proxyObjUrl();
     /// parsed version of proxyObjUrl
     ParsedUrl proxyObjPUrl();
     /// if the target object is local
@@ -516,18 +517,18 @@ interface LocalProxy {
 
 /// basic implementation of a proxy
 class BasicProxy: Proxy {
-    char[] _proxyObjUrl;
+    string _proxyObjUrl;
     ParsedUrl _proxyObjPUrl;
-    char[] _proxyName;
+    string _proxyName;
     RpcCallHandler _rpcCallHandler;
 
-    char[]proxyName(){
+    string proxyName(){
         return _proxyName;
     }
-    char[] proxyObjUrl(){
+    string proxyObjUrl(){
         return _proxyObjUrl;
     }
-    void proxyObjUrl(char[]u){
+    void proxyObjUrl(string u){
         _proxyObjUrl=u;
         _proxyObjPUrl=ParsedUrl.parseUrl(u);
     }
@@ -567,15 +568,15 @@ class BasicProxy: Proxy {
         return this;
     }
     this(){ }
-    this(char[]name,char[]url){
+    this(string name,string url){
         proxyObjUrl=url;
         _proxyName=name;
     }
     static ClassMetaInfo metaI;
     static this(){
         metaI=ClassMetaInfo.createForType!(typeof(this))("blip.parallel.rpc.BasicProxy");
-        metaI.addFieldOfType!(char[])("proxyObjUrl","url identifying the proxied object");
-        metaI.addFieldOfType!(char[])("proxyName","name identifying the class of the proxy object");
+        metaI.addFieldOfType!(string )("proxyObjUrl","url identifying the proxied object");
+        metaI.addFieldOfType!(string )("proxyName","name identifying the class of the proxy object");
     }
     ClassMetaInfo getSerializationMetaInfo(){
         return metaI;
@@ -584,12 +585,12 @@ class BasicProxy: Proxy {
     void postSerialize(Serializer s){ }
     void serialize(Serializer s){
         s.field(metaI[0],_proxyObjUrl);
-        char[] pName=proxyName();
+        string pName=proxyName();
         s.field(metaI[1],_proxyName);
     }
     void unserialize(Unserializer u){
         u.field(metaI[0],_proxyObjUrl);
-        char[] pName;
+        string pName;
         u.field(metaI[1],_proxyName);
     }
     Serializable preUnserialize(Unserializer s){
@@ -613,7 +614,7 @@ class Publisher{
         ObjVendorI obj;
     }
 
-    HashMap!(char[],PublishedObject) objects;
+    HashMap!(string ,PublishedObject) objects;
     UniqueNumber!(int) idNr;
     ProtocolHandler protocol;
     CharSink log;
@@ -621,14 +622,14 @@ class Publisher{
     this(ProtocolHandler pH){
         this.protocol=pH;
         this.log=pH.log;
-        this.objects=new HashMap!(char[],PublishedObject)();
+        this.objects=new HashMap!(string ,PublishedObject)();
         this.idNr=UniqueNumber!(int)(3);
         if (log==null){
             this.log=serr.call;
         }
     }
     
-    PublishedObject publishedObjectNamed(char[]name){
+    PublishedObject publishedObjectNamed(string name){
         PublishedObject po;
         synchronized(this){
             auto o=name in objects;
@@ -638,7 +639,7 @@ class Publisher{
         }
         return po;
     }
-    ObjVendorI objectNamed(char[]name){
+    ObjVendorI objectNamed(string name){
         PublishedObject po=publishedObjectNamed(name);
         return po.obj;
     }
@@ -651,8 +652,8 @@ class Publisher{
             protocol.sysError(url,"invalid request",sendRes,__FILE__,__LINE__);
             return;
         }
-        char[]objName=url.path[1];
-        char[]fName=url.path[2];
+        string objName=url.path[1];
+        string fName=url.path[2];
         ubyte[]requestId=urlDecode(url.anchor);
         auto o=objectNamed(objName);
         if (o is null){
@@ -664,8 +665,8 @@ class Publisher{
         o.remoteMainCall(fName,requestId,u,sendRes);
     }
     
-    char[] publishObject(ObjVendorI obj, char[]name,bool makeUnique=false,Flags flags=Flags.Public){
-        char[] myName=name;
+    string publishObject(ObjVendorI obj, string name,bool makeUnique=false,Flags flags=Flags.Public){
+        string myName=name;
         PublishedObject pObj;
         pObj.obj=obj;
         pObj.flags=flags;
@@ -678,7 +679,7 @@ class Publisher{
                         throw new RpcException("an object with name '"~name~"' is already published",
                             __FILE__,__LINE__);
                     }
-                    myName=name~to!(char[])(idNr.next());
+                    myName=name~to!(string )(idNr.next());
                 } else {
                     obj.objName(myName);
                     objects[myName]=pObj;
@@ -688,7 +689,7 @@ class Publisher{
         }
     }
     
-    bool unpublishObject(char[]name){
+    bool unpublishObject(string name){
         synchronized(this){
             bool res= (name in objects) !is null;
             objects.removeKey(name);
@@ -699,15 +700,15 @@ class Publisher{
 
 /// handles failures of remote hosts
 class FailureManager{
-    alias RedBlack!(char[],void delegate(char[])) Node;
+    alias RedBlack!(string ,void delegate(cstring)) Node;
     Node* failureCallbacks;
-    alias void delegate(char[]baseUrl,bool delegate(char[])realFail) FailureHandler;
+    alias void delegate(cstring baseUrl,bool delegate(cstring)realFail) FailureHandler;
     Deque!(FailureHandler) failureHandlers;
     this(){
         failureHandlers=new Deque!(FailureHandler)();
     }
     /// register a url to be watched for failures
-    void addFailureCallback(char[]url,void delegate(char[])failureOp){
+    void addFailureCallback(string url,void delegate(cstring)failureOp){
         synchronized(this){
             if (failureCallbacks is null){
                 failureCallbacks=new Node;
@@ -739,12 +740,12 @@ class FailureManager{
             }
         }
     }
-    void rmFailureCallback(char[]url,void delegate(char[])failureOp){
+    void rmFailureCallback(string url,void delegate(cstring)failureOp){
         synchronized(this){
             if (failureCallbacks is null){
                 return;
             } else {
-                auto t=failureCallbacks.find(url,function int(ref char[]a,ref char[]b){ return cmp(a,b); });
+                auto t=failureCallbacks.find(url,function int(ref string a,ref string b){ return cmp(a,b); });
                 if (t!is null){
                     if (t.attribute is failureOp){ // should use the callback to order same url?
                         auto tPrev=t.predecessor;
@@ -780,12 +781,12 @@ class FailureManager{
         failureHandlers.filterInPlace(delegate bool(FailureHandler f){ return f!is fh; });
     }
     /// notifies a failure of some url
-    void notifyFailure(char[]baseUrl,bool delegate(char[])realFail){
+    void notifyFailure(string baseUrl,bool delegate(cstring)realFail){
         synchronized(this){
             if (failureCallbacks!is null){
-                auto iter=failureCallbacks.findFirst(baseUrl,function int(ref char[]a,ref char[]b){ return cmp(a,b); },true);
+                auto iter=failureCallbacks.findFirst(baseUrl,function int(ref string a,ref string b){ return cmp(a,b); },true);
                 while(iter!is null){
-                    char[] newK=iter.value;
+                    string newK=iter.value;
                     if (newK.length>baseUrl.length) newK=newK[0..baseUrl.length];
                     if (newK>baseUrl) break;
                     auto next=iter.successor;
@@ -813,9 +814,9 @@ class ProtocolHandler{
     
     alias ProtocolHandler function(ParsedUrl url) ProtocolGetter;
     /// those that can actually handle the given protocol
-    static ProtocolGetter[char[]] protocolHandlers;
+    static ProtocolGetter[string ] protocolHandlers;
     /// registers a handler for a given protocol
-    static void registerProtocolHandler(char[] protocol,ProtocolGetter pH){
+    static void registerProtocolHandler(string protocol,ProtocolGetter pH){
         assert((protocol in protocolHandlers)is null,"duplicate handler for protocol "~protocol);
         protocolHandlers[protocol]=pH;
     }
@@ -827,20 +828,20 @@ class ProtocolHandler{
     
     /// internal proxy creators
     struct ProxyCreators{
-        Proxy function(char[]name,char[]url) proxyCreator;
-        Proxy function(char[]name,char[]url) localProxyCreator;
+        Proxy function(string name,string url) proxyCreator;
+        Proxy function(string name,string url) localProxyCreator;
     }
-    static ProxyCreators[char[]] proxyCreators;
+    static ProxyCreators[string ] proxyCreators;
     static Mutex proxyCreatorsLock;
     FailureManager failureManager;
     
     static this(){
         proxyCreatorsLock=new Mutex();
-        ProtocolHandler.registerProxy("blip.BasicProxy",function Proxy(char[]name,char[]url){ return new BasicProxy(name,url); });
+        ProtocolHandler.registerProxy("blip.BasicProxy",function Proxy(string name,string url){ return new BasicProxy(name,url); });
     }
     /// registers an internal proxy creator
-    static void registerProxy(char[] name,Proxy function(char[]name,char[]url) generate,
-        Proxy function(char[]name,char[]url) generateLocal=null)
+    static void registerProxy(string name,Proxy function(string name,string url) generate,
+        Proxy function(string name,string url) generateLocal=null)
     {
         ProxyCreators pc;
         pc.proxyCreator=generate;
@@ -854,14 +855,14 @@ class ProtocolHandler{
         }
     }
     /// public method to get a proxy
-    static Proxy proxyForUrl(char[]objectUrl,char[]proxyName=null){
+    static Proxy proxyForUrl(string objectUrl,string proxyName=null){
         auto pUrl=ParsedUrl.parseUrl(objectUrl);
         auto handler=protocolForUrl(pUrl);
         assert(handler!is null,"unhandled protocol for url "~objectUrl);
         return handler.proxyForPUrl(pUrl,proxyName);
     }
     /// nicer to use method to get a prxy of the given type
-    static T proxyForUrlT(T)(char[]objectUrl,char[]proxyName=null){
+    static T proxyForUrlT(T)(string objectUrl,string proxyName=null){
         auto p=proxyForUrl(objectUrl,proxyName);
         auto res=cast(T)cast(Object)p;
         if (res is null){
@@ -871,7 +872,7 @@ class ProtocolHandler{
     }
     // dynamic part
     Publisher publisher;
-    char[]_handlerUrl;
+    string _handlerUrl;
     
     this(CharSink log=null){
         this.log=log;
@@ -881,22 +882,22 @@ class ProtocolHandler{
         failureManager=new FailureManager();
     }
     
-    // a function with no arguments returning a char[]
-    char[] simpleCall(ParsedUrl url){
-        char[] res;
+    // a function with no arguments returning a string 
+    string simpleCall(ParsedUrl url){
+        string res;
         doRpcCall(url,delegate void(Serializer){},
             delegate void(Unserializer u){ u(res); },Variant.init);
         return res;
     }
     
-    char[] handlerUrl(){
+    string handlerUrl(){
         return _handlerUrl;
     }
     
     bool localUrl(ParsedUrl pUrl){
         return false;
     }    
-    Proxy proxyForPUrl(ParsedUrl pUrl,char[]proxyName=null){
+    Proxy proxyForPUrl(ParsedUrl pUrl,string proxyName=null){
         if (proxyName.length==0){
             ParsedUrl pUrl2=pUrl;
             pUrl2.appendToPath("proxyName");
@@ -913,10 +914,10 @@ class ProtocolHandler{
         }
         Proxy nP;
         char[256] buf;
-        char[] objectUrl=(pUrl.url(buf)).dup;
+        string objectUrl=Idup(pUrl.url(buf));
         if (localUrl(pUrl) && creator.localProxyCreator !is null){
             nP=creator.localProxyCreator(proxyName,objectUrl);
-            char[]objName=pUrl.path[1]; // kind of ugly
+            string objName=pUrl.path[1]; // kind of ugly
             auto lP=cast(LocalProxy)cast(Object)nP;
             auto vendor=publisher.objectNamed(objName.dup);
             assert(lP!is null,"local proxy is null");
@@ -929,10 +930,10 @@ class ProtocolHandler{
         return nP;
     }
     
-    void sysError(ParsedUrl url,char[] msg,SendResHandler sendRes, char[] file, long line){
+    void sysError(ParsedUrl url,string msg,SendResHandler sendRes, string file, long line){
         sendRes(cast(ubyte[])url.anchor,delegate void(Serializer s){
             s(3);
-            s(msg~" "~file~":"~to!(char[])(line)~" calling "~url.url);
+            s(msg~" "~file~":"~to!(string )(line)~" calling "~url.url);
         });
     }
     
@@ -1041,7 +1042,7 @@ class ProtocolHandler{
         assert(0,"unimplemented");
     }
     
-    char[] proxyObjUrl(char[] objectName){
+    string proxyObjUrl(string objectName){
         return handlerUrl()~"/obj/"~objectName;
     }
 }

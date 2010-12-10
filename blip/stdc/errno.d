@@ -9,6 +9,7 @@ static if (Tango.Major==1){
     public import tango.stdc.constants.errno;
 }
 public import tango.stdc.string: strlen;
+import blip.Comp;
 static if (! is(typeof(strerror_d))){
     version (Windows){
         extern extern(C) char * strerror(int errnum);

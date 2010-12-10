@@ -34,6 +34,7 @@ import blip.math.Math:min,max,round,sqrt,ceil,abs;
 import blip.stdc.string:memcpy;
 import blip.util.TemplateFu: nArgs;
 import blip.core.Traits:isComplexType,isImaginaryType,ComplexTypeOf,RealTypeOf,isAtomicType;
+import blip.Comp;
 //import tango.util.log.Trace; //pippo
 
 /// return type of the generic dot operation
@@ -259,7 +260,7 @@ else {
 }
 
 class LinAlgException:Exception{
-    this(char[] err){
+    this(string err){
         super(err);
     }
 }
@@ -524,18 +525,18 @@ body {
     index_type optimalChunkSize_j=NArray!(S,rank2).defaultOptimalChunkSize;
     if (scaleC==0){
         if (scaleRes==1){
-            const char[] innerLoop=pLoopPtr(rank2,["b","t2"],
+            const istring innerLoop=pLoopPtr(rank2,["b","t2"],
                     "*t2Ptr0 = (*aPtr0)*(*bPtr0);","j");
             mixin(pLoopPtr(rank1,["a","t1"],
                     "t2.startPtrArray=t1Ptr0;\n"~innerLoop,"i"));
         } else {
-            const char[] innerLoop=pLoopPtr(rank2,["b","t2"],
+            const istring innerLoop=pLoopPtr(rank2,["b","t2"],
                     "*t2Ptr0 = scaleRes*(*aPtr0)*(*bPtr0);","j");
             mixin(pLoopPtr(rank1,["a","t1"],
                     "t2.startPtrArray=t1Ptr0;\n"~innerLoop,"i"));
         }
     } else {
-        const char[] innerLoop=pLoopPtr(rank2,["b","t2"],
+        const istring innerLoop=pLoopPtr(rank2,["b","t2"],
                 "*t2Ptr0 = scaleC*(*t2Ptr0)+scaleRes*(*aPtr0)*(*bPtr0);","j");
         mixin(pLoopPtr(rank1,["a","t1"],
                 "t2.startPtrArray=t1Ptr0;\n"~innerLoop,"i"));

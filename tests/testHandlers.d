@@ -20,17 +20,18 @@ import blip.serialization.Handlers;
 import blip.container.GrowableArray;
 import blip.io.Console;
 import blip.io.BasicIO;
+import blip.Comp;
 
 void main(){
     char[14] buf;
     auto arr=new GrowableArray!(char)(buf,0);
     auto f=new FormattedWriteHandlers!()(&arr.appendArr);
     int i=10;
-    char[] s="bla";
+    string s="bla";
     f(i);
     f(s);
     f(cast(void[])"bla2");
-    sout(cast(char[])arr.takeData)("\n");
+    sout(cast(string )arr.takeData)("\n");
     soutStream.flush;
     ssout(outWriter("sep\n"));
     auto arr2=new GrowableArray!(ubyte)();

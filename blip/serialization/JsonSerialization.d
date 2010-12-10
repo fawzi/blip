@@ -27,6 +27,7 @@ import blip.text.UtfUtils;
 import blip.container.GrowableArray;
 import blip.io.BasicIO;
 import blip.io.StreamConverters;
+import blip.Comp;
 
 class JsonSerializer(T=char) : Serializer {
     int depth;
@@ -34,7 +35,7 @@ class JsonSerializer(T=char) : Serializer {
     bool atStart;
     bool compact; // skips class, id when possible
     const T[1] nline=[cast(T)'\n'];
-    Dumper!(void delegate(char[])) s; // quick dump of strings
+    Dumper!(void delegate(cstring)) s; // quick dump of strings
     /// writes a newline
     void newline(){
         handlers.rawWriteStr(nline);
@@ -281,8 +282,8 @@ class JsonUnserializer(T=char) : Unserializer {
     }
     static class FieldMismatchException:Exception{
         FieldMetaInfo *mismatchedField;
-        char[] actualField;
-        this(FieldMetaInfo *mismatchedField,char[] actualField,char[]desc,char[]filename,long line){
+        string actualField;
+        this(FieldMetaInfo *mismatchedField,string actualField,string desc,string filename,long line){
             super(desc,filename,line);
             this.actualField=actualField;
             this.mismatchedField=mismatchedField;
@@ -297,7 +298,7 @@ class JsonUnserializer(T=char) : Unserializer {
             if (field !is null && (!field.pseudo)){
                 this.reader.skipString(cast(S)",",false);
                 if (!this.reader.skipString2(cast(S)field.name,false)){
-                    char[] fieldReadName;
+                    string fieldReadName;
                     this.reader(fieldReadName);
                     if (fieldReadName.length>0)
                         this.reader.skipString(cast(S)":");
@@ -460,7 +461,7 @@ class JsonUnserializer(T=char) : Unserializer {
         }
         if (reader.skipString2(cast(S)"class",false)){
             reader.skipString(cast(S)":");
-            char[] className;
+            string className;
             reader(className);
             if (className=="proxy"||reader.check(&scanId)){
                 reader.next(&scanId);
@@ -573,7 +574,7 @@ class JsonUnserializer(T=char) : Unserializer {
     /// utility method that throws an exception
     /// override this to give more info on parser position,...
     /// this method *has* to throw
-    override void serializationError(char[]msg,char[]filename,long line,Exception next=null){
+    override void serializationError(string msg,string filename,long line,Exception next=null){
         reader.parseError(msg,filename,line,next);
     }
     

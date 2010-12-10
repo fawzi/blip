@@ -31,6 +31,7 @@ import cstdlib = tango.stdc.stdlib : free, malloc,realloc;
 import blip.util.Grow:growLength;
 import blip.container.Pool;
 import blip.sync.Atomic;
+import blip.Comp;
 
 /// guard object to deallocate large arrays that contain inner pointers
 /// offers reference counting, and assumes that the underlying chunk of memory is not resized
@@ -645,13 +646,13 @@ static bool BulkArrayIsDummy(T)(BulkArray!(T) b){
     return (b.flags & BulkArray!(T).Flags.Dummy)!=0;
 }
 
-void baUnaryOpStr(char[] opStr,T)(ref BulkArray!(T) a){
+void baUnaryOpStr(string opStr,T)(ref BulkArray!(T) a){
     for (aPtr0=a.ptr;aPtr0!=ptrEnd;++aPtr0){
         mixin(opStr);
     }
 }
 
-void baBinaryOpStr(char[] opStr,T,U)(ref BulkArray!(T) a,ref BulkArray!(U) b){
+void baBinaryOpStr(string opStr,T,U)(ref BulkArray!(T) a,ref BulkArray!(U) b){
     assert(a.length==b.length,"binaryOpStr only on equally sized arrays");
     U * bPtr0=b.ptr;
     T* aPtrEnd=a.ptrEnd;
@@ -660,7 +661,7 @@ void baBinaryOpStr(char[] opStr,T,U)(ref BulkArray!(T) a,ref BulkArray!(U) b){
     }
 }
 
-void baTertiaryOpStr(char[] opStr,T,U,V)(ref BulkArray!(T) a,ref BulkArray!(U) b,ref BulkArray!(V) c){
+void baTertiaryOpStr(string opStr,T,U,V)(ref BulkArray!(T) a,ref BulkArray!(U) b,ref BulkArray!(V) c){
     assert(a.length==b.length,"binaryOpStr only on equally sized arrays");
     assert(a.length==c.length,"binaryOpStr only on equally sized arrays");
     U * bPtr0=b.ptr;

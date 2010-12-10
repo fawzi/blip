@@ -24,6 +24,7 @@ import tango.math.Math;
 import blip.narray.NArray;
 import blip.container.GrowableArray;
 version(NoTrace){} else { import blip.core.stacktrace.TraceExceptions; }
+import blip.Comp;
 
 version(multiarray){
     import murray.multiarray: ndarray,ones,zeros;
@@ -463,7 +464,7 @@ sout("t14: index op floated to outer loops and removal of multiplication on stru
 
 } 
 
-void main(char [][] argv) 
+void main(string [] argv) 
 {
     tst();
 }

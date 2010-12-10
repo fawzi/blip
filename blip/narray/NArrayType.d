@@ -62,6 +62,7 @@ import blip.parallel.smp.WorkManager;
 import blip.io.BasicIO;
 import cstdlib = blip.stdc.stdlib : free, malloc;
 import blip.util.Convert;
+import blip.Comp;
 
 //version=RefCount;
 
@@ -678,7 +679,7 @@ else {
         NArray!(V,rank-cast(int)staticArraySize!(S))arrayIndex(S)(S index){
             static assert(is(S:int[])||is(S:long[])||is(S:uint[])||is(S:ulong[]),"only arrays of indexes supported");
             static assert(isStaticArrayType!(S),"arrayIndex needs *static* arrays as input");
-            const char[] loopBody=("auto res=opIndex("~arrayToSeq("index",cast(int)staticArraySize!(S))~");");
+            const istring loopBody=("auto res=opIndex("~arrayToSeq("index",cast(int)staticArraySize!(S))~");");
             mixin(loopBody);
             return res;
         }
@@ -886,7 +887,7 @@ else {
                     }
                     return 0;
                 }
-                void desc(void delegate(char[]) s){
+                void desc(void delegate(cstring) s){
                     if (this is null){
                         s("<SubView *null*>");
                         return;
@@ -1027,7 +1028,7 @@ else {
                     }
                 } else {
                     auto bArray=this.baseArray;
-                    const char[] loopBody=`
+                    const istring loopBody=`
                     int ret=loop_body(*bArrayPtr0);
                     if (ret) return ret;
                     `;
@@ -1045,7 +1046,7 @@ else {
                     }
                 } else {
                     auto bArray=this.baseArray;
-                    const char[] loopBody=`
+                    const istring loopBody=`
                     int ret=loop_body(iPos,*bArrayPtr0);
                     if (ret) return ret;
                     ++iPos;
@@ -1055,7 +1056,7 @@ else {
                 }
                 return 0;
             }
-            void desc(void delegate(char[]) sink){
+            void desc(void delegate(cstring) sink){
                 auto s=dumper(sink);
                 if (this is null){
                     s("<FlatIterator *null*>");
@@ -1076,10 +1077,10 @@ else {
                 res.a=a;
                 return res;
             }
-            int opApply( int delegate(inout V) loop_body ) 
+            int opApply( int delegate(ref V) loop_body ) 
             {
                 auto aa=this.a;
-                const char[] loopBody=`
+                const istring loopBody=`
                 int ret=loop_body(*aaPtr0);
                 if (ret) return ret;
                 `;
@@ -1089,7 +1090,7 @@ else {
             int opApply( int delegate(ref index_type,ref V) loop_body ) 
             {
                 auto aa=this.a;
-                const char[] loopBody=`
+                const istring loopBody=`
                 int ret=loop_body(iPos,*aaPtr0);
                 if (ret) return ret;
                 ++iPos;
@@ -1115,7 +1116,7 @@ else {
             int opApply( int delegate(ref V) loop_body ) 
             {
                 auto aa=this.a;
-                const char[] loopBody=`
+                const istring loopBody=`
                 int ret=loop_body(*aaPtr0);
                 if (ret) return ret;
                 `;
@@ -1126,7 +1127,7 @@ else {
             int opApply( int delegate(ref index_type,ref V) loop_body ) 
             {
                 auto aa=this.a;
-                const char[] loopBody=`
+                const istring loopBody=`
                 int ret=loop_body(iPos,*aaPtr0);
                 if (ret) return ret;
                 ++iPos;
@@ -1199,7 +1200,7 @@ else {
             }
             int opApply(int delegate(ref V x) loop_body){
                 NArray a=this.it.baseArray;
-                const char[] loopBody=`
+                const istring loopBody=`
                 int ret=loop_body(*aPtr0);
                 if (ret) return ret;
                 `;
@@ -1216,7 +1217,7 @@ else {
                 NArray a=this.it.baseArray;
                 index_type optimalChunkSize_i=this.optimalChunkSize;
                 size_t iPos=0;
-                const char[] loopBody=`
+                const istring loopBody=`
                 int ret=loop_body(iPos,*aPtr0);
                 if (ret) return ret;
                 ++iPos;
@@ -1520,8 +1521,8 @@ else {
             assert(0, "Comparison of arrays not allowed");
         }
 
-        void printData(CharSink s,char[] formatEl=",10", index_type elPerLine=10,
-            char[] indent=""){
+        void printData(CharSink s,string formatEl=",10", index_type elPerLine=10,
+            string indent=""){
             s("[");
             static if(rank==1) {
                 index_type lastI=this.shape[0]-1;
@@ -1552,9 +1553,9 @@ else {
 
         struct Printer{
             NArray arr;
-            char[] formatEl=",10";
+            string formatEl=",10";
             index_type elPerLine=10;
-            char[] indent="";
+            string indent="";
             void desc(CharSink s){
                 if (arr is null){
                     s("*null*"); /// print an empty array instead???
@@ -1565,8 +1566,8 @@ else {
         }
         
         /// a struct that prints the contents of this array with the given format
-        Printer dataPrinter(char[] formatEl=",10", index_type elPerLine=10,
-            char[] indent="")
+        Printer dataPrinter(string formatEl=",10", index_type elPerLine=10,
+            string indent="")
         {
             Printer res;
             res.arr=this;
@@ -1576,13 +1577,13 @@ else {
             return res;
         }
         
-        char[] toString(){
+        string toString(){
             return collectAppender(delegate void(CharSink s){ this.printData(s); });
         }
 
         /// description of the NArray wrapper, not of the contents, for debugging purposes...
         /// see printData for the content
-        void desc(void delegate(char[]) sink){
+        void desc(void delegate(cstring) sink){
             auto s=dumper(sink);
             if (this is null){
                 s("<NArray *null*>");
@@ -1948,7 +1949,7 @@ void unaryOp(alias op,int rank,T)(NArray!(T,rank) a,
     mixin(pLoopPtr(rank,["a"],"op(*aPtr0);\n","i"));
 }
 /// ditto
-void unaryOpStr(char[] op,int rank,T)(NArray!(T,rank) a,
+void unaryOpStr(string op,int rank,T)(NArray!(T,rank) a,
         index_type optimalChunkSize=NArray!(T,rank).defaultOptimalChunkSize){
     index_type optimalChunkSize_i=optimalChunkSize;
     mixin(pLoopPtr(rank,["a"],op,"i"));
@@ -1964,7 +1965,7 @@ body {
     mixin(pLoopPtr(rank,["a","b"],"op(*aPtr0,*bPtr0);\n","i"));
 }
 /// ditto
-void binaryOpStr(char[] op,int rank,T,S)(NArray!(T,rank) a, NArray!(S,rank) b,
+void binaryOpStr(string op,int rank,T,S)(NArray!(T,rank) a, NArray!(S,rank) b,
     index_type optimalChunkSize=NArray!(T,rank).defaultOptimalChunkSize)
 in { assert(a.shape==b.shape,"incompatible shapes in binaryOp"); }
 body {
@@ -1983,7 +1984,7 @@ body {
         "op(*aPtr0,*bPtr0,*cPtr0);\n","i"));
 }
 /// ditto
-void ternaryOpStr(char[] op, int rank, T, S, U)(NArray!(T,rank) a, NArray!(S,rank) b, NArray!(U,rank) c,
+void ternaryOpStr(string op, int rank, T, S, U)(NArray!(T,rank) a, NArray!(S,rank) b, NArray!(U,rank) c,
     index_type optimalChunkSize=NArray!(T,rank).defaultOptimalChunkSize)
 in { assert(a.shape==b.shape && a.shape==c.shape,"incompatible shapes in ternaryOp"); }
 body {
@@ -1994,7 +1995,7 @@ body {
 /+ -------------- looping mixin constructs ---------------- +/
 
 /// if baseName is not empty adds a dot (sometime this.xxx does not work and xxx works)
-char [] arrayNameDot(char[] baseName){
+string arrayNameDot(string baseName){
     if (baseName=="") {
         return "";
     } else {
@@ -2007,11 +2008,11 @@ char [] arrayNameDot(char[] baseName){
 + (ivarStr~_XX_, X=dimension, starting with 0) 
 + pointers to the actual elements are also available (arrayName~"Ptr0")
 +/
-char [] sLoopGenIdx(int rank,char[][] arrayNames,char[] loop_body,char[]ivarStr,char[]indent="    ",
-    char[][] idxPre=[], char[][] idxPost=[]){
-    char[] res="";
-    char[] indentInc="    ";
-    char[] indent2=indent~indentInc;
+string sLoopGenIdx(int rank,string [] arrayNames,string loop_body,string ivarStr,string indent="    ",
+    string [] idxPre=[], string [] idxPost=[]){
+    string res="";
+    string indentInc="    ";
+    string indent2=indent~indentInc;
 
     foreach(i,arrayName;arrayNames){
         res~=indent~arrayNameDot(arrayName)~"dtype * "~arrayName~"Ptr"~ctfe_i2a(rank-1)~"="
@@ -2026,7 +2027,7 @@ char [] sLoopGenIdx(int rank,char[][] arrayNames,char[] loop_body,char[]ivarStr,
             ~arrayNameDot(arrayNames[0])~"shape["~ctfe_i2a(idim)~"];\n";
     }
     for (int idim=0;idim<rank;idim++){
-        char[] ivar=ivarStr.dup~"_"~ctfe_i2a(idim)~"_";
+        string ivar=ivarStr.dup~"_"~ctfe_i2a(idim)~"_";
         res~=indent~"for (index_type "~ivar~"=0;"
             ~ivar~"<"~ivarStr~"Shape"~ctfe_i2a(idim)~";++"~ivar~"){\n";
         if (idxPre.length>idim) res~=idxPre[idim];
@@ -2057,11 +2058,11 @@ char [] sLoopGenIdx(int rank,char[][] arrayNames,char[] loop_body,char[]ivarStr,
 + general sequential pointer based mixin
 + partial pointers are defined, but indexes are not (counts backward)
 +/
-char [] sLoopGenPtr(int rank,char[][] arrayNames,
-        char[] loop_body,char[]ivarStr,char[] indent="    "){
-    char[] res="";
-    char[] indInc="    ";
-    char[] indent2=indent~indInc;
+string sLoopGenPtr(int rank,string [] arrayNames,
+        string loop_body,string ivarStr,string indent="    "){
+    string res="";
+    string indInc="    ";
+    string indent2=indent~indInc;
 
     foreach(i,arrayName;arrayNames){
         res~=indent;
@@ -2072,7 +2073,7 @@ char [] sLoopGenPtr(int rank,char[][] arrayNames,
         }
     }
     for (int idim=0;idim<rank;idim++){
-        char[] ivar=ivarStr.dup~"_"~ctfe_i2a(idim)~"_";
+        string ivar=ivarStr.dup~"_"~ctfe_i2a(idim)~"_";
         res~=indent~"for (index_type "~ivar~"="~arrayNameDot(arrayNames[0])~"shape["~ctfe_i2a(idim)~"];"
             ~ivar~"!=0;--"~ivar~"){\n";
         if (idim<rank-1) {
@@ -2105,14 +2106,14 @@ char [] sLoopGenPtr(int rank,char[][] arrayNames,
 + array might be split in sub pieces, each with its loop, and looping might be in a
 + different order, but the indexes are the correct ones
 +/
-char [] pLoopIdx(int rank,char[][] arrayNames,
-        char[] loopBody,char[]ivarStr,char[][] arrayNamesDot=[],int[] optAccess=[],char[] indent="    ",
-        char[][] idxPre=[], char[][] idxPost=[]){
+string pLoopIdx(int rank,string [] arrayNames,
+        string loopBody,string ivarStr,string [] arrayNamesDot=[],int[] optAccess=[],string indent="    ",
+        string [] idxPre=[], string [] idxPost=[]){
     if (arrayNames.length==0)
         return "";
-    char[] res="";
-    char[] indent2=indent~"    ";
-    char[] indent3=indent2~"    ";
+    string res="";
+    string indent2=indent~"    ";
+    string indent3=indent2~"    ";
     bool hasNamesDot=true;
     res~=indent~"index_type dummy"~ivarStr~"=optimalChunkSize_"~ivarStr~";\n";
     if (arrayNamesDot.length==0){
@@ -2154,7 +2155,7 @@ char [] pLoopIdx(int rank,char[][] arrayNames,
         res~=" else if (commonFlags"~ivarStr~"&ArrayFlags.Large){\n";
         res~=indent2~"typeof("~arrayNames[0]~") "~arrayNames[0]~"_opt_="
             ~arrayNamesDot[0]~"optAxisOrder;\n";
-        char[][] newNamesDot=[arrayNames[0]~"_opt_."];
+        string [] newNamesDot=[arrayNames[0]~"_opt_."];
         res~=pLoopIdx(rank,arrayNames,startIdxs,loopBody,ivarStr,newNamesDot,[],indent2);
         res~=indent~"}";
     } else if ((!hasNamesDot) && arrayNames.length>1 && optAccess.length>0){
@@ -2172,7 +2173,7 @@ char [] pLoopIdx(int rank,char[][] arrayNames,
             res~=indent2~"typeof("~arrayName~") "~arrayName~"_opt_="
                 ~arrayNamesDot[i]~"axisTransform(perm,invert);\n";
         }
-        char[][] newNamesDot=[];
+        string [] newNamesDot=[];
         foreach(arrayName;arrayNames){
             newNamesDot~=[arrayName~"_opt_."];
         }
@@ -2188,13 +2189,13 @@ char [] pLoopIdx(int rank,char[][] arrayNames,
 + (possibly) parallel pointer based loop character mixin
 + might do a compact loop, only the final pointers are valid
 +/
-char [] pLoopPtr(int rank,char[][] arrayNames,
-        char[] loopBody,char[]ivarStr,char[][] arrayNamesDot=[],int[] optAccess=[],char[] indent="    "){
+string pLoopPtr(int rank,string [] arrayNames,
+        string loopBody,string ivarStr,string [] arrayNamesDot=[],int[] optAccess=[],string indent="    "){
     if (arrayNames.length==0)
         return "";
-    char[] res="";
-    char[] indent2=indent~"    ";
-    char[] indent3=indent2~"    ";
+    string res="";
+    string indent2=indent~"    ";
+    string indent3=indent2~"    ";
     bool hasNamesDot=true;
     if (arrayNamesDot.length==0){
         hasNamesDot=false;
@@ -2236,7 +2237,7 @@ char [] pLoopPtr(int rank,char[][] arrayNames,
         res~=" else if (commonFlags"~ivarStr~"&ArrayFlags.Large){\n";
         res~=indent2~"typeof("~arrayNames[0]~") "~arrayNames[0]~"_opt_="
             ~arrayNamesDot[0]~"optAxisOrder;\n";
-        char[][] newNamesDot=[arrayNames[0]~"_opt_."];
+        string [] newNamesDot=[arrayNames[0]~"_opt_."];
         res~=pLoopPtr(rank,arrayNames,loopBody,ivarStr,newNamesDot,[],indent2);
         res~=indent~"}";
     } else if ((!hasNamesDot) && arrayNames.length>1 && optAccess.length>0){
@@ -2254,7 +2255,7 @@ char [] pLoopPtr(int rank,char[][] arrayNames,
             res~=indent2~"typeof("~arrayName~") "~arrayName~"_opt_="
                 ~arrayNamesDot[i]~"axisTransform(perm,invert);\n";
         }
-        char[][] newNamesDot=[];
+        string [] newNamesDot=[];
         foreach(arrayName;arrayNames){
             newNamesDot~=[arrayName~"_opt_."];
         }
@@ -2270,10 +2271,10 @@ char [] pLoopPtr(int rank,char[][] arrayNames,
 /++
 + sequential (inner fastest) loop character mixin
 +/
-char [] sLoopPtr(int rank,char[][] arrayNames, char[] loopBody,char[]ivarStr){
+string sLoopPtr(int rank,string [] arrayNames, string loopBody,string ivarStr){
     if (arrayNames.length==0)
         return "";
-    char[] res="";
+    string res="";
     res~="    uint commonFlags"~ivarStr~"=";
     foreach (i,arrayName;arrayNames){
         res~=arrayNameDot(arrayName)~"flags";
@@ -2296,8 +2297,8 @@ char [] sLoopPtr(int rank,char[][] arrayNames, char[] loopBody,char[]ivarStr){
 }
 
 /// array to Sequence (for arrayIndex,arrayIndexAssign)
-char[] arrayToSeq(char[] arrayName,int dim){
-    char[] res="";
+string arrayToSeq(string arrayName,int dim){
+    string res="";
     for (int i=0;i<dim;++i){
         res~=arrayName~"["~ctfe_i2a(i)~"]";
         if (i!=dim-1)
@@ -2306,16 +2307,16 @@ char[] arrayToSeq(char[] arrayName,int dim){
     return res;
 }
 
-char[] opApplyIdxAll(int rank,char[] arrayName,bool sequential){
-    char[] res="";
-    char[] indent="    ";
+string opApplyIdxAll(int rank,string arrayName,bool sequential){
+    string res="";
+    string indent="    ";
     res~="int opApply(int delegate(";
     for (int i=0;i<rank;++i){
         res~="ref index_type, ";
     }
     res~="ref V) loop_body) {\n";
     res~="    auto aa=this."~arrayName~";\n";
-    char[] loopBody="";
+    string loopBody="";
     loopBody~=indent~"int ret=loop_body(";
     for (int i=0;i<rank;++i){
         loopBody~="i_"~ctfe_i2a(i)~"_, ";

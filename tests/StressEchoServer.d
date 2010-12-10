@@ -33,6 +33,7 @@ import blip.math.random.Random;
 import blip.parallel.smp.WorkManager;
 import blip.stdc.stdlib:exit;
 //import blip.util.IgnoreSigpipe;
+import blip.Comp;
 
 class StressGenerator{
     Random rand;
@@ -150,7 +151,7 @@ class StressManager{
         }
     }
 }
-void main(char[][] argv)
+void main(string [] argv)
 {
     if (argv.length<3 ||argv.length>6){
         sout("usage:")(argv[0])(" host port [connections [iterations [maxWait]]]\n");

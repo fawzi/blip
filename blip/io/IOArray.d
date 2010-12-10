@@ -18,6 +18,7 @@ module blip.io.IOArray;
 private import tango.core.Exception;
 
 private import tango.io.device.Conduit;
+import blip.Comp;
 
 /******************************************************************************
 
@@ -60,10 +61,10 @@ class IOArray : Conduit, InputBuffer, OutputBuffer, Conduit.Seek
         private size_t  dimension;              // maximum extent of content
         private size_t  expansion;              // for growing instances
 
-        private static char[] overflow  = "output buffer is full";
-        private static char[] underflow = "input buffer is empty";
-        private static char[] eofRead   = "end-of-flow while reading";
-        private static char[] eofWrite  = "end-of-flow while writing";
+        private static string overflow  = "output buffer is full";
+        private static string underflow = "input buffer is empty";
+        private static string eofRead   = "end-of-flow while reading";
+        private static string eofWrite  = "end-of-flow while writing";
 
         /***********************************************************************
 
@@ -148,7 +149,7 @@ class IOArray : Conduit, InputBuffer, OutputBuffer, Conduit.Seek
 
         ***********************************************************************/
 
-        final override char[] toString ()
+        final override string toString ()
         {
                 return "<array>";
         }

@@ -18,9 +18,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 module blip.omg.core.CoordSys;
-private {
-    import blip.omg.core.LinearAlgebra;
-}
+import blip.omg.core.LinearAlgebra;
+import blip.Comp;
 
 
 
@@ -109,7 +108,7 @@ struct CoordSys {
         return res;
     }
     
-    char[] toString(){
+    string toString(){
         return "{" ~ origin.toString ~ ";" ~ rotation.toString ~ "}";
     }
 }

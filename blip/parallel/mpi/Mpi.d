@@ -35,6 +35,7 @@ version(mpi)
     import blip.core.Thread;
     import blip.stdc.config;
     import blip.io.StreamConverters;
+    import blip.Comp;
 
     template MPI_DatatypeForType(T){
         static if (is(T==ubyte)){
@@ -199,7 +200,7 @@ version(mpi)
 
     /// mpi error
     class MpiException:Exception{
-        this(char[] msg,char[] file, long line){
+        this(string msg,string file, long line){
             super(msg,file,line);
         }
     }
@@ -247,7 +248,7 @@ version(mpi)
             return MpiUnserializer(SerializedMessage(status.MPI_TAG,buf));
         }
         template sendT(T){
-            void send(T valOut,int tag=0){
+            void send(Const!(T) valOut,int tag=0){
                 static if(is(T U:U[])){
                     int count=valOut.length;
                     void * buf=valOut.ptr;
@@ -298,8 +299,8 @@ version(mpi)
         alias r2.recv recv;
         alias r3.recv recv;
         
-        void sendStr(char[] s, int tag=0){
-            sendT!(char[]).send(s,tag);
+        void sendStr(cstring s, int tag=0){
+            sendT!(cstring ).send(s,tag);
         }
         int recvStr(ref char[] s,int tag=0){
             MPI_Status status;
@@ -316,7 +317,7 @@ version(mpi)
         void close(){ }
     
         template sendrecvT(T){
-            int sendrecv(T sendV,ref T recvV,Channel recvChannel,int sendTag=0,int recvTag=0){
+            int sendrecv(Const!(T) sendV,ref T recvV,Channel recvChannel,int sendTag=0,int recvTag=0){
                 if (recvChannel is this){
                     static if(is(T U:U[])){
                         recvV[]=sendV;
@@ -338,7 +339,7 @@ version(mpi)
         alias sr2.sendrecv sendrecv;
         alias sr3.sendrecv sendrecv;
         
-        void desc(void delegate(char[]) sink){
+        void desc(void delegate(cstring) sink){
             auto s=dumper(sink);
             s("{<MpiChannel@")(cast(void*)this)(">\n");
             s("  otherRank:")(this.otherRank)(",\n");
@@ -348,12 +349,12 @@ version(mpi)
     }
 
     class MpiCart(int dimG):Cart!(dimG){
-        char[] name;
+        string name;
         int[dimG] _dims;
         int[dimG] _myPos;
         int[dimG] _periods;
         MpiLinearComm _baseComm;
-        this(MpiLinearComm baseComm,char[] name,int[]dims,int[] periods,bool reorder=true){
+        this(MpiLinearComm baseComm,string name,int[]dims,int[] periods,bool reorder=true){
             assert(dims.length==dimG,"invalid number of dimensions");
             assert(periods is null || periods.length==dimG,"invalid number of dimensions");
             
@@ -419,7 +420,7 @@ version(mpi)
         MpiChannel[] channels;
         UniqueNumber!(int) counter;
         MPI_Comm comm;
-        char[] _name;
+        string _name;
     
         static class HandlerServer{
             MpiLinearComm comm;
@@ -453,7 +454,7 @@ version(mpi)
         this(){
             this(MPI_COMM_WORLD,"world");
         }
-        this(MPI_Comm comm,char[] name=""){
+        this(MPI_Comm comm,string name=""){
             this.comm=comm;
             _name=name;
             int dim;
@@ -466,10 +467,10 @@ version(mpi)
             counter=UniqueNumber!(int)(10);
             channels=new MpiChannel[](dim);
         }
-        char[] name(){
+        string name(){
             return _name;
         }
-        void name(char[] n){
+        void name(string n){
             _name=n;
         }
         int dim(){
@@ -498,13 +499,13 @@ version(mpi)
             }
             return new MpiLinearComm(newComm);
         }
-        Cart!(2) mkCart(char[] name,int[2] dims,int[2] periodic,bool reorder){
+        Cart!(2) mkCart(string name,int[2] dims,int[2] periodic,bool reorder){
             return new MpiCart!(2)(this,name,dims,periodic,reorder);
         }
-        Cart!(3) mkCart(char[] name,int[3] dims,int[3] periodic,bool reorder){
+        Cart!(3) mkCart(string name,int[3] dims,int[3] periodic,bool reorder){
             return new MpiCart!(3)(this,name,dims,periodic,reorder);
         }
-        Cart!(4) mkCart(char[] name,int[4] dims,int[4] periodic,bool reorder){
+        Cart!(4) mkCart(string name,int[4] dims,int[4] periodic,bool reorder){
             return new MpiCart!(4)(this,name,dims,periodic,reorder);
         }
     
@@ -798,10 +799,10 @@ version(mpi)
             t.start();
         }
     
-        void desc(void delegate(char[]) sink){
+        void desc(void delegate(cstring) sink){
             desc(sink,true);
         }
-        void desc(void delegate(char[]) sink,bool shortDesc){
+        void desc(void delegate(cstring) sink,bool shortDesc){
             auto s=dumper(sink);
             s("{<MpiLinearComm@")(cast(void*)this)(">\n");
             s("  name:")(this.name)(",\n");

@@ -17,6 +17,7 @@
 // limitations under the License.
 module blip.serialization.SerializationExpose;
 import blip.serialization.SerializationBase;
+import blip.Comp;
 version(Xpose){
     import xf.xpose.Expose;
     public alias xf.xpose.Expose.expose expose;
@@ -25,7 +26,7 @@ version(Xpose){
     public import xf.xpose.Utils;
 
     template NewSerializationExpose_mix0() {
-        static char[] begin(char[] target) {
+        static string begin(string target) {
             return `
             static ClassMetaInfo serializationMetaInfo;
         
@@ -50,24 +51,24 @@ version(Xpose){
         }
     
     
-        static char[] end(char[] target) {
+        static string end(string target) {
             return `}  /* mixin SerializationInitializerMix;*/ `;
         }
     
     
-        static char[] method(char[] target, char[] name, char[] rename, char[] overload, char[] attribs) {
+        static string method(string target, string name, string rename, string overload, string attribs) {
             return "pragma(msg,`method(target: '"~target~"' name: '"~name~"' rename: '"~rename~"' overload: '"~overload~"' attribs: '"~attribs~"')8`);\n";
         }
     
-        static char[] field(char[] target, char[] name, char[] rename, bool readOnly, char[] attribs) {
-            char[] res="".dup;
+        static string field(string target, string name, string rename, bool readOnly, string attribs) {
+            string res="";
             if (rename.length==0) rename=name;
-            char[] fieldN="field_"~rename;
-            char[] type=attribsGet(attribs,"type");
-            char[] indent="    ";
+            string fieldN="field_"~rename;
+            string type=attribsGet(attribs,"type");
+            string indent="    ";
             res~=indent~"{\n";
             res~=indent~"    alias "~(target.length>0?target:"UnrefType!(typeof(this))")~" TType;\n";
-            char[] fType=attribsGet(attribs,"type");
+            string fType=attribsGet(attribs,"type");
             if (fType.length>0){
                 res~=indent~"    alias "~fType~" FType;\n";
             } else {
@@ -82,8 +83,8 @@ version(Xpose){
                 res~=indent~"        auto sLevel=SerializationLevel.normalLevel;\n";
                 res~=indent~"    }\n";
             }
-            char[] doc=attribsGet(attribs,"doc");
-            char[] citeList=attribsGet(attribs,"cites");
+            string doc=attribsGet(attribs,"doc");
+            string citeList=attribsGet(attribs,"cites");
             res~=indent~"    serializationMetaInfo.addFieldOfType!(FType)(`"~rename~"`,`"
                 ~doc~"`,`"~citeList~"`,sLevel);\n";
             res~=indent~"}\n";
@@ -93,7 +94,7 @@ version(Xpose){
 
 
     template NewSerializationExpose_mix1() {
-        static char[] begin(char[] target) {
+        static string begin(string target) {
             if (target.length==0) target=`UnrefType!(typeof(this))`;
             return
             `
@@ -191,20 +192,20 @@ version(Xpose){
         }
     
     
-        static char[] end(char[] target) {
+        static string end(string target) {
             return ` }`;
         }
     
     
-        static char[] method(char[] target, char[] name, char[] rename, char[] overload, char[] attribs) {
+        static string method(string target, string name, string rename, string overload, string attribs) {
             return ``;
         }
     
-        static char[] field(char[] target, char[] name, char[] rename, bool readOnly, char[] attribs) {
+        static string field(string target, string name, string rename, bool readOnly, string attribs) {
             if (rename.length==0) rename=name;
-            char[] fieldN="field_"~rename;
-            char[] prefix = "" == target ? "(cast(typeof(this))_this)." : `(cast(RefType!(`~target~`))_this).`;
-            char[] res=`
+            string fieldN="field_"~rename;
+            string prefix = "" == target ? "(cast(typeof(this))_this)." : `(cast(RefType!(`~target~`))_this).`;
+            string res=`
             {
                 FieldMetaInfo *fieldMeta=serializationMetaInfo[fieldIndex];
                 serializer.field(fieldMeta,`~prefix~name~`);

@@ -27,10 +27,11 @@ import blip.parallel.smp.WorkManager;
 import blip.io.BasicIO;
 import blip.io.StreamConverters;
 import blip.core.Variant;
+import blip.Comp;
 
 /// handles vending (and possibly also receiving the results if using one channel for both)
 class MpiProtocolHandler: ProtocolHandler{
-    static MpiProtocolHandler[char[]] mpiProtocolHandlers;
+    static MpiProtocolHandler[string ] mpiProtocolHandlers;
     
     /// those that can actually handle the given protocol
     static ProtocolHandler findHandlerForUrl(ParsedUrl url){
@@ -58,7 +59,7 @@ class MpiProtocolHandler: ProtocolHandler{
         char[128] buf;
         auto arr=lGrowableArray!(char)(buf,0,GASharing.Local);
         dumper(&arr)(pH.comm.name)("-")(pH.tag);
-        char[] commName=arr.takeData();
+        string commName=cast(string)arr.takeData();
         synchronized(MpiProtocolHandler.classinfo){
             if ((commName in mpiProtocolHandlers)is null)
                 throw new RpcException("duplicate handler for communicatr named "~commName,__FILE__,__LINE__);
@@ -98,11 +99,11 @@ class MpiProtocolHandler: ProtocolHandler{
         unregisterMpiProtocolHandler(this);
     }
     
-    void sendReply(ubyte[] reqId,void delegate(Serializer) serRes){
+    void sendReply(Const!(ubyte)[] reqId,void delegate(Serializer) serRes){
         ubyte[512] buf=void;
         try{
             char[128] buf2;
-            auto s=comm[to!(int)(cast(char[])reqId[0..reqId.find(cast(ubyte)'-')])].sendTag(tag,buf);
+            auto s=comm[to!(int)(cast(string )reqId[0..reqId.find(cast(ubyte)'-')])].sendTag(tag,buf);
             scope(exit){ s.close(); }
             size_t i=5;
             buf2[0..i]="/req#";
@@ -111,7 +112,7 @@ class MpiProtocolHandler: ProtocolHandler{
             s(buf2[0..i+rc.length]);
             serRes(s);
         } catch(Object o){
-            Log.lookup ("blip.rpc").warn("exception in sendReply sending result of #{}: {}",cast(char[])reqId,o);
+            Log.lookup ("blip.rpc").warn("exception in sendReply sending result of #{}: {}",cast(string )reqId,o);
         }
     }
     
@@ -171,7 +172,7 @@ class MpiProtocolHandler: ProtocolHandler{
                     throw new RpcException(errMsg~" calling "~url.url(),__FILE__,__LINE__);
                 }
                 default:
-                    throw new RpcException("unknown resKind "~to!(char[])(resKind)~
+                    throw new RpcException("unknown resKind "~to!(string )(resKind)~
                         " calling "~url.url(),__FILE__,__LINE__);
                 }
             } else {
@@ -211,7 +212,7 @@ class MpiProtocolHandler: ProtocolHandler{
     /// Channel handler that handles a request
     void channelHandler(Channel c,int tagN){
         assert(tag==tagN,"mismatched tags");
-        char[]path;
+        string path;
         ubyte[512] buf;
         auto u=c.recvTag(tag,buf);
         u(path);
@@ -258,7 +259,7 @@ class MpiProtocolHandler: ProtocolHandler{
         }
     }
 
-    override char[] proxyObjUrl(char[] objectName){
+    override string proxyObjUrl(string objectName){
         return handlerUrl()~"/obj/"~objectName;
     }
 }

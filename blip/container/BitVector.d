@@ -18,6 +18,7 @@
 module blip.container.BitVector;
 private import blip.core.BitManip;
 alias size_t internal_t; // at the moment there are places where this is hardcoded (bitsize=32)
+import blip.Comp;
 
 struct BitVector(size_t len){
     internal_t[(len+internal_t.sizeof*8-1)/(internal_t.sizeof*8)] data;
@@ -79,7 +80,7 @@ struct BitVector(size_t len){
      * Params:
      *  dg = The supplied code as a delegate.
      */
-    int opApply( int delegate(inout bool) dg )
+    int opApply( int delegate(ref bool) dg )
     {
         int result;
 
@@ -96,7 +97,7 @@ struct BitVector(size_t len){
 
 
     /** ditto */
-    int opApply( int delegate(inout size_t, inout bool) dg )
+    int opApply( int delegate(ref size_t, ref bool) dg )
     {
         int result;
 
@@ -163,9 +164,9 @@ struct BitVector(size_t len){
     /**
      * returns a string with the hex representation of the current bit sequence
      */
-    char[] toString(){
+    string toString(){
         auto dim = this.dim();
-        char[] res;
+        string res;
         auto p=ptr;
         for (size_t i=0;i<dim;++i){
             for (int idim=internal_t.sizeof;idim!=0;){

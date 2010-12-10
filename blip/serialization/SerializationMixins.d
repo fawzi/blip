@@ -19,12 +19,13 @@
 // limitations under the License.
 module blip.serialization.SerializationMixins;
 public import blip.core.Traits: ctfe_i2a,isStaticArrayType,DynamicArrayType;
+import blip.Comp;
 
-char[][] extractFieldsAndDocs(char[] fieldsDoc){
+string [] extractFieldsAndDocs(string fieldsDoc){
     int i=0;
-    char[][] res=[];
+    string [] res=[];
     while (i<fieldsDoc.length){
-        char[] field="",doc="";
+        string field="",doc="";
         while (i<fieldsDoc.length && fieldsDoc[i]==' ') ++i;
         auto fieldStart=i;
         while (i<fieldsDoc.length){
@@ -55,9 +56,9 @@ char[][] extractFieldsAndDocs(char[] fieldsDoc){
 /// serializes some fields
 /// basic version, does not work for subclasses serialized with external structs
 /// (should take the logic from the Xpose version)
-char[] serializeSome(char[] typeName1,char[]fieldsDoc,bool classAddPost=true){
-    char[] typeName=typeName1;
-    char[] res="";
+string serializeSome(string typeName1,string fieldsDoc,bool classAddPost=true){
+    string typeName=typeName1;
+    string res="";
     res~="static ClassMetaInfo metaI;\n";
     res~="static this(){\n";
     res~="    static if (is(typeof(this) == class)){\n";
@@ -160,8 +161,8 @@ char[] serializeSome(char[] typeName1,char[]fieldsDoc,bool classAddPost=true){
 /// serializes some fields
 /// basic version, does not work for subclasses serialized with external structs
 /// (should take the logic from the Xpose version)
-char[] createView(char[] viewName,char[]fieldsDoc,char[] baseType=""){
-    char[] res="";
+string createView(string viewName,string fieldsDoc,string baseType=""){
+    string res="";
     bool inContext=false;
     if (viewName[0]<'A' && viewName[0]>'Z') {
         assert(0,"first letter of viewName should be an uppercase letter");
@@ -262,10 +263,10 @@ char[] createView(char[] viewName,char[]fieldsDoc,char[] baseType=""){
     return res;
 }
 
-char[] descSome(char[] typeName1,char[]fieldsDoc){
-    char[] typeName;
-    char[] res=`
-    void desc(void delegate(char[]) sink){
+string descSome(string typeName1,string fieldsDoc){
+    string typeName;
+    string res=`
+    void desc(void delegate(cstring) sink){
         dumper(sink)("{ class:")`;
     if (typeName.length==0) {
         res~="(typeof(this).mangleof)";

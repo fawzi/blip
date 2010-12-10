@@ -19,21 +19,22 @@ import blip.io.BasicIO;
 import blip.io.BasicStreams;
 import tango.io.Console;
 import blip.io.StreamConverters;
+import blip.Comp;
 
 /// a threadsafe sink to Stdout
-Dumper!(void delegate(char[])) sout;
+Dumper!(void delegate(cstring)) sout;
 /// non threadsafe sink to Stdout
-Dumper!(void delegate(char[])) soutUnsafe;
+Dumper!(void delegate(cstring)) soutUnsafe;
 /// sink to Stderr
-Dumper!(void delegate(char[])) serr;
+Dumper!(void delegate(cstring)) serr;
 /// stdout stream
 OutStreamI soutStream;
 /// stderr stream
 OutStreamI serrStream;
 /// in a parallel setting this is a log local to the current process
-Dumper!(void delegate(char[])) localLog;
+Dumper!(void delegate(cstring)) localLog;
 /// in a parallel setting this log is active only in the master process
-Dumper!(void delegate(char[])) globalLog;
+Dumper!(void delegate(cstring)) globalLog;
 /// true is the global log is active
 bool hasGlobalLog;
 

@@ -17,6 +17,7 @@
 // limitations under the License.
 module blip.io.BasicStreams;
 import blip.io.BasicIO;
+import blip.Comp;
 
 /// basic stream based on a binary sink, no encoding conversion for strings, dangerous to mix!
 final class BasicBinStream: OutStreamI{
@@ -31,20 +32,20 @@ final class BasicBinStream: OutStreamI{
     void rawWrite(void[] a){
         this.sink(a);
     }
-    void rawWriteStrD(char[]s){
+    void rawWriteStrD(cstring s){
         this.sink(s);
     }
-    void rawWriteStr(char[]s){
+    void rawWriteStr(cstring s){
         this.sink(s);
     }
-    void rawWriteStr(wchar[]s){
+    void rawWriteStr(cstringw s){
         this.sink(s);
     }
-    void rawWriteStr(dchar[]s){
+    void rawWriteStr(cstringd s){
         this.sink(s);
     }
     CharSink charSink(){
-        return &this.rawWriteStrD; // cast(void delegate(char[]))rawWriteStr does not work on older compilers
+        return &this.rawWriteStrD; // cast(void delegate(cstring))rawWriteStr does not work on older compilers
     }
     BinSink binSink(){
         return sink;
@@ -64,10 +65,10 @@ final class BasicBinStream: OutStreamI{
 
 /// basic stream based on a string sink, uses the type T as native type, the others are converted
 final class BasicStrStream(T=char): OutStreamI{
-    void delegate(T[]) sink;
+    void delegate(Const!(T)[]) sink;
     void delegate() _flush;
     void delegate() _close;
-    this(void delegate(T[]) s,void delegate()f=null,void delegate()c=null){
+    this(void delegate(Const!(T)[]) s,void delegate()f=null,void delegate()c=null){
         this.sink=s;
         this._flush=f;
         this._close=c;
@@ -77,9 +78,10 @@ final class BasicStrStream(T=char): OutStreamI{
     }
     /// writes a raw string
     void writeStr(U)(U[]data){
-        static if (is(U==T[])){
+        alias Unqual!(U) V;
+        static if (is(V==T[])){
             sink(data);
-        } else static if (is(U==char[])||is(U==wchar[])||is(U==dchar[])){
+        } else static if (is(V==char[])||is(V==wchar[])||is(V==dchar[])){
             T[] s;
             if (t.length<240){
                 T[256] buf;
@@ -93,13 +95,13 @@ final class BasicStrStream(T=char): OutStreamI{
     // alias writeStr!(char)  rawWriteStr;
     // alias writeStr!(wchar) rawWriteStr;
     // alias writeStr!(dchar) rawWriteStr;
-    void rawWriteStr(char[]s){
+    void rawWriteStr(cstring s){
         writeStr(s);
     }
-    void rawWriteStr(wchar[]s){
+    void rawWriteStr(cstringw s){
         writeStr(s);
     }
-    void rawWriteStr(dchar[]s){
+    void rawWriteStr(cstringd s){
         writeStr(s);
     }
     void flush(){
@@ -109,7 +111,7 @@ final class BasicStrStream(T=char): OutStreamI{
         static if (is(T==char)){
             return this.sink;
         } else {
-            return &this.writeStr!(char); // cast(void delegate(char[]))rawWriteStr does not work on older compilers
+            return &this.writeStr!(char); // cast(void delegate(cstring))rawWriteStr does not work on older compilers
         }
     }
     BinSink binSink(){
@@ -173,20 +175,20 @@ final class BufferedBinStream: OutStreamI{
     void rawWrite(void[] a){
         this.sink(a);
     }
-    void rawWriteStrD(char[]s){
+    void rawWriteStrD(cstring s){
         this.sink(s);
     }
-    void rawWriteStr(char[]s){
+    void rawWriteStr(cstring s){
         this.sink(s);
     }
-    void rawWriteStr(wchar[]s){
+    void rawWriteStr(cstringw s){
         this.sink(s);
     }
-    void rawWriteStr(dchar[]s){
+    void rawWriteStr(cstringd s){
         this.sink(s);
     }
     CharSink charSink(){
-        return &this.rawWriteStrD; // cast(void delegate(char[]))rawWriteStr does not work on older compilers
+        return &this.rawWriteStrD; // cast(void delegate(cstring))rawWriteStr does not work on older compilers
     }
     BinSink binSink(){
         return &this.sink;
@@ -204,10 +206,10 @@ final class BufferedBinStream: OutStreamI{
 
 /// basic stream based on a string sink, uses the type T as native type, the others are converted
 final class BufferedStrStream(T=char): OutStreamI{
-    void delegate(T[]) _sink;
+    void delegate(Const!(T)[]) _sink;
     void delegate() _flush;
     void delegate() _close;
-    T[] buf;
+    Const!(T)[] buf;
     size_t content;
     
     this(CharSink s,size_t bufDim=512,void delegate()f=null,void delegate()c=null){
@@ -222,7 +224,7 @@ final class BufferedStrStream(T=char): OutStreamI{
         this.content=0;
     }
     
-    void sink(T[]data){
+    void sink(Const!(T)[]data){
         synchronized(this){
             if (data.length<=buf.length-content){
                 buf[content..content+data.length]=data;
@@ -258,9 +260,10 @@ final class BufferedStrStream(T=char): OutStreamI{
     }
     /// writes a raw string
     void writeStr(U)(U[]data){
-        static if (is(U==T[])){
+        alias Unqual!(U) V;
+        static if (is(V==T[])){
             sink(data);
-        } else static if (is(U==char[])||is(U==wchar[])||is(U==dchar[])){
+        } else static if (is(V==char[])||is(V==wchar[])||is(V==dchar[])){
             T[] s;
             if (t.length<240){
                 T[256] buf;
@@ -274,13 +277,13 @@ final class BufferedStrStream(T=char): OutStreamI{
     // alias writeStr!(char)  rawWriteStr;
     // alias writeStr!(wchar) rawWriteStr;
     // alias writeStr!(dchar) rawWriteStr;
-    void rawWriteStr(char[]s){
+    void rawWriteStr(cstring s){
         writeStr(s);
     }
-    void rawWriteStr(wchar[]s){
+    void rawWriteStr(cstringw s){
         writeStr(s);
     }
-    void rawWriteStr(dchar[]s){
+    void rawWriteStr(cstringd s){
         writeStr(s);
     }
     void flush(){
@@ -290,7 +293,7 @@ final class BufferedStrStream(T=char): OutStreamI{
         static if (is(T==char)){
             return &this.sink;
         } else {
-            return &this.writeStr!(char); // cast(void delegate(char[]))rawWriteStr does not work on older compilers
+            return &this.writeStr!(char); // cast(void delegate(cstring))rawWriteStr does not work on older compilers
         }
     }
     BinSink binSink(){

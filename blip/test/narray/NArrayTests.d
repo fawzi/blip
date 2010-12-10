@@ -34,10 +34,11 @@ import blip.BasicModels;
 import blip.core.Traits;
 import blip.io.BasicIO;
 import blip.io.StreamConverters;
+import blip.Comp;
 
 /// returns a NArray indexed with the variables of a pLoopIdx or sLoopGenIdx
-char[] NArrayInLoop(char[] arrName,int rank,char[] ivarStr){
-    char[] res="".dup;
+string NArrayInLoop(string arrName,int rank,string ivarStr){
+    string res="";
     res~=arrName~"[";
     for (int i=0;i<rank;++i) {
         res~=ivarStr~"_"~ctfe_i2a(i)~"_";
@@ -59,7 +60,7 @@ void checkLoop1(T,int rank)(NArray!(T,rank) a){
         "if (*aPtr0!="~NArrayInLoop("a",rank,"i")~") throw new Exception(\"sLoopGenIdx looping1 failed\",__FILE__,__LINE__);","i"));
     }
     index_type[rank] iPos;
-    const char[] loopBody1=`
+    const istring loopBody1=`
     if (did_wrap) throw new Exception("counter wrapped",__FILE__,__LINE__);
     if (a.arrayIndex(iPos)!=*aPtr0) throw new Exception("sLoopPtr failed",__FILE__,__LINE__);
     did_wrap=a.incrementArrayIdx(iPos);
@@ -70,7 +71,7 @@ void checkLoop1(T,int rank)(NArray!(T,rank) a){
         mixin(sLoopPtr(rank,["a"],loopBody1,"i"));
         if (!did_wrap) throw new Exception("incomplete loop",__FILE__,__LINE__);
     }
-    const char[] loopBody2=`
+    const istring loopBody2=`
     if (did_wrap) throw new Exception("counter wrapped",__FILE__,__LINE__);
     if (a.arrayIndex(iPos)!=*aPtr0) throw new Exception("sLoopIdx looping failed",__FILE__,__LINE__);
     did_wrap=a.incrementArrayIdx(iPos);
@@ -643,7 +644,7 @@ void testSerial(T,int rank)(NArray!(T,rank)a){
     if (!checkResStr(a,b)){
         buf.seek(0,buf.Anchor.Begin);
         sout("b:"); writeOut(sout.call,b); sout("\n");
-        sout("buf:<<")(cast(char[])buf.slice)(">>\n");
+        sout("buf:<<")(cast(cstring)buf.slice)(">>\n");
         throw new Exception("different string values",__FILE__,__LINE__);
     }
 }
@@ -759,7 +760,7 @@ void doNArrayFixTests(){
     arangeTests;
     test_iter;
     auto a6=a4.dup;
-    unaryOp!((inout int x){x*=2;},3,int)(a6);
+    unaryOp!((ref int x){x*=2;},3,int)(a6);
     foreach (i,j,k,v;a4.pFlat){
         if (2*v!=a6[i,j,k]) throw new Exception("error",__FILE__,__LINE__);
     }
@@ -768,11 +769,11 @@ void doNArrayFixTests(){
     auto l2=large2.dup;
     auto large3=l2.T;
     if ((large2.flags&ArrayFlags.Large)==0) throw new Exception("error",__FILE__,__LINE__);
-    unaryOp!((inout int x){x*=32;},2,int)(large2);
+    unaryOp!((ref int x){x*=32;},2,int)(large2);
     foreach (i,j,v;large2.pFlat){
         if (v!=32*l2[i,j]) throw new Exception("error",__FILE__,__LINE__);
     }
-    binaryOp!((inout int x, int y){x/=y+1;},2,int,int)(large2,large3);
+    binaryOp!((ref int x, int y){x/=y+1;},2,int,int)(large2,large3);
     foreach (i,j,v;large2.pFlat){
         if (v!=(32*l2[i,j])/(large3[i,j]+1)) throw new Exception("error",__FILE__,__LINE__);
     }

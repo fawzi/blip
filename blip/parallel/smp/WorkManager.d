@@ -130,9 +130,10 @@ import blip.parallel.smp.BasicTasks;
 import tango.util.log.Config;
 import blip.util.TangoLog;import blip.parallel.smp.NumaSchedulers;
 import blip.parallel.smp.Numa;
+import blip.Comp;
 
-char[][] ctfe_splitCompress(char[]sep,char[] str){
-    char[][] res;
+string [] ctfe_splitCompress(string sep,string str){
+    string [] res;
     size_t fromI=0;
     bool wasSpace=false;
     foreach(i,c;str){
@@ -157,9 +158,9 @@ char[][] ctfe_splitCompress(char[]sep,char[] str){
 /// creates an action, i.e. a void delegate() called name, that captures the local
 /// variables locals, and executes the action action.
 /// lives in the heap, so it is safe
-char[] mkActionMixin(char[]name,char[]locals_,char[]action){
-    char[][] locals=ctfe_splitCompress("|",locals_);
-    char[] res= `
+string mkActionMixin(string name,string locals_,string action){
+    string [] locals=ctfe_splitCompress("|",locals_);
+    string res= `
     void delegate() `~name~`;
     {`;
     foreach(v;locals){

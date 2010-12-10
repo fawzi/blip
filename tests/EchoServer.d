@@ -29,6 +29,7 @@ import blip.io.BufferIn;
 import blip.core.Thread; //pippo
 import blip.stdc.stdlib:exit;
 import blip.util.IgnoreSigpipe;
+import blip.Comp;
 
 class ConnectionHandler{
     SocketServer serv;
@@ -122,10 +123,10 @@ class ConnectionHandler{
         }
     }
 }
-void main(char[][] argv)
+void main(string [] argv)
 {
     auto c=new ConnectionHandler();
-    char[] port="50000";
+    string port="50000";
     if (argv.length>1){
         port=argv[1];
     }

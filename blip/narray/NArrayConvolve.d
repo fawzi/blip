@@ -21,6 +21,7 @@ import blip.narray.NArrayBasicOps;
 import blip.util.TemplateFu;
 import blip.core.Traits;
 import blip.math.Math:min;
+import blip.Comp;
 debug(ConvolveCheckAccess) import blip.container.GrowableArray;
 /+ --------- convolution --------- +/
 // convolution base in 2d: 3 streams (minus,zero,plus), kernel[imin..imax,jmin..jmax] in aij
@@ -28,9 +29,9 @@ debug(ConvolveCheckAccess) import blip.container.GrowableArray;
 //  -  |  
 //  |  +  |
 //     |  +
-char[] convolveBase(char[] indent,bool istream_m=true, bool istream_z=true, bool istream_p=true,
+string convolveBase(string indent,bool istream_m=true, bool istream_z=true, bool istream_p=true,
         int jshift=0, int jmin=0, int jmax=3, int imin=0,int imax=3){
-    char [] res="".dup;
+    string res="";
     if (istream_m && imin<=1 && 1<imax){
         res~=indent;
         debug (ConvolveCheckAccess) res~="safeOut(cast(T*)(cast(size_t)resPtr0-resStrideI),__LINE__);";
@@ -81,7 +82,7 @@ char[] convolveBase(char[] indent,bool istream_m=true, bool istream_z=true, bool
     return res;
 }
 
-//pragma(msg,"convolveBase(char[] indent,bool istream_m=true, bool istream_z=true, bool istream_p=true,
+//pragma(msg,"convolveBase(string indent,bool istream_m=true, bool istream_z=true, bool istream_p=true,
 //        int jshift=0, int jmin=0, int jmax=3, int imin=0,int imax=3)");
 //pragma(msg,convolveBase("   "));
 //pragma(msg,"------");
@@ -90,9 +91,9 @@ enum Border:int{
     Decrease=-1, Same=0, Increase=1
 }
 
-char[] incrementA(char[] indent,int imin,int imax,int jshift){
-    char[] res="".dup;
-    char[] aPtrName="";
+string incrementA(string indent,int imin,int imax,int jshift){
+    string res="".dup;
+    string aPtrName="";
     for (int i=imin;i<imax;++i){
         if (i==0) aPtrName="aPtrMenoI";
         if (i==1) aPtrName="aPtr0";
@@ -104,7 +105,7 @@ char[] incrementA(char[] indent,int imin,int imax,int jshift){
     return res;
 }
 
-//pragma(msg,"incrementA(char[] indent,int imin,int imax,int jshift)");
+//pragma(msg,"incrementA(string indent,int imin,int imax,int jshift)");
 //pragma(msg,incrementA("  ",0,3,0));
 //pragma(msg,"----");
 
@@ -115,11 +116,11 @@ char[] incrementA(char[] indent,int imin,int imax,int jshift){
 //       jOut-(0 if Decrease, 2 if Same, 4 if Increase))
 // jcore=3*junloop+jrest
 // if (jrest<0) jOut=-jrest
-char[] convolveJLoop(char[] indent0,int jrest=0,bool istream_m=true, bool istream_z=true,
+string convolveJLoop(string indent0,int jrest=0,bool istream_m=true, bool istream_z=true,
     bool istream_p=true,int imin=0,int imax=3,Border border=Border.Same){
-    char [] res="".dup;
+    string res="";
     res~=indent0~"{\n";
-    char[] indent=indent0~"    ";
+    string indent=indent0~"    ";
     res~=indent~"T* resPtr0=resPtr0I;\n";
     res~=indent~"T* aPtr0=aPtr0I;\n";
     if (jrest<0){
@@ -207,7 +208,7 @@ char[] convolveJLoop(char[] indent0,int jrest=0,bool istream_m=true, bool istrea
         }
         res~=indent;
         res~="for (j=junloop;j!=0;--j){\n";
-        char[] indent2=indent~"    ";
+        string indent2=indent~"    ";
         for (int jshift=0;jshift<3;++jshift){
             res~=incrementA(indent2,imin,imax,(jshift+2)%3);
             res~=convolveBase(indent2,istream_m,istream_z,istream_p,jshift,0,3,imin,imax);
@@ -233,7 +234,7 @@ char[] convolveJLoop(char[] indent0,int jrest=0,bool istream_m=true, bool istrea
     return res;
 }
 
-//pragma(msg,"convolveJLoop(char[] indent0,int jrest=0,bool istream_m=true, bool istream_z=true,
+//pragma(msg,"convolveJLoop(string indent0,int jrest=0,bool istream_m=true, bool istream_z=true,
 //    bool istream_p=true,int imin=0,int imax=3,Border border=Border.Same)");
 //pragma(msg,convolveJLoop("    "));
 //pragma(msg,"----");
@@ -243,8 +244,8 @@ char[] convolveJLoop(char[] indent0,int jrest=0,bool istream_m=true, bool istrea
 // icore=the length in i dir without border - 2 = min(iIn,iOut)-2
 // icore=2*iunloop+irest
 // if (irest<0) -irest=min(inA.shape[rank-2],outA.shape[rank-2]) (only -1 implemented)
-char[] convolveILoop(char[]indent,int jrest,int irest,Border border){
-    char [] res="".dup;
+string convolveILoop(string indent,int jrest,int irest,Border border){
+    string res="";
     res~=indent~"T* resPtr0I=pOutAPtr0;\n";
     res~=indent~"T* aPtr0I=pInAPtr0;\n";
     if (irest<0){
@@ -272,7 +273,7 @@ char[] convolveILoop(char[]indent,int jrest,int irest,Border border){
         res~=indent~"aPtr0I=cast(T*)(cast(size_t)aPtr0I+2*aStrideI);\n";
         // bulk calc
         res~=indent~"for (index_type i=iunloop;i!=0;--i){\n";
-        char[] indent2=indent~"    ";
+        string indent2=indent~"    ";
         res~=convolveJLoop(indent2,jrest,true,true,true,0,3,border);
         res~=indent2~"resPtr0I=cast(T*)(cast(size_t)resPtr0I+2*resStrideI);\n";
         res~=indent2~"aPtr0I=cast(T*)(cast(size_t)aPtr0I+2*aStrideI);\n";
@@ -299,14 +300,14 @@ char[] convolveILoop(char[]indent,int jrest,int irest,Border border){
     return res;
 }
 
-//pragma(msg,"convolveILoop(char[]indent,int jrest,int irest,Border border");
+//pragma(msg,"convolveILoop(string indent,int jrest,int irest,Border border");
 //pragma(msg,convolveILoop("    ",0,0,Border.Same));
 //pragma(msg,"-------");
 
 /// operations to do before convolveIJ
-char[] preConvolveIJSetup(char[]indent,char[]inAName,char[]outAName,Border border,bool jOnly=false)
+string preConvolveIJSetup(string indent,string inAName,string outAName,Border border,bool jOnly=false)
 {
-    char[] res="".dup;
+    string res="".dup;
     res~="/+ line 0 +/ long convolveStartLine=__LINE__; /+ line 0 +/\n";
     res~=indent~"index_type jIn="~inAName~".shape[rank-1];\n";
     res~=indent~"index_type jOut="~outAName~".shape[rank-1];\n";
@@ -347,7 +348,7 @@ char[] preConvolveIJSetup(char[]indent,char[]inAName,char[]outAName,Border borde
         res~=indent~"T[] outBaseSlice="~outAName~".data;\n";
         res~=indent~"void safeOut(T* ptr,long lineNr){\n";
         res~=indent~"    if (ptr<outBaseSlice.ptr || ptr>=(outBaseSlice.ptr+outBaseSlice.length)){\n";
-        res~=indent~"        char[] msg=collectAppender(void delegate(CharSink sink){\n";
+        res~=indent~"        string msg=collectAppender(void delegate(CharSink sink){\n";
         res~=indent~"            sink(\"ERROR convolve kernel invalid write\\n\");\n";
         res~=indent~"            dumper(sink)(\" invalid access of out array in convolution kernel, T=\")\n";
         res~=indent~"            (T.stringof)(\",rank=\")(rank)(\",switchTag=\")(switchTag)(\", line=\")\n";
@@ -357,7 +358,7 @@ char[] preConvolveIJSetup(char[]indent,char[]inAName,char[]outAName,Border borde
         res~=indent~"}\n";
         res~=indent~"void safeIn(T* ptr,long lineNr){\n";
         res~=indent~"    if (ptr<inBaseSlice.ptr || ptr>=(inBaseSlice.ptr+inBaseSlice.length)){\n";
-        res~=indent~"        char[] msg=collectAppender(void delegate(CharSink sink){\n";
+        res~=indent~"        string msg=collectAppender(void delegate(CharSink sink){\n";
         res~=indent~"            dumper(s)(\"ERROR convolve kernel invalid read\\n\")\n";
         res~=indent~"            (\" invalid access of in array in convolution kernel, T=\")\n";
         res~=indent~"            (T.stringof)(\",rank=\")(rank)(\",switchTag=\")(switchTag)(\", line=\")\n";
@@ -369,16 +370,16 @@ char[] preConvolveIJSetup(char[]indent,char[]inAName,char[]outAName,Border borde
     return res;
 }
 
-//pragma(msg,"preConvolveIJSetup(char[]indent,char[]inAName,char[]outAName,Border border,bool jOnly=false)");
+//pragma(msg,"preConvolveIJSetup(string indent,string inAName,string outAName,Border border,bool jOnly=false)");
 //pragma(msg,preConvolveIJSetup("    ","inA","outA",Border.Same));
 //pragma(msg,"------");
 
 /// 2d convolution with nearest neighbors
 /// the variables of preConvolveIJSetup and T*pOutAPtr0,pInAPtr0 have to be defined
-char[] convolveIJ(char[] indent,Border border){
-    char[] res="".dup;
+string convolveIJ(string indent,Border border){
+    string res="".dup;
     res~=indent~"switch (switchTag){\n";
-    char[] indent2=indent~"    ";
+    string indent2=indent~"    ";
     foreach (ires;[-1,0]){
         foreach (jres;[-4,-3,-2,-1,0,1,2]){
             res~=indent~"case "~ctfe_i2a(10*ires+jres)~":\n";
@@ -399,12 +400,12 @@ char[] convolveIJ(char[] indent,Border border){
 
 /// 2d convolution with nearest neighbors
 /// the variables of preConvolveIJSetup and T*pOutAPtr0,pInAPtr0 have to be defined
-char[] convolveJOnly(char[] indent,Border border){
-    char[] res="".dup;
+string convolveJOnly(string indent,Border border){
+    string res="".dup;
     res~=indent~"T* resPtr0I=pOutAPtr0;\n";
     res~=indent~"T* aPtr0I=pInAPtr0;\n";
     res~=indent~"switch (switchTag){\n";
-    char[] indent2=indent~"    ";
+    string indent2=indent~"    ";
     foreach (jres;[-4,-3,-2,-1,0,1,2]){
         res~=indent~"case "~ctfe_i2a(jres)~":\n";
         res~=indent~"  {\n";
@@ -535,17 +536,17 @@ body{
     if (outA.flags & ArrayFlags.Zero) return outA;
     static if(rank==1){
         static if (border==Border.Increase){
-            const char[] startPStr
+            const istring startPStr
             ="    T* pOutAPtr0=cast(T*)(cast(size_t)outA.startPtrArray+outA.bStrides[0]);\n"
             ~"    T* pInAPtr0=inA.startPtrArray;\n";
         } else static if (border==Border.Same){
-            const char[] startPStr="    T* pOutAPtr0=outA.startPtrArray,pInAPtr0=inA.startPtrArray;\n";
+            const istring startPStr="    T* pOutAPtr0=outA.startPtrArray,pInAPtr0=inA.startPtrArray;\n";
         } else {
-            const char[] startPStr
+            const istring startPStr
             ="    T* pOutAPtr0=outA.startPtrArray;\n"
             ~"    T* pInAPtr0=cast(T*)(cast(size_t)inA.startPtrArray+inA.bStrides[0]);\n";
         }
-        const char[] loopStr
+        const istring loopStr
             ="    T c10=kernel[0],c11=kernel[1],c12=kernel[2];\n"
             ~"    T c00,c01,c02,c20,c21,c22;\n"
             ~preConvolveIJSetup("    ","inA","outA",border,true)
@@ -560,17 +561,17 @@ body{
         T c10=kernel[1,0],c11=kernel[1,1],c12=kernel[1,2];
         T c20=kernel[2,0],c21=kernel[2,1],c22=kernel[2,2];
         static if (border==Border.Increase){
-            const char[] startPStr
+            const istring startPStr
             ="    T* pOutAPtr0=cast(T*)(cast(size_t)outA.startPtrArray+outA.bStrides[0]+outA.bStrides[1]);\n"
             ~"    T* pInAPtr0=inA.startPtrArray;\n";
         } else static if (border==Border.Same){
-            const char[] startPStr="    T* pOutAPtr0=outA.startPtrArray,pInAPtr0=inA.startPtrArray;\n";
+            const istring startPStr="    T* pOutAPtr0=outA.startPtrArray,pInAPtr0=inA.startPtrArray;\n";
         } else {
-            const char[] startPStr
+            const istring startPStr
             ="    T* pOutAPtr0=outA.startPtrArray;\n"
             ~"    T* pInAPtr0=cast(T*)(cast(size_t)inA.startPtrArray+inA.bStrides[0]+inA.bStrides[1]);\n";
         }
-        const char[] loopStr
+        const istring loopStr
         =startPStr
         ~preConvolveIJSetup("    ","inA","outA",border)
         ~convolveIJ("    ",border);
@@ -589,7 +590,7 @@ body{
             cast(T*)(cast(size_t)outA.startPtrArray
                 +((outA.shape[0]-partialShape)/2)*(outA.bStrides[0]+outA.bStrides[1]+outA.bStrides[2])),
             outA.newFlags, outA.newBase);
-        const char[] intConvolveStr=convolveIJ("    ",border);
+        const istring intConvolveStr=convolveIJ("    ",border);
         static if (border==Border.Increase){
             const loopBody=`
             for (index_type kDiff=-1;kDiff<2;++kDiff){

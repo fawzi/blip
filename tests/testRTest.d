@@ -24,6 +24,7 @@ import blip.util.TangoLogConfig;
 import blip.util.TangoLog;
 import blip.io.BasicIO;
 import blip.io.Console;
+import blip.Comp;
 version(Trace){ import blip.core.stacktrace.TraceExceptions; }
 
 private int[4] specialNrs=[0,2,5,8];
@@ -35,10 +36,10 @@ private mixin testInit!("acceptable= 10>arg0 && arg0>-10;") smallIntSkipTst; // 
 private mixin testInit!("",`arg0=specialNrs[arg0_i]; arg0_nEl=specialNrs.length;
 arg1=specialNrs[arg1_i]; arg1_nEl=specialNrs.length;`) combNrTst; // combinatorial cases
 
-void main(char[][]argv){
+void main(string []argv){
     sout("blip.parallel.smp:")(Log.lookup("blip.parallel.smp").level)("\n");
     sout("blip.parallel.smp.queue:")(Log.lookup("blip.parallel.smp.queue").level)("\n");
-    CharSink nullPrt=delegate void(char[]s){};
+    CharSink nullPrt=delegate void(string s){};
     nullPrt=sout.call;
     SingleRTest.defaultTestController=new TextController("",TextController.OnFailure.StopTest,
         TextController.PrintLevel.AllShort,nullPrt,nullPrt,1,false);

@@ -28,6 +28,7 @@ import tango.core.Memory;
 import Integer=tango.text.convert.Integer;
 import tango.core.Tuple;
 import blip.io.EventWatcher;
+import blip.Comp;
 
 version=TestRpcNoOneway;
 
@@ -280,7 +281,7 @@ void rpcTestServer(){
         });
     }
 }
-void rpcTestSimpleClient(char[] url,int repeat=1){
+void rpcTestSimpleClient(string url,int repeat=1){
     try{
         //GC.disable();
         
@@ -290,7 +291,7 @@ void rpcTestSimpleClient(char[] url,int repeat=1){
         auto pUrl=ParsedUrl.parseUrl(url);
         auto handler=ProtocolHandler.protocolForUrl(pUrl);
         for (int itime=0;itime<repeat;++itime){
-            char[] res=handler.simpleCall(pUrl);
+            string res=handler.simpleCall(pUrl);
             sinkTogether(sout,delegate void(CharSink s){
                 dumper(s)("simpleCall returned '")(res)("'\n");
             });
@@ -315,7 +316,7 @@ struct SerUnser{
     }
 }
 
-void rpcTestClient(char[] url){
+void rpcTestClient(string url){
     try{
         //GC.disable();
         
@@ -344,7 +345,7 @@ void rpcTestClient(char[] url){
             {
                 ParsedUrl pUrl2=pUrl;
                 pUrl2.appendToPath("proxyName");
-                char[] resN=callH.simpleCall(pUrl2);
+                string resN=callH.simpleCall(pUrl2);
                 sinkTogether(sout,delegate void(CharSink s){
                     dumper(s)("proxyName:")(resN)("\n");
                 });
@@ -433,7 +434,7 @@ void rpcTestClient(char[] url){
                     {
                         ParsedUrl pUrl2=pUrl;
                         pUrl2.appendToPath("proxyName");
-                        char[] resN=callH.simpleCall(pUrl2);
+                        string resN=callH.simpleCall(pUrl2);
                         sinkTogether(sout,delegate void(CharSink s){
                             dumper(s)("proxyName:")(resN)("\n");
                         });
@@ -464,7 +465,7 @@ void rpcTestClient(char[] url){
 }
 
 
-void main(char[][]args){
+void main(string []args){
     void help(){
         sout("usage:\n")
             (args[0])(" [--help|-server|-client proxUrl|-simpleClient callUrl|-combined]\n");

@@ -30,11 +30,12 @@ private {
     import blip.serialization.Serialization;
     import blip.serialization.SerializationMixins;
     import blip.util.Convert;
+    import blip.Comp;
 }
 
 /// mixin to loop on vectors and matrixes
-char[] vectMLoopMixin(char[][] names,char[] op){
-    char[] res=`
+string vectMLoopMixin(string [] names,string op){
+    string res=`
     {`;
     foreach(n;names){
         res~=`
@@ -261,12 +262,12 @@ struct Vector(flt_, int dim_) {
     }
 
     
-    char[] toString() {
-        char[] res = "[";
-            res ~= convTo!(char[])(x);
-            static if (dim >= 2) res ~= ", " ~ convTo!(char[])(y);
-            static if (dim >= 3) res ~= ", " ~ convTo!(char[])(z);
-            static if (dim >= 4) res ~= ", " ~ convTo!(char[])(w);
+    string toString() {
+        string res = "[";
+            res ~= convTo!(string )(x);
+            static if (dim >= 2) res ~= ", " ~ convTo!(string )(y);
+            static if (dim >= 3) res ~= ", " ~ convTo!(string )(z);
+            static if (dim >= 4) res ~= ", " ~ convTo!(string )(w);
         return res ~ "]";
     }
     
@@ -387,7 +388,7 @@ struct Vector(flt_, int dim_) {
     }
     
     
-    private template opXVAssign(char[] op) {
+    private template opXVAssign(string op) {
         void opXVAssign(T)(T rhs) {
             assert (ok);
             static if (is(typeof(rhs.opVecMul_r(*this)) : Vector)) {
@@ -526,8 +527,8 @@ struct Vector(flt_, int dim_) {
     }
     
     
-    private static char[] genSwizzleCode(char[] str) {
-        char[] res = "";
+    private static string genSwizzleCode(string str) {
+        string res = "";
         foreach (i, c; str) {
             assert (i <= 9);
             if (c == '0' || c == '1') {
@@ -540,7 +541,7 @@ struct Vector(flt_, int dim_) {
     }
     
     
-    Vector!(flt, str.length) swizzle(char[] str)() {
+    Vector!(flt, str.length) swizzle(string str)() {
         assert (ok);
         Vector!(flt, str.length) res = void;
         mixin(genSwizzleCode(str));
@@ -691,7 +692,7 @@ struct Matrix(flt_, int rows_, int cols_) {
     }
     
     
-    static char[] _rc(int r, int c)(char[] src) {
+    static string _rc(int r, int c)(string src) {
         static if (r == rows && isExtended) {
             static if (r == c) {
                 return "cscalar!(flt, 1)";
@@ -928,7 +929,7 @@ struct Matrix(flt_, int rows_, int cols_) {
     }
     
     
-    private void opXAssign_(char[] x)(flt rhs) {
+    private void opXAssign_(string x)(flt rhs) {
         assert (ok);
         foreach (c; Range!(cols)) {
             foreach (r; Range!(rows)) {
@@ -945,7 +946,7 @@ struct Matrix(flt_, int rows_, int cols_) {
         public alias opXAssign_!("/")   opDivAssign;
     }
 
-    private Matrix opX_(char[] x)(flt rhs) {
+    private Matrix opX_(string x)(flt rhs) {
         Matrix res = *this;
         res.opXAssign_!(x)(rhs);
         return res;
@@ -979,7 +980,7 @@ struct Matrix(flt_, int rows_, int cols_) {
     }
     alias set opSliceAssign;
 
-    private void opMXAssign_(char[] x)(ref Matrix rhs) {
+    private void opMXAssign_(string x)(ref Matrix rhs) {
         assert (ok);
         assert (rhs.ok);
         
@@ -1258,15 +1259,15 @@ struct Matrix(flt_, int rows_, int cols_) {
     }
     
     
-    char[] toString() {
-        char[] row(int r) {
-            char[] res = "(" ~ convTo!(char[])(getRC(r, 0));
+    string toString() {
+        string row(int r) {
+            string res = "(" ~ convTo!(string )(getRC(r, 0));
             for (int i = 1; i < cols; ++i) {
-                res ~= "," ~ convTo!(char[])(getRC(r, i));
+                res ~= "," ~ convTo!(string )(getRC(r, i));
             }
             return res ~ ")";
         }
-        char[] res = "[" ~ row(0);
+        string res = "[" ~ row(0);
         for (int i = 1; i < rows; ++i) {
             res ~= "; " ~ row(i);
         }
@@ -1291,7 +1292,7 @@ struct Matrix(flt_, int rows_, int cols_) {
     }
 }
 
-char[] Matrix_rc(int rows,int cols,int r, int c,char[] src) {
+string Matrix_rc(int rows,int cols,int r, int c,string src) {
     bool isExtended = rows + 1 == cols;
     if (r == rows && isExtended) {
             if (r == c) {
@@ -1350,7 +1351,7 @@ struct Quaternion(flt_) {
         return true;
     }
     
-    char[] toString(){
+    string toString(){
         return xyzw.toString; // TODO better
     }
     

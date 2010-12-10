@@ -31,33 +31,34 @@ import blip.time.Clock;
 import blip.util.NotificationCenter;
 import blip.container.Pool;
 import blip.container.Cache;
+import blip.Comp;
 
 /+interface RemoteTask:Serializable{
-    char[]name();
+    string name();
     void do_task(Cluster c);
 }
 
 class ClusterException:Exception{
-    this(char[]msg,char[]file,long line){
+    this(string msg,string file,long line){
         super(msg,file,line);
     }
 }
 
 class Worker{
-    char[] sourceId;
-    char[] baseUrl;
+    string sourceId;
+    string baseUrl;
     void executeTask(RemoteTask t){
         
     }
 }
 
 class Peer{
-    char[] sourceId;
-    char[] baseUrl;
+    string sourceId;
+    string baseUrl;
     mixin(serializeSome("blip.parallel.cluster.Worker","sourceId|baseUrl"));
     mixin printOut!();
     this(){}
-    this(char[] sourceId,char[] baseUrl){
+    this(string sourceId,string baseUrl){
         this.sourceId=sourceId;
         this.baseUrl=baseUrl;
     }
@@ -69,7 +70,7 @@ class ListChange{
 
 /// dead peer
 struct DeadPeer{
-    char[] sourceId;
+    string sourceId;
     Time deathTime;
     long lastEntryId;
 }
@@ -79,12 +80,12 @@ struct DeadPeer{
 class WeakList(T){
     /// an entry in the weak list
     struct Entry{
-        char[] sourceId;
+        string sourceId;
         long lastEntryIdSync; // value of lastEntryIdSync in the source when entry was added (useful to do some extra consistency checks)
         long entryId0;
         long entryId;
         T data;
-        static Entry *opCall(char[]sourceId,long entryId0,long entryId,T data){
+        static Entry *opCall(string sourceId,long entryId0,long entryId,T data){
             auto res=new Entry;
             res.sourceId=sourceId;
             res.entryId0=entryId0;
@@ -130,7 +131,7 @@ class WeakList(T){
         override Entry *allocateNew(){
             return new Entry;
         }
-        Entry *getObj(char[]sourceId,long entryId0,long entryId,T data){
+        Entry *getObj(string sourceId,long entryId0,long entryId,T data){
             Entry *res=super.getObj();
             res.sourceId=sourceId;
             res.entryId0=entryId0;
@@ -146,7 +147,7 @@ class WeakList(T){
     Deque!(JournalEntry) journal;
     long journalFirstId;
     
-    char[] name; /// name of the weak list
+    string name; /// name of the weak list
     Cluster cluster;
     
     T[]     sharedData;     /// data shared by the whole cluster
@@ -232,14 +233,14 @@ class WeakList(T){
         
     }
 
-    ListChange mergeWithListOf(char[]sourceId,ListChange c){
+    ListChange mergeWithListOf(string sourceId,ListChange c){
     // find common basis:
     // find max(last from sourceId, second last local)
     // send entries 
         return null;
     }
     /// synchronizes this list with the one of sourceId
-    void mergeWith(char[]sourceId){
+    void mergeWith(string sourceId){
         
     }
     static this(){
@@ -252,15 +253,15 @@ class WeakList(T){
 /// a cluster of peer to peer servers
 class Cluster{
     NotificationCenter nCenter; // notifications
-    Variant[char[]] info;
-    char[] sourceId;
+    Variant[string ] info;
+    string sourceId;
     WeakList!(Peer) workersList;
-    Peer[char[]] workersDict;
+    Peer[string ] workersDict;
     DeadPeer[] deadPeers;
     
-    char[] firstAdd(char[]partialSId,char[]baseUrl){
+    string firstAdd(string partialSId,string baseUrl){
         auto w=new Worker;
-        char[] fullId;
+        string fullId;
         synchronized(workersList){
             fullId=collectAppender(delegate void(CharSink s){
                 writeOut(s,workersList.lastEntryId+1,":d6");
@@ -278,7 +279,7 @@ class Cluster{
             
         }
     }
-    bool knowsSource(char[]s){
+    bool knowsSource(string s){
         return (s in workersDict)!is null;
     }
 }

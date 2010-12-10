@@ -25,6 +25,7 @@ import Integer=tango.text.convert.Integer;
 import blip.math.random.Random;
 import blip.parallel.smp.PLoopHelpers;
 import blip.math.Math;
+import blip.Comp;
 
 class Gauss{
     double[] alpha,r,res;
@@ -55,7 +56,7 @@ class Gauss{
     }
 }
 
-int main(char[][] args){
+int main(string [] args){
     size_t n=10000;
     if (args.length>1){
         n=Integer.toInt(args[1]);

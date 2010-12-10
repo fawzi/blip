@@ -32,6 +32,7 @@ import blip.core.Variant;
 import blip.container.GrowableArray;
 import blip.io.BasicIO;
 import blip.io.StreamConverters;
+import blip.Comp;
 
 // duplication of serializer/unserilizer with blip.parallel.Mpi ugly, should probably be abstracted away
 struct SNMessage{
@@ -183,7 +184,7 @@ class SNChannel:Channel,BasicObjectI{
         return _serializer;
     }
     template sendT(T){
-        void send(T v,int tag=0){
+        void send(Const!(T) v,int tag=0){
             recevingChannel.data.append(SNMessage(tag,Variant(v)));
             recevingChannel.notify();
         }
@@ -310,7 +311,7 @@ class SNChannel:Channel,BasicObjectI{
     alias r2.recv recv;
     alias r3.recv recv;
     
-    void sendStr(char[] s, int tag=0){
+    void sendStr(Const!(char[]) s, int tag=0){
         sendT!(char[]).send(s,tag);
     }
     int recvStr(ref char[] s,int tag=0){
@@ -328,7 +329,7 @@ class SNChannel:Channel,BasicObjectI{
     }
     
     template sendrecvT(T){
-        int sendrecv(T sendV,ref T recvV,Channel recvChannel,int sendTag=0,int recvTag=0){
+        int sendrecv(Const!(T) sendV,ref T recvV,Channel recvChannel,int sendTag=0,int recvTag=0){
             if (recvChannel is this && sendTag==recvTag && data.length==0){
                 recvV=sendV;
                 return recvTag;
@@ -346,7 +347,7 @@ class SNChannel:Channel,BasicObjectI{
     alias sr2.sendrecv sendrecv;
     alias sr3.sendrecv sendrecv;
 
-    void desc(void delegate(char[]) s){
+    void desc(void delegate(cstring) s){
         s("{<SNChannel@"); writeOut(s,cast(void*)this); s(">\n");
         s("  queue:"); writeOut(s,data); s(",\n");
         s("  handlers:{");
@@ -439,23 +440,23 @@ class SNCart(int dimG):Cart!(dimG){
 class SNLinearComm:LinearComm,BasicObjectI{
     SNChannel[] channels;
     UniqueNumber!(int) counter;
-    char[] _name;
+    string _name;
     int _myRank;
     
-    this(char[] name=null){
+    this(string name=null){
         this([new SNChannel()],name);
     }
-    this(SNChannel[] channels,char[]name){
+    this(SNChannel[] channels,string name){
         this.channels=channels;
         this._name=name;
         this._myRank=0;
         assert(channels.length==1,"only 1 channel supported at the moment");
         counter=UniqueNumber!(int)(10);
     }
-    char[] name(){
+    string name(){
         return _name;
     }
-    void name(char[] n){
+    void name(string n){
         _name=n;
     }
     int myRank(){
@@ -471,15 +472,15 @@ class SNLinearComm:LinearComm,BasicObjectI{
         assert(newRank==0,"only 1 process thing available");
         return this;
     }
-    Cart!(2) mkCart(char[] name,int[2] dims,int[2] periodic,bool reorder){
+    Cart!(2) mkCart(string name,int[2] dims,int[2] periodic,bool reorder){
         assert(dims==[1,1],"only 1 process thing available");
         return new SNCart!(2)(new SNLinearComm(channels,name),dims,periodic);
     }
-    Cart!(3) mkCart(char[] name,int[3] dims,int[3] periodic,bool reorder){
+    Cart!(3) mkCart(string name,int[3] dims,int[3] periodic,bool reorder){
         assert(dims==[1,1,1],"only 1 process thing available");
         return new SNCart!(3)(new SNLinearComm(channels,name),dims,periodic);
     }
-    Cart!(4) mkCart(char[] name,int[4] dims,int[4] periodic,bool reorder){
+    Cart!(4) mkCart(string name,int[4] dims,int[4] periodic,bool reorder){
         assert(dims==[1,1,1,1],"only 1 process thing available");
         return new SNCart!(4)(new SNLinearComm(channels,name),dims,periodic);
     }
@@ -630,7 +631,7 @@ class SNLinearComm:LinearComm,BasicObjectI{
         (cast(SNChannel)(this[0])).registerHandler(handler,tag);
     }
     
-    void desc(void delegate(char[]) s){
+    void desc(void delegate(cstring) s){
         s("{<SNLinearComm> name:"); s(name); s("}");
     }
 }

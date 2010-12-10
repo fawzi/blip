@@ -20,6 +20,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 module blip.bindings.fft.fftw;
+import blip.Comp;
 
 import tango.stdc.stdio;
 import tango.stdc.stddef;
@@ -92,7 +93,7 @@ enum{
  FFTW_FORWARD=-1,
  FFTW_BACKWARD=1,
 }
-const double FFTW_NO_TIMELIMIT=-1.0;
+const Immutable!(double) FFTW_NO_TIMELIMIT=-1.0;
 enum:uint{
 /* documented flags */
  FFTW_MEASURE=0U,

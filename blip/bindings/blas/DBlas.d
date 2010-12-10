@@ -53,24 +53,24 @@ version (FORTRAN_FLOAT_FUNCTIONS_RETURN_DOUBLE) {
      or
      r = (a/sqrt(conj(a)*a  + conj(b)*b)) * sqrt(conj(a)*a + conj(b)*b)
 */
-void rotg(inout f_float a, inout f_float b, out f_float c, out f_float s) {
+void rotg(ref f_float a, ref f_float b, out f_float c, out f_float s) {
     srotg_(&a, &b, &c, &s);
 }
-void rotg(inout f_double a, inout f_double b, out f_double c, out f_double s) {
+void rotg(ref f_double a, ref f_double b, out f_double c, out f_double s) {
     drotg_(&a, &b, &c, &s);
 }
-void rotg(inout f_cfloat a, inout f_cfloat b, out f_float c, out f_cfloat s) {
+void rotg(ref f_cfloat a, ref f_cfloat b, out f_float c, out f_cfloat s) {
     crotg_(&a, &b, &c, &s);
 }
-void rotg(inout f_cdouble a, inout f_cdouble b, out f_double c, out f_cdouble s) {
+void rotg(ref f_cdouble a, ref f_cdouble b, out f_double c, out f_cdouble s) {
     zrotg_(&a, &b, &c, &s);
 }
 
 /// Generate modified plane (Givens) rotation
-void rotmg(inout f_double d1, inout f_double d2, inout f_double b1, inout f_double b2, f_double *param) {
+void rotmg(ref f_double d1, ref f_double d2, ref f_double b1, ref f_double b2, f_double *param) {
     drotmg_(&d1, &d2, &b1, &b2, param);
 }
-void rotmg(inout f_float d1, inout f_float d2, inout f_float b1, inout f_float b2, f_float *param) {
+void rotmg(ref f_float d1, ref f_float d2, ref f_float b1, ref f_float b2, f_float *param) {
     srotmg_(&d1, &d2, &b1, &b2, param);
 }
 

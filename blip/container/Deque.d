@@ -22,6 +22,7 @@ import blip.math.Math;
 import blip.io.BasicIO;
 import blip.util.Grow:growLength;
 import blip.serialization.Serialization;
+import blip.Comp;
 
 class Deque(T):CopiableObjectI{
     T[] baseArr;
@@ -434,7 +435,7 @@ class Deque(T):CopiableObjectI{
     
         mixin printOut!();
     } else {
-        void desc(void delegate(char[]) s){
+        void desc(void delegate(cstring) s){
             s("{<Deque!(");
             s(T.stringof);
             s(") nEl=");

@@ -19,6 +19,7 @@ module blip.Comp;
 
 version(D_Version2){
 mixin(`
+  import std.traits: Unqual;
   template Const(T){
       alias const(T) Const;
   }
@@ -28,8 +29,11 @@ mixin(`
   immutable(T) Idup(T)(T val){
       return val.idup;
   }
-  alias immutable(char)[] string;
+  //alias immutable(char)[] string;
   alias const(char)[] cstring;
+  alias const(wchar)[] cstringw;
+  alias const(dchar)[] cstringd;
+  alias immutable(char[]) istring;
 `);
 } else {
   template Const(T){
@@ -43,4 +47,10 @@ mixin(`
   }
   alias char[] string;
   alias char[] cstring;
+  alias wchar[] cstringw;
+  alias dchar[] cstringd;
+  alias char[] istring;
+  template Unqual(T){
+      alias T Unqual;
+  }
 }

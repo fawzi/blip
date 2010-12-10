@@ -25,7 +25,7 @@
 // limitations under the License.
 module blip.bindings.ev.Libev;
 import blip.stdc.signal;
-private alias char[] string;
+import blip.Comp;
 extern (C){
     //align (4):
 

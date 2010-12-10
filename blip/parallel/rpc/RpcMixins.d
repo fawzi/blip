@@ -25,14 +25,15 @@ public import blip.core.Variant;
 public import blip.parallel.smp.WorkManager;
 public import blip.container.GrowableArray;
 public import blip.io.BasicIO;
+import blip.Comp;
 
 /// main mixin, creates proxies (possibly also local) and vendor, called 'name~"Proxy"', 'name~"LocalProxy"',
 /// 'name~"Vendor"', extName is used to build the serializer and proxy registration names, it defaults to
 /// the mangleof.
-char[] rpcMixin(char[] extName, char[] extraProxyInterfaces,char[]functions,bool localProxy=true,char[] name="Default"){
+string rpcMixin(string extName, string extraProxyInterfaces,string functions,bool localProxy=true,string name="Default"){
     assert(name.length>0,"name cannot be empty");
     auto functionsComments=extractFieldsAndDocs(functions);
-    char[] res;
+    string res;
     res=rpcProxyMixin(name,extName,extraProxyInterfaces,functionsComments,localProxy);
     res~=rpcVendorMixin(name,extName,functionsComments);
     return res;
@@ -43,20 +44,20 @@ char[] rpcMixin(char[] extName, char[] extraProxyInterfaces,char[]functions,bool
 /// at the moment the local proxy is not strict (i.e. does not always spawn a task), this while faster
 /// might introduce subtle changes (with respect to behaviour of the spawned subtasks, that might be non
 /// finished when the function returns). Switch to always spawn??
-char[] rpcProxyMixin(char[] name,char[] extName,char[] extraInterfaces,char[][] functionsComments,
+string rpcProxyMixin(string name,string extName,string extraInterfaces,string [] functionsComments,
     bool localProxy=true)
 {
-    char[] extNameProxy;
+    string extNameProxy;
     if (extName.length==0){
         extNameProxy=name~`Proxy.mangleof`;
     } else {
         extNameProxy=`"`~extName~`Proxy"`;
     }
-    char[] res=`
+    string res=`
     alias typeof(this) `~name~`ProxiedType;`;
     res~=`
     final static class `~name~`Proxy: BasicProxy`~((extraInterfaces.length!=0)?",":" ")~extraInterfaces~` {
-        this(char[]name,char[]url){
+        this(string name,string url){
             if (name.length==0)
                 name=`~extNameProxy~`;
             super(name,url);
@@ -211,7 +212,7 @@ char[] rpcProxyMixin(char[] name,char[] extName,char[] extraInterfaces,char[][] 
                 return gPool.getObj();
             }
         }
-        this(char[]name,char[]url){
+        this(string name,string url){
             OnewayClosure.addGPool();
             if (name=="")
                 name=`~extNameProxy~`;
@@ -274,33 +275,33 @@ char[] rpcProxyMixin(char[] name,char[] extName,char[] extraInterfaces,char[][] 
     }
     static this(){
         ProtocolHandler.registerProxy(`~extNameProxy~`,
-            function Proxy(char[]name,char[]url){ return new `~name~`Proxy(name,url); },
-            function Proxy(char[]name,char[]url){ return new `~name~`ProxyLocal(name,url); });
+            function Proxy(string name,string url){ return new `~name~`Proxy(name,url); },
+            function Proxy(string name,string url){ return new `~name~`ProxyLocal(name,url); });
     }`;
     } else {
         res~=`
         }
         static this(){
             ProtocolHandler.registerProxy(`~extNameProxy~`,
-                function Proxy(char[]name,char[]url){ return new `~name~`Proxy(name,url); });
+                function Proxy(string name,string url){ return new `~name~`Proxy(name,url); });
         }
         `;
     }
     return res;
 }
 
-char[] rpcVendorMixin(char[] name,char[] extName_, char[][] functionsComments){
-    char[] extNameProxy;
+string rpcVendorMixin(string name,string extName_, string [] functionsComments){
+    string extNameProxy;
     if (extName_.length==0){
         extNameProxy=name~`Proxy.mangleof`;
     } else {
         extNameProxy=`"`~extName_~`Proxy"`;
     }
-    char[] extName=`"`~extName_~`Vendor"`;
+    string extName=`"`~extName_~`Vendor"`;
     if (extName_.length==0) {
         extName=name~`Vendor.mangleof`;
     }
-    char[] res=`
+    string res=`
     final static class `~name~`Vendor:BasicVendor{
         `~name~`ProxiedType obj;
         override `~name~`ProxiedType targetObj(){ return obj; }
@@ -458,7 +459,7 @@ char[] rpcVendorMixin(char[] name,char[] extName_, char[][] functionsComments){
             Closure.rmGPool();
         }
         
-        override void proxyDescDumper(void delegate(char[])s){
+        override void proxyDescDumper(void delegate(cstring)s){
             super.proxyDescDumper(s);`;
     for (int ifield=0;ifield<functionsComments.length/2;++ifield){
         auto functionName=functionsComments[2*ifield];
@@ -530,7 +531,7 @@ char[] rpcVendorMixin(char[] name,char[] extName_, char[][] functionsComments){
         }`;
     }
     res~=`
-        void remoteMainCall(char[] fName,ubyte[] reqId, Unserializer u, SendResHandler sendRes){
+        void remoteMainCall(string fName,ubyte[] reqId, Unserializer u, SendResHandler sendRes){
             switch(fName){`;
     for (int ifield=0;ifield<functionsComments.length/2;++ifield){
         auto functionName=functionsComments[2*ifield];

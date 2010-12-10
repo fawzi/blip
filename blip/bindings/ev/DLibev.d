@@ -31,6 +31,7 @@ import blip.container.HashSet;
 version(TrackEvents){
     import blip.io.Console;
 }
+import blip.Comp;
 
 /// bits for ev_default_loop and ev_loop_new
 enum EVFLAG: uint{
@@ -57,8 +58,8 @@ enum EVBACKEND: uint{
 
 // the active watcher types (excluding none, custom, any, and superclasses watcher,watcher_list,watcher_time)
 // without "ev_" at the beginning, separated by commas
-char[] baseEvTypesStr(){
-    char[] str="io,timer,";
+string baseEvTypesStr(){
+    string str="io,timer,";
     static if (EV_PERIODIC_ENABLED){
         str~="periodic,";
     }
@@ -83,7 +84,7 @@ char[] baseEvTypesStr(){
 }
 
 /// ev types (excluding none and custom that do not have a real type corresponding to it)
-char[] evTypesStr(){
+string evTypesStr(){
     return baseEvTypesStr()~"watcher,watcher_list,watcher_time,any_watcher";
 }
 
@@ -109,8 +110,8 @@ char[] evTypesStr(){
             periodic
 +/
 
-char[] kindOfTypeMixin(){
-    char[] res="";
+string kindOfTypeMixin(){
+    string res="";
     foreach(i,kStr;ctfeSplit(",",evTypesStr(),true)){
         res~=`
     `~((i!=0)?`} else `[]:""[])~`static if (is(T==ev_`~kStr~`)){
@@ -123,8 +124,8 @@ char[] kindOfTypeMixin(){
     return res;
 }
 
-char[] startMixin(){
-    char[] res=`
+string startMixin(){
+    string res=`
     switch(kind){`;
     foreach(kStr;ctfeSplit(",",baseEvTypesStr(),true)){
         res~=`
@@ -143,8 +144,8 @@ char[] startMixin(){
     return res;
 }
 
-char[] stopMixin(){
-    char[] res=`
+string stopMixin(){
+    string res=`
     switch(kind){`;
     foreach(kStr;ctfeSplit(",",baseEvTypesStr(),true)){
         res~=`
@@ -167,12 +168,12 @@ char[] stopMixin(){
     return res;
 }
 
-char[] mixinInitAndCreate(char[]kind,char[] extraArgsDecls, char[] extraArgs){
-    char[] upcaseKind=kind.dup;
+string mixinInitAndCreate(string kind,string extraArgsDecls, string extraArgs){
+    string upcaseKind=kind.dup;
     upcaseKind[0]+='A'-'a';
-    char[] commaExtraArgs=((extraArgs.length>0)?",":" ")~extraArgs;
-    char[] extraArgsDeclsComma=extraArgsDecls~((extraArgsDecls.length>0)?",":" ");
-    char[] res=`
+    string commaExtraArgs=((extraArgs.length>0)?",":" ")~extraArgs;
+    string extraArgsDeclsComma=extraArgsDecls~((extraArgsDecls.length>0)?",":" ");
+    string res=`
 /// initialize a `~kind~` watcher, the callback can be either directly given, or created by passing
 /// a structure pointer/class that contains an extern(C) cCallback static member
 GenericWatcher `~kind~`Init(T=watcherCbF)(`~extraArgsDeclsComma~` T callback=null){
@@ -241,7 +242,7 @@ struct GenericWatcher{
     int kind;
     PoolI!(GenericWatcher) pool; // should be set only if it is based on any_watcher
     
-    void desc(void delegate(char[])s){
+    void desc(void delegate(string)s){
         dumper(s)("<GenericWatcher@")(ptr_)(" kind:")(kind)(">");
     }
     

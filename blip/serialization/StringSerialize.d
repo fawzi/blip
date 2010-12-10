@@ -19,6 +19,7 @@ import blip.serialization.JsonSerialization;
 import blip.serialization.SBinSerialization;
 import blip.serialization.SerializationBase;
 import blip.container.GrowableArray;
+import blip.Comp;
 
 /// utility method to serialize just one object to an array of the given type
 U[] serializeToArray(T,U=char)(T t,U[] buf=cast(U[])null){
@@ -50,14 +51,14 @@ void serializeToSink(U,T)(void delegate(T[]) sink,U t){
 
 // useful to be mixed in in serializable objects to give desc and toString...
 template printOut(){
-    char[] toString(){
+    string toString(){
         static if (is(typeof(*T.init)==struct))
-            return serializeToArray(*this);
+            return cast(string)serializeToArray(*this);
         else
-            return serializeToArray(this);
+            return cast(string)serializeToArray(this);
     }
     
-    void desc(void delegate(char[]) sink){
+    void desc(void delegate(cstring) sink){
         static if (is(typeof(*T.init)==struct))
             serializeToSink(sink,*this);
         else

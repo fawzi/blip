@@ -22,6 +22,7 @@ import blip.io.BasicIO;
 import blip.io.Console;
 import blip.container.GrowableArray;
 import Integer=tango.text.convert.Integer;
+import blip.Comp;
 
 long fib(long n){
     auto tAtt=taskAtt.val;
@@ -42,7 +43,7 @@ void testFib(long n){
         sout("fib(")(n)(")=")(res)(" time=")((t1-t0)*realtimeClockPeriod())("\n");
     }
 }
-int main(char[][] args){
+int main(string [] args){
     long n=15;
     if (args.length>1){
         n=Integer.toInt(args[1]);

@@ -24,6 +24,7 @@ module blip.util.NotificationCenter;
 import blip.sync.Atomic;
 import blip.core.Variant;
 import blip.container.AtomicSLink;
+import blip.Comp;
 
 struct Callback{
     enum Flags{
@@ -32,7 +33,7 @@ struct Callback{
         ReceiveWhenInProcess=2, /// receive when a notification happens while processing the first one (callback has to be threadsafe)
         ReceiveAll=4, /// receive all notification (even if you are still waiting for the first to start executing, the callback should be threadsafe)
     }
-    void delegate(char[],Callback*,Variant) callback;
+    void delegate(cstring,Callback*,Variant) callback;
     Callback *next;
     Flags flags;
     
@@ -41,7 +42,7 @@ struct Callback{
     }
     
     static Callback *freeList;
-    static Callback *newCallback(void delegate(char[],Callback*,Variant) callback,
+    static Callback *newCallback(void delegate(cstring,Callback*,Variant) callback,
         Flags flags=Flags.None)
     {
         auto newC=popFrom(freeList);
@@ -65,13 +66,13 @@ struct CallbackList{
 }
 
 class NotificationCenter{
-    CallbackList*[char[]] notificationLists;
+    CallbackList*[string ] notificationLists;
     this(){}
-    bool registerCallback(char[]name,void delegate(char[],Callback*,Variant) callback,
+    bool registerCallback(string name,void delegate(cstring,Callback*,Variant) callback,
         Callback.Flags flags=Callback.Flags.None){
         return registerCallback(name,Callback.newCallback(callback,flags));
     }
-    bool registerCallback(char[]name,Callback *callback){
+    bool registerCallback(string name,Callback *callback){
         CallbackList*res;
         synchronized(this){
             auto res2=name in notificationLists;
@@ -90,7 +91,7 @@ class NotificationCenter{
             return true;
         }
     }
-    void notify(char[]name,Variant args){
+    void notify(string name,Variant args){
         CallbackList*res;
         synchronized(this){
             auto res2=name in notificationLists;
