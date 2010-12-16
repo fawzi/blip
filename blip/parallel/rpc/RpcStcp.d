@@ -555,7 +555,67 @@ class StcpProtocolHandler: ProtocolHandler{
         }
         return false;
     }
-    /// perform 
+/+    /// local rpc call, oneway methods are *not* executed in background (change?)
+    override void doRpcCallLocal(ParsedUrl url,void delegate(Serializer) serArgs, void delegate(Unserializer) unserRes,Variant addrArg){
+        sinkTogether(sout,delegate void(CharSink s){
+            dumper(s)("doRpcCallLocal with url ")(url)("\n");
+        });
+        ubyte[1024] buf1;
+        ubyte[512] buf2;
+        auto serArr=lGrowableArray(buf1,0);
+        auto resArr=lGrowableArray(buf2,0);
+        scope(exit){
+            resArr.deallocData;
+            serArr.deallocData;
+        }
+        scope ser=new SBinSerializer(&serArr.appendVoid);
+        serArgs(ser);
+        auto data=serArr.data;
+        auto d2=data;
+        void readExact(void[]d){
+            if (d2.length<d.length) throw new Exception("EOF while reading",__FILE__,__LINE__);
+            d[]=d2[0..d.length];
+            d2=d2[d.length..$];
+        }
+        scope unser=new SBinUnserializer(&readExact);
+        scope serRes=new SBinSerializer(&resArr.appendVoid); // should reuse ser
+        assert(0);
+        // the result writer should notify the reader, as they are in different tasks
+        void getReply(ubyte[] reqId,void delegate(Serializer) sRes){
+            sRes(serRes);
+        }
+        handleRequest(url,unser,&getReply);
+        assert(d2.length==0,"args not fully read");
+        d2=resArr.data;
+        sout("resultData=")(d2)("\n");
+        if (unserRes!is null){
+            unser.resetObjIdCounter();
+            int resKind;
+            unser(resKind);
+            switch (resKind){
+            case 0:
+                break;
+            case 1:
+                unserRes(unser);
+                break;
+            case 2:{
+                char[] errMsg;
+                unser(errMsg);
+                throw new RpcException(errMsg~" local calling "~url.url(),__FILE__,__LINE__);
+                }
+            case 3:{
+                char[] errMsg;
+                unser(errMsg);
+                throw new RpcException(errMsg~" local calling "~url.url(),__FILE__,__LINE__);
+                }
+            default:
+                throw new RpcException("unknown resKind "~to!(string )(resKind)~
+                    " calling "~url.url(),__FILE__,__LINE__);
+            }
+        }
+        assert(d2.length==0,"res not fully read");
+    }+/
+    /// perform rpc call using sockets
     override void doRpcCall(ParsedUrl url,void delegate(Serializer) serArgs, void delegate(Unserializer) unserRes,Variant addrArg){
         version(TrackRpc){
             sinkTogether(sout,delegate void(CharSink s){
@@ -695,9 +755,15 @@ class StcpProtocolHandler: ProtocolHandler{
             case "stop":
                 assert(0,"to do"); // should close down the connection, check for requests that were sent after the closing request id and restart them at the moment closig a connection means that it will never be reestablished.
             default:
-                Log.lookup ("blip.rpc").error("unknown namespace {} in {}",url.path[0],url.url);
+                sinkTogether(log,delegate void(CharSink s){
+                    dumper(s)("Warning unknown namespace ")(url.path[0])(" in ")(url)("\n");
+                });
                 sysError(url,"unknown namespace",sendRes,__FILE__,__LINE__);
             }
+        } else {
+            sinkTogether(log,delegate void(CharSink s){
+                dumper(s)("Warning no valid path in url ")(url)("\n");
+            });
         }
     }
     

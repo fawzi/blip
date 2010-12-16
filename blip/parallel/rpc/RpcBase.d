@@ -109,6 +109,10 @@ struct ParsedUrl{
             sink(anchor);
         }
     }
+    void desc(void delegate(cstring)sink){
+        urlWriter(sink);
+    }
+    
     void pathAndRestWriter(void delegate(cstring)sink){
         foreach (p;path){
             sink("/");
@@ -469,7 +473,113 @@ class BasicVendor:ObjVendorI{
             exceptionReplyBg(sendRes,reqId,appender.takeData());
         }
     }
-    
+}
+/// utility method to call an rpc method returning void
+void rpcManualVoidCallPUrl(T...)(ParsedUrl pUrl,T args){
+    version(TrackRpc){
+        sinkTogether(sout,delegate void(CharSink s){
+            dumper(s)("will do rpcManualVoidCallPUrl with url ")(pUrl)("\n");
+        });
+    }
+    Variant firstArg;
+    static if (is(typeof(Variant(args[0])))){
+        firstArg=Variant(args[0]);
+    }
+    void serialArgs(Serializer s){ s(args); }
+    void unserialRes(Unserializer u){ };
+    auto handler=ProtocolHandler.protocolForUrl(pUrl);
+    if (handler.localUrl(pUrl)) {
+        version(TrackRpc){
+            sinkTogether(sout,delegate void(CharSink s){
+                dumper(s)("will local call for url ")(pUrl)("\n");
+            });
+        }
+        handler.doRpcCallLocal(pUrl,&serialArgs,&unserialRes,firstArg);
+    } else {
+        version(TrackRpc){
+            sinkTogether(sout,delegate void(CharSink s){
+                dumper(s)("will do remote call for url ")(pUrl)("\n");
+            });
+        }
+        handler.doRpcCall(pUrl,&serialArgs,&unserialRes,firstArg);
+    }
+    version(TrackRpc){
+        sinkTogether(sout,delegate void(CharSink s){
+            dumper(s)("finished url ")(pUrl)("\n");
+        });
+    }
+}
+/// ditto
+void rpcManualVoidCall(T...)(string url,T args){
+    auto pUrl=ParsedUrl.parseUrl(url);
+    rpcManualVoidCallPUrl(pUrl,args);
+}
+/// utility method to call a oneway method
+void rpcManualOnewayCallPUrl(T...)(ParsedUrl pUrl,T args){
+    Variant firstArg;
+    static if (is(typeof(Variant(args[0])))){
+        firstArg=Variant(args[0]);
+    }
+    void serialArgs(Serializer s){ s(args); }
+    auto handler=ProtocolHandler.protocolForUrl(pUrl);
+    handler.doRpcCall(pUrl,&serialArgs,cast(void delegate(Unserializer))null,firstArg);
+    if (handler.localUrl(pUrl)) {
+        handler.doRpcCallLocal(pUrl,&serialArgs,cast(void delegate(Unserializer))null,firstArg);
+    } else {
+        handler.doRpcCall(pUrl,&serialArgs,cast(void delegate(Unserializer))null,firstArg);
+    }
+}
+/// ditto
+void rpcManualOnewayCall(T...)(string url,T args){
+    auto pUrl=ParsedUrl.parseUrl(url);
+    rpcManualOnewayCallPUrl(pUrl,args);
+}
+/// utility method to call an rpc method that returns a value
+void rpcManualResCallPUrl(U,T...)(out U res,ParsedUrl pUrl,T args){
+    version(TrackRpc){
+        sinkTogether(sout,delegate void(CharSink s){
+            dumper(s)("will do rpcManualResCallPUrl with url ")(pUrl)("\n");
+        });
+    }
+    Variant firstArg;
+    static if (is(typeof(Variant(args[0])))){
+        firstArg=Variant(args[0]);
+    }
+    void serialArgs(Serializer s){ s(args); }
+    void unserialRes(Unserializer u){ u(res); };
+    auto handler=ProtocolHandler.protocolForUrl(pUrl);
+    if (handler.localUrl(pUrl)) {
+        version(TrackRpc){
+            sinkTogether(sout,delegate void(CharSink s){
+                dumper(s)("will do local call for url ")(&pUrl.urlWriter)("\n");
+            });
+        }
+        handler.doRpcCallLocal(pUrl,&serialArgs,&unserialRes,firstArg);
+    } else {
+        version(TrackRpc){
+            sinkTogether(sout,delegate void(CharSink s){
+                dumper(s)("will do remote call for url ")(&pUrl.urlWriter)("\n");
+            });
+        }
+        handler.doRpcCall(pUrl,&serialArgs,&unserialRes,firstArg);
+    }
+    version(TrackRpc){
+        sinkTogether(sout,delegate void(CharSink s){
+            dumper(s)("did rpcManualResCallPUrl with url ")(&pUrl.urlWriter)("\n");
+        });
+    }
+}
+/// ditto
+void rpcManualResCall(U,T...)(out U res,string url,T args){
+    auto pUrl=ParsedUrl.parseUrl(url);
+    rpcManualResCallPUrl(res,pUrl,args);
+}
+/// ditto
+U rpcManualResCall1(U,T...)(string url,T args){
+    U res;
+    auto pUrl=ParsedUrl.parseUrl(url);
+    rpcManualResCallPUrl(res,pUrl,args);
+    return res;
 }
 
 /// handler that performs an Rpc call
@@ -648,7 +758,9 @@ class Publisher{
     {
         char[256] buf;
         if (url.path.length<3){
-            Log.lookup ("blip.rpc").warn("ignoring invalid request {}",url.url(buf));
+            sinkTogether(log,delegate void(CharSink s){
+                dumper(s)("Warning: ignoring invalid request ")(url)("\n");
+            });
             protocol.sysError(url,"invalid request",sendRes,__FILE__,__LINE__);
             return;
         }
@@ -822,6 +934,11 @@ class ProtocolHandler{
     }
     /// returns the protocol handler for the given url
     static ProtocolHandler protocolForUrl(ParsedUrl url){
+        if ((url.protocol in protocolHandlers) is null){
+            sinkTogether(sout,delegate void(CharSink s){
+                dumper(s)("no handler for protocol ")(url.protocol)("\n");
+            });
+        }
         auto pH=protocolHandlers[url.protocol];
         return pH(url);
     }
@@ -1031,15 +1148,26 @@ class ProtocolHandler{
                 }
                 break;
             default:
-                Log.lookup ("blip.rpc").error("unknown namespace {} in {}",url.path[0],url.url());
+                sinkTogether(log,delegate void(CharSink s){
+                    dumper(s)("Warning unknown namespace ")(url.path[0])(" in ")(url)("\n");
+                });
                 sysError(url,"unknown namespace",sendRes,__FILE__,__LINE__);
             }
+        } else {
+            sinkTogether(log,delegate void(CharSink s){
+                dumper(s)("Warning no valid path in url ")(url)("\n");
+            });
         }
     }
-
+    /// rpc call to a potentially remote server
     void doRpcCall(ParsedUrl url,void delegate(Serializer) serArgs, void delegate(Unserializer) unserRes,
         Variant firstArg){
         assert(0,"unimplemented");
+    }
+    /// local rpc call, oneway methods might *not* executed in background (change?)
+    void doRpcCallLocal(ParsedUrl url,void delegate(Serializer) serArgs, void delegate(Unserializer) unserRes,
+        Variant firstArg){
+        doRpcCall(url,serArgs,unserRes,firstArg);
     }
     
     string proxyObjUrl(string objectName){

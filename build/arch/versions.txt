@@ -31,7 +31,7 @@ rpc
 # version TrackRpc: tracks remote procedure calls
 # version StcpTextualSerialization: uses Json serializer for the data sent though stcp (instead of Sbin) 
 # version StcpNoCache: does not use cache 
-# version TrackStcpRequests: writes out creation, distruction, transfer to pool of StcpRequests
+# version TrackStcpRequests: writes out creation, destruction, transfer to pool of StcpRequests
 
 tests
 # version NoLog: removes logging from EchoServer and StressEchoServer

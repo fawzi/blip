@@ -67,6 +67,17 @@ class A{
     mixin(rpcMixin("tst.A","","iVal|setIVal|b|mult|div|notify:oneway|voidMethod",true,"A"));
 }
 
+void manualCalls(string proxyUrl){
+    rpcManualVoidCall(proxyUrl~"/setIVal",4);
+    int res;
+    rpcManualResCall(res,proxyUrl~"/iVal");
+    if (res!=4) throw new Exception(collectAppender(delegate void(CharSink s){
+        dumper(s)("unexpected value for ival:")(res);
+        }),__FILE__,__LINE__);
+    rpcManualOnewayCall(proxyUrl~"/notify",res);
+    rpcManualResCall(res,proxyUrl~"/b",cast(double)3);
+}
+
 void rpcTests(){
     try{
         //GC.disable();
@@ -91,6 +102,9 @@ void rpcTests(){
         sout("gc collect!\n");
         GC.collect();
         sout("gc did collect!\n");
+        sout("manualCalls\n");
+        manualCalls(vendor.proxyObjUrl());
+        sout("manualCallsDone\n");
         auto localP0=ProtocolHandler.proxyForUrl(vendor.proxyObjUrl());
         auto localP=cast(A.AProxyLocal)localP0;
         if (localP is null) throw new Exception("non local proxy",__FILE__,__LINE__);
@@ -135,6 +149,9 @@ void rpcTests(){
         sout("gc collect3!\n");
         GC.collect();
         sout("gc did collect3!\n");
+        sout("manualCalls\n");
+        manualCalls(vendor.proxyObjUrl());
+        sout("manualCallsDone\n");
         {
             auto res=localP4.b(4);
             sinkTogether(sout,delegate void(CharSink s){
@@ -281,6 +298,7 @@ void rpcTestServer(){
         });
     }
 }
+
 void rpcTestSimpleClient(string url,int repeat=1){
     try{
         //GC.disable();
@@ -290,6 +308,7 @@ void rpcTestSimpleClient(string url,int repeat=1){
         });
         auto pUrl=ParsedUrl.parseUrl(url);
         auto handler=ProtocolHandler.protocolForUrl(pUrl);
+        manualCalls(url);
         for (int itime=0;itime<repeat;++itime){
             string res=handler.simpleCall(pUrl);
             sinkTogether(sout,delegate void(CharSink s){

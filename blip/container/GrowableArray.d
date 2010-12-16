@@ -102,11 +102,11 @@ struct LocalGrowableArray(T){
     void opCall(V)(V v){
         opCatAssign(v);
     }
-    static if(is(T==ubyte)){
+    static if(is(T==ubyte)||is(T==byte)){
         void appendVoid(void[]t){
             if (t.length!=0){
                 growTo(data.length+t.length);
-                dataPtr[(dataLen-t.length)..dataLen]=cast(ubyte[])t;
+                dataPtr[(dataLen-t.length)..dataLen]=cast(T[])t;
             }
         }
         //alias appendVoid opCatAssign;
