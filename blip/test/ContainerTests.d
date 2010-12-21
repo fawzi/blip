@@ -25,6 +25,7 @@ import blip.container.BulkArray;
 import blip.sync.Atomic;
 import blip.container.Pool;
 import blip.container.Deque;
+import blip.container.BatchedGrowableArray;
 
 void testDeque(uint startPos,int[] arr1,int[] arr2){
     Deque!(int) d=new Deque!(int)(2);
@@ -278,6 +279,51 @@ void testPoolNext(){
     }
 }
 
+void testBatchedGrowableArray(T=int,int bSize=2)(T[] arr,T[] arr2){
+    auto bArr=new BatchedGrowableArray!(T,bSize)();
+    foreach(el;arr){
+        bArr.appendEl(el);
+    }
+    size_t nEl=0;
+    foreach(el;bArr.view){
+        if (arr[nEl]!=el) throw new Exception("error1",__FILE__,__LINE__);
+        if (el!=bArr[nEl]) throw new Exception("error2",__FILE__,__LINE__);
+        ++nEl;
+    }
+    if (nEl!=arr.length) throw new Exception("error3",__FILE__,__LINE__);
+    bArr.appendArr(arr);
+    nEl=0;
+    foreach(i,el;bArr.view){
+        if (arr[i%arr.length]!=el) {
+            throw new Exception(collectAppender(delegate void(CharSink s){
+                dumper(s)("error4  bArr[")(i)("]=")(el)("vs")(arr[i%arr.length]);
+            }),__FILE__,__LINE__);
+        }
+        if (el!=bArr[i]) throw new Exception("error5",__FILE__,__LINE__);
+        ++nEl;
+    }
+    if (nEl!=2*arr.length) throw new Exception("error6",__FILE__,__LINE__);
+    if (arr2.length>0){
+        auto newC=arr2[0]%(nEl*2);
+        bArr.growCapacityTo(newC);
+        bArr.appendArr(arr2);
+        foreach(i,el;arr){
+            if (bArr[i]!=el) throw new Exception("error7",__FILE__,__LINE__);
+            if (bArr[i+arr.length]!=el) throw new Exception("error8",__FILE__,__LINE__);
+        }
+        foreach(i,el;arr2){
+            if (bArr[i+nEl]!=el) throw new Exception("error9",__FILE__,__LINE__);
+        }
+        if (bArr.length!=nEl+arr2.length) throw new Exception("error10",__FILE__,__LINE__);
+    }
+    if (nEl>0){
+        auto idx=(cast(size_t)arr[0])%bArr.length;
+        bArr[idx]=arr[0]+1;
+        if (bArr[idx]!=arr[0]+1) throw new Exception("error11",__FILE__,__LINE__);
+    }
+    
+}
+
 /// all container tests (a template to avoid compilation and instantiation unless really requested)
 TestCollection containerTests()(TestCollection superColl=null){
     TestCollection coll=new TestCollection("container",__LINE__,__FILE__,superColl);
@@ -285,5 +331,6 @@ TestCollection containerTests()(TestCollection superColl=null){
     autoInitTst.testNoFailF("BulkArrayLoop",&testLoop!(int),__LINE__,__FILE__,coll);
     autoInitTst.testNoFailF("Pool!(void*,16)",&testPool,__LINE__,__FILE__,coll);
     autoInitTst.testNoFailF("PoolNext!(NextI)",&testPoolNext,__LINE__,__FILE__,coll);
+    autoInitTst.testNoFailF("BatchedGrowableArray!(int,2)",&testBatchedGrowableArray!(int,2),__LINE__,__FILE__,coll);
     return coll;
 }

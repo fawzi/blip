@@ -297,7 +297,7 @@ void mpiBcastT(T)(LinearComm para,ref T val,int target,int tag=0){
         }
         auto buf0=buf;
         auto us=new SBinUnserializer(delegate void(void[] data){
-            assert(data.length<buf.length);
+            assert(data.length<=buf.length);
             data[]=buf[0..data.length];
             buf=buf[data.length..$];
         }); // use cache???

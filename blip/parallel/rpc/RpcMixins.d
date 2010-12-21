@@ -222,7 +222,7 @@ string rpcProxyMixin(string name,string extName,string extraInterfaces,string []
             this(`~extNameProxy~`,"");
         }
         ~this(){
-            OnewayClosure.rmGPool();
+            //OnewayClosure.rmGPool(); // forces rmGPool to be non blocking (no alloc lo lock aquire)
         }`;
         for (int ifield=0;ifield<functionsComments.length/2;++ifield){
             auto functionName=functionsComments[2*ifield];
@@ -456,7 +456,7 @@ string rpcVendorMixin(string name,string extName_, string [] functionsComments){
             this.obj=obj;
         }
         ~this(){
-            Closure.rmGPool();
+            // Closure.rmGPool();
         }
         
         override void proxyDescDumper(void delegate(cstring)s){
