@@ -23,8 +23,11 @@ import tango.math.random.Random;
 import blip.rtest.RTest;
 version(NoTrace){} else { import blip.core.stacktrace.TraceExceptions; import blip.util.TraceAll; }
 import blip.Comp;
+import blip.stdc.stdlib:exit,abort;
 
 void main(string [] args){
+    scope(exit) abort();
     sout(rand.toString()); sout("\n");
     mainTestFun(args,blipTests!()());
+    exit(0);
 }
