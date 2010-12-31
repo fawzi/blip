@@ -364,7 +364,6 @@ struct Vector(flt_, int dim_) {
             }
         }
         
-        
         Vector normalized() {
             Vector res = *this;
             res.normalize();
@@ -752,6 +751,12 @@ struct Matrix(flt_, int rows_, int cols_) {
                 { row: oneAtPos!(1) }
             ]
         };
+        const static Matrix zero = {
+            col: [
+                { row: oneAtPos!(rows) },
+                { row: oneAtPos!(rows) }
+            ]
+        };
     } else
     static if (3 == cols) {
         const static Matrix identity = {
@@ -759,6 +764,13 @@ struct Matrix(flt_, int rows_, int cols_) {
                 { row: oneAtPos!(0) },
                 { row: oneAtPos!(1) },
                 { row: oneAtPos!(2) }
+            ]
+        };
+        const static Matrix zero = {
+            col: [
+                { row: oneAtPos!(rows) },
+                { row: oneAtPos!(rows) },
+                { row: oneAtPos!(rows) }
             ]
         };
     } else
@@ -769,6 +781,14 @@ struct Matrix(flt_, int rows_, int cols_) {
                 { row: oneAtPos!(1) },
                 { row: oneAtPos!(2) },
                 { row: oneAtPos!(3) }
+            ]
+        };
+        const static Matrix zero = {
+            col: [
+                { row: oneAtPos!(rows) },
+                { row: oneAtPos!(rows) },
+                { row: oneAtPos!(rows) },
+                { row: oneAtPos!(rows) }
             ]
         };
     } else
