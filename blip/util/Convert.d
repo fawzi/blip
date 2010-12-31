@@ -22,7 +22,9 @@ module blip.util.Convert;
 /// to do that see blip.text.StringConversions
 template convertTo(T){
     T convertTo(V)(V x){
-        static if (is(typeof(T.from(x))==T)){
+        static if (is(T==V)){
+            return x;
+        } else static if (is(typeof(T.from(x))==T)){
             return T.from(x);
         } else static if (is(typeof(x.to!(T)())==T)){
             return x.to!(T)();
