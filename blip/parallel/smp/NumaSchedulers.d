@@ -43,6 +43,7 @@ import blip.container.Pool;
 import blip.util.RefCount;
 import blip.core.stacktrace.StackTrace;
 import blip.Comp;
+import blip.stdc.stdlib: abort;
 
 // locking order, be careful to change that to avoid deadlocks
 // especially addSched and redirectedTask are sensible
@@ -1464,6 +1465,7 @@ class MExecuter:ExecuterI{
                 log.error(collectAppender(&e.writeOut));
                 soutStream.flush();
                 scheduler.raiseRunlevel(SchedulerRunLevel.Stopped);
+                abort();
             }
         }
     }
