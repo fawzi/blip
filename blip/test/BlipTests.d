@@ -21,6 +21,7 @@ import blip.rtest.RTest;
 import blip.test.ContainerTests;
 import blip.test.UtilTests:utilTests;
 import blip.test.parallel.ParallelTests:parallelTests;
+import blip.test.io.IOTests: ioTests;
 
 /// all tests for blip, as template so that they are not instantiated if not used
 /// (important especially for NArray).
@@ -31,6 +32,7 @@ TestCollection blipTests()(TestCollection superColl=null){
     containerTests!()(coll);
     parallelTests!()(coll);
     utilTests!()(coll);
+    ioTests!()(coll);
     
     return coll;
 }
