@@ -277,15 +277,16 @@ void mpiBcastT(T)(LinearComm para,ref T val,int target,int tag=0){
         ubyte[256] _buf;
         ubyte[] buf;
         int size;
+        auto arr=lGrowableArray(_buf,0,GASharing.GlobalNoFree);
+        scope (exit) arr.deallocData();
         if (para.myRank==target){
-            auto arr=lGrowableArray(_buf,0,GASharing.GlobalNoFree);
             auto s=new SBinSerializer(&arr.appendVoid); // use cache???
             s(val);
             size=arr.length;
             para.bcast(size,target,tag);
             auto arrV=arr.data;
             para.bcast(arrV,target,tag);
-            buf=arr.takeData;
+            buf=arrV;
         } else {
             para.bcast(size,target,tag);
             if (size<=_buf.length){
@@ -296,11 +297,12 @@ void mpiBcastT(T)(LinearComm para,ref T val,int target,int tag=0){
             para.bcast(buf,target,tag);
         }
         auto buf0=buf;
-        auto us=new SBinUnserializer(delegate void(void[] data){
+        void readE(void[] data){
             assert(data.length<=buf.length);
             data[]=buf[0..data.length];
             buf=buf[data.length..$];
-        }); // use cache???
+        }
+        auto us=new SBinUnserializer(&readE); // use cache???
         us(val);
         if (size>_buf.length){
             delete buf0;
