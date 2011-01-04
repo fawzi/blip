@@ -98,7 +98,7 @@
 module blip.io.BasicIO;
 import blip.util.TangoConvert: formatFloat;
 import blip.core.Array: find;
-import blip.core.Traits: isStaticArrayType;
+import blip.core.Traits: isStaticArrayType,isAssocArrayType;
 import blip.util.TemplateFu: nArgs;
 import blip.text.UtfUtils: convertToString;
 import blip.Comp;
@@ -319,7 +319,7 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
             }
             sink("]");
         }
-    } else static if (is(T K:T[K])){
+    } else static if (isAssocArrayType!(T)){
         sink("[");
         int notFirst=false;
         foreach (k,t;v){
