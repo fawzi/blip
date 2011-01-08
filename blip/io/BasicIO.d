@@ -594,3 +594,29 @@ void readExact(TInt,TOut)(size_t delegate(TInt[]) rSome,TOut[]outBuf){
         readTot+=readNow;
     }
 }
+
+/// utility function that outputs the given string indenting it
+/// (i.e. adding indent after each newline)
+void sinkIndented(T,U,V)(T[] indent,void delegate(U[]) s,V[] str){
+    static assert(is(Unqual!(T)==Unqual!(U)) && is(Unqual!(T)==Unqual!(V)));
+    size_t i0=0;
+    foreach(i,c;str){
+        if (c=='\n'){
+            s(str[i0..i+1]);
+            i0=i+1;
+            s(indent);
+        }
+        if (c=='\r'){
+            throw new Exception("carriage return not supported in sinkIndented",__FILE__,__LINE__);
+        }
+    }
+    s(str[i0..$]);
+}
+/// utility function that forwards the indented writer to the sink
+/// (i.e. adding indent after each newline)
+void indentWriter(T,U,V)(T[] indent,void delegate(U[]) sink,void delegate(void delegate(V[])) writer){
+    static assert(is(Unqual!(T)==Unqual!(U)) && is(V==U));
+    writer(delegate void(V[] str){
+        sinkIndented!(T,U,V)(indent,sink,str);
+    });
+}
