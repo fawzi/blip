@@ -24,6 +24,7 @@ import BIO=blip.io.BasicIO;
 import tango.io.stream.Buffered;
 import blip.io.IOArray;
 import blip.Comp;
+import BasicStreams=blip.io.BasicStreams;
 
 final class StreamWriter{
     OutputStream writer;
@@ -63,11 +64,20 @@ final class StreamWriter{
     final void flush(){
         writer.flush;
     }
+    final void close(){
+        writer.close();
+    }
 }
 
 void delegate(void[]) binaryDumper(OutputStream s){
     auto res=new StreamWriter(s);
     return &res.writeExact;
+}
+
+BasicStreams.BasicBinStream binaryStream(OutputStream s){
+    auto sw=new StreamWriter(s);
+    auto res=new BasicStreams.BasicBinStream(&sw.writeExact,&sw.flush,&sw.close);
+    return res;
 }
 
 class StreamStrWriter(T){
@@ -123,6 +133,9 @@ class StreamStrWriter(T){
     void flush(){
         writer.flush();
     }
+    void close(){
+        writer.close();
+    }
 }
 
 void delegate(T[]) strDumperT(T)(OutputStream s){
@@ -130,9 +143,21 @@ void delegate(T[]) strDumperT(T)(OutputStream s){
     return &res.writeStr;
 }
 
+BasicStreams.BasicStrStream!(T) strStreamT(T)(OutputStream s){
+    auto sw=new StreamStrWriter!(T)(s);
+    auto res=new BasicStreams.BasicStrStream!(T)(&sw.writeStr,&sw.flush,&sw.close);
+    return res;
+}
+
 void delegate(T[]) strDumperSyncT(T)(OutputStream s){
     auto res=new StreamStrWriter!(T)(s);
     return &res.writeStrSync;
+}
+
+BasicStreams.BasicStrStream!(T) strStreamSyncT(T)(OutputStream s){
+    auto sw=new StreamStrWriter!(T)(s);
+    auto res=new BasicStreams.BasicStrStream!(T)(&sw.writeStrSync,&sw.flush,&sw.close);
+    return res;
 }
 
 alias strDumperT!(char) strDumper;

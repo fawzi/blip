@@ -162,6 +162,18 @@ class WriteHandlers: CoreHandlers,OutStreamI{
         assert(0,"unimplemented");
     }
     /// writes a raw string
+    void rawWriteStrC(cstring data){
+        assert(0,"unimplemented");
+    }
+    void rawWriteStrW(cstringw data){
+        assert(0,"unimplemented");
+    }
+    void rawWriteStrD(cstringd data){
+        assert(0,"unimplemented");
+    }
+    //alias rawWriteStrC rawWriteStr;
+    //alias rawWriteStrW rawWriteStr;
+    //alias rawWriteStrD rawWriteStr;
     void rawWriteStr(cstring data){
         assert(0,"unimplemented");
     }
@@ -349,10 +361,19 @@ final class BinaryWriteHandlers(bool SwapBytes=isSmallEndian):WriteHandlers{
     void rawWrite(void[] data){
         basicWrite(data);
     }
-    final void rawWriteStrD(cstring data){
+    /// writes a raw string
+    void rawWriteStrC(cstring data){
         writer(data);
     }
-    /// writes a raw string
+    void rawWriteStrW(cstringw data){
+        writer(data);
+    }
+    void rawWriteStrD(cstringd data){
+        writer(data);
+    }
+    //alias rawWriteStrC rawWriteStr;
+    //alias rawWriteStrW rawWriteStr;
+    //alias rawWriteStrD rawWriteStr;
     void rawWriteStr(cstring data){
         writer(data);
     }
@@ -363,7 +384,7 @@ final class BinaryWriteHandlers(bool SwapBytes=isSmallEndian):WriteHandlers{
         writer(data);
     }
     CharSink charSink(){
-        return &this.rawWriteStrD;
+        return &this.rawWriteStrC;
     }
     BinSink binSink(){
         return writer;
@@ -570,6 +591,18 @@ class FormattedWriteHandlers(U=char): WriteHandlers{
             assert(0,"unsupported type "~T.stringof);
         }
     }
+    override void rawWriteStrC(cstring s){
+        writeStr(s);
+    }
+    override void rawWriteStrW(cstringw s){
+        writeStr(s);
+    }
+    override void rawWriteStrD(cstringd s){
+        writeStr(s);
+    }
+    //alias rawWriteStrC rawWriteStr;
+    //alias rawWriteStrW rawWriteStr;
+    //alias rawWriteStrD rawWriteStr;
     override void rawWriteStr(cstring s){
         writeStr(s);
     }

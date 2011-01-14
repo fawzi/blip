@@ -32,9 +32,18 @@ final class BasicBinStream: OutStreamI{
     void rawWrite(void[] a){
         this.sink(a);
     }
-    void rawWriteStrD(cstring s){
+    void rawWriteStrC(cstring s){
         this.sink(s);
     }
+    void rawWriteStrW(cstringw s){
+        this.sink(s);
+    }
+    void rawWriteStrD(cstringd s){
+        this.sink(s);
+    }
+    //alias rawWriteStrC rawWriteStr;
+    //alias rawWriteStrW rawWriteStr;
+    //alias rawWriteStrD rawWriteStr;
     void rawWriteStr(cstring s){
         this.sink(s);
     }
@@ -45,7 +54,7 @@ final class BasicBinStream: OutStreamI{
         this.sink(s);
     }
     CharSink charSink(){
-        return &this.rawWriteStrD; // cast(void delegate(cstring))rawWriteStr does not work on older compilers
+        return &this.rawWriteStrC; // cast(void delegate(cstring))rawWriteStr does not work on older compilers
     }
     BinSink binSink(){
         return sink;
@@ -77,24 +86,39 @@ final class BasicStrStream(T=char): OutStreamI{
         writeOut(this.sink,(cast(ubyte*)a.ptr)[0..a.length],"x");
     }
     /// writes a raw string
-    void writeStr(U)(U[]data){
+    void writeStr(U)(U data){
         alias Unqual!(U) V;
         static if (is(V==T[])){
             sink(data);
         } else static if (is(V==char[])||is(V==wchar[])||is(V==dchar[])){
-            T[] s;
-            if (t.length<240){
+            if (data.length<240){
                 T[256] buf;
-                s=convertToString!(T)(t,buf);
+                auto s=convertToString!(T)(data,buf);
+                sink(s);
             } else {
-                s=convertToString!(T)(t);
+                scope T[] s;
+                s=convertToString!(T)(data);
+                sink(s);
             }
-            sink(s);
+        } else {
+            static assert(0,U.stringof~" is not supported by BasicStrStream!("~T.stringof~").writeStr");
         }
     }
-    // alias writeStr!(char)  rawWriteStr;
-    // alias writeStr!(wchar) rawWriteStr;
-    // alias writeStr!(dchar) rawWriteStr;
+    // alias writeStr!(char)  rawWriteStrC;
+    // alias writeStr!(wchar) rawWriteStrW;
+    // alias writeStr!(dchar) rawWriteStrD;
+    void rawWriteStrC(cstring s){
+        writeStr(s);
+    }
+    void rawWriteStrW(cstringw s){
+        writeStr(s);
+    }
+    void rawWriteStrD(cstringd s){
+        writeStr(s);
+    }
+    //alias rawWriteStrC rawWriteStr;
+    //alias rawWriteStrW rawWriteStr;
+    //alias rawWriteStrD rawWriteStr;
     void rawWriteStr(cstring s){
         writeStr(s);
     }
@@ -175,7 +199,13 @@ final class BufferedBinStream: OutStreamI{
     void rawWrite(void[] a){
         this.sink(a);
     }
-    void rawWriteStrD(cstring s){
+    void rawWriteStrC(cstring s){
+        this.sink(s);
+    }
+    void rawWriteStrW(cstringw s){
+        this.sink(s);
+    }
+    void rawWriteStrD(cstringd s){
         this.sink(s);
     }
     void rawWriteStr(cstring s){
@@ -187,8 +217,11 @@ final class BufferedBinStream: OutStreamI{
     void rawWriteStr(cstringd s){
         this.sink(s);
     }
+    //alias rawWriteStrC rawWriteStr;
+    //alias rawWriteStrW rawWriteStr;
+    //alias rawWriteStrD rawWriteStr;
     CharSink charSink(){
-        return &this.rawWriteStrD; // cast(void delegate(cstring))rawWriteStr does not work on older compilers
+        return &this.rawWriteStrC; // cast(void delegate(cstring))rawWriteStr does not work on older compilers
     }
     BinSink binSink(){
         return &this.sink;
@@ -274,9 +307,21 @@ final class BufferedStrStream(T=char): OutStreamI{
             sink(s);
         }
     }
-    // alias writeStr!(char)  rawWriteStr;
-    // alias writeStr!(wchar) rawWriteStr;
-    // alias writeStr!(dchar) rawWriteStr;
+    // alias writeStr!(char)  rawWriteStrC;
+    // alias writeStr!(wchar) rawWriteStrW;
+    // alias writeStr!(dchar) rawWriteStrD;
+    void rawWriteStrC(cstring s){
+        writeStr(s);
+    }
+    void rawWriteStrW(cstringw s){
+        writeStr(s);
+    }
+    void rawWriteStrD(cstringd s){
+        writeStr(s);
+    }
+    //alias rawWriteStrC rawWriteStr;
+    //alias rawWriteStrW rawWriteStr;
+    //alias rawWriteStrD rawWriteStr;
     void rawWriteStr(cstring s){
         writeStr(s);
     }

@@ -148,6 +148,9 @@ interface OutStreamI{
     void rawWriteStr(cstring);
     void rawWriteStr(cstringw);
     void rawWriteStr(cstringd);
+    void rawWriteStrC(cstring);
+    void rawWriteStrW(cstringw);
+    void rawWriteStrD(cstringd);
     void rawWrite(void[]);
     CharSink charSink();
     BinSink  binSink();
@@ -468,7 +471,11 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
             sink("*1i");
         }
     } else static if (is(T==void*)){
-        writeOut(sink,cast(size_t)v,args);
+        static if (nArgs!(S)==0){
+            writeOut(sink,cast(size_t)v,"x");
+        } else {
+            writeOut(sink,cast(size_t)v,args);
+        }
     } else static if (is(T:int)){
         writeOut(sink,cast(int)v);
     } else {
