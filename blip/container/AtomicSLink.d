@@ -21,6 +21,7 @@
 // limitations under the License.
 module blip.container.AtomicSLink;
 import blip.sync.Atomic: atomicOp,memoryBarrier;
+import blip.io.BasicIO;
 
 /// inserts newHead before head, and returns the value at head when the insertion took place
 T insertAt(T)(ref T head,T newHead){
@@ -38,3 +39,29 @@ T insertAt(T)(ref T head,T newHead){
 T popFrom(T)(ref T list){
     return atomicOp(list,delegate T(T val){ memoryBarrier!(true,false,false,false)(); return ((val is null)?null:val.next); /+ do we really need a barrier? only alpha needed a barrier for dependent loads... +/ });
 }
+
+/// very basic single linked list structure
+struct SLinkT(T){
+    T val;
+    SLinkT* next;
+    static SLinkT* opCall(T v,SLinkT* next=null){
+        auto res=new SLinkT;
+        res.val=v;
+        res.next=next;
+        return res;
+    }
+    void desc(void delegate(char[])sink){
+        sink("SLinkT@");
+        writeOut(sink,cast(void*)this);
+        sink("{");
+        static if (is(typeof(writeOut(sink,val)))){
+            sink("{ res:");
+            writeOut(sink,res);
+            sink(",");
+        }
+        sink(" next:@");
+        writeOut(sink,cast(void*)next);
+        sink(" }");
+    }
+}
+
