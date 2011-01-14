@@ -31,7 +31,7 @@ struct Callback{
         None=0,
         Resubmit=1, /// resubmit
         ReceiveWhenInProcess=2, /// receive when a notification happens while processing the first one (callback has to be threadsafe)
-        ReceiveAll=4, /// receive all notification (even if you are still waiting for the first to start executing, the callback should be threadsafe)
+        ReceiveAll=7, /// receive all notification (even if you are still waiting for the first to start executing, the callback should be threadsafe)
     }
     void delegate(cstring,Callback*,Variant) callback;
     Callback *next;
@@ -68,9 +68,31 @@ struct CallbackList{
 class NotificationCenter{
     CallbackList*[string ] notificationLists;
     this(){}
-    bool registerCallback(string name,void delegate(cstring,Callback*,Variant) callback,
+    /// unregisters a "ReceiveAll" callback (other callbacks can be removed by removing the resubmit flag, which will drop them at the next notification)
+    /// use the Resubmit flag also for ReceiveAll callbacks?
+    bool unregisterReceiveAllCallback(string name,Callback*cb){
+        synchronized(this){
+            auto res2=name in notificationLists;
+            if (res2 is null) return false;
+            auto lst=&((*res2).catchAll);
+            while((*lst)!is null && (*lst)!is cb){
+                lst= &((*lst).next);
+            }
+            if ((*lst)is cb){
+                *lst=cb.next;
+                return true;
+            }
+        }
+        return false;
+    }
+    Callback * registerCallback(string name,void delegate(cstring,Callback*,Variant) callback,
         Callback.Flags flags=Callback.Flags.None){
-        return registerCallback(name,Callback.newCallback(callback,flags));
+        auto res=Callback.newCallback(callback,flags);
+        if (registerCallback(name,res)){
+            return res;
+        } else {
+            return null;
+        }
     }
     bool registerCallback(string name,Callback *callback){
         CallbackList*res;
