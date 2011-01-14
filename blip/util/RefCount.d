@@ -25,13 +25,13 @@ template RefCountMixin(){
     
     void retain(){
         if (atomicAdd(refCount,cast(size_t)1)==0){
-            throw new Exception("refCount was 0 in retain",__FILE__,__LINE__);
+            throw new Exception("refCount was 0 in retain of "~typeof(this).stringof,__FILE__,__LINE__);
         }
     }
     void release(){
         size_t oldVal=atomicAdd(refCount,-cast(size_t)1);
         if (oldVal==0){
-            throw new Exception("refCount was 0 in release",__FILE__,__LINE__);
+            throw new Exception("refCount was 0 in release of "~typeof(this).stringof,__FILE__,__LINE__);
         }
         if (oldVal==1){
             release0();
