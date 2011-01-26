@@ -243,7 +243,7 @@ void mpiRecvT(T)(Channel c,ref T val,int tag=0){
         s.close();
     }
 }
-/// utility method for 
+/// utility method for broadcasting
 void mpiBcastT(T)(LinearComm para,ref T val,int target,int tag=0){
     static if (isBasicMpiType!(T)||isBasicMpiArrType!(T)){
         para.bcast(val,target,tag);

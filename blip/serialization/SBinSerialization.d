@@ -64,7 +64,11 @@ class SBinSerializer : Serializer {
             }
         }
     }
-    this(WriteHandlers w){
+    this(OutStreamI s){
+        WriteHandlers w=cast(WriteHandlers)cast(Object)s;
+        if (w is null){
+            w=new BinaryWriteHandlers!()(w);
+        }
         super(w);
         writer=w;
         lastMetaId=3; // 0: null, 1: default type, 2: proxy, 3: metaInfo

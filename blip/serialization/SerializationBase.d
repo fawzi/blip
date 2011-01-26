@@ -564,6 +564,7 @@ class Serializer {
         if (serializerCloseCallback){
             serializerCloseCallback(this);
         }
+        handlers.close();
     }
     /// flushes the underlying stream
     void flush(){

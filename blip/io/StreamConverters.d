@@ -80,6 +80,12 @@ BasicStreams.BasicBinStream binaryStream(OutputStream s){
     return res;
 }
 
+BasicStreams.BasicBinStream binaryStreamSync(OutputStream s){
+    auto sw=new StreamWriter(s);
+    auto res=new BasicStreams.BasicBinStream(&sw.writeExactSync,&sw.flush,&sw.close);
+    return res;
+}
+
 class StreamStrWriter(T){
     OutputStream writer;
     this(OutputStream s){

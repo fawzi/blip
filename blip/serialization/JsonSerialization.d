@@ -45,10 +45,18 @@ class JsonSerializer(T=char) : Serializer {
     this(Dumper!(void delegate(T[])) sink){
         this(sink.call);
     }
-    /// constructor usin a sink delegate
+    /// constructor using a sink delegate
     this(void delegate(T[])sink){
-        super(new FormattedWriteHandlers!()(sink));
-        s=dumper(handlers.charSink());
+        this(new FormattedWriteHandlers!(T)(sink));
+    }
+    /// constructor using an OutStreamI (or a WriteHandlers)
+    this(OutStreamI s){
+        WriteHandlers w=cast(WriteHandlers)cast(Object)s;
+        if (w is null){
+            w=new FormattedWriteHandlers!(T)(s);
+        }
+        super(w);
+        this.s=dumper(handlers.charSink());
         writeCount=0;
         atStart=true;
         compact=true;

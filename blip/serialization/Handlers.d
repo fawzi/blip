@@ -274,7 +274,10 @@ final class BinaryWriteHandlers(bool SwapBytes=isSmallEndian):WriteHandlers{
         this._close=_close;
         setCoreHandlersFrom_basicWrite();
     }
-    
+    this (OutStreamI w){
+        this(&w.rawWrite,&w.flush,&w.close);
+    }
+
     /+ /// guartees the given alignment
     void alignStream(int i){
         assert(i>0&&i<=32);
@@ -535,6 +538,17 @@ final class BinaryReadHandlers(bool SwapBytes=isSmallEndian):ReadHandlers{
 class FormattedWriteHandlers(U=char): WriteHandlers{
     void delegate(U[]) writer;
     void delegate() _close;
+    this(OutStreamI w){
+        static if (is(U==char)){
+            this(&w.rawWriteStrC,&w.flush,&w.close);
+        } else static if (is(U==wchar)){
+            this(&w.rawWriteStrW,&w.flush,&w.close);
+        } else static if (is(U==dchar)){
+            this(&w.rawWriteStrD,&w.flush,&w.close);
+        } else {
+            static assert(0,U.stringof~" unsupported");
+        }
+    }
     this(void delegate(U[]) writer,void delegate() flusher=null,void delegate() _close=null){
         super(flusher);
         this.writer=writer;
