@@ -18,6 +18,8 @@
 module blip.io.BasicStreams;
 import blip.io.BasicIO;
 import blip.Comp;
+import blip.text.UtfUtils: convertToString;
+
 
 /// basic stream based on a binary sink, no encoding conversion for strings, dangerous to mix!
 final class BasicBinStream: OutStreamI{
