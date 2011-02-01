@@ -60,7 +60,12 @@ version(Windows){
     import tango.stdc.posix.sys.types:pid_t;
 }
 version(noHwloc){
-    import tango.core.Cpuid;
+import tango.core.Version;
+    static if (Tango.Major==1) {
+        import tango.core.tools.Cpuid;
+    } else {
+        import tango.core.Cpuid;
+    }
 }
 
 /// identifier for the processor (OS dependent)
@@ -175,10 +180,8 @@ struct MemoryInfo{
 
 struct MachineInfo{
     NumaNode attachedTo;
-    string dmi_board_vendor;       /**< \brief DMI board vendor name */
-    string dmi_board_name;         /**< \brief DMI board model name */
     MemoryInfo memory;
-    mixin(serializeSome("",`attachedTo|dmi_board_vendor|dmi_board_name|memory`));
+    mixin(serializeSome("",`attachedTo|memory`));
     mixin printOut!();
 }
 
@@ -257,9 +260,11 @@ struct SubnodesWithLevel(NodeType,bool isRandom) /+:SimpleIteratorI!(NodeType)+/
                     if (nodeAtt.level>level) {
                         ++lastStack;
                         static if (isRandom){
-                            stack[lastStack]=topo.subNodesRandom(nodeAtt,skipSubnode);
+                            auto p=topo.subNodesRandom(nodeAtt,skipSubnode);
+                            stack[lastStack]=p;
                         } else {
-                            stack[lastStack]=topo.subNodes(nodeAtt);
+                            auto p=topo.subNodes(nodeAtt);
+                            stack[lastStack]=p;
                         }
                     } else if (nodeAtt.level==level){
                         el=nodeAtt;
@@ -549,7 +554,7 @@ class ExplicitNumaTopology: ExplicitTopology!(NumaNode), NumaTopology {
 ExplicitNumaTopology uniformTopology(int[] nDirectChilds){
     alias ExplicitTopology!(NumaNode).NumaLevel Level;
     int nNodesLevel=1;
-    auto nLevels=nDirectChilds.length;
+    int nLevels=cast(int)nDirectChilds.length;
     Level[] levels=new Level[nLevels+1];
     for (int ilevel=0;ilevel<nLevels;++ilevel){
         Level *lAtt=&(levels[nLevels-ilevel]);
@@ -569,7 +574,7 @@ ExplicitNumaTopology uniformTopology(int[] nDirectChilds){
             
             if (ilevel>0){
                 lAtt.superNodes[inode].pos=inode/nDirectChilds[ilevel-1];
-                lAtt.superNodes[inode].level=nNodesLevel-ilevel+1;
+                lAtt.superNodes[inode].level=nLevels-ilevel+1;
             }
         }
         nNodesLevel*=nDirectChilds[ilevel];
@@ -1122,8 +1127,6 @@ version(noHwloc){} else {
                 res.attachedTo=NumaNode(level,refObj.logical_index);
                 switch(obj.type){
                 case HWLOC_OBJ.MACHINE:
-                    res.dmi_board_vendor =fromStringz(obj.attr.machine.dmi_board_vendor);
-                    res.dmi_board_name   =fromStringz(obj.attr.machine.dmi_board_name);
                     res.memory=memoryInfoFromHwloc(res.attachedTo,obj.memory);
                     break;
                 case HWLOC_OBJ.SYSTEM:

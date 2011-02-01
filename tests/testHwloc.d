@@ -16,6 +16,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 module testHwloc;
+version(noHwloc){
+    import blip.io.Console;
+    void main(){
+        sout("version(noHwloc): hwloc is not used\n");
+    }
+} else {
 import blip.parallel.hwloc.hwloc;
 import tango.stdc.stdio;
 version(NoTrace){} else { import blip.core.stacktrace.TraceExceptions; }
@@ -134,3 +140,5 @@ int main()
 
         return 0;
 }
+
+}// version(noHwloc) else

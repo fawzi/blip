@@ -1044,6 +1044,7 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
     /// numa node cache for the given node
     Cache nnCacheForNode(NumaNode node){
         auto n=node;
+        auto lNuma=((topo.maxLevel<=2)?topo.maxLevel:2);
         while (n.level<2){
             n=topo.superNode(n);
         }
@@ -1266,14 +1267,19 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
             }
         }
         size_t selectedSched;
-        synchronized(this){
-            size_t i=this.rand.uniformR(scheds.length);
-            size_t j=this.rand.uniformR(scheds.length-1);
-            if (j>=i) ++j;
-            if (scheds[i].queue.length<scheds[j].queue.length){
-                selectedSched=i;
-            } else {
-                selectedSched=j;
+        assert(scheds.length>0);
+        if (scheds.length==1){
+            selectedSched=0;
+        } else {
+            synchronized(this){
+                size_t i=this.rand.uniformR(scheds.length);
+                size_t j=this.rand.uniformR(scheds.length-1);
+                if (j>=i) ++j;
+                if (scheds[i].queue.length<scheds[j].queue.length){
+                    selectedSched=i;
+                } else {
+                    selectedSched=j;
+                }
             }
         }
         t.scheduler=scheds[selectedSched];

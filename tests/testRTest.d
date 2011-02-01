@@ -25,6 +25,7 @@ import blip.util.TangoLog;
 import blip.io.BasicIO;
 import blip.io.Console;
 import blip.Comp;
+import blip.core.Thread;
 version(Trace){ import blip.core.stacktrace.TraceExceptions; }
 
 private int[4] specialNrs=[0,2,5,8];
@@ -37,8 +38,6 @@ private mixin testInit!("",`arg0=specialNrs[arg0_i]; arg0_nEl=specialNrs.length;
 arg1=specialNrs[arg1_i]; arg1_nEl=specialNrs.length;`) combNrTst; // combinatorial cases
 
 void main(string []argv){
-    sout("blip.parallel.smp:")(Log.lookup("blip.parallel.smp").level)("\n");
-    sout("blip.parallel.smp.queue:")(Log.lookup("blip.parallel.smp.queue").level)("\n");
     CharSink nullPrt=delegate void(string s){};
     nullPrt=sout.call;
     SingleRTest.defaultTestController=new TextController("",TextController.OnFailure.StopTest,
@@ -46,53 +45,53 @@ void main(string []argv){
     TestCollection failTests=new TestCollection("failTests",__LINE__,__FILE__);
 
     SingleRTest[] tests=[
-    autoInitTst.testTrue("(2*x)%2==0",(int x){ return ((2*x)%2==0);},
+    autoInitTst.testTrueF("(2*x)%2==0",function bool(int x){ return ((2*x)%2==0);},
         __LINE__,__FILE__),
-    autoInitTst.testTrue("(2*x)%2==0 r2",(int x){ return ((2*x)%2==0);},
+    autoInitTst.testTrueF("(2*x)%2==0 r2",function bool(int x){ return ((2*x)%2==0);},
         __LINE__,__FILE__),
-    autoInitTst.testTrue("(2*x)%2==0 r3",(int x){ return ((2*x)%2==0);},
+    autoInitTst.testTrueF("(2*x)%2==0 r3",function bool (int x){ return ((2*x)%2==0);},
         __LINE__,__FILE__),
-    autoInitTst.testTrue("(2*x)%4==0 (should fail)",(int x){ return ((2*x)%4==0);},
+    autoInitTst.testTrueF("(2*x)%4==0 (should fail)",function bool(int x){ return ((2*x)%4==0);},
         __LINE__,__FILE__),
-    autoInitTst.testTrue("(2*x)%4==0 || (2*x)%4==2 (should fail)",(int x){ return ((2*x)%4==0 || (2*x)%4==2);},
+    autoInitTst.testTrueF("(2*x)%4==0 || (2*x)%4==2 (should fail)",function bool(int x){ return ((2*x)%4==0 || (2*x)%4==2);},
         __LINE__,__FILE__),
-    posArg0Tst.testTrue("(2*x)%4==0 || (2*x)%4==2, int.max/2>=x>=0",
-        (int x,uint y){ return ((2*x)%4==0 || (2*x)%4==2);},
+    posArg0Tst.testTrueF("(2*x)%4==0 || (2*x)%4==2, int.max/2>=x>=0",
+        function bool(int x,uint y){ return ((2*x)%4==0 || (2*x)%4==2);},
         __LINE__,__FILE__),
-    smallIntTst.testTrue("x*x<100",(int x){ return (x*x<100);},
+    smallIntTst.testTrueF("x*x<100",function bool(int x){ return (x*x<100);},
         __LINE__,__FILE__),
-    smallIntSkipTst.testTrue("x*x<100",(int x){ return (x*x<100);},
+    smallIntSkipTst.testTrueF("x*x<100",function bool(int x){ return (x*x<100);},
         __LINE__,__FILE__),
-    autoInitTst.testFalse("!:((2*x)%2!=0)",(int x){ return ((2*x)%2!=0);},
+    autoInitTst.testFalseF("!:((2*x)%2!=0)",function bool(int x){ return ((2*x)%2!=0);},
         __LINE__,__FILE__),
-    autoInitTst.testFalse("!:((2*x)%4==0) (should fail)",(int x){ return ((2*x)%4==0);},
+    autoInitTst.testFalseF("!:((2*x)%4==0) (should fail)",function bool(int x){ return ((2*x)%4==0);},
         __LINE__,__FILE__),
-    smallIntTst.testFalse("!:(x*x>100)",(int x){ return (x*x>100);},
+    smallIntTst.testFalseF("!:(x*x>100)",function bool(int x){ return (x*x>100);},
         __LINE__,__FILE__),
-    smallIntSkipTst.testFalse("!:(x*x>100)",(int x){ return (x*x>100);},
+    smallIntSkipTst.testFalseF("!:(x*x>100)",function bool(int x){ return (x*x>100);},
         __LINE__,__FILE__),
-    autoInitTst.testNoFail("assert((2*x)%2==0)",(int x){ if ((2*x)%2!=0) throw new Exception("error",__FILE__,__LINE__);},
+    autoInitTst.testNoFailF("assert((2*x)%2==0)",function void(int x){ if ((2*x)%2!=0) throw new Exception("error",__FILE__,__LINE__);},
         __LINE__,__FILE__),
-    autoInitTst.testNoFail("assert((2*x)%4==0) (should fail)",(int x){ if ((2*x)%4!=0) throw new Exception("error",__FILE__,__LINE__);},
+    autoInitTst.testNoFailF("assert((2*x)%4==0) (should fail)",function void(int x){ if ((2*x)%4!=0) throw new Exception("error",__FILE__,__LINE__);},
         __LINE__,__FILE__),
-    smallIntTst.testNoFail("assert(x*x<100)",(int x){ if (x*x>=100) throw new Exception("error",__FILE__,__LINE__);},
+    smallIntTst.testNoFailF("assert(x*x<100)",function void(int x){ if (x*x>=100) throw new Exception("error",__FILE__,__LINE__);},
         __LINE__,__FILE__),
-    smallIntSkipTst.testNoFail("assert(x*x<100)",(int x){ if (x*x>=100) throw new Exception("error",__FILE__,__LINE__);},
+    smallIntSkipTst.testNoFailF("assert(x*x<100)",function void(int x){ if (x*x>=100) throw new Exception("error",__FILE__,__LINE__);},
         __LINE__,__FILE__),
-    autoInitTst.testFail("assert((2*x)%2!=0)",(int x){ if ((2*x)%2==0) throw new Exception("error",__FILE__,__LINE__);},
+    autoInitTst.testFailF("assert((2*x)%2!=0)",function void(int x){ if ((2*x)%2==0) throw new Exception("error",__FILE__,__LINE__);},
         __LINE__,__FILE__,failTests),
-    autoInitTst.testFail("assert((2*x)%4==0) (should fail)",(int x){ if ((2*x)%4!=0) throw new Exception("error",__FILE__,__LINE__); },
+    autoInitTst.testFailF("assert((2*x)%4==0) (should fail)",function void(int x){ if ((2*x)%4!=0) throw new Exception("error",__FILE__,__LINE__); },
         __LINE__,__FILE__,failTests),
-    smallIntTst.testFail("assert(x*x>100)",(int x){ if (x*x<=100) throw new Exception("error",__FILE__,__LINE__); },
+    smallIntTst.testFailF("assert(x*x>100)",function void(int x){ if (x*x<=100) throw new Exception("error",__FILE__,__LINE__); },
         __LINE__,__FILE__,failTests),
-    smallIntSkipTst.testFail("assert(x*x>100)",(int x){ if (x*x<=100) throw new Exception("error",__FILE__,__LINE__); },
+    smallIntSkipTst.testFailF("assert(x*x>100)",function void(int x){ if (x*x<=100) throw new Exception("error",__FILE__,__LINE__); },
         __LINE__,__FILE__,failTests),
-    combNrTst.testTrue("(x!=2)||(y!=1)",(int x, int y){ return (x!=2)||(y!=1); },
+    combNrTst.testTrueF("(x!=2)||(y!=1)",function bool(int x, int y){ return (x!=2)||(y!=1); },
         __LINE__,__FILE__),
-    combNrTst.testTrue("(x!=8)||(y!=5) (should fail)",(int x, int y){ return (x!=8)||(y!=5); },
+    combNrTst.testTrueF("(x!=8)||(y!=5) (should fail)",function bool(int x, int y){ return (x!=8)||(y!=5); },
         __LINE__,__FILE__),
-    combNrTst.testTrue("(x!=8)||(y!=8)||(z>0) (should fail)",
-        (int x, int y, int z){ return (x!=8)||(y!=8)||(z>0); },__LINE__,__FILE__)
+    combNrTst.testTrueF("(x!=8)||(y!=8)||(z>0) (should fail)",
+        function bool(int x, int y, int z){ return (x!=8)||(y!=8)||(z>0); },__LINE__,__FILE__)
     ];
 
     auto expectedFailures=[0,0,0,1,1,0,0,0,0,1,0,0,0,1,0,0,0,2,0,0,0,1,1];
