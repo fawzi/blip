@@ -7,7 +7,7 @@ Blip.parellel
 an overview of the parallelization strategies available in the blip library
     by Fawzi Mohamed
 
-Note that there is a [preprint of an article](https://github.com/fawzi/blip/raw/master/paraArt.pdf) 
+Note that there is a [preprint of an article](https://github.com/fawzi/blip/raw/master/paraArt.pdf) on the parallelization
 
 Parallelization hierarchy
 -------------------------

@@ -41,6 +41,7 @@ be wrapped around other approaches, or used "natively".
    can be forwarded to writeOut...
 
 For example:
+
     import blip.io.BasicIO; // CharSink,writeOut,dumper...
     import blip.io.Console; // sout,serr
     import blip.container.GrowableArray; // sinkTogether, ...
@@ -73,7 +74,9 @@ For example:
         });
         sout(heapAllocStr2);
     }
+
 will output something like
+
     Hello world 0
     Hello world 1
     Hello world 2
@@ -91,42 +94,63 @@ The basic Parallel unity is a Task, for example to create a task that will execu
 It is important to note that the delegate and all the memory it accesses have to remain valid for the whole execution of the task. Thus it is dangerous to use stack allocated delegates/objects unless you are sure they will remain valid. The simplest solution to be on the safe side is to always use a method of an objet (or heap allocated struct).
 
 Now you can attach operations to be executed at the end of the task
+
     t.appendOnFinish(&obj.cleanup).appendOnFinish(&submitNewTask);
+
 If you don't want to use the task after submission you can tell it that it is ok to
 immediately reuse the task
+
     t.autorelease;
+
 And finally you can submit it and wait for it to complete
+
     t.executeNow();
+
 or you can submit it an immediately go on executing the rest of the current function
+
     t.submit();
+
 to avoid submitting too many tasks at once you might want to "pause" the current task
 so that it will be resumed when more tasks are requested:
+
     Task.yield();
+
 you might also insert a possible pause, which might be done or not with
+
     Task.maybeYield();
+
 As it is common to do a pause just after submitting, you can submit a task with
+
     t.submitYield();
+
 which is equivalent to
+
     t.submit(); Task.maybeYield();
 
 The current task can be suspended as follows
+
     auto tAtt=taskAtt.val; // get the current task
     tAtt.delay(delegate void(){
         waitForSomeEvent(tAtt);
     })
+
 where waitForSomeEvent should call tAtt.resubmitDelayed() when the task can be restarted.
 This allows to remove tasks that wait (for example) for i/o events from the active tasks
 and keep the processor busy executing tasks that are available in the meantime.
 
 A tasks is considered finished only when all its subtasks have finished executing.
 You can wait for the end of a task t with
+
     t.wait();
+
 It is important that the task is either not yet started, or retained (i.e. do not wait on an autoreleased task, that will give you an error).
 
 Submitting a task as we did before starts the task as subtask of the currently executing
 task. If you want to schedule it differently you can start it by giving it and explicit
 superTask
+
     t.submit(superTask);
+
 In particular the defaultTask will start the task as an independent task, and one can
 define other tasks that have different scheduling, for example sequentialTask enforces
 a sequential execution of its subtasks.
@@ -134,12 +158,15 @@ a sequential execution of its subtasks.
 Tasks give a lot of power and freedom to define the parallel workflow of an algorithm,
 but sometime they are a bit too much to simply perform a parallel loop.
 For this there are some helpers, for example
+
     int[] myBeautifulArray=...;
     foreach(i,ref el;pLoopArray(myBeautifulArray,30)){
         el+=i;
     }
+
 makes a parallel loop on myBeautifulArray, trying to do 30 elements in a task.
 whereas
+
     int i=0;
     auto iterator=bool(ref int el){
         if (i < 10){
@@ -154,6 +181,7 @@ whereas
             dumper(s)("did ")(i)("\n");
         });
     }
+
 does a parallel loop on an iterator that goes over the first 10 elements (this is less
 efficient than the previous, because an iterator serializes things).
 
@@ -162,8 +190,10 @@ of the loop can be executed in parallel without problems.
 
 Blip Overview: N-dimensional arrays (from blip.narray.NArray)
 -------------------------------------------------------------
+
 Blip has n-dimensional arrays that work very well with large amount of data.
 Most operations that you expect from an N dimensional array are there.
+
     import blip.narray.NArray;
 
     auto a=zeros!(real)([3,4,12]); // a 3x4x12 array of reals filled with zeros
@@ -186,7 +216,9 @@ Most operations that you expect from an N dimensional array are there.
     {{{
     int[] myData=...;
     auto nArr=a2NA(myData);
+
 There many other features, some highlight are:
+
 * inv (Inverse of a square matrix),
 * solve (Solve a linear system of equations),
 * det (Determinant of a square matrix),
@@ -218,6 +250,7 @@ Another typical use case is when you have a slow reference implementation for so
 and a fast one, and you want to be sure they are the same.
 
 For simplicity here we use really simple tests, in this case a possible use is:
+
     module tstMod;
     import blip.rtest.RTest;
     import blip.io.Console;
@@ -302,10 +335,12 @@ For simplicity here we use really simple tests, in this case a possible use is:
         // re-run a test, or run a subset of the tests
         mainTestFun(args,tests);
     }
+
 The main function shows how to make a program that creates an executable that will perform the tests.
 The program lets you re-execute a test, or execute only a subset of the tests, and always
 gives you enough information to reproduce the test runs.
 If everything goes well the output will be something like
+
     SyncCMWC+KISS99000000003ade6df6_00000020_9e1eea7c_315c04d6_983cb309_4f0a27b2_70796712_30441827_5789bc75_1799db5b_5cbebbd8_fc540d2d_3a50f6a6_56f3d5e1_bf450e7a_734e21d3_47a47ad2_ac7ffd34_52ff8217_0bf3fb03_27c70b1c_3c25d4e7_81283378_8073186e_2f9b1eea_40f7a829_a6d75629_8d990330_8c74c5c4_ddd5e44b_ef0f3c04_c476864e_3cc5af5e_ad8e39e7_0000000e_373679ad_00000000_00000000_40e05b40_2a100202_9bbe625f_12b8d071
     test`myModule/myTests/(2*x)%2==0`                        0-100/100-100
     test`myModule/ABTests/testBStack`                        0-100/100-100
@@ -333,6 +368,7 @@ from it you should see the arguments that made the test fail, and you can re-run
 
 Blip Overview: Serialization (from blip.serialization.Serialization)
 --------------------------------------------------------------------
+
 Serialization is somewhat connected to output, but has another goal, it tries to save 
 some in memory objects to a stream, or to generate in memory objects reading a stream.
 
@@ -367,6 +403,7 @@ This can be done by hand (see testSerial), but it is easier just using the seria
      mixin(serializeSome("",`z|a`));
      mixin printOut!();
     }
+
 the printOut mixin adds a description method desc that writes out the object using the
 json format, and a toString method, so that by defining serialization one has also easily
 a description.

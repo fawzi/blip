@@ -11,6 +11,7 @@ In january 2011 I began full rewrite with support for more compilers, and nicer 
 
 Basic setups
 ------------
+
     # setting up a D environment from scratch
     # you might want to change the following variables
 
@@ -52,6 +53,7 @@ Basic setups
 
 Setup (environment) files for various compilers
 -----------------------------------------------
+
     # dmd
     cat > $D_HOME/env/dmd.sh <<EOF
     # source this file to setup the dmd compiler
@@ -90,6 +92,7 @@ Common libs/software
 --------------------
 You might skip something if you have it already, but the following will assume that you install it.
 You will need hg http://mercurial.selenic.com/ , which is not installed as part of this.
+
     # libbz2
     # 
     # if you are missing libbz2 get it from http://www.bzip.org/downloads.html
@@ -174,6 +177,7 @@ You will need hg http://mercurial.selenic.com/ , which is not installed as part 
 
 Ldc
 ----
+
     # cmake (for ldc)
     # needs also the package, so build it in $D_HOME/pkgs
     mkdir -p $D_HOME/pkgs
@@ -262,6 +266,7 @@ the [tango library](http://dsource.org/projects/tango)
 Blip/dchem libs
 ---------------
 libraries either needed or suggested for blip and dchem
+
     # libxml2 needed by the xml hwloc backend
     wget ftp://xmlsoft.org/libxml2/libxml2-sources-2.7.8.tar.gz
     tar xzf 
@@ -358,6 +363,7 @@ use --help to get more information on all the flags
 Dmd
 ----
 The Dmd compiler. On 64 bit one should still test the beta (should change soonish)
+
     # dmd
     #
     # the new dmd compiler with beta support for 64 bit, installed in the dmd
@@ -369,6 +375,7 @@ Gdc
 ----
 Gdc development has been recovered and proceeds very quickly. The support for tango is being reestablished.
 We start installing gdc with phobos.
+
     ### gdc stuff
     cd $BuildDir
     wget ftp://ftp.fu-berlin.de/unix/languages/gcc/infrastructure/gmp-4.3.2.tar.bz2
@@ -438,6 +445,7 @@ Old stuff
 Old tango
 ---------
 If you want to use the older tango version (might have issues with newer compilers)
+
     cd $D_HOME
     git clone git://github.com/fawzi/oldTango.git tango
     cd tango/build
@@ -451,6 +459,7 @@ If you want to use the older tango version (might have issues with newer compile
 
 dchem
 -----
+
     git clone git@github.com:fawzi/dchem.git
     cd dchem
     # later you can just
