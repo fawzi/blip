@@ -1,0 +1,372 @@
+---
+title: Blip Overview
+layout: Default
+---
+Blip Overview
+=============
+
+Here is a quick overview of some of the features of Blip.
+The idea is to give you enough information to know what is available, if you want more
+information the best thing is to look at the code, or to ask.
+
+== Blip overview: Formatted and debug output (from blip.io.BasicIO) ==
+
+Tango and phobos have quite different i/o approaches, and io is something that you will
+use in some place in any program, so blip took the obvious approach:
+
+it introduces a third approach ;-)
+
+Things are not so bad though, because it introduces a very light weight approach that can
+be wrapped around other approaches, or used "natively".
+
+ * based on CharSink, i.e. a void delegate(char[])
+    * easy to define new sinks and wrap around things
+    * can be used also a low level without introducing dependencies
+ * writeOut(sink,obj,args) is a template that tries to write out obj to sink, formatting it using args.
+  to make an object work with writeOut you should define void desc(CharSink,args) in it.
+  Basic types are already supported.
+ * there is a Dumper struct that wraps CharSink and similar objects (with very low overhead) and makes them nicer to use (wisper style calling, automatic use of writeOut).
+   The dumper struct can be easily be created with the dumper(sink) function
+ * blip.io.Console defines some dumpers: sout (standard out, thread safe) serr (standard error, thread safe), and also unsafe versions
+ * blip.container.GrowableArray defines a structure to collects several additions
+   (lGrowableArray can be used to create a local version of it).
+   With it it offers some useful helper functions:
+    * collectAppender(void delegate(CharSink) appender) collects all appends done by appender and returns them as array
+    * sinkTogether(sink,void delegate(CharSink) appender) sinks all appends done by appender at once into the given sink
+ * A formatting function like tango's format is not present.
+   This mainly because one should decide if a template (easier but more bloat) or a
+   variadic function should be used. Still it should be easy to add:
+   using {} to signal arguments, if one uses the following format
+   "[argNr]:formattingOptions[,width]" in the curly braces, then "formattingOptions[,width]"
+   can be forwarded to writeOut...
+
+For example:
+    import blip.io.BasicIO; // CharSink,writeOut,dumper...
+    import blip.io.Console; // sout,serr
+    import blip.container.GrowableArray; // sinkTogether, ...
+
+    class A{
+        this (){}
+        void desc(CharSink s){
+            s("<class A@")(cast(void*)this)(">");
+        }
+    }
+
+    void main(){
+        for (int i=0;i<3;++i){
+            sout("Hello world ")(i)("\n");
+        }
+        A a=new A(),nullA;
+        sinkTogether(sout,delegate void(CharSink s){
+            dumper(s)("All this text with a:")(a)(" and nullA:")(nullA)(" is guaranteed to be outputted together\n");
+        });
+        char[128] buf;
+        auto collector=lGrowableArray(buf,0);
+        collector("bla");
+        collector(" and bla ");
+        collector(&a.desc);
+        writeOut(&collector.appendArr,nullA);
+        char[] heapAllocStr=collector.takeData;
+        sout(heapAllocStr)("\n");
+        char[] heapAllocStr2=collectAppender(delegate void(CharSink sink){
+            dumper(sink)("An easier way to collect data:")([1,2,4])(" in a heap allocated string (for example to generate an exception message)\n");
+        });
+        sout(heapAllocStr2);
+    }
+will output something like
+    Hello world 0
+    Hello world 1
+    Hello world 2
+    All this text with a:<class A@2109344> and nullA:<A *NULL*> is guaranteed to be outputted together
+    bla and bla <class A@2109344><A *NULL*>
+    An easier way to collect data:[1,2,4] in a heap allocated string (for example to generate an exception message)
+
+Blip Overview: Parallel smp execution (from blip.parallel.smp.WorkManager)
+--------------------------------------------------------------------------
+At smp level blip uses a parallelization strategy based on tasks
+Blip uses a parallelization scheme that is described more in details in ParallelizationConcepts .
+To use smp parallelization the easiest thing is to just import blip.parallel.smp.WorkManager.
+The basic Parallel unity is a Task, for example to create a task that will execute the delegate &obj.myOp you can:
+    auto t=Task("myOpTask",&obj.myOp);
+It is important to note that the delegate and all the memory it accesses have to remain valid for the whole execution of the task. Thus it is dangerous to use stack allocated delegates/objects unless you are sure they will remain valid. The simplest solution to be on the safe side is to always use a method of an objet (or heap allocated struct).
+
+Now you can attach operations to be executed at the end of the task
+    t.appendOnFinish(&obj.cleanup).appendOnFinish(&submitNewTask);
+If you don't want to use the task after submission you can tell it that it is ok to
+immediately reuse the task
+    t.autorelease;
+And finally you can submit it and wait for it to complete
+    t.executeNow();
+or you can submit it an immediately go on executing the rest of the current function
+    t.submit();
+to avoid submitting too many tasks at once you might want to "pause" the current task
+so that it will be resumed when more tasks are requested:
+    Task.yield();
+you might also insert a possible pause, which might be done or not with
+    Task.maybeYield();
+As it is common to do a pause just after submitting, you can submit a task with
+    t.submitYield();
+which is equivalent to
+    t.submit(); Task.maybeYield();
+
+The current task can be suspended as follows
+    auto tAtt=taskAtt.val; // get the current task
+    tAtt.delay(delegate void(){
+        waitForSomeEvent(tAtt);
+    })
+where waitForSomeEvent should call tAtt.resubmitDelayed() when the task can be restarted.
+This allows to remove tasks that wait (for example) for i/o events from the active tasks
+and keep the processor busy executing tasks that are available in the meantime.
+
+A tasks is considered finished only when all its subtasks have finished executing.
+You can wait for the end of a task t with
+    t.wait();
+It is important that the task is either not yet started, or retained (i.e. do not wait on an autoreleased task, that will give you an error).
+
+Submitting a task as we did before starts the task as subtask of the currently executing
+task. If you want to schedule it differently you can start it by giving it and explicit
+superTask
+    t.submit(superTask);
+In particular the defaultTask will start the task as an independent task, and one can
+define other tasks that have different scheduling, for example sequentialTask enforces
+a sequential execution of its subtasks.
+
+Tasks give a lot of power and freedom to define the parallel workflow of an algorithm,
+but sometime they are a bit too much to simply perform a parallel loop.
+For this there are some helpers, for example
+    int[] myBeautifulArray=...;
+    foreach(i,ref el;pLoopArray(myBeautifulArray,30)){
+        el+=i;
+    }
+makes a parallel loop on myBeautifulArray, trying to do 30 elements in a task.
+whereas
+    int i=0;
+    auto iterator=bool(ref int el){
+        if (i<10){
+            el=i;
+            ++i;
+            return true;
+        }
+        return false;
+    }
+    foreach(i;pLoopIter(iterator)){
+        sinkTogether(sout,delegate void(CharSink s){
+            dumper(s)("did ")(i)("\n");
+        });
+    }
+does a parallel loop on an iterator that goes over the first 10 elements (this is less
+efficient than the previous, because an iterator serializes things).
+
+Clearly in both cases it is the programmer responsibility to make sure that the body
+of the loop can be executed in parallel without problems.
+
+Blip Overview: N-dimensional arrays (from blip.narray.NArray)
+-------------------------------------------------------------
+Blip has n-dimensional arrays that work very well with large amount of data.
+Most operations that you expect from an N dimensional array are there.
+    import blip.narray.NArray;
+
+    auto a=zeros!(real)([3,4,12]); // a 3x4x12 array of reals filled with zeros
+    auto b=a[2]; // the last 4x12 slice of a
+    b[3,4]=1.5; // changes both a and b
+    c=dot(a,b.T); // 3x4x4 obtained multiplying a b transposed
+    auto a2=ones!(real)([3,3]); // a 3x3 array of reals filled with ones
+    c[Range(0,-1),Range(1,4),4]=a2; // using python notation this means c[:,1:,4]=a2
+    auto a3=empty!(real)(4); // an unitialized 4-vector of reals
+    foreach(i,v;b){
+        index_type start=i%2;
+        scope d=a3[Range(start,start-2)];
+        d+=v;
+    }
+    a3[]=1.4;
+    a3[2]=a3[2]+1.1; // unfortunately due to limitations of D1 += and indexing does not work
+    sout(a3.dataPrinter(":6")); // prints data using 6 digits of precision
+    }}}
+    If you have some data in an array you can have a NArray that uses that memory with
+    {{{
+    int[] myData=...;
+    auto nArr=a2NA(myData);
+There many other features, some highlight are:
+* inv (Inverse of a square matrix),
+* solve (Solve a linear system of equations),
+* det (Determinant of a square matrix),
+* eig (Eigenvalues and vectors of a square matrix),
+* eigh (Eigenvalues and eigenvectors of a Hermitian matrix),
+* svd (Singular value decomposition of a matrix),
+* filtering operations, folding, convolution,...
+
+Quick Overview: RTest a random testing framework (from blip.rtest.RTest)
+------------------------------------------------------------------------
+A framework to quickly write tests that check property/functions using randomly
+generated data or all combinations of some values.
+
+I wrote this framework inspired by Haskell's Quickcheck, but the result is a rather 
+different (but still shares the main philosophy).
+
+The idea is to be able to write tests as quickly and as painlessly as possible.
+Typical use would be for example:
+You have a function that solves linear systems of equations, and you want to test it.
+The matrix should be square, and the b vector should have the same size as the matrix dimension.
+So either you define  an ad-hoc structure, or you write a custom generator for it
+(it is quite unlikely that the constraint are satisfied just by chance and you would
+spend all your time waiting for a valid test case).
+Then (if detA>0) you can check that the solution really solves the system of equations 
+with a small residual error.
+Your test can fail in many ways also due to the internal checks of the equation solver,
+and you want to  always have a nice report that lets you reproduce the problem.
+Another typical use case is when you have a slow reference implementation for something
+and a fast one, and you want to be sure they are the same.
+
+For simplicity here we use really simple tests, in this case a possible use is:
+    module tstMod;
+    import blip.rtest.RTest;
+    import blip.io.Console;
+    import blip.math.random.Random;
+    
+    bool functionToTest() {return true;}
+    
+    TestCollection myTests(TestCollection superColl=null){
+        // define a collection for my tests
+        TestCollection myTests=new TestCollection("myTests",__LINE__,__FILE__,superColl);
+    
+        // define a test with a test function (note the F in the name)
+        autoInitTst.testTrueF("testName",&functionToTest,__LINE__,__FILE__,myTests);
+        // an explicit case using a delegate (no final F)
+        autoInitTst.testTrue("(2*x)%2==0",delegate bool(int x){ return ((2*x)%2==0);},__LINE__,__FILE__,myTests);
+    
+        return myTests;
+    }
+    
+    class A{
+        static A randomGenerate(Rand r){
+            // generate an instance and returns it
+            return new A;
+        }
+    }
+    class B{
+        static B randomGenerate(Rand r){
+            // generate an instance and returns it
+            return new B;
+        }
+        void push(A a){ /+ add a on the stack +/ }
+        A pop(){ /+ gives back the top instance +/ return new A; }
+    }
+    
+    struct SpecialAB{
+        A a;
+        B b;
+        static SpecialAB randomGenerate(Rand r){
+            SpecialAB res;
+            // generate special a,b pair
+            return res;
+        }
+    }
+    
+    void testBStack(B b,A[] as){
+        foreach(a;as) b.push(a);
+        foreach_reverse(a;as){
+            assert(a==b.pop());
+        }
+    }
+    
+    void testSpecial(SpecialAB sAb){
+        // test sAb.a and sAb.b...
+    }
+    
+    // a normal non random test
+    void normalTest(){ }
+    
+    // this can be a template if you want to avoid allocation when not needed...
+    TestCollection abTests(TestCollection superColl=null){
+        TestCollection coll=new TestCollection("ABTests",__LINE__,__FILE__,superColl);
+        autoInitTst.testNoFailF("testBStack",&testBStack,__LINE__,__FILE__,coll);
+        autoInitTst.testNoFailF("testSpecial",&testSpecial,__LINE__,__FILE__,coll);
+        autoInitTst.testNoFailF("normalTest",&normalTest,__LINE__,__FILE__,coll);
+        return coll;
+    }
+    
+    /// myModule tests
+    TestCollection allTests(TestCollection superColl=null){
+        TestCollection coll=new TestCollection("myModule",__LINE__,__FILE__,superColl);
+        abTests(coll);
+        myTests(coll);
+        return coll;
+    }
+    
+    void main(char[][] args){
+        sout(rand.toString()); sout("\n");
+        auto tests=allTests();
+        // it would be possible to simply call
+        // tests.runTests();
+        // but it is nicer to use mainTestFun that creates a command line utility that can
+        // re-run a test, or run a subset of the tests
+        mainTestFun(args,tests);
+    }
+The main function shows how to make a program that creates an executable that will perform the tests.
+The program lets you re-execute a test, or execute only a subset of the tests, and always
+gives you enough information to reproduce the test runs.
+If everything goes well the output will be something like
+    SyncCMWC+KISS99000000003ade6df6_00000020_9e1eea7c_315c04d6_983cb309_4f0a27b2_70796712_30441827_5789bc75_1799db5b_5cbebbd8_fc540d2d_3a50f6a6_56f3d5e1_bf450e7a_734e21d3_47a47ad2_ac7ffd34_52ff8217_0bf3fb03_27c70b1c_3c25d4e7_81283378_8073186e_2f9b1eea_40f7a829_a6d75629_8d990330_8c74c5c4_ddd5e44b_ef0f3c04_c476864e_3cc5af5e_ad8e39e7_0000000e_373679ad_00000000_00000000_40e05b40_2a100202_9bbe625f_12b8d071
+    test`myModule/myTests/(2*x)%2==0`                        0-100/100-100
+    test`myModule/ABTests/testBStack`                        0-100/100-100
+    test`myModule/ABTests/testSpecial`                       0-100/100-100
+    test`myModule/myTests/testName`                          0-1/1-1
+    test`myModule/myTests`                                   0-2/2-1
+    test`myModule/ABTests/normalTest`                        0-1/1-1
+    test`myModule/ABTests`                                   0-3/3-1
+    test`myModule`                                           0-7/7-1
+whereas if a test fails then it will print out something like this
+   test`myModule/ABTests/testBStack` failed with exception
+   tango.core.Exception.AssertException@tstMod(48): Assertion failure
+   ----------------
+   arg0: tstMod.B
+   arg1: [tstMod.A,tstMod.A,tstMod.A,tstMod.A,tstMod.A,tstMod.A,tstMod.A,tstMod.A,tstMod.A,tstMod.A,tstMod.A,tstMod.A,tstMod.A,tstMod.A]
+   test failed in collection`myModule/ABTests` created at `/Users/fawzi/d/blip/tstMod.d:61`
+   test failed in collection`myModule` created at `/Users/fawzi/d/blip/tstMod.d:70`
+
+   To reproduce:
+   ./tstMod.dbg --test='myModule/ABTests/testBStack' --counter='[0, 0]' --seed='CMWC+KISS99000000003ade6df6_00000020_21fbefdb_098b076c_7141f7c9_efcd27ac_f263306f_7ae1fd7b_a951d311_44a69d9e_32924c00_69ca7851_b475cfca_b147313a_88ee5415_00c7f4f7_5cc041eb_be68dd44_f715251b_649d63ba_46ba01bb_6497e1de_07277ba2_61ef65da_5825166c_53db8c1f_321c6da0_18b9f7e1_ca2d2ef5_a3d26eed_d319fbd7_48eecaf4_94d223cf_9f6a8ed6_0000001f_34c58f50_00000000_00000000_243c0339_476217a0_09c29624_15095711'
+   ERROR test `myModule/ABTests/testBStack` from `/Users/fawzi/d/blip/tstMod.d:62` FAILED!!-----------------------------------------------------------
+   test`myModule/ABTests/testBStack`                        1-0/1-1
+
+from it you should see the arguments that made the test fail, and you can re-run it.
+
+Blip Overview: Serialization (from blip.serialization.Serialization)
+--------------------------------------------------------------------
+Serialization is somewhat connected to output, but has another goal, it tries to save 
+some in memory objects to a stream, or to generate in memory objects reading a stream.
+
+There are various ways and formats to encode the information in a stream.
+Blip tries to separate the concerns as much as possible, thus the serialization functions
+in an object are independent on the actual format used to output them to a stream.
+The format is chosen by the serializer. There is a serializer that writes out json
+format, and another that writes a binary format. Other formats can be added.
+To allow efficient binary serialization an object has to give a description of its content
+separately from the function actually doing the serialization.
+
+This can be done by hand (see testSerial), but it is easier just using the serializeSome mixin:
+    import blip.serialization.Serialization;
+
+    class A{
+     int x;
+     int _y;
+     int y(){ return _y; }
+     void y(int v){ _y=v; }
+     this(){}
+     mixin(serializeSome("A",`
+     x: coordinates x in pixels
+     y: coordinate y in pixels`));
+ 
+     mixin printOut!();
+    }
+
+    struct B{
+     int z;
+     A a;
+ 
+     mixin(serializeSome("",`z|a`));
+     mixin printOut!();
+    }
+the printOut mixin adds a description method desc that writes out the object using the
+json format, and a toString method, so that by defining serialization one has also easily
+a description.

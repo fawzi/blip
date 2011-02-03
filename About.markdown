@@ -1,0 +1,31 @@
+---
+title: About
+layout: Default
+---
+
+About Blip
+==========
+
+Blip was started in 2008 while Fawzi was working at the Chemistry institute at [Prof. Sauer Group](http://www.chemie.hu-berlin.de/ag_sauer/index.php), with a [AvH fellowship](http://www.humboldt-foundation.de/web/start.html).
+
+The aim was to build a new basis for my development of computational programs, especially in the chemistry and molecular modeling field.
+
+The [tango library](http://dsource.org/projects/tango) gave an excellent starting point for many things, but was missing some basic things, so blip was born.
+It is possible that some pieces of blip will end up into tango, and in fact the random number generation already did the jump: it used to be in blip.random and now it is tango.math.random just like the Atomic module.
+
+In several places blip wraps tango, that is done in purpose to insulate a bit from changes in tango, something that has been shown to be useful. This would also help porting blip to phobos for example if the need should arise.
+
+Contributors
+------------
+
+To manipulate 2,3 and 4D vectors, quaternions and matrixes pieces of the excellent [xf.omg](http://team0xf.com:1024/omg/) of Tomasz Stachowiak, with smaller adaptions are used
+
+The lapack/blas wrappers come from the [gobo project](http://www.dsource.org/projects/multiarray/browser/trunk/Gobo) of Bill Baxter, that also inspired some design decisions of NArray.
+
+The first interface to libev did use [Leandro Lucarella ev wrappers](http://git.llucax.com.ar/w/software/ev.d.git), but now it has been fully replaced.
+
+Hopefully soon there will be more people/work to list here...
+
+enjoy
+
+Fawzi

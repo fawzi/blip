@@ -1,0 +1,54 @@
+---
+title: License & contributing
+layout: Default
+---
+License & contributing
+======================
+
+Apache 2.0
+----------
+Blip is licensed using Apache 2.0 license.
+[Apache 2.0](http://www.apache.org/licenses/LICENSE-2.0.html) is and open source license (OSI approved), that is well described, allows "closing up" the source and commercial development.
+
+The interaction with other licenses is well described, and also which and how code with other licenses can be integrated.
+Contributions are implicitly considered covered by the apache license, and some effort has been taken so that one can always use the whole code as being just covered by the apache license, even if it contains parts that might have different licensing.
+This helps using the code as a package.
+
+Commercial closed source deployment
+-----------------------------------
+You can use the code in closed source commercial applications. The only thing that you have to do is to tell in the documentation (if available) that you used Blip into it.
+If you distribute source code you should also note that it is derived from blip, and where the original code might be found.
+Eventual notes in the Notice.txt file should also be included.
+
+Boost License 1.0?
+------------------
+Yes indeed the license is not Boost License 1.0, this for a couple of reasons:
+ - Boost license is such that it seems that BSD/MIT licensed code cannot be freely used.
+   But by blip developers such codes are considered free enough to be used without having to ask the author to relicense them.
+ - the "you need to tell that you used Blip clause" brings publicity to the project, and opensource projects that survive just by people donating their skills need some exposure.
+The standard library might do well without advertisement, but a separated project can surely profit from some exposure, and such a requirement is negligible for most users.
+Thus relicensing under Boost is not planned, but could be discussed if *really* required.
+
+Contributing
+------------
+Blip wants to be a community project, so contributions by who is using it are mostly welcome.
+Sometime it is not easy to decide what should go in and what shouldn't.
+Here are few rules that should be followed.
+
+ * Working code wins over beautiful abstractions: Abstractions without code should 
+   not be part of the library, and should not be a reason not to include some code.
+ * Cleaner code wins, if something can be made cleaner without reducing too much the
+   performace then it should be cleaned
+ * Faster code wins, if something can be made faster without forcing an ugly API then
+   it should be adopted
+ * The first point was "code should work", and to ensure this the code should be used.
+   Non used code is not welcome it should have either a large program (not part of blip)
+   using it or a good test suite (that should be included in blip), ideally both.
+ * Backward compatibility if possible should be maintained, and large users of the code
+   should be consulted before large changes that break it, but there is *no* guarantee
+   about backward compatibility having a better/faster API is reason enough to perform a change
+ * existing features, especially if developed by someone else should not be removed without
+   reason, and if possible only after contacting the contributor, but again no guarantees are done
+
+These guidelines have enough free room that conflict might arise, in this case it should be discussed in the community, to try to reach a solution. The reference repository is *not* a place for such arguments. If no solution to such arguments can be found the BDFL of this project will decide.
+

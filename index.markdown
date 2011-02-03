@@ -21,7 +21,7 @@ It offers:
 
 The source is available at github
 
- * browse: http://github.com/fawzi/blip
+ * browse: [http://github.com/fawzi/blip](http://github.com/fawzi/blip)
 
  * install: `git clone git://github.com/fawzi/blip.git` (see GettingStarted for the details)
 
@@ -31,32 +31,20 @@ News
 ----
 
  * 2010-11-17 announcing blip 0.5
-
  * 2010-10-22 smp parallelization interface has stabilized
-
  * 2010-10-22 native (non tango based) input handling is used for sockets, output is pretty much stable.
-
  * 2010-10-22 libev is used for socket io and sleep
-
  * 2010-10-22 ip6 socket implementation is available on *nix
- 
  * 2010-10-22 rpc parallelization is also working
 
 Starting Points
 ---------------
 
- * AboutBlip --  some background on the library
-
- * GettingStarted -- how to start using the library
-
- * BlipOverview -- an overview of the main features of blip
-
- * ParallelizationConcepts --the concepts behind the parallelization of blip
-
- * [wiki:NArrayPerformace] -- indexing and looping performance with 3D arrays
-
- * A talk about the random testing framework that is part of blip http://petermodzelewski.blogspot.com/2009/02/tango-conference-2008-rolling-dice.html
- 
- * [wiki:HowToD], how to set up a D environment on linux x86_64
-
- * LicenseContributing -- license of blip, and how to contribute to it
+ * [AboutBlip](About.html) --  some background on the library
+ * [GettingStarted](GettingStarted.html) -- how to start using the library
+ * [BlipOverview](Overview.html) -- an overview of the main features of blip
+ * [ParallelizationConcepts](ParallelizationConcepts.html) --the concepts behind the parallelization of blip
+ * [NArrayPerformace](NArrayPerformace.html) -- indexing and looping performance with 3D arrays
+ * A talk about the random [testing framework](http://petermodzelewski.blogspot.com/2009/02/tango-conference-2008-rolling-dice.html) that is part of blip
+ * [HowToD](HowToD.html), how to set up a D environment on linux x86_64
+ * [LicenseContributing](LicenseContributing.html) -- license of blip, and how to contribute to it
