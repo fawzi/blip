@@ -14,13 +14,9 @@ general you might disable some parts of blip that you are not interested in by u
 correct flags. The easiest way is to add the flags to the DFLAGS environment variable
 (or to your compiler configuration file).
 For example to set version=noHwloc with a bash shell you would do
-{{{
-export DFLAGS="$DFLAGS -version=noHwloc"
-}}}
+    export DFLAGS="$DFLAGS -version=noHwloc"
 with the dmd compiler and
-{{{
-export DFLAGS="$DFLAGS -d-version=noHwloc"
-}}}
+    export DFLAGS="$DFLAGS -d-version=noHwloc"
 with the ldc compiler.
 
 How to D

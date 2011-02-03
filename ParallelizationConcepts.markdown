@@ -61,7 +61,7 @@ the task A is not easy.
 
 Assuming that tasks management/switching costs x it is much better to try to
 subdivide the problem in as many tasks as possible, but making sure that each
-task on average still needs y>>x time to execute (for example y~10x)
+task on average still needs y >> x time to execute (for example y~10x)
 independently of the number of processors. In this case a scheduler can keep
 processors busy by distributing tasks around, and if load on cone processor
 changes the work can be automatically moved. This means that the unit of

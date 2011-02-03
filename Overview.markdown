@@ -48,12 +48,12 @@ For example:
     class A{
         this (){}
         void desc(CharSink s){
-            s("<class A@")(cast(void*)this)(">");
+            s(" < class A@")(cast(void*)this)(" > ");
         }
     }
 
     void main(){
-        for (int i=0;i<3;++i){
+        for (int i=0;i < 3;++i){
             sout("Hello world ")(i)("\n");
         }
         A a=new A(),nullA;
@@ -77,8 +77,8 @@ will output something like
     Hello world 0
     Hello world 1
     Hello world 2
-    All this text with a:<class A@2109344> and nullA:<A *NULL*> is guaranteed to be outputted together
-    bla and bla <class A@2109344><A *NULL*>
+    All this text with a: < class A@2109344 >  and nullA: < A *NULL* >  is guaranteed to be outputted together
+    bla and bla  < class A@2109344 >  < A *NULL* > 
     An easier way to collect data:[1,2,4] in a heap allocated string (for example to generate an exception message)
 
 Blip Overview: Parallel smp execution (from blip.parallel.smp.WorkManager)
@@ -142,7 +142,7 @@ makes a parallel loop on myBeautifulArray, trying to do 30 elements in a task.
 whereas
     int i=0;
     auto iterator=bool(ref int el){
-        if (i<10){
+        if (i < 10){
             el=i;
             ++i;
             return true;

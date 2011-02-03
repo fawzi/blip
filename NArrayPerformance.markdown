@@ -6,9 +6,9 @@ Timings for testNArrayPerf.d
 ============================
 
 This tests the performance of various loops that are used in NArray and how much worse is the "naive" N-dimensional looping
-        for (int i=0;i<ndim;i++)
-        for (int j=0;j<ndim;j++)
-        for (int k=0;k<ndim;k++){
+        for (int i=0;i < ndim;i++)
+        for (int j=0;j < ndim;j++)
+        for (int k=0;k < ndim;k++){
             resNArr[i]=resNArr[i]+d1[i,j,k]*d2[0,j,k];
         }
 t9 with respect to loops that use global reduction operations on NArrays (t10-t12), implementation in simplified struct/arrays that could represent possible implementation strategies of NArray assuming various compiler optimizations (t2-t8), and with respect to the "optimal" implementation that knows that everything is contiguous and takes advantage of that to do a single loop (tref).
