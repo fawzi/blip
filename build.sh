@@ -10,6 +10,7 @@ build_dir=
 noopt=
 nodbg=
 noTangoUser=
+installLibs=
 BLIP_HOME=$PWD
 mpi=
 
@@ -32,10 +33,9 @@ while [ $# -gt 0 ]
 do
     case $1 in
         --help)
-            echo "usage: build [--version x] [--quick] [--d-home dHome] "
-            echo "           [--verbose] [--build-dir buildDir]"
+            echo "usage: build [options]"
             echo ""
-            echo "  builds mainDFile.d linking blip and all needed libs (lapack, bz2,...)"
+            echo "  builds the blip library and its tests and possibly installs it"
             echo "  --version x     builds version x (typically opt or dbg)"
             echo "  --quick         no clean before rebuilding"
             echo "  --verbose       verbose building"
@@ -48,6 +48,7 @@ do
             echo "  --no-dbg        does not compile the dbg version"
             echo "  --build-dir X   uses X as build dir (you *really* want to use a local"
             echo "                  filesystem like /tmp/$USER/build for building if possible"
+            echo "  --install       installs the libraries (in the lib dir close to the compiler)"
             if [ -n "$D_BUILD_DIR" ] ; then
                 echo "                  defaults to $D_BUILD_DIR )"
             else
@@ -92,6 +93,9 @@ do
         --blip-home)
             shift
             BLIP_HOME=$1
+            ;;
+        --install)
+            installLibs=1
             ;;
         --mpi)
             mpi=1
@@ -161,7 +165,7 @@ case `uname` in
     if [ -n "$MKLROOT" ] ; then
       extra_libs_os="${linkFlag}-lhwloc ${linkFlag}-lxml2 ${linkFlag}-lnuma ${linkFlag}-lev ${linkFlag}-L$MKLROOT/lib/em64t ${linkFlag}-lmkl_lapack ${linkFlag}--start-group ${linkFlag}-lmkl_intel_lp64 ${linkFlag}-lmkl_core ${linkFlag}-lmkl_sequential ${linkFlag}--end-group ${linkFlag}-ldl ${linkFlag}-lz ${linkFlag}-lbz2"
     else
-      extra_libs_os="${linkFlag}-lhwloc ${linkFlag}-lxml2 ${linkFlag}-lev ${linkFlag}-lgoto2 ${linkFlag}-ldl ${linkFlag}-lz ${linkFlag}-lbz2"
+      extra_libs_os="${linkFlag}-lhwloc ${linkFlag}-lev ${linkFlag}-llapack ${linkFlag}-lblas ${linkFlag}-ldl ${linkFlag}-lz ${linkFlag}-lbz2"
     fi
   ;;
   *)
@@ -198,10 +202,12 @@ fi
 if [ -n "$tests" ] ; then
     $make $makeFlags EXTRA_LIBS="$EXTRA_LIBS $extra_libs" VERSION=$version${mpiVersion} || die "error building the tests"
 fi
-installDir=`dirname $compiler`/../lib
-for l in libs/libblip-* ; do
-    if [ -e "$l" ] ; then
-      echo "$l -> $installDir"
-      cp $l $installDir
-    fi
-done
+if [ -n "$installLibs" ]; then
+  installDir=`dirname $compiler`/../lib
+  for l in libs/libblip-* ; do
+      if [ -e "$l" ] ; then
+        echo "$l -> $installDir"
+        cp $l $installDir
+      fi
+  done
+fi
