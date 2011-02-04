@@ -16,7 +16,6 @@ Parallelization hierarchy
    shared memory and several execution contextes, and is confined on one machine
    (there are ways to extend it further, but I don't think that it is a good
    idea)
- 
  * mpi is the second level, it stands for message passing interface, and more or
    less mirrors what is offered by MPI 1.2: message passing but on a fixed number
    N of "executers", these can be identified with a simple number from 0 to N-1.
@@ -26,16 +25,12 @@ Parallelization hierarchy
    emphasis is on collective communication that is normally implemented
    efficiently. Mpi is just an interface, it can be realized on the top of mpi,
    but it doesn't have to.
- 
  * rpc stays for remote procedure calling, it is implemented using some ideas
    from xml rpc and rest interfaces, and has an api similar to Next distributed
    objects (DO): you have a way to publish objects, and you can connect and call
    method using proxies to communicate to remote objects. Remote objects are
    identified through url-like strings, several low level protocols can be
    supported
- 
- * cluster is just a couple of things useful to handle a dynamic group of
-   executers communicating though rpc
 
 SMP
 ----
@@ -144,21 +139,16 @@ describe concurrent programs.
 One has tasks (see blip.parallel.smp.BasicTasks) that execute a given function and:
 
  - can be created and spawn
- 
  - are always spawn in the context of a super task
- 
  - are finished only when all their subtasks are finished
- 
+
  it is possible to:
  
  - add operations to execute when a task finishes
- 
  - wait for the completion of some task
- 
  - delay the executing task and then resubmit it later (useful when the task
    executes one of those operations that stall the cpu, see Taks.delay and
    Task.resubmitDelayed)
- 
  - you can ask the current task for a cache that is common to the current numa
    node (this is useful for pools, and delete lists in general, see cachedPool,
    cachedPoolNext in blip.container.Cache).

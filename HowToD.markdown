@@ -432,6 +432,7 @@ We start installing gdc with phobos.
 
 now if we want to use tango we have to deactivate phobos, and activate tango, and build it.
 At the moment it is a bit ugly.
+
     mkdir $D_HOME/gdc/include/d/4.5.2/phobos
     mv $D_HOME/gdc/include/d/4.5.2/std $D_HOME/gdc/include/d/4.5.2/object.d $D_HOME/gdc/include/d/4.5.2/phobos
     ln -s $D_HOME/gdc/tango/tango $D_HOME/gdc/tango/object.di $D_HOME/gdc/include/d/4.5.2

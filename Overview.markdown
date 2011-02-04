@@ -350,7 +350,9 @@ If everything goes well the output will be something like
     test`myModule/ABTests/normalTest`                        0-1/1-1
     test`myModule/ABTests`                                   0-3/3-1
     test`myModule`                                           0-7/7-1
+
 whereas if a test fails then it will print out something like this
+
    test`myModule/ABTests/testBStack` failed with exception
    tango.core.Exception.AssertException@tstMod(48): Assertion failure
    ----------------
