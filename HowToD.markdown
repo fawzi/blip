@@ -350,7 +350,7 @@ blip
     # while installing tango, otherwise do it now
     cd blip
     # later you can just git pull
-    ./build.sh
+    ./build.sh --install
     # add a simple script to build d programs
     ln -s $D_HOME/blip/dbuild $D_HOME/bin
 
