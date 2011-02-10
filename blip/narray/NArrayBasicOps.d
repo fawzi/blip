@@ -301,7 +301,7 @@ template a2NAof(V){
 /// if shouldFree=true it frees the array when destroyed (using stdc free)
 /// fortran if it should be in fortran order (in fortran order by default the inner shapes are 1, 
 /// by defult the outer ones)
-NArray!(T,dim)a2NA(T,U=int,int dim=1)(T[] arr,bool shouldFree=false,bool fortran=false,U[] reshape=null){
+NArray!(T,dim)a2NA(T,int dim=1,U=int)(T[] arr,bool shouldFree=false,bool fortran=false,U[] reshape=null){
     static assert(dim>0,"conversion for arrays of rank at least 1");
     uint flags=ArrayFlags.None;
     Guard guard;
