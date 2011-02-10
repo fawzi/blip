@@ -910,16 +910,16 @@ enum HWLOC_CPUBIND{
                            * possible (implementation reason) or not
                            * allowed (administrative reasons), and the
                            * function will fail in that case.
-			   *
-			   * When retrieving the binding of a process,
-			   * this flag checks whether all its threads
-			   * actually have the same binding.
-			   * If the flag is not given, the binding of
-			   * each thread will be accumulated.
-			   *
-			   * \note This flag is meaningless when retrieving
-			   * the binding of a thread.
-			   */
+                           *
+                           * When retrieving the binding of a process,
+                           * this flag checks whether all its threads
+                           * actually have the same binding.
+                           * If the flag is not given, the binding of
+                           * each thread will be accumulated.
+                           *
+                           * \note This flag is meaningless when retrieving
+                           * the binding of a thread.
+                           */
   NOMEMBIND = (1<<3), /**< \brief Avoid any effect on memory binding
                                    * \hideinitializer
                                    *
