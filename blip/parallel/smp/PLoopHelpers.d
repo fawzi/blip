@@ -37,10 +37,11 @@ version(NoPLoop){
 /// creates a context for a loop.
 /// ctxExtra should define a ctxName createNew() method, startLoop can define blockSize>0
 /// no exception handlers are set up, you can set them up with startLoop and endLoop
-string loopCtxMixin(string ctxName,string ctxExtra,string startLoop,string loopOp,string endLoop){
+string loopCtxMixin(string ctxName,string ctxExtra,string startLoop,string loopOp,string endLoop,
+    string idxType="size_t"){
     return `
     struct `~ctxName~`{
-        size_t start,end;
+        `~idxType~` start,end;
         `~ctxName~` *next;
         PoolI!(`~ctxName~`*) pool;
         `~ctxExtra~`
@@ -84,7 +85,7 @@ string loopCtxMixin(string ctxName,string ctxExtra,string startLoop,string loopO
         void exec(){
             size_t blockSize=1;
             `~startLoop~`
-            if (end>start+blockSize+blockSize/2){
+            if (end>start+cast(`~idxType~`)(blockSize+blockSize/2)){
                 auto newChunk=createNew();
                 auto newChunk2=createNew();
                 auto mid=(end-start)/2;
@@ -98,7 +99,7 @@ string loopCtxMixin(string ctxName,string ctxExtra,string startLoop,string loopO
                 Task("PLoopArraysub",&newChunk.exec).appendOnFinish(&newChunk.giveBack).autorelease.submit();
                 Task("PLoopArraysub2",&newChunk2.exec).appendOnFinish(&newChunk2.giveBack).autorelease.submit();
             } else {
-                for (size_t idx=start;idx<end;++idx){
+                for (`~idxType~` idx=start;idx<end;++idx){
                     `~loopOp~`;
                 }
             }
@@ -250,6 +251,82 @@ PLoopArray!(T) pLoopArray(T)(T arr,size_t optimalBlockSize=1){
     PLoopArray!(T) res=new PLoopArray!(T)(arr,optimalBlockSize);
     return res;
 }
+
+// loops on an integer range
+class PLoopIRange(T){
+    T iStart;
+    T iEnd;
+    size_t optimalBlockSize=1;
+    int delegate(ref T) loopBody;
+    Exception exception=null;
+    int res=0;
+    
+    mixin(loopCtxMixin("LoopBlock1",`
+    PLoopIRange context;
+    `,`
+    blockSize=context.optimalBlockSize;
+    if (context.res!=0||context.exception!is null) return;
+    try{`,`
+    auto iAtt=context.iStart;
+    auto r=context.loopBody(iAtt);
+    if (r!=0){
+        context.res=r;
+        return;
+    }`,`
+    }catch(Exception e){
+        context.exception=e;
+    }
+    `,`T`));
+    this(T iStart,T iEnd,size_t optimalBlockSize=1){
+        this.iStart=iStart;
+        this.iEnd=iEnd;
+        this.optimalBlockSize=optimalBlockSize;
+    }
+    int opApply(int delegate(ref T) loopBody){
+        if (!(iStart<iEnd)) return 0;
+        version(NoPLoop){} else {
+            this.loopBody=loopBody;
+            if (iEnd>optimalBlockSize+optimalBlockSize/2+iStart){
+                LoopBlock1.addGPool();
+                scope(exit) LoopBlock1.rmGPool();
+                LoopBlock1 *looper=new LoopBlock1; // avoid alloc? gave problems...
+                looper.context=this;
+                looper.start=iStart;
+                looper.end=iEnd;
+                Task("PLoopIRangeMain",&looper.exec).autorelease.executeNow();
+                if (exception!is null)
+                    throw new Exception("exception in PLoopIRange",__FILE__,__LINE__,exception);
+                return res;
+            }
+        }
+        Task("PLoopIRangeMainSeq",delegate void(){
+            try{
+                auto end=iEnd;
+                for (T idx=iStart;idx<end;++idx){
+                    T idx2=idx;
+                    auto r=loopBody(idx2);
+                    if (r!=0){
+                        res=r;
+                        return;
+                    }
+                }
+            } catch (Exception e) {
+                exception=e;
+            }
+        }).autorelease.executeNow();
+        if (exception!is null)
+            throw new Exception("exception in PLoopIRange",__FILE__,__LINE__,exception);
+        return res;
+    }
+}
+
+/// returns a structure that does a parallel loop on the given range trying to do optimalBlockSize loops in each task
+PLoopIRange!(T) pLoopIRange(T)(T iStart,T iEnd,size_t optimalBlockSize=1){
+    assert(optimalBlockSize>0,"optimalBlockSize must be larger than 0");
+    PLoopIRange!(T) res=new PLoopIRange!(T)(iStart,iEnd,optimalBlockSize);
+    return res;
+}
+
 
 /// structure to do a parallel loop on an iterator (each element has its own task)
 class PLoopIter(T){
