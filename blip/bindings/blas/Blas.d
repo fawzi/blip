@@ -73,11 +73,11 @@ void srotg_(f_float *a, f_float *b, f_float *c, f_float *s);
 void drotg_(f_double *a, f_double *b, f_double *c, f_double *s);
 void crotg_(f_cfloat *a, f_cfloat *b, f_float *c, f_cfloat *s);
 void zrotg_(f_cdouble *a, f_cdouble *b, f_double *c, f_cdouble *s);
-
+version(BlasRotm){
 /// Generate modified plane (Givens) rotation
 void drotmg_(f_double *d1, f_double *d2, f_double *b1, f_double *b2, f_double *param);
 void srotmg_(f_float *d1, f_float *d2, f_float *b1, f_float *b2, f_float *param);
-
+}
 /// Apply plane (Givens) rotation
 ///             _      _
 ///     x_i  := | c  s | * x_i
@@ -88,9 +88,11 @@ void drot_(f_int *n, f_double *x, f_int *incx, f_double *y, f_int *incy, f_doubl
 void csrot_(f_int *n, f_cfloat *x, f_int *incx, f_cfloat *y, f_int *incy, f_float *c, f_float *s);
 void zdrot_(f_int *n, f_cdouble *x, f_int *incx, f_cdouble *y, f_int *incy, f_double *c, f_double *s);
 
+version(BlasRotm){
 /// Apply modified plane (Givens) rotation
 void srotm_(f_int *n, f_float *x, f_int *incx, f_float *y, f_int *incy, f_float *param);
 void drotm_(f_int *n, f_double *x, f_int *incx, f_double *y, f_int *incy, f_double *param);
+}
 
 /// Swap the values contained in x and y 
 ///     x <-> y
@@ -119,30 +121,43 @@ void daxpy_(f_int *n, f_double *alpha, f_double *x, f_int *incx, f_double *y, f_
 void caxpy_(f_int *n, f_cfloat *alpha, f_cfloat *x, f_int *incx, f_cfloat *y, f_int *incy);
 void zaxpy_(f_int *n, f_cdouble *alpha, f_cdouble *x, f_int *incx, f_cdouble *y, f_int *incy);
 
-
 /// ret := x.T * y
-// gotoBlas2 has the correct interface only for cblas on 64 bit targets
-float  cblas_sdsdot(f_int n, float, float *x, f_int incx, float *y, f_int incy);
-double cblas_dsdot (f_int n, float *x, f_int incx, float *y, f_int incy);
-float  cblas_sdot(f_int n, float  *x, f_int incx, float  *y, f_int incy);
+version(CBlasDot){
+    float  cblas_sdsdot(f_int n, float, float *x, f_int incx, float *y, f_int incy);
+    double cblas_dsdot (f_int n, float *x, f_int incx, float *y, f_int incy);
+    double ddot_(f_int *n, double *x, f_int *incx, double *y, f_int *incy);
+    float  cblas_sdot(f_int n, float  *x, f_int incx, float  *y, f_int incy);
+    double cblas_ddot(f_int n, double *x, f_int incx, double *y, f_int incy);
 
-float_ret_t sdot_(f_int *n, f_float *x, f_int *incx, f_float *y, f_int *incy);
-f_double ddot_(f_int *n, f_double *x, f_int *incx, f_double *y, f_int *incy);
-f_double dsdot_(f_int *n, f_float *sx, f_int *incx, f_float *sy, f_int *incy);
-void cdotu_(f_cfloat *ret_val, f_int *n, f_cfloat *x, f_int *incx, f_cfloat *y, f_int *incy);
-void zdotu_(f_cdouble *ret_val, f_int *n, f_cdouble *x, f_int *incx, f_cdouble *y, f_int *incy);
-//f_cfloat cdotu_(f_cfloat *ret_val, f_int *n, f_cfloat *x, f_int *incx, f_cfloat *y, f_int *incy);
-//f_cdouble zdotu_(f_cdouble *ret_val, f_int *n, f_cdouble *x, f_int *incx, f_cdouble *y, f_int *incy);
-
-/// ret := x.H * y
-void cdotc_(f_cfloat *ret_val, f_int *n, f_cfloat *x, f_int *incx, f_cfloat *y, f_int *incy);
-void zdotc_(f_cdouble *ret_val, f_int *n, f_cdouble *x, f_int *incx, f_cdouble *y, f_int *incy);
-//f_cfloat cdotc_(f_cfloat *ret_val, f_int *n, f_cfloat *x, f_int *incx, f_cfloat *y, f_int *incy);
-//f_cdouble zdotc_(f_cdouble *ret_val, f_int *n, f_cdouble *x, f_int *incx, f_cdouble *y, f_int *incy);
-
-/// ret := b + x.T * y
-float_ret_t sdsdot_(f_int *n, f_float *b, f_float *x, f_int *incx, f_float *y, f_int *incy);
-
+    void cblas_cdotu_sub(f_int n, cfloat *x, f_int incx, cfloat *y, f_int incy,cfloat *ret_val);
+    void cblas_zdotu_sub(f_int n, cdouble *x, f_int incx, cdouble *y, f_int incy,cdouble *ret_val);
+    /// ret := x.H * y
+    void cblas_cdotc_sub(f_int n, cfloat *x, f_int incx, cfloat *y, f_int incy,cfloat *ret_val);
+    void cblas_zdotc_sub(f_int n, cdouble *x, f_int incx, cdouble *y, f_int incy,cdouble *ret_val);
+    /// ret := b + x.T * y
+    float cblas_sdsdot(f_int n, float *b, float *x, f_int incx, float *y, f_int incy);
+} else {
+    // it seems that one cannot really define functions returning values,
+    // especially complex numbers reliabily so we avoid these functions 
+/*
+    float_ret_t sdot_(f_int *n, f_float *x, f_int *incx, f_float *y, f_int *incy);
+    f_double ddot_(f_int *n, f_double *x, f_int *incx, f_double *y, f_int *incy);
+    f_double dsdot_(f_int *n, f_float *sx, f_int *incx, f_float *sy, f_int *incy);
+    void cdotu_(f_cfloat *ret_val, f_int *n, f_cfloat *x, f_int *incx, f_cfloat *y, f_int *incy);
+    void zdotu_(f_cdouble *ret_val, f_int *n, f_cdouble *x, f_int *incx, f_cdouble *y, f_int *incy);
+    //f_cfloat cdotu_(f_cfloat *ret_val, f_int *n, f_cfloat *x, f_int *incx, f_cfloat *y, f_int *incy);
+    //f_cdouble zdotu_(f_cdouble *ret_val, f_int *n, f_cdouble *x, f_int *incx, f_cdouble *y, f_int *incy);
+    
+    /// ret := x.H * y
+    void cdotc_(f_cfloat *ret_val, f_int *n, f_cfloat *x, f_int *incx, f_cfloat *y, f_int *incy);
+    void zdotc_(f_cdouble *ret_val, f_int *n, f_cdouble *x, f_int *incx, f_cdouble *y, f_int *incy);
+    //f_cfloat cdotc_(f_cfloat *ret_val, f_int *n, f_cfloat *x, f_int *incx, f_cfloat *y, f_int *incy);
+    //f_cdouble zdotc_(f_cdouble *ret_val, f_int *n, f_cdouble *x, f_int *incx, f_cdouble *y, f_int *incy);
+    
+    /// ret := b + x.T * y
+    float_ret_t sdsdot_(f_int *n, f_float *b, f_float *x, f_int *incx, f_float *y, f_int *incy);
+    */
+}
 /// ret := sqrt( x.T * x )
 float_ret_t scnrm2_(f_int *n, f_cfloat *x, f_int *incx);
 float_ret_t snrm2_(f_int *n, f_float *x, f_int *incx);

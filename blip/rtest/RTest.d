@@ -217,9 +217,9 @@ int mainTestFun(string [] argStr,SingleRTest testSuite){
         args("help").bind(delegate void(){ help=true; });
         args("runs").bind(delegate string (string arg){ runs=to!(int)(arg[1..$]); return null; });
         args("trace").bind(delegate void(){ trace=true; });
-        args("seed").bind(delegate string (string arg){ seed=arg[1..$].dup; return null; });
+        args("seed").bind(delegate string (string arg){ seed=arg.dup; return null; });
         args("counter").bind(delegate string (string arg){ counter=parseIArray(arg[1..$]); return null; });
-        args("test").bind(delegate string (string arg){ test=arg[1..$].dup; return null; });
+        args("test").bind(delegate string (string arg){ sout("test:'")(arg)("'\n"); test=arg.dup; return null; });
         args("on-failure").bind(delegate string (string arg){
             if (arg.length==0) throw new Exception("expected an argument after --on-failure");
             if (arg[0]=='=') arg=arg[1..$];
