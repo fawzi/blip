@@ -641,6 +641,11 @@ struct BulkArray(T){
     }
 }
 
+/// utility method to create bulk arrays
+BulkArray!(T) bulkArray(T)(T[]arr,ChunkGuard g=null){
+    return BulkArray!(T)(arr,g);
+}
+
 /// tests if b is a dummy array
 static bool BulkArrayIsDummy(T)(BulkArray!(T) b){
     return (b.flags & BulkArray!(T).Flags.Dummy)!=0;
