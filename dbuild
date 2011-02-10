@@ -137,7 +137,7 @@ case `uname` in
   if [ -n "$MKLROOT" ] ; then
     extra_libs_os="${linkFlag}-lhwloc ${linkFlag}-lev ${linkFlag}-L$MKLROOT/lib/em64t ${linkFlag}-lmkl_lapack ${linkFlag}--start-group ${linkFlag}-lmkl_intel_lp64 ${linkFlag}-lmkl_core ${linkFlag}-lmkl_sequential  ${linkFlag}--end-group ${linkFlag}-ldl ${linkFlag}-lz ${linkFlag}-lbz2"
   else
-    extra_libs_os="${linkFlag}-lhwloc ${linkFlag}-lev ${linkFlag}-lgoto2 ${linkFlag}-ldl ${linkFlag}-lz ${linkFlag}-lbz2 ${linkFlag}-lg2c"
+    extra_libs_os="${linkFlag}-lhwloc ${linkFlag}-lev ${linkFlag}-llapack ${linkFlag}-lblas ${linkFlag}-lgfortran ${linkFlag}-ldl ${linkFlag}-lz ${linkFlag}-lbz2"
   fi
   ;;
   *)
