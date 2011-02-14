@@ -26,7 +26,7 @@ import blip.bindings.ev.DLibev;
 import blip.io.EventWatcher;
 import blip.io.BasicStreams;
 import blip.io.BufferIn;
-import blip.core.Thread; //pippo
+import blip.core.Thread;
 import blip.stdc.stdlib:exit;
 import blip.util.IgnoreSigpipe;
 import blip.Comp;
