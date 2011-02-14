@@ -51,7 +51,7 @@ import blip.core.Array: sort;
 import blip.stdc.string: memset,memcpy,memcmp;
 import blip.util.TemplateFu;
 import blip.core.Traits;
-import blip.math.Math: abs,sqrt;
+import blip.math.Math;
 import blip.rtest.RTest;
 import blip.BasicModels;
 import blip.serialization.Serialization;
