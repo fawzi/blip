@@ -35,3 +35,9 @@ rpc
 
 tests
 # version NoLog: removes logging from EchoServer and StressEchoServer
+
+narray
+# version no_blas: does not use blas bindings
+# version CBlasDot: uses cblas for dot operations (returning values from fortran does not work reliably)
+# version BlasRotm: activates the modified Givens rotations (not defined in some blas versions)
+# version no_lapack: does not use lapack bindings (deativates several functions)

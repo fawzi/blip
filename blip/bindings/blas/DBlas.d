@@ -66,6 +66,7 @@ void rotg(ref f_cdouble a, ref f_cdouble b, out f_double c, out f_cdouble s) {
     zrotg_(&a, &b, &c, &s);
 }
 
+version(BlasRotm){
 /// Generate modified plane (Givens) rotation
 void rotmg(ref f_double d1, ref f_double d2, ref f_double b1, ref f_double b2, f_double *param) {
     drotmg_(&d1, &d2, &b1, &b2, param);
@@ -73,7 +74,7 @@ void rotmg(ref f_double d1, ref f_double d2, ref f_double b1, ref f_double b2, f
 void rotmg(ref f_float d1, ref f_float d2, ref f_float b1, ref f_float b2, f_float *param) {
     srotmg_(&d1, &d2, &b1, &b2, param);
 }
-
+}
 /// Apply plane (Givens) rotation
 ///             _      _
 ///     x_i  := | c  s | * x_i
@@ -91,7 +92,7 @@ void rot(f_int n, f_cfloat *x, f_int incx, f_cfloat *y, f_int incy, f_float c, f
 void rot(f_int n, f_cdouble *x, f_int incx, f_cdouble *y, f_int incy, f_double c, f_double s) {
     zdrot_(&n, x, &incx, y, &incy, &c, &s);
 }
-
+version(BlasRotm){
 /// Apply modified plane (Givens) rotation
 void rotm(f_int n, f_float *x, f_int incx, f_float *y, f_int incy, f_float *param) {
     srotm_(&n, x, &incx, y, &incy, param);
@@ -99,7 +100,7 @@ void rotm(f_int n, f_float *x, f_int incx, f_float *y, f_int incy, f_float *para
 void rotm(f_int n, f_double *x, f_int incx, f_double *y, f_int incy, f_double *param) {
     drotm_(&n, x, &incx, y, &incy, param);
 }
-
+}
 /// Swap the values contained in x and y 
 ///     x <-> y
 void swap(f_int n, f_float *x, f_int incx, f_float *y, f_int incy) {
@@ -164,46 +165,44 @@ void axpy(f_int n, f_cdouble alpha, f_cdouble *x, f_int incx, f_cdouble *y, f_in
 }
 
 
+version(CBlasDot){
 /// ret := x.T * y
-float dot(f_int n, f_float *x, f_int incx, f_float *y, f_int incy) {
+f_float dot(f_int n, f_float *x, f_int incx, f_float *y, f_int incy) {
     return cblas_sdot(n, x, incx, y, incy);
 }
 f_double dot(f_int n, f_double *x, f_int incx, f_double *y, f_int incy) {
-    return ddot_(&n, x, &incx, y, &incy);
+    return cblas_ddot(n, x, incx, y, incy);
 }
 f_double ddot(f_int n, f_float *sx, f_int incx, f_float *sy, f_int incy) {
     return cblas_dsdot(n, sx, incx, sy, incy);
 }
 f_cfloat dotu(f_int n, f_cfloat *x, f_int incx, f_cfloat *y, f_int incy) {
     f_cfloat ret_val;
-    cdotu_(&ret_val, &n, x, &incx, y, &incy);
+    cblas_cdotu_sub(n, x, incx, y, incy,&ret_val);
     return ret_val;
 }
 f_cdouble dotu(f_int n, f_cdouble *x, f_int incx, f_cdouble *y, f_int incy) {
     f_cdouble ret_val;
-    zdotu_(&ret_val, &n, x, &incx, y, &incy);
+    cblas_zdotu_sub(n, x, incx, y, incy,&ret_val);
     return ret_val;
 }
-//f_cfloat cdotu_(f_cfloat *ret_val, f_int *n, f_cfloat *x, f_int *incx, f_cfloat *y, f_int *incy);
-//f_cdouble zdotu_(f_cdouble *ret_val, f_int *n, f_cdouble *x, f_int *incx, f_cdouble *y, f_int *incy);
 
 /// ret := x.H * y
 f_cfloat dotc(f_int n, f_cfloat *x, f_int incx, f_cfloat *y, f_int incy) {
     f_cfloat ret_val;
-    cdotc_(&ret_val, &n, x,  &incx, y, &incy);
+    cblas_cdotc_sub(n, x,  incx, y, incy,&ret_val);
     return ret_val;
 }
 f_cdouble dotc(f_int n, f_cdouble *x, f_int incx, f_cdouble *y, f_int incy) {
     f_cdouble ret_val;
-    zdotc_(&ret_val, &n, x, &incx, y, &incy);
+    cblas_zdotc_sub(n, x, incx, y, incy,&ret_val);
     return ret_val;
 }
-//f_cfloat cdotc_(f_cfloat *ret_val, f_int *n, f_cfloat *x, f_int *incx, f_cfloat *y, f_int *incy);
-//f_cdouble zdotc_(f_cdouble *ret_val, f_int *n, f_cdouble *x, f_int *incx, f_cdouble *y, f_int *incy);
 
 /// ret := b + x.T * y
 float_ret_t dsdot(f_int n, f_float *b, f_float *x, f_int incx, f_float *y, f_int incy) {
-    return sdsdot_(&n, b, x, &incx, y, &incy);
+    return cblas_sdsdot(n, b, x, incx, y, incy);
+}
 }
 
 /// ret := sqrt( x.T * x )

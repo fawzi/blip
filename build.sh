@@ -163,9 +163,10 @@ case `uname` in
   ;;
   Linux)
     if [ -n "$MKLROOT" ] ; then
+      DFLAGS_ADD="$DFLAGS_ADD ${versionFlag}CBlasDot"
       extra_libs_os="${linkFlag}-lhwloc ${linkFlag}-lxml2 ${linkFlag}-lnuma ${linkFlag}-lev ${linkFlag}-L$MKLROOT/lib/em64t ${linkFlag}-lmkl_lapack ${linkFlag}--start-group ${linkFlag}-lmkl_intel_lp64 ${linkFlag}-lmkl_core ${linkFlag}-lmkl_sequential ${linkFlag}--end-group ${linkFlag}-ldl ${linkFlag}-lz ${linkFlag}-lbz2"
     else
-      extra_libs_os="${linkFlag}-lhwloc ${linkFlag}-lev ${linkFlag}-llapack ${linkFlag}-lblas ${linkFlag}-ldl ${linkFlag}-lz ${linkFlag}-lbz2"
+      extra_libs_os="${linkFlag}-lhwloc ${linkFlag}-lev ${linkFlag}-llapack ${linkFlag}-lblas ${linkFlag}-lgfortran ${linkFlag}-ldl ${linkFlag}-lz ${linkFlag}-lbz2"
     fi
   ;;
   *)
@@ -194,13 +195,13 @@ if [ -n "$clean" ]; then
     rm -f libs/libblip-*
 fi
 if [ -z "$noopt" ]; then
-    $make $makeFlags EXTRA_LIBS="$EXTRA_LIBS $extra_libs_opt" VERSION=opt${mpiVersion} lib || die "error building the opt version"
+    $make $makeFlags DFLAGS_ADD="$DFLAGS_ADD" EXTRA_LIBS="$EXTRA_LIBS $extra_libs_opt" VERSION=opt${mpiVersion} lib || die "error building the opt version"
 fi
 if [ -z "$nodbg" ]; then
-    $make $makeFlags EXTRA_LIBS="$EXTRA_LIBS $extra_libs_dbg" VERSION=dbg${mpiVersion} lib || die "error building the dbg version"
+    $make $makeFlags DFLAGS_ADD="$DFLAGS_ADD" EXTRA_LIBS="$EXTRA_LIBS $extra_libs_dbg" VERSION=dbg${mpiVersion} lib || die "error building the dbg version"
 fi
 if [ -n "$tests" ] ; then
-    $make $makeFlags EXTRA_LIBS="$EXTRA_LIBS $extra_libs" VERSION=$version${mpiVersion} || die "error building the tests"
+    $make $makeFlags DFLAGS_ADD="$DFLAGS_ADD" EXTRA_LIBS="$EXTRA_LIBS $extra_libs" VERSION=$version${mpiVersion} || die "error building the tests"
 fi
 if [ -n "$installLibs" ]; then
   installDir=`dirname $compiler`/../lib

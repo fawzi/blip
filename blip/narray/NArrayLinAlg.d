@@ -186,7 +186,7 @@ TypeOfOuter!(T,U,S).ResType outer(T,U,S...)(T t,U u,S args){
             return u.opOuter_r(t,args);
         }
     } else static if (is(typeof(outerNA(t,u,args)))){ // NArray outer
-        /// it is defined here because NArray outer is speacial, being so large it was split in several
+        /// it is defined here because NArray outer is special, being so large it was split in several
         /// modules and putting it in NArray would create circular refs (or a huge module)
         /// unfortunaley (by design?) the only "free" templates that are picked up are those that are
         /// locally visible where the template is defined. To have other ones a mixin is needed...
@@ -313,20 +313,22 @@ body {
             // call blas
             // negative incremented vector in blas loops backwards on a[0..n], not on a[-n+1..1]
             static if(rank1==1 && rank2==1){
-                T* aStartPtr=a.startPtrArray,bStartPtr=b.startPtrArray;
-                if (a.bStrides[0]<0) aStartPtr=cast(T*)(cast(size_t)aStartPtr+(a.shape[0]-1)*a.bStrides[0]);
-                if (b.bStrides[0]<0) bStartPtr=cast(T*)(cast(size_t)bStartPtr+(b.shape[0]-1)*b.bStrides[0]);
-                static if (is(T==f_float) && is(S==f_double)){
-                    c=cast(S)DBlas.ddot(a.shape[0], aStartPtr, a.bStrides[0]/cast(index_type)T.sizeof,
-                        bStartPtr, b.bStrides[0]/cast(index_type)T.sizeof);
-                } else static if (is(T==cfloat)|| is(T==cdouble)){
-                    c=cast(S)DBlas.dotu(a.shape[0], aStartPtr, a.bStrides[0]/cast(index_type)T.sizeof,
-                        bStartPtr, b.bStrides[0]/cast(index_type)T.sizeof);
-                } else {
-                    c=cast(S)DBlas.dot(a.shape[0], aStartPtr, a.bStrides[0]/cast(index_type)T.sizeof,
-                        bStartPtr, b.bStrides[0]/cast(index_type)T.sizeof);
+                version(CBlasDot){
+                    T* aStartPtr=a.startPtrArray,bStartPtr=b.startPtrArray;
+                    if (a.bStrides[0]<0) aStartPtr=cast(T*)(cast(size_t)aStartPtr+(a.shape[0]-1)*a.bStrides[0]);
+                    if (b.bStrides[0]<0) bStartPtr=cast(T*)(cast(size_t)bStartPtr+(b.shape[0]-1)*b.bStrides[0]);
+                    static if (is(T==f_float) && is(S==f_double)){
+                        c=cast(S)DBlas.ddot(a.shape[0], aStartPtr, a.bStrides[0]/cast(index_type)T.sizeof,
+                            bStartPtr, b.bStrides[0]/cast(index_type)T.sizeof);
+                    } else static if (is(T==cfloat)|| is(T==cdouble)){
+                        c=cast(S)DBlas.dotu(a.shape[0], aStartPtr, a.bStrides[0]/cast(index_type)T.sizeof,
+                            bStartPtr, b.bStrides[0]/cast(index_type)T.sizeof);
+                    } else {
+                        c=cast(S)DBlas.dot(a.shape[0], aStartPtr, a.bStrides[0]/cast(index_type)T.sizeof,
+                            bStartPtr, b.bStrides[0]/cast(index_type)T.sizeof);
+                    }
+                    return c;
                 }
-                return c;
             } else static if (rank1==1 && rank2==2) {
                 T* aStartPtr=a.startPtrArray;
                 if (a.bStrides[0]<0) aStartPtr=cast(T*)(cast(size_t)aStartPtr+(a.shape[0]-1)*a.bStrides[0]);
