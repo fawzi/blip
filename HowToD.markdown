@@ -242,7 +242,7 @@ Ldc
     make install
     # we compile the runtime separately from the user lib, so we rename the default lib to link
     mv $D_HOME/etc/ldc.conf $D_HOME/etc/ldc.conf.orig
-    set -e 's/tango-user-ldc/tango-base-ldc/g'  \
+    sed -e 's/tango-user-ldc/tango-base-ldc/g'  \
         $D_HOME/etc/ldc.conf.orig > $D_HOME/etc/ldc.conf
     cd $BuildDir
 
@@ -269,7 +269,7 @@ libraries either needed or suggested for blip and dchem
 
     # libxml2 needed by the xml hwloc backend
     wget ftp://xmlsoft.org/libxml2/libxml2-sources-2.7.8.tar.gz
-    tar xzf 
+    tar xzf libxml2-sources-2.7.8.tar.gz
     cd libxml2-2.7.8
     ./configure --prefix=$D_HOME
     make
