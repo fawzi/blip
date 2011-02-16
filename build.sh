@@ -164,7 +164,7 @@ case `uname` in
   Linux)
     if [ -n "$MKLROOT" ] ; then
       DFLAGS_ADD="$DFLAGS_ADD ${versionFlag}CBlasDot"
-      extra_libs_os="${linkFlag}-lhwloc ${linkFlag}-lxml2 ${linkFlag}-lnuma ${linkFlag}-lev ${linkFlag}-L$MKLROOT/lib/em64t ${linkFlag}-lmkl_lapack ${linkFlag}--start-group ${linkFlag}-lmkl_intel_lp64 ${linkFlag}-lmkl_core ${linkFlag}-lmkl_sequential ${linkFlag}--end-group ${linkFlag}-ldl ${linkFlag}-lz ${linkFlag}-lbz2"
+      extra_libs_os="${linkFlag}-lhwloc ${linkFlag}-lxml2 ${linkFlag}-lev ${linkFlag}-L$MKLROOT/lib/em64t ${linkFlag}-lmkl_lapack ${linkFlag}--start-group ${linkFlag}-lmkl_intel_lp64 ${linkFlag}-lmkl_core ${linkFlag}-lmkl_sequential ${linkFlag}--end-group ${linkFlag}-ldl ${linkFlag}-lz ${linkFlag}-lbz2"
     else
       extra_libs_os="${linkFlag}-lhwloc ${linkFlag}-lev ${linkFlag}-llapack ${linkFlag}-lblas ${linkFlag}-lgfortran ${linkFlag}-ldl ${linkFlag}-lz ${linkFlag}-lbz2"
     fi
