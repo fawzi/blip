@@ -1190,12 +1190,12 @@ int sbpAccept32(socket_t sock,socket_t *newSock,char*addrStr,uint32_t *addrStrLe
                     struct sockaddr_storage address;
                     socklen_t addrLen=(socklen_t)sizeof(address);
                     socklen_t addrStrLen2=(socklen_t)(*addrStrLen);
-                    *newSock=accept(lS->socktable[iSockAtt],(sockaddr*)&address,&addrLen);
+                    *newSock=accept(lS->socktable[iSockAtt],(struct sockaddr*)&address,&addrLen);
                     if (*newSock<=0){
                         perror("SBP accepting socket");
                         return 33;
                     }
-                    if (getnameinfo((sockaddr*)&address, addrLen, addrStr, addrStrLen2, &serviceBuf[0],
+                    if (getnameinfo((struct sockaddr*)&address, addrLen, addrStr, addrStrLen2, &serviceBuf[0],
                         (socklen_t)sizeof(serviceBuf), 0))
                     {
                         addrStr[0]=0;
