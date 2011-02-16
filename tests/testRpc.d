@@ -89,7 +89,7 @@ void rpcTests(){
         
         auto vendor=new A.AVendor(A.globalA);
         sout("initedVendor\n");
-        auto rpc1=new StcpProtocolHandler("","1242");
+        auto rpc1=new StcpProtocolHandler("","50000");
         sout("register:\n");
         rpc1.register();
         sout("start\n");
@@ -127,7 +127,7 @@ void rpcTests(){
         GC.collect();
         sout("gc did collect2!\n");
     
-        auto rpc3=new StcpProtocolHandler("","1243");
+        auto rpc3=new StcpProtocolHandler("","50001");
         rpc3.register();
         rpc3.startServer(false);
         auto vendor2=new A.AVendor(A.globalA);
@@ -276,7 +276,7 @@ void rpcTestServer(){
         //GC.disable();
         auto vendor=new A.AVendor(A.globalA);
         sout("initedVendor\n");
-        auto rpc1=new StcpProtocolHandler("","1242");
+        auto rpc1=new StcpProtocolHandler("","50000");
         sout("register:\n");
         rpc1.register();
         sout("start\n");
