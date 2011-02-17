@@ -77,6 +77,17 @@ struct BasicSocket{
     static BasicSocket opCall(socket_t s){
         BasicSocket res;
         res.sock=s;
+        // set non blocking
+        int oldMode;
+        if ((oldMode = fcntl(res.sock, F_GETFL, 0)) == -1 ||
+	    fcntl(res.sock, F_SETFL, oldMode | O_NONBLOCK)==-1){
+	    throw new BIOException(collectAppender(delegate void(CharSink s){
+			dumper(s)("could not set non blocking mode for socket ")(s);
+		    }),__FILE__,__LINE__);
+	}
+        // receive OutOfBand data inline
+        int i=1;
+        setsockopt(res.sock,SOL_SOCKET,SO_OOBINLINE,&i,4); // ignore failures...
         return res;
     }
     /// creates a socket
@@ -157,9 +168,10 @@ struct BasicSocket{
         res.sock=s;
         // set non blocking
         int oldMode;
-        if ((oldMode = fcntl(res.sock, F_GETFL, 0)) != -1){
-            fcntl(res.sock, F_SETFL, oldMode | O_NONBLOCK);
-        }
+        if ((oldMode = fcntl(res.sock, F_GETFL, 0)) == -1 ||
+	    fcntl(res.sock, F_SETFL, oldMode | O_NONBLOCK)==-1){
+	    throw new BIOException("could not set non blocking mode "~address~" "~service,__FILE__,__LINE__);
+	}
         // receive OutOfBand data inline
         int i=1;
         setsockopt(res.sock,SOL_SOCKET,SO_OOBINLINE,&i,4); // ignore failures...
