@@ -332,7 +332,7 @@ struct Vector(flt_, int dim_) {
     }
     
 
-    flt sqLength() {
+    flt norm22() {
         assert (ok);
                 static if (2 == dim) return x * x + y * y;
         else    static if (3 == dim) return x * x + y * y + z * z;
@@ -341,9 +341,9 @@ struct Vector(flt_, int dim_) {
     }
 
     
-    flt length() {
+    flt norm2() {
         assert (ok);
-        flt sq = sqLength();
+        flt sq = norm22();
         if (sq != cscalar!(flt, 0)) {
             return scalar!(flt)(sqrt(scalar!(real)(sq)));
         }
@@ -353,7 +353,7 @@ struct Vector(flt_, int dim_) {
 
     static if (fieldOps) {
         void normalize() {
-            flt l = length();
+            flt l = norm2();
             if (l != cscalar!(flt, 0)) {
                 static if (isFloatingPointType!(flt)) {
                     flt inv = cscalar!(flt, 1) / l;
@@ -374,7 +374,7 @@ struct Vector(flt_, int dim_) {
 
     static if (is(flt == float)) {
         void quickNormalize() {
-            flt inv = invSqrt(sqLength);
+            flt inv = invSqrt(norm22);
             *this *= inv;
         }
 
@@ -552,7 +552,7 @@ struct Vector(flt_, int dim_) {
         assert (ok);
         assert (other.ok);
         other -= *this;
-        return other.length;
+        return other.norm2;
     }
     
     
@@ -569,7 +569,7 @@ struct Vector(flt_, int dim_) {
     
     
     bool isUnit() {
-        real sql = cast(real)sqLength();
+        real sql = cast(real)norm22();
         return abs(sql - 1.0) < unitSqNormEpsilon;
     }
 }
