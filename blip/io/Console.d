@@ -42,10 +42,10 @@ static this(){
     auto stdOut=new StreamStrWriter!(char)(Cout.output);
     auto stdErr=new StreamStrWriter!(char)(Cerr.output);
     soutUnsafe=dumper(&stdOut.writeStrFlushNl);
-    soutStream=new BasicStrStream!()(&stdOut.writeStrFlushNl,&stdOut.flush);
+    soutStream=new BasicStrStream!()(&stdOut.desc,&stdOut.writeStrFlushNl,&stdOut.flush);
     sout=dumper(&stdOut.writeStrSyncFlushNl);
     serr=dumper(&stdErr.writeStrFlushNl);
-    serrStream=new BasicStrStream!()(&stdErr.writeStrFlushNl,&stdErr.flush);
+    serrStream=new BasicStrStream!()(&stdErr.desc,&stdErr.writeStrFlushNl,&stdErr.flush);
     localLog=sout;
     globalLog=sout;
     hasGlobalLog=true;

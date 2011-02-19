@@ -67,15 +67,18 @@ class SBinSerializer : Serializer {
     this(OutStreamI s){
         WriteHandlers w=cast(WriteHandlers)cast(Object)s;
         if (w is null){
-            w=new BinaryWriteHandlers!()(w);
+            w=new BinaryWriteHandlers!()(s);
         }
         super(w);
         writer=w;
         lastMetaId=3; // 0: null, 1: default type, 2: proxy, 3: metaInfo
         compact=true;
     }
-    this(void delegate(void[]) s){
-        this(new BinaryWriteHandlers!()(s));
+    this(string desc,void delegate(void[]) s){
+        this(new BinaryWriteHandlers!()(desc,s));
+    }
+    this(OutWriter desc,void delegate(void[]) s){
+        this(new BinaryWriteHandlers!()(desc,s));
     }
     void writeField(FieldMetaInfo *field){ }
     /// writes something that has a custom write operation

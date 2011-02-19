@@ -286,20 +286,20 @@ class StcpConnection{
         //this.sock.keepalive(true);
         serTask=new SequentialTask("stcpSerTask",defaultTask,true);
         // should limit buffer to 1280 or 1500 or multiples of them? (jumbo frames)
-        outStream=new BufferedBinStream(&this.writeExact,3000,&this.sock.flush,&this.sock.close);
-        readIn=new BufferIn!(void)(&this.rawReadInto);
+        outStream=new BufferedBinStream(&this.sock.desc,&this.writeExact,3000,&this.sock.flush,&this.sock.close);
+        readIn=new BufferIn!(void)(&this.sock.desc,&this.rawReadInto);
         version(StcpTextualSerialization){
-            auto r=new BufferIn!(char)(cast(size_t delegate(cstring))&this.rawReadInto);
+            auto r=new BufferIn!(char)(&this.sock.desc,cast(size_t delegate(cstring))&this.rawReadInto);
             //ReinterpretReader!(void,char) r=readIn.reinterpretReader!(char)();
             charReader=r;
-            serializer=new JsonSerializer!(char)(outStream.charSink());
+            serializer=new JsonSerializer!(char)(&outStream.desc,outStream.charSink());
             unserializer=new JsonUnserializer!(char)(charReader);
         } else {
             version(StcpNoCache){
                 serializer=new SBinSerializer(&this.writeExact);
                 unserializer=new SBinUnserializer(&this.rawReadExact);
             } else {
-                serializer=new SBinSerializer(outStream.binSink());
+                serializer=new SBinSerializer(&outStream.desc,outStream.binSink());
                 unserializer=new SBinUnserializer(readIn);
             }
         }

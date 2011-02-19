@@ -40,6 +40,7 @@ import blip.text.UtfUtils;
 import blip.BasicModels;
 import blip.io.StreamConverters: ReadHandler;
 import blip.Comp;
+import blip.container.GrowableArray;
 
 /// the non array core types
 template isBasicCoreType(T){
@@ -135,13 +136,33 @@ class CoreHandlers{
     void handleBinReader(BinReader w){
         assert(0,"unimplemented");
     }
+    void desc(CharSink s){
+        s("CoreHandlers");
+    }
 }
 
 /// handlers for writing
 class WriteHandlers: CoreHandlers,OutStreamI{
     void delegate() flusher;
+    string dsc;
+    void delegate(CharSink) dscWriter;
     
-    this(void delegate() f){ flusher=f; }
+    void _writeDsc(CharSink s){
+        s(dsc);
+    }
+    
+    this(string dsc,void delegate() f,OutWriter dscW=null){
+        flusher=f;
+        this.dsc=dsc;
+        if (dscW!is null){
+            this.dscWriter=dscW;
+        } else {
+            this.dscWriter=&this._writeDsc;
+        }
+    }
+    this(OutWriter dsc,void delegate() f){
+        this("",f,dsc);
+    }
     
     /// flushes the underlying stream if possible
     void flush(){
@@ -198,11 +219,13 @@ class WriteHandlers: CoreHandlers,OutStreamI{
     void close(){
         assert(0,"unimplemented");
     }
+    void desc(CharSink s){
+        dscWriter(s);
+    }
 }
 
 /// handlers for reading
 class ReadHandlers: CoreHandlers{
-    this(){}
     /// nicer way to read in
     ReadHandlers opCall(T)(ref T t){
         static assert(isCoreType!(T),T.stringof~" is not a core type");
@@ -266,16 +289,19 @@ final class BinaryWriteHandlers(bool SwapBytes=isSmallEndian):WriteHandlers{
     void delegate(void[]) writer;
     void delegate() _close;
     
-    this (void delegate(void[]) writer, void delegate() flusher=null, void delegate() _close=null)
+    this (string dsc,void delegate(void[]) writer, void delegate() flusher=null, void delegate() _close=null,OutWriter dscW=null)
     {
-        super(flusher);
+        super(dsc,flusher,dscW);
         this.writer=writer;
         this.flusher=flusher;
         this._close=_close;
         setCoreHandlersFrom_basicWrite();
     }
     this (OutStreamI w){
-        this(&w.rawWrite,&w.flush,&w.close);
+        this("",&w.rawWrite,&w.flush,&w.close,&w.desc);
+    }
+    this (OutWriter dsc,void delegate(void[]) writer, void delegate() flusher=null, void delegate() _close=null){
+        this("",writer,flusher,_close,dsc);
     }
 
     /+ /// guartees the given alignment
@@ -408,6 +434,7 @@ final class BinaryReadHandlers(bool SwapBytes=isSmallEndian):ReadHandlers{
     
     this (Reader!(void) reader)
     {
+        super();
         this.reader=reader;
         auto tReader=cast(ReadHandler!(void))reader;
         if (tReader is null){ 
@@ -532,6 +559,9 @@ final class BinaryReadHandlers(bool SwapBytes=isSmallEndian):ReadHandlers{
             writeOut(s,"reader"); s("@"); writeOut(s,pos);
         }
     }
+    void desc(CharSink s){
+        s("BinaryReadHandlers("); reader.desc(s); s(")");
+    }
 }
 
 /// formatted write handlers written on the top of a simple sink
@@ -540,17 +570,24 @@ class FormattedWriteHandlers(U=char): WriteHandlers{
     void delegate() _close;
     this(OutStreamI w){
         static if (is(U==char)){
-            this(&w.rawWriteStrC,&w.flush,&w.close);
+            this(&w.desc,&w.rawWriteStrC,&w.flush,&w.close);
         } else static if (is(U==wchar)){
-            this(&w.rawWriteStrW,&w.flush,&w.close);
+            this(&w.desc,&w.rawWriteStrW,&w.flush,&w.close);
         } else static if (is(U==dchar)){
-            this(&w.rawWriteStrD,&w.flush,&w.close);
+            this(&w.desc,&w.rawWriteStrD,&w.flush,&w.close);
         } else {
             static assert(0,U.stringof~" unsupported");
         }
+        dsc=collectAppender(&w.desc);
     }
-    this(void delegate(U[]) writer,void delegate() flusher=null,void delegate() _close=null){
-        super(flusher);
+    this(string dsc,void delegate(U[]) writer,void delegate() flusher=null,void delegate() _close=null,OutWriter dscW=null){
+        super(dsc,flusher,dscW);
+        this.writer=writer;
+        this._close=_close;
+        setCoreHandlersFrom_basicWrite();
+    }
+    this(OutWriter dsc,void delegate(U[]) writer,void delegate() flusher=null,void delegate() _close=null){
+        super(dsc,flusher);
         this.writer=writer;
         this._close=_close;
         setCoreHandlersFrom_basicWrite();
@@ -579,7 +616,7 @@ class FormattedWriteHandlers(U=char): WriteHandlers{
     }
     
     mixin(coreHandlerSetFromTemplateMixinStr("basicWrite"));
-
+    
     /// returns if the current protocol is binary or not
     bool binary(){
         return false;
@@ -696,6 +733,10 @@ final class FormattedReadHandlers(T):ReadHandlers{
     /// skips the given string
     bool skipStr(T[] str,bool shouldThrow=true){
         return reader.skipString(str,shouldThrow);
+    }
+    
+    void desc(CharSink s){
+        s("FormattedReadHandlers("); reader.desc(s); s(")");
     }
 }
 

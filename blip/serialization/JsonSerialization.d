@@ -42,12 +42,16 @@ class JsonSerializer(T=char) : Serializer {
     }
 
     /// constructor using a wispered sink delegate
-    this(Dumper!(void delegate(T[])) sink){
-        this(sink.call);
+    this(string dsc,Dumper!(void delegate(T[])) sink){
+        this(dsc,sink.call);
     }
     /// constructor using a sink delegate
-    this(void delegate(T[])sink){
-        this(new FormattedWriteHandlers!(T)(sink));
+    this(string dsc,void delegate(T[])sink){
+        this(new FormattedWriteHandlers!(T)(dsc,sink));
+    }
+    /// constructor using a sink delegate
+    this(OutWriter dsc,void delegate(T[])sink){
+        this(new FormattedWriteHandlers!(T)(dsc,sink));
     }
     /// constructor using an OutStreamI (or a WriteHandlers)
     this(OutStreamI s){

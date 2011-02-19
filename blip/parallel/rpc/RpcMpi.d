@@ -188,7 +188,7 @@ class MpiProtocolHandler: ProtocolHandler{
             }
             auto obj=publisher.objectNamed(url.path[1]);
             auto arr=lGrowableArray!(ubyte)(buf,0,GASharing.GlobalNoFree);
-            auto s=new SBinSerializer(&arr.appendVoid);
+            auto s=new SBinSerializer("mpiRpcSer",&arr.appendVoid);
             s(url.url(buf2));
             serArgs(s);
             auto arr2=new IOArray(arr.takeData);

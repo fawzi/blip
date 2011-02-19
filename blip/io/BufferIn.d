@@ -20,6 +20,7 @@ import blip.text.UtfUtils;
 import blip.stdc.string: memmove;
 import blip.math.Math: min;
 import blip.container.GrowableArray;
+import blip.Comp;
 version(TrackBInReadSome) import blip.io.Console;
 
 /// a reader that reinterprets the memory
@@ -28,7 +29,9 @@ final class ReinterpretReader(U,T):Reader!(T){
     
     this(BufferIn!(U) buf){
         this.buf=buf;
+        this.dsc=dsc;
     }
+    
 
     /// reader 
     size_t readSome(T[] t){
@@ -42,6 +45,11 @@ final class ReinterpretReader(U,T):Reader!(T){
     
     void shutdownInput(){
         this.buf.shutdownInput();
+    }
+    
+    void desc(CharSink s){
+        s("ReinterpretReader!(");s(U.stringof); s(","); s(T.stringof); s(")(");
+        writeOut(s,buf); s(")");
     }
 }
 
@@ -58,24 +66,47 @@ final class BufferIn(TInt):Reader!(TInt){
     SliceExtent slice;
     size_t encodingOverhead;
     void delegate() _shutdownInput;
+    string dsc;
+    void delegate(CharSink) dscWriter;
     
-    this(size_t delegate(TInt[]) basicReader,TBuf[] buf,size_t encodingOverhead=ulong.sizeof/TInt.sizeof,void delegate() shutdown=null,size_t bufLen=0,size_t bufPos=0){
+    void _writeDesc(CharSink s){
+        s(dsc);
+    }
+    
+    this(void delegate(CharSink) dscW,size_t delegate(TInt[]) basicReader,TBuf[] buf,size_t encodingOverhead=ulong.sizeof/TInt.sizeof,void delegate() shutdown=null,size_t bufLen=0,size_t bufPos=0){
+        this("",basicReader,buf,encodingOverhead,shutdown,bufLen,bufPos,dscW);
+    }
+    this(string dsc,size_t delegate(TInt[]) basicReader,TBuf[] buf,size_t encodingOverhead=ulong.sizeof/TInt.sizeof,void delegate() shutdown=null,size_t bufLen=0,size_t bufPos=0,void delegate(CharSink) dscW=null){
         assert(buf.length>encodingOverhead,"buf too small");
         this.buf=buf;
         this.bufPos=bufPos;
         this.bufLen=bufLen;
+        this.dsc=dsc;
+        if (dscW!is null){
+            this.dscWriter=dscW;
+        } else {
+            this.dscWriter=&_writeDesc;
+        }
         assert(bufPos<=buf.length && bufPos+bufLen<=buf.length,"invalid bufPos/bufLen");
         _read=basicReader;
         slice=SliceExtent.Partial;
         _shutdownInput=shutdown;
     }
     static if(is(TInt==void)){
-        this(size_t delegate(TInt[]) basicReader,TInt[] buf,size_t encodingOverhead=ulong.sizeof/TInt.sizeof,void delegate() shutdown=null,size_t bufLen=0,size_t bufPos=0){
-            this(basicReader, cast(TBuf[])buf, encodingOverhead, shutdown, bufLen, bufPos);
+        this(string dsc,size_t delegate(TInt[]) basicReader,TInt[] buf,size_t encodingOverhead=ulong.sizeof/TInt.sizeof,void delegate() shutdown=null,size_t bufLen=0,
+            size_t bufPos=0){
+            this(dsc,basicReader, cast(TBuf[])buf, encodingOverhead, shutdown, bufLen, bufPos);
+        }
+        this(OutWriter dsc,size_t delegate(TInt[]) basicReader,TInt[] buf,size_t encodingOverhead=ulong.sizeof/TInt.sizeof,void delegate() shutdown=null,size_t bufLen=0,
+            size_t bufPos=0){
+            this(dsc,basicReader, cast(TBuf[])buf, encodingOverhead, shutdown, bufLen, bufPos);
         }
     }
-    this(size_t delegate(TInt[]) basicReader,size_t bufLen=512,size_t encodingOverhead=0){
-        this(basicReader,new TBuf[](bufLen),encodingOverhead);
+    this(string dsc,size_t delegate(TInt[]) basicReader,size_t bufLen=512,size_t encodingOverhead=0){
+        this(dsc,basicReader,new TBuf[](bufLen),encodingOverhead);
+    }
+    this(OutWriter dsc,size_t delegate(TInt[]) basicReader,size_t bufLen=512,size_t encodingOverhead=0){
+        this(dsc,basicReader,new TBuf[](bufLen),encodingOverhead);
     }
     
     void loadMore(bool insist=true){
@@ -309,11 +340,15 @@ final class BufferIn(TInt):Reader!(TInt){
     ReinterpretReader!(TInt,T) reinterpretReader(T)(){
         return new ReinterpretReader!(TInt,T)(this);
     }
+    
+    void desc(CharSink s){
+        dscWriter(s);
+    }
 }
 
 /// a reader that reads the contents of an array
-BufferIn!(T) arrayReader(T)(T[] a){
-    auto res=new BufferIn!(T)(delegate size_t(T[] b){ return Eof; },a,0,null,a.length,0);
+BufferIn!(T) arrayReader(T)(string dsc,T[] a){
+    auto res=new BufferIn!(T)(dsc,delegate size_t(T[] b){ return Eof; },a,0,null,a.length,0);
     res.slice=SliceExtent.ToEnd;
     return res;
 }
@@ -336,8 +371,11 @@ final class MixedSource: MultiReader {
         //_readerWchar=buf.reinterpretReader!(wchar)();
         //_readerDchar=buf.reinterpretReader!(dchar)();
     }
-    this(size_t delegate(void[]) basicReader){
-        this(new BufferIn!(void)(basicReader));
+    this(string dsc,size_t delegate(void[]) basicReader){
+        this(new BufferIn!(void)(dsc,basicReader));
+    }
+    this(void delegate(CharSink) dscW,size_t delegate(void[]) basicReader){
+        this(new BufferIn!(void)(dscW,basicReader));
     }
     uint modes(){
         return _modes;
@@ -367,6 +405,9 @@ final class MixedSource: MultiReader {
         else if (_readerDchar !is null ) _readerDchar.shutdownInput();
         else if (_readerBin !is null ) _readerBin.shutdownInput();
     }
+    void desc(CharSink s){
+        dumper(s)("MultiReader(")(_readerChar)(",")(_readerWchar)(",")(_readerDchar)(",")(_readerBin)(")");
+    }
 }
 
 /// a class that supports all character streams on the top of a character stream
@@ -390,8 +431,11 @@ final class StringReader(T): MultiReader{
     }
     uint _modes=_nativeModes;//MultiReader.Mode.Char|MultiReader.Mode.Wchar|MultiReader.Mode.Dchar;
     
-    this(size_t delegate(T[])r){
-        this(new BufferIn!(T)(r));
+    this(string dsc,size_t delegate(T[])r){
+        this(new BufferIn!(T)(dsc,r));
+    }
+    this(OutWriter dscW,size_t delegate(T[])r){
+        this(new BufferIn!(T)(dscW,r));
     }
     this(bool delegate(size_t delegate(T[], SliceExtent slice,out bool iterate)) reader){
         this(r(basicReader));
@@ -433,6 +477,10 @@ final class StringReader(T): MultiReader{
         else if (_readerWchar !is null ) _readerWchar.shutdownInput();
         else if (_readerDchar !is null ) _readerDchar.shutdownInput();
         else if (_readerBin !is null ) _readerBin.shutdownInput();
+    }
+    void desc(CharSink s){
+        dumper(s)("StringReader!(")(T.stringof)(")(")(_readerChar)(",")(_readerWchar)(",")
+            (_readerDchar)(",")(_readerBin)(")");
     }
 }
 
