@@ -59,7 +59,7 @@ alias outfileStrWriterT!(char) outfileStrWriter;
 /// a string (text) based file (add newline replacing support??)
 BasicStreams.BasicStrStream!(T) outfileStrT(T)(string path,WriteMode wMode){
     auto sw=outfileStrWriterT!(T)(path,wMode);
-    auto res=new BasicStreams.BasicStrStream!(T)(&sw.writeStr,&sw.flush,&sw.close);
+    auto res=new BasicStreams.BasicStrStream!(T)(&sw.desc,&sw.writeStr,&sw.flush,&sw.close);
     return res;
 }
 /// ditto
@@ -68,7 +68,7 @@ alias outfileStrT!(char) outfileStr;
 /// a string (text) based file that syncronized access (add newline replacing support??)
 BasicStreams.BasicStrStream!(T) outfileStrSyncT(T)(string path,WriteMode wMode){
     auto sw=outfileStrWriterT!(T)(path,wMode);
-    auto res=new BasicStreams.BasicStrStream!(T)(&sw.writeStrSync,&sw.flush,&sw.close);
+    auto res=new BasicStreams.BasicStrStream!(T)(&sw.desc,&sw.writeStrSync,&sw.flush,&sw.close);
     return res;
 }
 /// ditto
@@ -97,13 +97,13 @@ StreamWriter outfileBinWriter(string path,WriteMode wMode){
 /// binary stream that writes to a file
 BasicStreams.BasicBinStream outfileBin(string path,WriteMode wMode){
     auto sw=outfileBinWriter(path,wMode);
-    auto res=new BasicStreams.BasicBinStream(&sw.writeExact,&sw.flush,&sw.close);
+    auto res=new BasicStreams.BasicBinStream(&sw.desc,&sw.writeExact,&sw.flush,&sw.close);
     return res;
 }
 /// binary stream that writes to a file synchronizing writes
 BasicStreams.BasicBinStream outfileBinSync(string path,WriteMode wMode){
     auto sw=outfileBinWriter(path,wMode);
-    auto res=new BasicStreams.BasicBinStream(&sw.writeExactSync,&sw.flush,&sw.close);
+    auto res=new BasicStreams.BasicBinStream(&sw.desc,&sw.writeExactSync,&sw.flush,&sw.close);
     return res;
 }
 /// input file using string

@@ -2,8 +2,10 @@
 ///
 /// wrapping of a tango module
 module blip.core.Array;
-public import tango.core.Array;
-
+public import tango.core.Array:find,rfind,kfind,krfind,findIf,contains,mismatch,count,replaceIf,remove,
+    removeIf,distinct,shuffle,partition,select,sort,includes,unionOf,intersectionOf,
+    missingFrom,differenceOf,makeHeap,pushHeap,popHeap,sortHeap;
+// lbound,ubound,bsearch moved to blip.util.BinSearch 
 /// compresses in place an array removing consecutive copies of the same element
 T[] compress(T)(T[]a){
     if (a.length==0) return a;

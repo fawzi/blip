@@ -19,7 +19,7 @@ import tango.io.model.IConduit;
 import tango.core.Array: find;
 import blip.text.UtfUtils: cropRight;
 import blip.container.GrowableArray;
-import blip.io.BasicIO: BIOException, SliceExtent,SmallBufferException,MultiReader,Reader;
+import blip.io.BasicIO: BIOException, SliceExtent,SmallBufferException,MultiReader,Reader,dumper,CharSink;
 import BIO=blip.io.BasicIO;
 import tango.io.stream.Buffered;
 import blip.io.IOArray;
@@ -67,6 +67,9 @@ final class StreamWriter{
     final void close(){
         writer.close();
     }
+    void desc(CharSink s){
+        s(writer.conduit.toString());
+    }
 }
 
 void delegate(void[]) binaryDumper(OutputStream s){
@@ -76,13 +79,13 @@ void delegate(void[]) binaryDumper(OutputStream s){
 
 BasicStreams.BasicBinStream binaryStream(OutputStream s){
     auto sw=new StreamWriter(s);
-    auto res=new BasicStreams.BasicBinStream(&sw.writeExact,&sw.flush,&sw.close);
+    auto res=new BasicStreams.BasicBinStream(&sw.desc,&sw.writeExact,&sw.flush,&sw.close);
     return res;
 }
 
 BasicStreams.BasicBinStream binaryStreamSync(OutputStream s){
     auto sw=new StreamWriter(s);
-    auto res=new BasicStreams.BasicBinStream(&sw.writeExactSync,&sw.flush,&sw.close);
+    auto res=new BasicStreams.BasicBinStream(&sw.desc,&sw.writeExactSync,&sw.flush,&sw.close);
     return res;
 }
 
@@ -142,6 +145,9 @@ class StreamStrWriter(T){
     void close(){
         writer.close();
     }
+    void desc(CharSink s){
+        s(writer.conduit.toString());
+    }
 }
 
 void delegate(T[]) strDumperT(T)(OutputStream s){
@@ -151,7 +157,7 @@ void delegate(T[]) strDumperT(T)(OutputStream s){
 
 BasicStreams.BasicStrStream!(T) strStreamT(T)(OutputStream s){
     auto sw=new StreamStrWriter!(T)(s);
-    auto res=new BasicStreams.BasicStrStream!(T)(&sw.writeStr,&sw.flush,&sw.close);
+    auto res=new BasicStreams.BasicStrStream!(T)(&sw.desc,&sw.writeStr,&sw.flush,&sw.close);
     return res;
 }
 
@@ -162,7 +168,7 @@ void delegate(T[]) strDumperSyncT(T)(OutputStream s){
 
 BasicStreams.BasicStrStream!(T) strStreamSyncT(T)(OutputStream s){
     auto sw=new StreamStrWriter!(T)(s);
-    auto res=new BasicStreams.BasicStrStream!(T)(&sw.writeStrSync,&sw.flush,&sw.close);
+    auto res=new BasicStreams.BasicStrStream!(T)(&sw.desc,&sw.writeStrSync,&sw.flush,&sw.close);
     return res;
 }
 
@@ -259,6 +265,15 @@ class ReadHandler(T):Reader!(T){
             arr.close();
         }
     }
+    void desc(CharSink s){
+        if (buf!is null){
+            s(buf.toString());
+        } else if (arr!is null){
+            s(arr.conduit.toString());
+        } else {
+            s("ReadHandler(*null*)");
+        }
+    }
 }
 
 Reader!(T) toReaderT(T)(InputStream i){
@@ -320,6 +335,9 @@ final class MultiInput: MultiReader{
         else if (_readerWchar !is null ) _readerWchar.shutdownInput();
         else if (_readerDchar !is null ) _readerDchar.shutdownInput();
         else if (_readerBin !is null ) _readerBin.shutdownInput();
+    }
+    void desc(CharSink s){
+        dumper(s)("MultiInput(")(_readerBin)(",")(_readerChar)(",")(_readerWchar)(",")(_readerDchar)(")");
     }
 }
 

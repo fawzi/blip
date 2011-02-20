@@ -49,8 +49,8 @@ class ConnectionHandler{
         BufferIn!(void) readIn;
         try{
             if (cached){
-                outStream=new BufferedBinStream(&h.sock.writeExact,2048,&h.sock.flush,&h.sock.close);
-                readIn=new BufferIn!(void)(&h.sock.rawReadInto);
+                outStream=new BufferedBinStream(&h.sock.desc,&h.sock.writeExact,2048,&h.sock.flush,&h.sock.close);
+                readIn=new BufferIn!(void)(&h.sock.desc,&h.sock.rawReadInto);
             }
             while(true){
                 size_t read;

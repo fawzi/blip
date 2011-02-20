@@ -189,7 +189,7 @@ void mpiSendT(T)(Channel c,T val,int tag=0){
             buf=new ubyte[](bSize);
         }
         auto arr=lGrowableArray(buf,0);
-        scope s=new SBinSerializer(&arr.appendArr); // use cache???
+        scope s=new SBinSerializer("mpiSendT",&arr.appendArr); // use cache???
         s(val);
         s.close();
         assert(arr.length>bSize,"unexpected length");
@@ -261,7 +261,7 @@ void mpiBcastT(T)(LinearComm para,ref T val,int target,int tag=0){
         }
         if (para.myRank==target){
             auto arr=lGrowableArray(_buf,0);
-            auto s=new SBinSerializer(&arr.appendArr); // use cache???
+            auto s=new SBinSerializer("mpiBcastT",&arr.appendArr); // use cache???
             s(val);
             assert(arr.length==buf.length,"unexpected length");
             assert(cast(ubyte*)arr.ptr is buf.ptr,"unexpected storage");
@@ -280,7 +280,7 @@ void mpiBcastT(T)(LinearComm para,ref T val,int target,int tag=0){
         auto arr=lGrowableArray(_buf,0,GASharing.GlobalNoFree);
         scope (exit) arr.deallocData();
         if (para.myRank==target){
-            auto s=new SBinSerializer(&arr.appendVoid); // use cache???
+            auto s=new SBinSerializer("mpiBcastT",&arr.appendVoid); // use cache???
             s(val);
             size=arr.length;
             para.bcast(size,target,tag);
@@ -381,7 +381,7 @@ void mpiAllGatherT(U,T)(LinearComm para,U valOut, T valIn,int tag=0,int[] inCoun
         ubyte[256] buf2;
         int size;
         auto arr=lGrowableArray(buf,0,GASharing.GlobalNoFree);
-        auto s=new SBinSerializer(&arr.appendVoid); // use cache???
+        auto s=new SBinSerializer("mpiGatherT",&arr.appendVoid); // use cache???
         s(valOut);
         auto lMem=LocalMem(buf2);
         int[] inCounts2=lMem.allocArr!(int)(para.dim);
@@ -482,7 +482,7 @@ void mpiGatherT(U,T)(LinearComm para,U valOut, T valIn,int root,int tag=0,int[] 
         int[256] buf2;
         int size;
         auto arr=lGrowableArray(buf,0,GASharing.GlobalNoFree);
-        auto s=new SBinSerializer(&arr.appendArr); // use cache???
+        auto s=new SBinSerializer("mpiGatherT",&arr.appendArr); // use cache???
         s(valIn);
         auto lMem=LocalMem(buf2);
         int[] inCounts2=lMem.allocArr!(int)(para.dim);

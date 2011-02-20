@@ -156,6 +156,7 @@ interface OutStreamI{
     BinSink  binSink();
     void flush();
     void close();
+    void desc(CharSink s);
 }
 
 /// a reader of elements of type T
@@ -166,6 +167,7 @@ interface Reader(T){
     bool handleReader(size_t delegate(T[], SliceExtent slice,out bool iterate) r);
     /// shutdown the input source
     void shutdownInput();
+    void desc(CharSink s);
 }
 
 /// one or more readers
@@ -180,6 +182,7 @@ interface MultiReader{
     Reader!(dchar) readerDchar();
     Reader!(void)  readerBin();
     void shutdownInput();
+    void desc(CharSink s);
 }
 
 

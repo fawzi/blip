@@ -57,7 +57,7 @@ class SNSerializer:SBinSerializer{
     }
     this(ubyte[] buf=null,bool local=false){
         content=lGrowableArray!(ubyte)(buf,0,GASharing.GlobalNoFree);
-        super(&content.appendVoid);
+        super(&this.desc,&content.appendVoid);
         tag=AnyTag;
         res.tag=AnyTag;
     }
@@ -81,6 +81,9 @@ class SNSerializer:SBinSerializer{
         res.msg=Variant.init;
         res.tag=AnyTag;
         tag=AnyTag;
+    }
+    void desc(CharSink s){
+        dumper(s)("SNSerializer(")(tag)(",")(cast(void*)target)(")");
     }
 }
 
