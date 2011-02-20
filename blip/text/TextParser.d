@@ -32,7 +32,6 @@ import blip.text.UtfUtils;
 import blip.BasicModels;
 import blip.io.StreamConverters: ReadHandler,toReaderChar;
 import blip.Comp;
-import blip.io.Console; // pippo
 
 /// a class that does a stream parser, for things in which white space amount
 /// is not relevant (it is just a separator)
@@ -245,14 +244,11 @@ class TextParser(T) : InputFilter
     /// returns the next token if one tokenizes with just string and separators
     T[]nextToken(){
         T[] str;
-        if (!getSeparator()){
-            parserPos(sout.call);sout("pippo after getSeparator fail\n");
+        if (getSeparator().length==0){
             if (!next(&scanString)){
-                parserPos(sout.call);sout("pippo after scanString fail\n");
                 return null;
             }
         }
-        parserPos(sout.call);sout("pippo after nextToken match\n");
         return slice;
     }
     /// check if the scan function would give a match without actually reading it
@@ -632,6 +628,9 @@ class TextParser(T) : InputFilter
             if (!next(&scanFloat)) parseError("error scanning float",__FILE__,__LINE__);
             assert(slice.length>0,"error slice too small");
             static if (is(U==float)||is(U==double)||is(U==real)){
+                foreach(i,c;slice){
+                    if (c=='D'||c=='d') slice[i]='e';
+                }
                 t=cast(U)Float.toFloat(slice);
             } else static if (!is(U==ulong)){
                 t=cast(U)Integer.toLong(slice);
