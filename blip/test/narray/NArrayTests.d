@@ -636,7 +636,7 @@ void testConvolveNN(T,int rank,Border border)(NArray!(T,rank)inA,NArray!(T,rank)
 
 void testSerial(T,int rank)(NArray!(T,rank)a){
     auto buf=new IOArray(1000,1000);
-    auto s=new JsonSerializer!(char)(strDumper(buf));
+    auto s=new JsonSerializer!(char)("testSerial",strDumper(buf));
     auto u=new JsonUnserializer!(char)(toReaderT!(char)(buf));
     s(a);
     NArray!(T,rank) b;

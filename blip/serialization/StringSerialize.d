@@ -36,7 +36,7 @@ U[] serializeToArray(T,U=char)(T t,U[] buf=cast(U[])null){
 
 void serializeToSink(U,T)(void delegate(T[]) sink,U t){
     static if (is(T==char)||is(T==wchar)||is(T==dchar)){
-        auto s=new JsonSerializer!(T)(sink);
+        auto s=new JsonSerializer!(T)("serializeToSink",sink);
         s(t);
     } else static if (is(T==ubyte)||is(T==void)){
         void delegate(void[]) sink2;

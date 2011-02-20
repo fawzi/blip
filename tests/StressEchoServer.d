@@ -65,8 +65,8 @@ class StressGenerator{
             char[3000] bufIn;
             char[3000] bufOut;
             if (cached){
-                outStream=new BufferedBinStream(&this.connection.writeExact,2048,&this.connection.flush,&this.connection.close);
-                readIn=new BufferIn!(void)(&this.connection.rawReadInto);
+                outStream=new BufferedBinStream(&this.connection.desc,&this.connection.writeExact,2048,&this.connection.flush,&this.connection.close);
+                readIn=new BufferIn!(void)(&connection.desc,&this.connection.rawReadInto);
             }
             for(uint iter=0;iter<stressIter;++iter){
                 size_t toSend=rand.uniformR(bufOut.length);

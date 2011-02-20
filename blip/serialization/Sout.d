@@ -21,5 +21,5 @@ import blip.io.Console;
 
 Serializer Sout;
 static this(){
-    Sout=new JsonSerializer!()(sout);
+    Sout=new JsonSerializer!()("sout",sout);
 }

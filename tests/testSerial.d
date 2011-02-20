@@ -263,14 +263,14 @@ void testUnserial(T)(T a){
 void testJsonUnserial(T)(T a){
     version(UnserializationTrace) sout("testing unserialization of "~T.stringof~"\n");
     auto buf=new IOArray(1000,1000);
-    auto js=new JsonSerializer!()(strDumper(buf));
+    auto js=new JsonSerializer!()("testJsonUnserial",strDumper(buf));
     js(a);
     auto jus=new JsonUnserializer!()(toReaderT!(char)(buf));
     T sOut;
     version(UnserializationTrace) sout("XXXXXX Unserialization start\n");
     jus(sOut);
     version(UnserializationTrace) {
-        auto js2=new JsonSerializer!()(sout);
+        auto js2=new JsonSerializer!()("sout",sout);
         sout("XXXXXX Unserialization end\n");
         sout("original:----\n");
         js2(a);
@@ -289,16 +289,16 @@ void testJson2Unserial(T)(T a){
     version(UnserializationTrace) sout("testing unserialization of "~T.stringof~"\n");
     char[512] buf_;
     auto buf=lGrowableArray(buf_,0);
-    auto js=new JsonSerializer!()(&buf.appendArr);
+    auto js=new JsonSerializer!()("testJson2Unserial",&buf.appendArr);
     js(a);
-    auto r=arrayReader(buf.data);
+    auto r=arrayReader("jsonSerData",buf.data);
     auto jus=new JsonUnserializer!()(r);
     T sOut;
     version(UnserializationTrace){
         sout("XXXXXX Unserialization start\n");
         sout("in the buffer:-----\n");
         sout(buf.data)("\n");
-        auto js2=new JsonSerializer!()(sout);
+        auto js2=new JsonSerializer!()("sout",sout);
         sout("original:----\n");
         js2(a);
         sout("-----\n");
@@ -317,10 +317,10 @@ void testJson2Unserial(T)(T a){
 void testBinUnserial(T)(T a){
     version(UnserializationTrace) sout("testing unserialization of "~T.stringof~"\n");
     auto buf=new IOArray(1000,1000);
-    auto js=new SBinSerializer(binaryDumper(buf));
+    auto js=new SBinSerializer("testBinUnserial",binaryDumper(buf));
     js(a);
     version(UnserializationTrace) {
-        auto js2=new JsonSerializer!()(sout);
+        auto js2=new JsonSerializer!()("sout",sout);
         sout("in the buffer:-----\n");
         buf.seek(0,IOStream.Anchor.Begin);
         char[128] buf2;
@@ -358,10 +358,10 @@ void testBin2Unserial(T)(T a){
     version(UnserializationTrace) sout("testing unserialization of "~T.stringof~"\n");
     ubyte[256] _buf;
     auto buf=lGrowableArray(_buf,0);
-    auto js=new SBinSerializer(&buf.appendVoid);
+    auto js=new SBinSerializer("testBin2Unserial",&buf.appendVoid);
     js(a);
     version(UnserializationTrace) {
-        auto js2=new JsonSerializer!()(sout);
+        auto js2=new JsonSerializer!()("sout",sout);
         sout("in the buffer:-----\n");
         char[128] buf2;
         auto arr=lGrowableArray!(char)(buf2,0);
@@ -380,7 +380,7 @@ void testBin2Unserial(T)(T a){
         js2(a);
         sout("XXXXXX Unserialization start\n");
     }
-    auto reader=arrayReader(cast(void[])buf.data);
+    auto reader=arrayReader("SbinSerData",cast(void[])buf.data);
     auto jus=new SBinUnserializer(reader);
     T sOut;
     jus(sOut);
@@ -405,13 +405,13 @@ void testUnserial2(T,U)(void delegate(void function(T,U)) testF){
 void testJsonUnserial2(T,U)(T a,ref U sOut){
     version(UnserializationTrace) sout("testing json unserialization of "~T.stringof~"\n");
     auto buf=new IOArray(1000,1000);
-    auto js=new JsonSerializer!()(strDumper(buf));
+    auto js=new JsonSerializer!()("testJsonUnserial2",strDumper(buf));
     js(a);
     auto jus=new JsonUnserializer!()(toReaderT!(char)(buf));
     version(UnserializationTrace) sout("XXXXXX Unserialization start\n");
     jus(sOut);
     version(UnserializationTrace) {
-        auto js2=new JsonSerializer!()(sout);
+        auto js2=new JsonSerializer!()("sout",sout);
         sout("XXXXXX Unserialization end\n");
         sout("in the buffer:-----\n");
         buf.seek(0,IOStream.Anchor.Begin);
@@ -425,9 +425,9 @@ void testJson2Unserial2(T,U)(T a,ref U sOut){
     version(UnserializationTrace) sout("testing json unserialization of "~T.stringof~"\n");
     char[512] buf_;
     auto buf=lGrowableArray(buf_,0);
-    auto js=new JsonSerializer!()(&buf.appendArr);
+    auto js=new JsonSerializer!()("testJson2Unserial2",&buf.appendArr);
     js(a);
-    auto r=arrayReader(buf.data);
+    auto r=arrayReader("JsonSerD",buf.data);
     auto jus=new JsonUnserializer!()(r);
     version(UnserializationTrace) {
         sout("XXXXXX Unserialization start\n");
@@ -443,10 +443,10 @@ void testJson2Unserial2(T,U)(T a,ref U sOut){
 void testBinUnserial2(T,U)(T a,ref U b){
     version(UnserializationTrace) sout("testing binary unserialization of "~T.stringof~"\n");
     auto buf=new IOArray(1000,1000);
-    auto js=new SBinSerializer(binaryDumper(buf));
+    auto js=new SBinSerializer("testBinUnserial2",binaryDumper(buf));
     js(a);
     version(UnserializationTrace) {
-        auto js2=new JsonSerializer!()(sout);
+        auto js2=new JsonSerializer!()("sout",sout);
         sout("in the buffer:-----\n");
         buf.seek(0,IOStream.Anchor.Begin);
         char[128] buf2;
@@ -478,10 +478,10 @@ void testBin2Unserial2(T,U)(T a,ref U b){
     version(UnserializationTrace) sout("testing binary unserialization of "~T.stringof~"\n");
     ubyte[256] _buf;
     auto buf=lGrowableArray(_buf,0);
-    auto js=new SBinSerializer(&buf.appendVoid);
+    auto js=new SBinSerializer("testBin2Unserial2",&buf.appendVoid);
     js(a);
     version(UnserializationTrace) {
-        auto js2=new JsonSerializer!()(sout);
+        auto js2=new JsonSerializer!()("testBin2Unserial2",sout);
         sout("in the buffer:-----\n");
         char[128] buf2;
         auto arr=lGrowableArray!(char)(buf2,0);
@@ -499,7 +499,7 @@ void testBin2Unserial2(T,U)(T a,ref U b){
         sout("----\n");
         sout("XXXXXX Unserialization start\n");
     }
-    auto reader=arrayReader(cast(void[])buf.data);
+    auto reader=arrayReader("JsonSerD2",cast(void[])buf.data);
     auto jus=new SBinUnserializer(reader);
     jus(b);
     version(UnserializationTrace){
@@ -510,14 +510,14 @@ void testBin2Unserial2(T,U)(T a,ref U b){
 
 void main(){
     CoreHandlers ch;
-    auto fh=new FormattedWriteHandlers!(char)(sout.call);
+    auto fh=new FormattedWriteHandlers!(char)("sout",sout.call);
     auto i=4;
     fh.handle(i);
     auto s="abc".dup;
     fh.handle(s);
     sout("\n");
     
-    auto js=new JsonSerializer!()(sout);
+    auto js=new JsonSerializer!()("sout",sout);
     auto r=new Rand();
     A a;
     simpleRandom(r,a);

@@ -26,11 +26,27 @@ final class BasicBinStream: OutStreamI{
     BinSink sink;
     void delegate() _flush;
     void delegate() _close;
-    this(BinSink s,void delegate()f=null,void delegate()c=null){
+    string dsc;
+    void delegate(CharSink) dscWriter;
+    
+    void _writeDsc(CharSink s){
+        s(dsc);
+    }
+    this(string dsc,BinSink s,void delegate()f=null,void delegate()c=null,void delegate(CharSink)dscW=null){
         this.sink=s;
         this._flush=f;
         this._close=c;
+        this.dsc=dsc;
+        if (dscW !is null){
+            this.dscWriter=dscW;
+        } else {
+            this.dscWriter=&_writeDsc;
+        }
     }
+    this(void delegate(CharSink)dscW,BinSink s,void delegate()f=null,void delegate()c=null){
+        this("",s,f,c,dscW);
+    }
+    
     void rawWrite(void[] a){
         this.sink(a);
     }
@@ -72,6 +88,9 @@ final class BasicBinStream: OutStreamI{
             _close();
         }
     }
+    void desc(CharSink s){
+        dscWriter(s);
+    }
 }
 
 /// basic stream based on a string sink, uses the type T as native type, the others are converted
@@ -79,10 +98,25 @@ final class BasicStrStream(T=char): OutStreamI{
     void delegate(Const!(T)[]) sink;
     void delegate() _flush;
     void delegate() _close;
-    this(void delegate(Const!(T)[]) s,void delegate()f=null,void delegate()c=null){
+    string dsc;
+    void delegate(CharSink) dscWriter;
+    
+    void _writeDsc(CharSink s){
+        s(dsc);
+    }
+    this(string dsc,void delegate(Const!(T)[]) s,void delegate()f=null,void delegate()c=null,OutWriter dscW=null){
         this.sink=s;
         this._flush=f;
         this._close=c;
+        this.dsc=dsc;
+        if (dscW!is null){
+            this.dscWriter=dscW;
+        } else {
+            this.dscWriter=&_writeDsc;
+        }
+    }
+    this(OutWriter dsc,void delegate(Const!(T)[]) s,void delegate()f=null,void delegate()c=null){
+        this("",s,f,c,dsc);
     }
     void rawWrite(void[] a){ // written in hex format
         writeOut(this.sink,(cast(ubyte*)a.ptr)[0..a.length],"x");
@@ -147,6 +181,9 @@ final class BasicStrStream(T=char): OutStreamI{
         if (_close!is null)
             _close();
     }
+    void desc(CharSink s){
+        dscWriter(s);
+    }
 }
 
 /// buffered stream based on a binary sink, no encoding conversion for strings, dangerous to mix!
@@ -159,17 +196,36 @@ final class BufferedBinStream: OutStreamI{
     void delegate() _close;
     ubyte[] buf;
     size_t content;
-
-    this(BinSink s,size_t bufDim=512, void delegate()f=null, void delegate()c=null){
-        this(s,new ubyte[](bufDim),f,c);
+    string dsc;
+    void delegate(CharSink) dscWriter;
+    
+    void _writeDsc(CharSink s){
+        s(dsc);
     }
-    this(BinSink s,ubyte[] buf,void delegate()f=null, void delegate()c=null){
+
+    this(string dsc,BinSink s,size_t bufDim=512, void delegate()f=null, void delegate()c=null){
+        this(dsc,s,new ubyte[](bufDim),f,c);
+    }
+    this(string dsc,BinSink s,ubyte[] buf,void delegate()f=null, void delegate()c=null,OutWriter dscW=null){
         this._sink=s;
         this.buf=buf;
         this._flush=f;
         this._close=c;
         this.content=0;
+        this.dsc=dsc;
+        if (dscW!is null){
+            this.dscWriter=dscW;
+        } else {
+            this.dscWriter=&_writeDsc;
+        }
     }
+    this(OutWriter dsc,BinSink s,size_t bufDim=512, void delegate()f=null, void delegate()c=null){
+        this("",s,new ubyte[](bufDim),f,c,dsc);
+    }
+    this(OutWriter dsc,BinSink s,ubyte[] buf,void delegate()f=null, void delegate()c=null){
+        this("",s,buf,f,c,dsc);
+    }
+    
     void sink(void[]data){
         if (data.length<=buf.length-content){
             buf[content..content+data.length]=cast(ubyte[])data;
@@ -237,6 +293,9 @@ final class BufferedBinStream: OutStreamI{
         if (_close!is null)
             _close();
     }
+    void desc(CharSink s){
+        dscWriter(s);
+    }
 }
 
 /// basic stream based on a string sink, uses the type T as native type, the others are converted
@@ -246,17 +305,31 @@ final class BufferedStrStream(T=char): OutStreamI{
     void delegate() _close;
     Const!(T)[] buf;
     size_t content;
+    string dsc;
     
-    this(CharSink s,size_t bufDim=512,void delegate()f=null,void delegate()c=null){
-        this(s,new T[](bufDim),f,c);
+    this(string dsc,CharSink s,size_t bufDim=512,void delegate()f=null,void delegate()c=null){
+        this(dsc,s,new T[](bufDim),f,c);
     }
     
-    this(CharSink s,T[] buf,void delegate()f=null,void delegate()c=null){
+    this(string dsc,CharSink s,T[] buf,void delegate()f=null,void delegate()c=null,OutWriter dscW=null){
         this._sink=s;
         this.buf=buf;
         this._flush=f;
         this._close=c;
         this.content=0;
+        this.dsc=dsc;
+        if (dscW!is null){
+            this.dscWriter=dscW;
+        } else {
+            this.dscWriter=&_writeDsc;
+        }
+    }
+    this(OutWriter dsc,CharSink s,size_t bufDim=512,void delegate()f=null,void delegate()c=null){
+        this("",s,new T[](bufDim),f,c,dsc);
+    }
+    
+    this(OutWriter dsc,CharSink s,T[] buf,void delegate()f=null,void delegate()c=null){
+        this("",s,buf,f,c,dsc);
     }
     
     void sink(Const!(T)[]data){
@@ -349,5 +422,8 @@ final class BufferedStrStream(T=char): OutStreamI{
     void close(){
         if (_close!is null)
             _close();
+    }
+    void desc(CharSink s){
+        dscWriter(s);
     }
 }

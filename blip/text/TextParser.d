@@ -32,6 +32,7 @@ import blip.text.UtfUtils;
 import blip.BasicModels;
 import blip.io.StreamConverters: ReadHandler,toReaderChar;
 import blip.Comp;
+import blip.io.Console; // pippo
 
 /// a class that does a stream parser, for things in which white space amount
 /// is not relevant (it is just a separator)
@@ -64,9 +65,26 @@ class TextParser(T) : InputFilter
         slice=slice[0..0];
     }+/
     
+    void desc(CharSink s,bool longDesc=false){
+        if (longDesc){
+            parserPos(s);
+        } else {
+            dumper(s)("{class:blip.TextParser,");
+            if (source!is null){
+                s("source:"); writeOut(s,source.conduit);
+            } else {
+                s("reader:"); writeOut(s,reader);
+            }
+            dumper(s)(", line:")(oldLine)(", col:")(oldCol)("}");
+        }
+    }
     /// position of the parsed token
     void parserPos(void delegate(cstring) s){
-        dumper(s)("line:")(oldLine)(" col:")(oldCol)(" token:\"")(convertToString!(char)(escape(slice)))("\"\n");
+        if (source!is null)
+            writeOut(s,source.conduit);
+        else
+            writeOut(s,reader);
+        dumper(s)(" line:")(oldLine)(" col:")(oldCol)(" token:\"")(convertToString!(char)(escape(slice)))("\"\n");
         T[] txt;
         if (source!is null){
             txt=cast(T[])source.slice;
@@ -227,9 +245,14 @@ class TextParser(T) : InputFilter
     /// returns the next token if one tokenizes with just string and separators
     T[]nextToken(){
         T[] str;
-        if (!getSeparator())
-            if (!next(&scanString))
+        if (!getSeparator()){
+            parserPos(sout.call);sout("pippo after getSeparator fail\n");
+            if (!next(&scanString)){
+                parserPos(sout.call);sout("pippo after scanString fail\n");
                 return null;
+            }
+        }
+        parserPos(sout.call);sout("pippo after nextToken match\n");
         return slice;
     }
     /// check if the scan function would give a match without actually reading it
