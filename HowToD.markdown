@@ -56,28 +56,28 @@ Setup (environment) files for various compilers
     cat > $D_HOME/env/dmd.sh <<EOF
     # source this file to setup the dmd compiler
 
-    export PATH=$D_HOME/dmd/linux/bin:$PATH
-    export LDPATH=$D_HOME/dmd/linux/lib64:$D_HOME/dmd/linux/lib:$LD_LIBRARY_PATH
-    export LD_LIBRARY_PATH=$D_HOME/dmd/linux/lib64:$D_HOME/dmd/linux/lib:$LD_LIBRARY_PATH
-    export LD_RUN_PATH=$D_HOME/dmd/linux/lib:$D_HOME/dmd/linux/lib64:$LD_RUN_PATH
+    export PATH=$D_HOME/dmd/linux/bin:\$PATH
+    export LDPATH=$D_HOME/dmd/linux/lib64:$D_HOME/dmd/linux/lib:\$LD_LIBRARY_PATH
+    export LD_LIBRARY_PATH=$D_HOME/dmd/linux/lib64:$D_HOME/dmd/linux/lib:\$LD_LIBRARY_PATH
+    export LD_RUN_PATH=$D_HOME/dmd/linux/lib:$D_HOME/dmd/linux/lib64:\$LD_RUN_PATH
     EOF
     # ldc
     cat > $D_HOME/env/ldc.sh <<EOF
     # source this file to setup the ldc compiler
 
-    export PATH=$D_HOME/ldc/bin:$D_HOME/llvm/bin:$PATH
-    export LDPATH=$D_HOME/ldc/lib:$D_HOME/llvm/lib:$LDPATH
-    export LD_LIBRARY_PATH=$D_HOME/ldc/lib:$D_HOME/llvm/lib:$LD_LIBRARY_PATH
-    export LD_RUN_PATH=$D_HOME/ldc/lib:$D_HOME/dmd/llvm/lib:$LD_RUN_PATH
+    export PATH=$D_HOME/ldc/bin:$D_HOME/llvm/bin:\$PATH
+    export LDPATH=$D_HOME/ldc/lib:$D_HOME/llvm/lib:\$LDPATH
+    export LD_LIBRARY_PATH=$D_HOME/ldc/lib:$D_HOME/llvm/lib:\$LD_LIBRARY_PATH
+    export LD_RUN_PATH=$D_HOME/ldc/lib:$D_HOME/dmd/llvm/lib:\$LD_RUN_PATH
     EOF
     # gdc
     cat > $D_HOME/env/gdc.sh <<EOF
     # source this file to setup the gdc compiler
 
-    export PATH=$D_HOME/gdc/bin:$PATH
-    export LDPATH=$D_HOME/gdc/lib:$LDPATH
-    export LD_LIBRARY_PATH=$D_HOME/gdc/lib:$LD_LIBRARY_PATH
-    export LD_RUN_PATH=$D_HOME/gdc/lib:$LD_RUN_PATH
+    export PATH=$D_HOME/gdc/bin:\$PATH
+    export LDPATH=$D_HOME/gdc/lib:\$LDPATH
+    export LD_LIBRARY_PATH=$D_HOME/gdc/lib:\$LD_LIBRARY_PATH
+    export LD_RUN_PATH=$D_HOME/gdc/lib:\$LD_RUN_PATH
     EOF
 
 load the d environment, and move to the build directory
