@@ -12,7 +12,7 @@ void cEscapeString(void delegate(char[])outF,char[] str){
         case '\\','\"':
             outF(str[wrote..i]);
             outF("\\");
-            wrote=i+1;
+            wrote=i;
             break;
         case '\n':
             outF(str[wrote..i]);
