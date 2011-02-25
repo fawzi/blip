@@ -17,8 +17,6 @@ Basic setups
 
     # the place where D and D related stuff should live
     export D_HOME=$HOME/d
-    # the directory to use for the packages & building (not needed once installed)
-    export BuildDir=/tmp/$USER
     # the place where to build D stuff
     # for performace reasons you want this to be local
     export D_BUILD_DIR=/tmp/$USER/d_build
@@ -85,6 +83,8 @@ Setup (environment) files for various compilers
 load the d environment, and move to the build directory
 
     . $D_HOME/bin/setup.sh
+    # the directory to use for the packages & building (not needed once installed)
+    export BuildDir=/tmp/$USER
     mkdir -p $BuildDir
     cd $BuildDir
 
@@ -254,8 +254,9 @@ the [tango library](http://dsource.org/projects/tango)
     #
     # at the moment (until the next release) you need the trunk version of tango,
     # or the older (and slighlty better tested) oldTango. Using the tango trunk
+    # as trunk might be broken at times we get a "safe" version
     cd $D_HOME
-    svn co http://svn.dsource.org/projects/tango/trunk tango
+    svn co -r '{2011-01-15}' http://svn.dsource.org/projects/tango/trunk tango
     # if you haven't downloaded blip yet
     git clone git://github.com/fawzi/blip
     #
@@ -297,8 +298,11 @@ libraries either needed or suggested for blip and dchem
     #
     cd $D_HOME/pkgs
     #cvs -z3 -d :pserver:anonymous@cvs.schmorp.de/schmorpforge co -r rel-4_03 libev
-    cvs -z3 -d :pserver:anonymous@cvs.schmorp.de/schmorpforge co -r rel-3_9 libev
-    cd libev
+    #cvs -z3 -d :pserver:anonymous@cvs.schmorp.de/schmorpforge co -r rel-3_9 libev
+    #cd libev
+    wget http://dist.schmorp.de/libev/Attic/libev-3.9.tar.gz
+    tar xzf libev-3.9.tar.gz
+    cd libev-3.9
     autoreconf -ivf
     ./configure --prefix=$D_HOME
     make
@@ -336,8 +340,9 @@ xfbuild
 -------
 xfbuild lets you build d files easily, blip dbuild script uses it
 
-    hg clone http://bitbucket.org/h3r3tic/xfbuild build
-    cd build
+    cd $D_HOME/pkgs
+    hg clone http://bitbucket.org/h3r3tic/xfbuild xfbuild
+    cd xfbuild
     ./ldcBuild.sh
     cp xfbuild $D_HOME/bin
     cd ..
