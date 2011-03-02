@@ -65,6 +65,7 @@ final class StreamWriter{
         writer.flush;
     }
     final void close(){
+        writer.flush();
         writer.close();
     }
     void desc(CharSink s){
@@ -143,6 +144,7 @@ class StreamStrWriter(T){
         writer.flush();
     }
     void close(){
+        writer.flush();
         writer.close();
     }
     void desc(CharSink s){
