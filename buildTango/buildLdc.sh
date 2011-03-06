@@ -13,7 +13,7 @@ dirldc=`dirname "$dirldc"`
 mv libtango-base-ldc.a libtango-user-ldc*.a "$dirldc/../lib"
 echo built and installed libs
 echo creating regtest
-ldc -d -d-version=UnitTest -d-debug=UnitTest -unittest -g -L-ltango-user-ldc-tst -L-lz -L-lbz2 runUnittests_ldc.d
+ldc -d -d-version=UnitTest -d-debug=UnitTest -unittest -g -L-ltango-user-ldc-tst -L$D_HOME/lib -L-lz -L-lbz2 runUnittests_ldc.d
 rm *.o
 echo running regtest
 ./runUnittests_ldc
