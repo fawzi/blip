@@ -314,9 +314,9 @@ DynamicArrayType!(T) sbpRead(T)(ReadExact rIn,T arr,bool strict=true){
                 }));
             }
         } else if (arr.length*U.sizeof<rcvLen){
-            res=new U[](rcvLen);
+            res=new U[](rcvLen/U.sizeof);
         } else {
-            res=arr[0..rcvLen/T.sizeof];
+            res=arr[0..rcvLen/U.sizeof];
         }
         static if (is(U==void)||is(U==byte)||is(U==ubyte)){
             if (kind!=SBP_KIND.kind_raw) throw new Exception("expected type raw",__FILE__,__LINE__);
