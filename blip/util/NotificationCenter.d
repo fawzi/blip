@@ -105,7 +105,7 @@ class NotificationCenter{
                 res=*res2;
             }
         }
-        if ((callback.flags & Callback.Flags.ReceiveAll)!=0){
+        if ((callback.flags & Callback.Flags.ReceiveAll)==Callback.Flags.ReceiveAll){
             insertAt(res.catchAll,callback);
             return true;
         } else {
