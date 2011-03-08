@@ -33,6 +33,13 @@ private {
     import blip.Comp;
 }
 
+private struct Column(flt, int rows) {
+    union {
+        flt[rows]               row;
+        .Vector!(flt, rows) vec;
+    }
+}
+
 /// mixin to loop on vectors and matrixes
 string vectMLoopMixin(string [] names,string op){
     string res=`
@@ -160,8 +167,7 @@ struct Vector(flt_, int dim_) {
     // :P
     alias ok isOK;
     alias ok isCorrect;
-    
-    
+
     static Vector from(T)(T v) {
         Vector res = void;
         static if (dim >= 1) res.x = scalar!(flt)(v.x);
@@ -271,28 +277,17 @@ struct Vector(flt_, int dim_) {
         return res ~ "]";
     }
     
-    
-    // use the free function
-    deprecated static flt dot(Vector a, Vector b) {
-        assert (a.ok && b.ok);
-        static if (2 == dim) return a.x * b.x + a.y * b.y;
-        else static if (3 == dim) return a.x * b.x + a.y * b.y + a.z * b.z;
-        else static if (4 == dim) return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
+    flt opDot(Vector b) {
+        assert (ok && b.ok);
+        static if (2 == dim) return x * b.x + y * b.y;
+        else static if (3 == dim) return x * b.x + y * b.y + z * b.z;
+        else static if (4 == dim) return x * b.x + y * b.y + z * b.z + w * b.w;
         else static assert (false);
     }
     
     mixin(serializeSome("","cell"));
     
     static if(dim==3) {
-        // use the free function
-        deprecated static Vector cross(Vector a, Vector b) {
-            assert (a.ok && b.ok);
-            return opCall (
-                a.y * b.z - b.y * a.z,
-                a.z * b.x - b.z * a.x,
-                a.x * b.y - b.x * a.y
-            );
-        }
         
         static if (isFloatingPointType!(flt)) {
             /// assumes that the current vector is normalized
@@ -340,6 +335,9 @@ struct Vector(flt_, int dim_) {
         else    static assert (false);
     }
 
+    Vector dup(){
+        return *this;
+    }
     
     flt norm2() {
         assert (ok);
@@ -601,15 +599,6 @@ alias Vector!(fixed, 4) vec4fi;
 // Matrix
 // ------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-
-
-private struct Column(flt, int rows) {
-    union {
-        flt[rows]               row;
-        .Vector!(flt, rows) vec;
-    }
-}
-
 struct Matrix(flt_, int rows_, int cols_) {
     static assert ((rows == cols || rows + 1 == cols) && rows >= 2 && cols <= 4);
     const bool isExtended = rows + 1 == cols;
@@ -688,6 +677,14 @@ struct Matrix(flt_, int rows_, int cols_) {
         } else {
             return col[c].row[r];
         }
+    }
+
+    Vector!(flt,cols) opIndex(int r){
+        static if (cols==1) return Vector!(flt,cols)(res.col[0].row[r]);
+        else static if (cols==2) return Vector!(flt,cols)(col[0].row[r],col[1].row[r]);
+        else static if (cols==3) return Vector!(flt,cols)(col[0].row[r],col[1].row[r],col[2].row[r]);
+        else static if (cols==4) return Vector!(flt,cols)(col[0].row[r],col[1].row[r],col[2].row[r],col[3].row[r]);
+        else static assert(0);
     }
     
     
@@ -1310,6 +1307,35 @@ struct Matrix(flt_, int rows_, int cols_) {
         }
         return true;
     }
+
+    /// outer op, implement for non square???
+    static Matrix outerOp(Vector!(flt,rows) v1,Vector!(flt,cols) v2,Matrix m=zero,
+                 flt scaleAB=1, flt scaleTarget=1){
+        m.csetRC!(0,0)(m.cgetRC!(0,0)*scaleTarget+scaleAB*v1.x*v2.x);
+        static if (cols>1) m.csetRC!(0,1)(m.cgetRC!(0,1)*scaleTarget+scaleAB*v1.x*v2.y);
+        static if (cols>2) m.csetRC!(0,2)(m.cgetRC!(0,2)*scaleTarget+scaleAB*v1.x*v2.z);
+        static if (cols>3) m.csetRC!(0,3)(m.cgetRC!(0,3)*scaleTarget+scaleAB*v1.x*v2.w);
+        static if (rows>1){
+            m.csetRC!(1,0)(m.cgetRC!(1,0)*scaleTarget+scaleAB*v1.y*v2.x);
+            static if (cols>1) m.csetRC!(1,1)(m.cgetRC!(1,1)*scaleTarget+scaleAB*v1.y*v2.y);
+            static if (cols>2) m.csetRC!(1,2)(m.cgetRC!(1,2)*scaleTarget+scaleAB*v1.y*v2.z);
+            static if (cols>3) m.csetRC!(1,3)(m.cgetRC!(1,3)*scaleTarget+scaleAB*v1.y*v2.w);
+        }
+        static if (rows>2){
+            m.csetRC!(2,0)(m.cgetRC!(2,0)*scaleTarget+scaleAB*v1.z*v2.x);
+            static if (cols>1) m.csetRC!(2,1)(m.cgetRC!(2,1)*scaleTarget+scaleAB*v1.z*v2.y);
+            static if (cols>2) m.csetRC!(2,2)(m.cgetRC!(2,2)*scaleTarget+scaleAB*v1.z*v2.z);
+            static if (cols>3) m.csetRC!(2,3)(m.cgetRC!(2,3)*scaleTarget+scaleAB*v1.z*v2.w);
+        }
+        static if (rows>3){
+            m.csetRC!(3,0)(m.cgetRC!(3,0)*scaleTarget+scaleAB*v1.w*v2.x);
+            static if (cols>1) m.csetRC!(3,1)(m.cgetRC!(3,1)*scaleTarget+scaleAB*v1.w*v2.y);
+            static if (cols>2) m.csetRC!(3,2)(m.cgetRC!(3,2)*scaleTarget+scaleAB*v1.w*v2.z);
+            static if (cols>3) m.csetRC!(3,3)(m.cgetRC!(3,3)*scaleTarget+scaleAB*v1.w*v2.w);
+        }
+        static assert(rows<=4&&cols<=4);
+        return m;
+    }
 }
 
 string Matrix_rc(int rows,int cols,int r, int c,string src) {
@@ -1797,16 +1823,6 @@ struct Quaternion(flt_) {
 
 
 alias Quaternion!(float)        quat;
-
-
-
-static flt dot(flt, int dim)(Vector!(flt, dim) a, Vector!(flt, dim) b) {
-    assert (a.ok && b.ok);
-    static if (2 == dim) return a.x * b.x + a.y * b.y;
-    else static if (3 == dim) return a.x * b.x + a.y * b.y + a.z * b.z;
-    else static if (4 == dim) return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
-    else static assert (false);
-}
 
 
 static T cross(T)(T a, T b) {

@@ -140,6 +140,8 @@ template TypeOfOuter(T,U,S...){
         alias typeof(T.outerOp(dummyS.init.t,dummyS.init.u,dummyS.init.args)) ResType;
     } else static if (is(typeof(U.outerOp(dummyS.init.t,dummyS.init.u,dummyS.init.args)))){ // static U.outerOp
         alias typeof(U.outerOp(dummyS.init.t,dummyS.init.u,dummyS.init.args)) ResType;
+    } else static if (nArgs!(S)>0 && is(typeof(S[0].outerOp(dummyS.init.t,dummyS.init.u,dummyS.init.args)))){ // static S[0].outerOp
+        alias typeof(S[0].outerOp(dummyS.init.t,dummyS.init.u,dummyS.init.args)) ResType;
     } else static if (is(typeof(dummyS.init.t.opOuter(dummyS.init.u,dummyS.init.args)))){ // t.opOuter
         alias typeof(dummyS.init.t.opOuter(dummyS.init.u,dummyS.init.args)) ResType;
     } else static if (is(typeof(dummyS.init.u.opOuter_r(dummyS.init.t,dummyS.init.args)))){ // u.opOuter_r
@@ -172,6 +174,12 @@ TypeOfOuter!(T,U,S).ResType outer(T,U,S...)(T t,U u,S args){
             U.outerOp(t,u,args);
         } else {
             return U.outerOp(t,u,args);
+        }
+    } else static if (nArgs!(S)>0 && is(typeof(S[0].outerOp(t,u,args)))){ // static U.outerOp
+        static if(is(typeof(S[0].outerOp(t,u,args))==void)){
+            S[0].outerOp(t,u,args);
+        } else {
+            return S[0].outerOp(t,u,args);
         }
     } else static if (is(typeof(t.opOuter(u,args)))){ // t.opOuter
         static if(is(typeof(t.opOuter(u,args))==void)){
