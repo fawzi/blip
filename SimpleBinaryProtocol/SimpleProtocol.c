@@ -160,34 +160,34 @@ void sbpsendh32__(int *ierr,socket_t *sock, int32_t *kind, uint32_t *length){
 int sbpSend4_32(socket_t sock,void* start,uint32_t len){
     uint64_t bitLen=((uint64_t)len)*4UL;
     if (swapBits){
-        sbpSendInvert4(sock,start,bitLen);
+        return sbpSendInvert4(sock,start,bitLen);
     } else {
-        sbpSendDirect(sock,start,bitLen);
+        return sbpSendDirect(sock,start,bitLen);
     }
 }
 
 int sbpSend8_32(socket_t sock,void* start,uint32_t len){
     uint64_t bitLen=((uint64_t)len)*8UL;
     if (swapBits){
-        sbpSendInvert8(sock,start,bitLen);
+        return sbpSendInvert8(sock,start,bitLen);
     } else {
-        sbpSendDirect(sock,start,bitLen);
+        return sbpSendDirect(sock,start,bitLen);
     }
 }
 
 int sbpSend4_64(socket_t sock,void* start,uint64_t len){
     if (swapBits){
-        sbpSendInvert4(sock,start,len);
+        return sbpSendInvert4(sock,start,len);
     } else {
-        sbpSendDirect(sock,start,len);
+        return sbpSendDirect(sock,start,len);
     }
 }
 
 int sbpSend8_64(socket_t sock,void* start,uint64_t len){
     if (swapBits){
-        sbpSendInvert8(sock,start,len);
+        return sbpSendInvert8(sock,start,len);
     } else {
-        sbpSendDirect(sock,start,len);
+        return sbpSendDirect(sock,start,len);
     }
 }
 
@@ -226,6 +226,7 @@ int sbpSendInvert4(socket_t sock,uint64_t len, void* start){
         perror("SBP error sending last byte inverted 4 byte data");
         return 2;
     }
+    return 0;
 }
 
 int sbpSendInvert8(int sock, uint64_t* start,uint64_t len){
@@ -258,6 +259,7 @@ int sbpSendInvert8(int sock, uint64_t* start,uint64_t len){
         perror("SBP error sending last byte inverted 4 byte data");
         return 2;
     }
+    return 0;
 }
 
 int sbpSendChars32(socket_t sock,char* p,uint32_t len){
@@ -439,7 +441,7 @@ int sbpReadHeader64(socket_t sock, uint32_t *kind, uint64_t *len){
         size_t readB=recv(sock,bufPos,toRead,MSG_WAITALL);
         if (readB==0){
             if (++nodata>10000){
-                fprintf(stderr,"partial read %d/%d:",bufPos-((char*)&buf),toRead);
+                fprintf(stderr,"partial read %ld/%ld:",bufPos-((char*)&buf),toRead);
                 for (pos=(char*)&buf;pos<bufPos;++pos)
                     fprintf(stderr," %02x",*pos);
                 fprintf(stderr,"\n");
@@ -512,46 +514,46 @@ void sbpreadh32__(int *ierr,socket_t *sock, uint32_t *kind, uint32_t *length){
 int sbpRead4_32(socket_t sock,void* start,uint32_t len){
     uint64_t bitLen=((uint64_t)len)*4;
     if (swapBits){
-        sbpReadInvert4(sock,start,bitLen);
+        return sbpReadInvert4(sock,start,bitLen);
     } else {
-        sbpReadDirect(sock,start,bitLen);
+        return sbpReadDirect(sock,start,bitLen);
     }
 }
 
 int sbpRead8_32(socket_t sock,void* start,uint32_t len){
     uint64_t bitLen=((uint64_t)len)*8;
     if (swapBits){
-        sbpReadInvert8(sock,start,bitLen);
+        return sbpReadInvert8(sock,start,bitLen);
     } else {
-        sbpReadDirect(sock,start,bitLen);
+        return sbpReadDirect(sock,start,bitLen);
     }
 }
 
 int sbpRead4_64(socket_t sock,void* start,uint64_t len){
     if (swapBits){
-        sbpReadInvert4(sock,start,len);
+        return sbpReadInvert4(sock,start,len);
     } else {
-        sbpReadDirect(sock,start,len);
+        return sbpReadDirect(sock,start,len);
     }
 }
 
 int sbpRead8_64(socket_t sock,void* start,uint64_t len){
     if (swapBits){
-        sbpReadInvert8(sock,start,len);
+        return sbpReadInvert8(sock,start,len);
     } else {
-        sbpReadDirect(sock,start,len);
+        return sbpReadDirect(sock,start,len);
     }
 }
 
 int sbpReadDirect(socket_t sock,void* start,uint64_t len){
     char*pos=start;
-    char*end=start+len;
+    char*end=((char*)start)+len;
     int nodata=0;
     while(pos!=end){
         size_t readB=recv(sock,pos,end-pos,MSG_WAITALL);
         if (readB==0){
             if (++nodata>10000){
-                fprintf(stderr,"SBP partial read %d, no data\n",pos-((char*)start));
+                fprintf(stderr,"SBP partial read %ld, no data\n",pos-((char*)start));
                 return 6;
             }
         } else {
@@ -690,7 +692,10 @@ int sbpReadChars64(socket_t sock,char* p,uint64_t *len){
     uint64_t rcvLen;
     uint32_t kind;
     if (sbpReadHeader64(sock,&kind,&rcvLen)!=0) return 13;
-    if (kind!=kind_char) return 10;
+    if (kind!=kind_char) {
+	printf("kind was %d and not %d, len:%ld\n",kind,kind_char,rcvLen);
+	return 10;
+    }
     if (rcvLen<= *len){
         char *pos;
         if (sbpReadDirect(sock,p,rcvLen)!=0) return 12;
@@ -699,7 +704,8 @@ int sbpReadChars64(socket_t sock,char* p,uint64_t *len){
         return 0;
     } else {
         if (sbpReadDirect(sock,p,*len)!=0) return 11;
-        if (sbpSkip(sock,rcvLen-*len)!=0) return 10;
+	printf("will skip\n");
+        if (sbpSkip(sock,rcvLen-*len)!=0) return 110;
         return 1;
     }
 }
@@ -756,7 +762,7 @@ void sbpreadcp64n__(int *ierr,socket_t*sock,char*p,uint64_t len){
 }
 
 int sbpReadCharsPiece32(socket_t sock,char* p,uint32_t len){
-    sbpReadCharsPiece64(sock,p,(uint64_t)len);
+    return sbpReadCharsPiece64(sock,p,(uint64_t)len);
 }
 /// f77 interface
 void sbpreadcp32n(int *ierr,socket_t*sock,char*p,uint32_t len){
@@ -789,10 +795,10 @@ void sbpreadi64(int*ierr,socket_t*sock,void*p,uint64_t*len){
     *ierr=sbpReadInt4Array64(*sock,p,*len);
 }
 void sbpreadi64_(int*ierr,socket_t*sock,void*p,uint64_t*len){
-    *ierr=sbpSendInt4Array64(*sock,p,*len);
+    *ierr=sbpReadInt4Array64(*sock,p,*len);
 }
 void sbpreadi64__(int*ierr,socket_t*sock,void*p,uint64_t*len){
-    *ierr=sbpSendInt4Array64(*sock,p,*len);
+    *ierr=sbpReadInt4Array64(*sock,p,*len);
 }
 
 int sbpReadInt4Array32(socket_t sock, void*p, uint32_t len){
@@ -1036,7 +1042,7 @@ int sbpListenForService32(socket_t *sock,char *service,uint32_t len){
     }
     lSock.nSockets=0;
     for (res=res0;res;res=res->ai_next){
-        //printf("will create socket(%d,%d,%d)\n",res->ai_family,res->ai_socktype,res->ai_protocol);
+        //printf("will create socket(%ld,%ld,%ld)\n",res->ai_family,res->ai_socktype,res->ai_protocol);
         s=socket(res->ai_family,res->ai_socktype,res->ai_protocol);
         if (s<0) continue;
         if (bind(s,res->ai_addr,res->ai_addrlen)!=0){
