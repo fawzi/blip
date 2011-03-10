@@ -2,9 +2,11 @@
 title: Blip
 layout: Default
 ---
+blip, an open D library
+=======================
 
 Welcome to Blip
-===============
+---------------
 
 a library that focuses on basic things that can be useful for scientific HPC programs.
 It offers:
