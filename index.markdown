@@ -28,6 +28,8 @@ The source is available at github
  * install: `git clone git://github.com/fawzi/blip.git` (see GettingStarted for the details)
 
  * requires either the latest trunk of [tango](http://dsource.org/projects/tango/) or an older special version (until next release)
+ 
+ * [dchem](http://fawzi.github.com/dchem) uses blip!
 
 News
 ----
