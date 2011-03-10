@@ -18,6 +18,9 @@ module blip.io.SimpleBinaryProtocol;
 import blip.io.BasicIO;
 import blip.core.Traits;
 import blip.container.GrowableArray;
+version(TrackSBP){
+    import blip.io.Console;
+}
 
 enum SBP_SIZES{
     endian_buf_size=1024
@@ -46,7 +49,7 @@ int sbpEnd(){
 
 void sbpSendHeader(BinSink sink, int kind, ulong len){
     ulong buf[2];
-    byte* bufPos=cast(byte*)buf.ptr;
+    byte* bufPos=(cast(byte*)buf.ptr)+4;
     byte* pos;
     static if (swapBits){
         pos=cast(byte*)&kind;
@@ -70,7 +73,12 @@ void sbpSendHeader(BinSink sink, int kind, ulong len){
         bufPos+=4;
         *(cast(ulong*)bufPos)=len;
     }
-    sink(buf[0..12]);
+    sink((cast(byte*)buf.ptr)[4..16]);
+    version(TrackSBP){
+        sinkTogether(sout,delegate void(CharSink s){
+            dumper(s)("sbpSendHeader kind:")(kind)(" len:")(len)("\n");
+        });
+    }
 }
 
 void sbpSendArr(T)(BinSink sink,T[]arr){
@@ -84,6 +92,7 @@ void sbpSendArr(T)(BinSink sink,T[]arr){
             break;
         case 8:
             sbpSendInvert8(sink,arr);
+            break;
         default:
             throw new Exception("unsupported byte size",__FILE__,__LINE);
         }
@@ -191,6 +200,11 @@ void sbpReadHeader(ReadExact rIn, ref uint kind, ref ulong len){
         kind=*(cast(uint*)bufPos);
         bufPos+=4;
         len=*(cast(ulong*)bufPos);
+    }
+    version(TrackSBP){
+        sinkTogether(sout,delegate void(CharSink s){
+            dumper(s)("sbpReadHeader kind:")(kind)(" len:")(len)("\n");
+        });
     }
 }
 
@@ -320,21 +334,22 @@ DynamicArrayType!(T) sbpRead(T)(ReadExact rIn,T arr,bool strict=true){
         }
         static if (is(U==void)||is(U==byte)||is(U==ubyte)){
             if (kind!=SBP_KIND.kind_raw) throw new Exception("expected type raw",__FILE__,__LINE__);
-            sbpReadArr(rIn,arr);
+            sbpReadArr(rIn,res);
         } else static if (is(U==char)){
             if (kind!=SBP_KIND.kind_char) throw new Exception("expected type char",__FILE__,__LINE__);
-            sbpReadArr(rIn,arr);
+            sbpReadArr(rIn,res);
         } else static if (is(U==int)){
             if (kind!=SBP_KIND.kind_int_small) throw new Exception("expected type int",__FILE__,__LINE__);
-            sbpReadArr(rIn,arr);
+            sbpReadArr(rIn,res);
         } else static if (is(U==double)){
             if (kind!=SBP_KIND.kind_double_small) throw new Exception("expected type double",__FILE__,__LINE__);
-            sbpReadArr(rIn,arr);
+            sbpReadArr(rIn,res);
         } else {
             static assert(false,"non supported type "~T.stringof);
         }
     } else {
         static assert(false,"non supported type "~T.stringof);
     }
+    return res;
 }
 

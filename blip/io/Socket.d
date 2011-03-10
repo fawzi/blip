@@ -390,10 +390,20 @@ struct BasicSocket{
     }
     
     void shutdownInput(){
+        version(SocketEcho){
+            sinkTogether(sout,delegate void(CharSink s){
+                dumper(s)("socket ")(sock)(" shutdownInput\n");
+            });
+        }
         shutdown(sock,SHUT_RD);
     }
 
     void close(){
+        version(SocketEcho){
+            sinkTogether(sout,delegate void(CharSink s){
+                dumper(s)("socket ")(sock)(" close\n");
+            });
+        }
         shutdown(sock,SHUT_WR);
     }
     
