@@ -44,7 +44,7 @@ struct SNMessage{
         res.msg=msg;
         return res;
     }
-    mixin(serializeSome("","tag"));
+    mixin(serializeSome("","A message on a single node","tag"));
 }
 
 class SNSerializer:SBinSerializer{

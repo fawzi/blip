@@ -28,7 +28,7 @@
 ///  int y(){ return _y; }
 ///  void y(int v){ _y=v; }
 ///  
-///  mixin(serializeSome("A",`
+///  mixin(serializeSome("A","a doc",`
 ///  x: coordinates x in pixels
 ///  y: coordinate y in pixels`));
 ///  
@@ -39,7 +39,7 @@
 ///  int z;
 ///  A a;
 ///  
-///  mixin(serializeSome("",`z|a`));
+///  mixin(serializeSome("","",`z|a`));
 ///  mixin printOut!();
 /// }
 /// }}}

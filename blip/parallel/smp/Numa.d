@@ -131,7 +131,7 @@ struct NumaNode{
     }
     static ClassMetaInfo metaI;
     static this(){
-        metaI=ClassMetaInfo.createForType!(typeof(*this))("NumaNode");
+        metaI=ClassMetaInfo.createForType!(typeof(*this))("NumaNode","identifies a numa node");
         metaI.addFieldOfType!(int)("level","the level of this node");
         metaI.addFieldOfType!(int)("pos","position of this node within the level");
     }
@@ -159,7 +159,7 @@ struct CacheInfo{
     ulong size_kB;
     ulong sharingLevel;
     ulong depth; // useful?
-    mixin(serializeSome("",`attachedTo|size_kB|sharingLevel|depth`));
+    mixin(serializeSome("","information on a cache",`attachedTo|size_kB|sharingLevel|depth`));
     mixin printOut!();
 }
 
@@ -170,24 +170,24 @@ struct MemoryInfo{
     struct Pages{
 	ulong size;
 	ulong count;
-	mixin(serializeSome("",`size|count`));
+	mixin(serializeSome("","information on pages (of memory)",`size|count`));
 	mixin printOut!();
     }
     Pages[] page_types;
-    mixin(serializeSome("",`attachedTo|local_memory_kB|total_memory_kB|page_types`));
+    mixin(serializeSome("","information on memory", `attachedTo|local_memory_kB|total_memory_kB|page_types`));
     mixin printOut!();
 }
 
 struct MachineInfo{
     NumaNode attachedTo;
     MemoryInfo memory;
-    mixin(serializeSome("",`attachedTo|memory`));
+    mixin(serializeSome("","information on the whole machine",`attachedTo|memory`));
     mixin printOut!();
 }
 
 struct SocketInfo{
     NumaNode attachedTo;
-    mixin(serializeSome("",`attachedTo`));
+    mixin(serializeSome("","socket information",`attachedTo`));
     mixin printOut!();
 }
 
@@ -418,7 +418,8 @@ class ExplicitTopology(NodeType): Topology!(NodeType){
         }
         static ClassMetaInfo metaI;
         static this(){
-            metaI=ClassMetaInfo.createForType!(typeof(*this))("ExplicitTopology!("~NodeType.stringof~").NumaLevel");
+            metaI=ClassMetaInfo.createForType!(typeof(*this))("ExplicitTopology!("~NodeType.stringof~").NumaLevel",
+                "a level of a numa hierarcy");
             metaI.addFieldOfType!(NodeType[])("nodes","the nodes of this level");
             metaI.addFieldOfType!(NodeType[])("superNodes","the super Nodes of this level");
             metaI.addFieldOfType!(NodeType[][])("subNodes","the sub nodes of this level");
@@ -501,7 +502,8 @@ class ExplicitTopology(NodeType): Topology!(NodeType){
     
     static ClassMetaInfo metaI;
     static this(){
-        metaI=ClassMetaInfo.createForType!(typeof(this))("ExplicitTopology!("~NodeType.stringof~")");
+        metaI=ClassMetaInfo.createForType!(typeof(this))("ExplicitTopology!("~NodeType.stringof~")",
+            "an explicit topology structure (stored in memory)");
         metaI.addFieldOfType!(NumaLevel[])("levels","the levels of this topology");
     }
     ClassMetaInfo getSerializationMetaInfo(){
@@ -537,7 +539,8 @@ class ExplicitNumaTopology: ExplicitTopology!(NumaNode), NumaTopology {
     
     static ClassMetaInfo metaI;
     static this(){
-        metaI=ClassMetaInfo.createForType!(typeof(this))("ExplicitNumaTopology");
+        metaI=ClassMetaInfo.createForType!(typeof(this))("ExplicitNumaTopology",
+            "an explicit numa topology");
     }
     ClassMetaInfo getSerializationMetaInfo(){
         return metaI;
@@ -606,7 +609,7 @@ version(noHwloc){} else {
         struct LevelMap{
             int depth; /// hwloc depth
             bool partition; /// if it is a partition
-            mixin(serializeSome("",`depth|partition`));
+            mixin(serializeSome("","information on a level of the topology",`depth|partition`));
             mixin printOut!();
         }
         LevelMap[] levelMapping; /// mapping numa level -> hwloc depth
@@ -1026,7 +1029,7 @@ version(noHwloc){} else {
     
     /+    static ClassMetaInfo metaI;
         static this(){
-            metaI=ClassMetaInfo.createForType!(typeof(this))("ExplicitTopology!("~NumaNode.stringof~")");
+            metaI=ClassMetaInfo.createForType!(typeof(this))("HwlocTopology","numa topology derivad from hwloc");
             metaI.addFieldOfType!(NumaLevel[])("levels","the levels of this topology");
         }
         ClassMetaInfo getSerializationMetaInfo(){

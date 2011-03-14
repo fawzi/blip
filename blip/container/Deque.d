@@ -412,7 +412,7 @@ class Deque(T):CopiableObjectI{
     static if (isCoreType!(T) ||is(typeof(T.init.serialize(Serializer.init)))) {
         static ClassMetaInfo metaI;
         static this(){
-            metaI=ClassMetaInfo.createForType!(typeof(this))("blip.container.Deque");
+            metaI=ClassMetaInfo.createForType!(typeof(this))("blip.container.Deque","a threadsafe double ended queue");
             metaI.addFieldOfType!(T[])("array","the items in the deque");
         }
         ClassMetaInfo getSerializationMetaInfo(){

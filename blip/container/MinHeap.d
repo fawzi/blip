@@ -331,7 +331,7 @@ class MinHeapSync(T){
             return heap.length;
     }
 
-    mixin(serializeSome("MinHeapSync!("~T.mangleof~")","data"));
+    mixin(serializeSome("MinHeapSync!("~T.mangleof~")","threadsafe minumum heap","data"));
     mixin printOut!();
 
     bool nonEmptyHeap(){

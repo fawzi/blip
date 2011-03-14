@@ -160,6 +160,7 @@ class ClassMetaInfo {
     ClassInfo ci;
     void* function (ClassMetaInfo mInfo) allocEl;
     ExternalSerializationHandlers * externalHandlers;
+    string doc;
     /// return the field with the given local index
     FieldMetaInfo *opIndex(int i){
         if (i>=0 && i<fields.length){
@@ -191,18 +192,19 @@ class ClassMetaInfo {
         addField(FieldMetaInfo(name,doc,getSerializationInfoForType!(T)(),sLevel));
     }
     /// constructor (normally use createForType)
-    this(string className,ClassMetaInfo superMeta,TypeInfo ti,ClassInfo ci,TypeKind kind,void* function(ClassMetaInfo)allocEl){
+    this(string className,string doc,ClassMetaInfo superMeta,TypeInfo ti,ClassInfo ci,TypeKind kind,void* function(ClassMetaInfo)allocEl){
         this.className=className;
         this.superMeta=superMeta;
         this.ti=ti;
         this.ci=ci;
         this.kind=kind;
         this.allocEl=allocEl;
+        this.doc=doc;
     }
     /// creates a new meta info for the given type and registers it
     /// if no name is given, T.mangleof is used.
     /// normally this is the best way to create a new MetaInfo
-    static ClassMetaInfo createForType(T)(string name="",
+    static ClassMetaInfo createForType(T)(string name="",string doc="",
         void *function(ClassMetaInfo) allocEl=cast(void *function(ClassMetaInfo))null){
         static if(is(T==class)){
             ClassInfo newCi=T.classinfo;
@@ -236,7 +238,7 @@ class ClassMetaInfo {
                 assert(allocEl !is null,"cannot allocate automatically, and no allocator given for "~T.stringof~" name:"~name);
             }
         }
-        auto res=new ClassMetaInfo(name,newSuperMeta,newTi,newCi,typeKindForType!(T),allocEl);
+        auto res=new ClassMetaInfo(name,doc,newSuperMeta,newTi,newCi,typeKindForType!(T),allocEl);
         SerializationRegistry().register!(T)(res);
         return res;
     }
@@ -259,6 +261,7 @@ class ClassMetaInfo {
         s(" ti:")(ti is null ? "*NULL*" : ti.toString)("@")(cast(void*)ti)("\n");
         s(" ci:")(ci is null ? "*NULL*" : ci.toString)("@")(cast(void*)ci)("\n");
         s(" allocEl:")(allocEl is null ? "*NULL*" : "*ASSOCIATED*")("@")(cast(void*)allocEl)("\n");
+        s(" doc:\"")(doc)("\"\n");
         foreach(field;fields){
             writeOut(sink,field);
             sink("\n");
@@ -275,6 +278,25 @@ class ClassMetaInfo {
             ++f;
         }
         return 0;
+    }
+    override equals_t opEquals(Object o2){
+        return this is o2;
+    }
+    override int opCmp(Object o2){
+        return (((cast(void*)this)<(cast(void*)o2))?-1:(this is o2)?0:1);
+    }
+    hash_t toHash(){
+        static if (hash_t.sizeof < size_t.sizeof){
+            return rt_hash_str(&this,size_t.sizeof);
+        } else {
+            union P2H{
+                void* ptr;
+                hash_t hash;
+            }
+            P2H w;
+            w.ptr=cast(void*)this;
+            return w.hash;
+        }
     }
 }
 
@@ -310,7 +332,11 @@ ClassMetaInfo getSerializationInfoForType(T)(){
     } else static if (is(T==interface)){
         return SerializationRegistry().getMetaInfo(Object.classinfo);
     } else static if (isArrayType!(T)){
-        return arrayMetaInfo;
+        static if (is(T:char[])||is(T:wchar[])||is(T:dchar[])){
+            return stringMetaInfo;
+        } else {
+            return arrayMetaInfo;
+        }
     } else static if (isAssocArrayType!(T)){
         return aaMetaInfo;
     } else static if (isCoreType!(T)){
@@ -368,19 +394,23 @@ ClassMetaInfo getSerializationInfoForVar(T)(T t){
 
 // various metaInfo (for completeness, not really needed)
 ClassMetaInfo arrayMetaInfo;
+ClassMetaInfo stringMetaInfo;
 ClassMetaInfo aaMetaInfo;
 ClassMetaInfo dictMetaInfo;
 ClassMetaInfo voidPtrMetaInfo;
 static this(){
-    arrayMetaInfo=new ClassMetaInfo("array",null,null,null,TypeKind.ArrayK,
+    arrayMetaInfo=new ClassMetaInfo("array","an array",null,null,null,TypeKind.ArrayK,
         cast(void* function(ClassMetaInfo))null); // use a different type for each array type?
-    aaMetaInfo=new ClassMetaInfo("aa",null,null,null,TypeKind.AAK,
+    stringMetaInfo=new ClassMetaInfo("string","a string",null,null,null,TypeKind.ArrayK,
+        cast(void* function(ClassMetaInfo))null); // use a different type for each array type?
+    aaMetaInfo=new ClassMetaInfo("aa","an associative array",null,null,null,TypeKind.AAK,
         cast(void* function(ClassMetaInfo))null); // use a different type for each aa type?
-    dictMetaInfo=new ClassMetaInfo("dict",null,null,null,TypeKind.DictK,
+    dictMetaInfo=new ClassMetaInfo("dict","a dictionary",null,null,null,TypeKind.DictK,
         cast(void* function(ClassMetaInfo))null); // use a different type for each dict type?
-    voidPtrMetaInfo=new ClassMetaInfo("voidPtr",null,null,null,TypeKind.VoidPtr,
+    voidPtrMetaInfo=new ClassMetaInfo("voidPtr","a pointer",null,null,null,TypeKind.VoidPtr,
         cast(void* function(ClassMetaInfo))null);
     SerializationRegistry().register!(int[])(arrayMetaInfo);
+    SerializationRegistry().register!(char[])(stringMetaInfo);
     SerializationRegistry().register!(int[int])(aaMetaInfo);
     SerializationRegistry().register!(int[string ])(dictMetaInfo);
     SerializationRegistry().register!(void*)(voidPtrMetaInfo);
@@ -393,7 +423,7 @@ string coreTypesMetaInfoMixStr(){
     }
     res~="static this(){\n";
     foreach(T;CoreTypes){
-        res~=strForCoreType!(T)~"MetaInfo=new ClassMetaInfo(\""~T.stringof~"\",null,typeid("~T.stringof~"),null,TypeKind.PrimitiveK,cast(void *function (ClassMetaInfo c))null);\n";
+        res~=strForCoreType!(T)~"MetaInfo=new ClassMetaInfo(\""~T.stringof~"\",\"\",null,typeid("~T.stringof~"),null,TypeKind.PrimitiveK,cast(void *function (ClassMetaInfo c))null);\n";
         res~="SerializationRegistry().register!("~T.stringof~")("~strForCoreType!(T)~"MetaInfo);\n";
     }
     res~="}\n";

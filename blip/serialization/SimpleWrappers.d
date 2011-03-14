@@ -54,7 +54,8 @@ struct LazyArray(T) {
     }
     static ClassMetaInfo metaI;
     static this(){
-        metaI=ClassMetaInfo.createForType!(typeof(*this))("LazyArray!("~T.stringof~")");// use T.mangleof?
+        metaI=ClassMetaInfo.createForType!(typeof(*this))("LazyArray!("~T.stringof~")",
+            "array of "~T.stringof);// use T.mangleof?
         metaI.kind=TypeKind.CustomK;
     }
     ClassMetaInfo getSerializationMetaInfo(){
@@ -134,7 +135,8 @@ struct LazyAA(K,V) {
     }
     static ClassMetaInfo metaI;
     static this(){
-        metaI=ClassMetaInfo.createForType!(typeof(*this))("LazyAA!("~K.stringof~","~V.stringof~")");// use T.mangleof?
+        metaI=ClassMetaInfo.createForType!(typeof(*this))("LazyAA!("~K.stringof~","~V.stringof~")",// use .mangleof?
+            "associative array from "~K.stringof~" to "~V.stringof);
         metaI.kind=TypeKind.CustomK;
     }
     ClassMetaInfo getSerializationMetaInfo(){

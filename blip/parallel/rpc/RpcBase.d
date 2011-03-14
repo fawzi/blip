@@ -684,7 +684,7 @@ class BasicProxy: Proxy {
     }
     static ClassMetaInfo metaI;
     static this(){
-        metaI=ClassMetaInfo.createForType!(typeof(this))("blip.parallel.rpc.BasicProxy");
+        metaI=ClassMetaInfo.createForType!(typeof(this))("blip.parallel.rpc.BasicProxy","a proxy base class");
         metaI.addFieldOfType!(string )("proxyObjUrl","url identifying the proxied object");
         metaI.addFieldOfType!(string )("proxyName","name identifying the class of the proxy object");
     }

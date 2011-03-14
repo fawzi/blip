@@ -56,7 +56,8 @@ string [] extractFieldsAndDocs(string fieldsDoc){
 /// serializes some fields
 /// basic version, does not work for subclasses serialized with external structs
 /// (should take the logic from the Xpose version)
-string serializeSome(string typeName1,string fieldsDoc,bool classAddPost=true){
+string serializeSome(string typeName1,string doc,string fieldsDoc){
+    bool classAddPost=true;
     string typeName=typeName1;
     string res="";
     res~="static ClassMetaInfo metaI;\n";
@@ -68,6 +69,7 @@ string serializeSome(string typeName1,string fieldsDoc,bool classAddPost=true){
     } else {
         res~="`"~typeName~"`";
     }
+    res~=",`"~doc~"`";
     res~=");\n";
     res~="    }else{\n";
     res~="        metaI=ClassMetaInfo.createForType!(typeof(*this))(";
@@ -76,13 +78,14 @@ string serializeSome(string typeName1,string fieldsDoc,bool classAddPost=true){
     } else {
         res~="`"~typeName~"`";
     }
+    res~=",`"~doc~"`";
     res~=");\n";
     res~="    }\n";
     auto fieldsDocArray=extractFieldsAndDocs(fieldsDoc);
     for (int ifield=0;ifield<fieldsDocArray.length/2;++ifield){
         auto field=fieldsDocArray[2*ifield];
-        auto doc=fieldsDocArray[2*ifield+1];
-        res~="    metaI.addFieldOfType!(typeof(this."~field~"))(`"~field~"`,`"~doc~"`);\n";
+        auto docF=fieldsDocArray[2*ifield+1];
+        res~="    metaI.addFieldOfType!(typeof(this."~field~"))(`"~field~"`,`"~docF~"`);\n";
     }
     res~="}\n";
     res~="ClassMetaInfo getSerializationMetaInfo(){\n";
@@ -161,7 +164,7 @@ string serializeSome(string typeName1,string fieldsDoc,bool classAddPost=true){
 /// serializes some fields
 /// basic version, does not work for subclasses serialized with external structs
 /// (should take the logic from the Xpose version)
-string createView(string viewName,string fieldsDoc,string baseType=""){
+string createView(string viewName,string doc,string fieldsDoc,string baseType=""){
     string res="";
     bool inContext=false;
     if (viewName[0]<'A' && viewName[0]>'Z') {
@@ -180,11 +183,12 @@ string createView(string viewName,string fieldsDoc,string baseType=""){
     res~=`
         static ClassMetaInfo metaI;
         static this(){
-            metaI=ClassMetaInfo.createForType!(typeof(*this))(typeof(*this).mangleof);`;
+            metaI=ClassMetaInfo.createForType!(typeof(*this))(typeof(*this).mangleof,`~
+            "`"~doc~"`);";
     auto fieldsDocArray=extractFieldsAndDocs(fieldsDoc);
     for (int ifield=0;ifield<fieldsDocArray.length/2;++ifield){
         auto field=fieldsDocArray[2*ifield];
-        auto doc=fieldsDocArray[2*ifield+1];
+        auto docF=fieldsDocArray[2*ifield+1];
         res~=`
             {
                 static if (is(typeof(this.`~field~`()))){
@@ -192,7 +196,7 @@ string createView(string viewName,string fieldsDoc,string baseType=""){
                 } else {
                     alias typeof(this.`~field~`) FieldType;
                 }
-                metaI.addFieldOfType!(FieldType)("`~field~"\",`"~doc~"`"~`);
+                metaI.addFieldOfType!(FieldType)("`~field~"\",`"~docF~"`"~`);
             }`;
     }
     res~=`

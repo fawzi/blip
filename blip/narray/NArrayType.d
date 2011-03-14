@@ -1841,7 +1841,7 @@ else {
             synchronized{
                 if (metaI is null){
                     metaI=ClassMetaInfo.createForType!(NArray)
-                        ("NArray!("~V.stringof~","~ctfe_i2a(rank)~")",
+                        ("NArray!("~V.stringof~","~ctfe_i2a(rank)~")","a numerical multidimensional array (wrapper based, tries to avoid allocation)",
                         function void *(ClassMetaInfo){
                             index_type[rank] strid=0;
                             index_type[rank] shap=0;

@@ -285,7 +285,7 @@ struct Vector(flt_, int dim_) {
         else static assert (false);
     }
     
-    mixin(serializeSome("","cell"));
+    mixin(serializeSome("","a small vector","cell"));
     
     static if(dim==3) {
         
@@ -668,7 +668,7 @@ struct Matrix(flt_, int rows_, int cols_) {
         return res;
     }
     
-    mixin(serializeSome("","cell"));
+    mixin(serializeSome("","a small vector","cell"));
     
     flt cgetRC(int r, int c)() {
         assert (ok);
@@ -1376,7 +1376,7 @@ struct Quaternion(flt_) {
         .Vector!(flt, 4) xyzw;
     }
     
-    mixin(serializeSome("Quaternion!("~flt_.stringof~")","x|y|z|w"));
+    mixin(serializeSome("Quaternion!("~flt_.stringof~")","a quaternion","x|y|z|w"));
     
     const static Quaternion identity = { x: cscalar!(flt, 0), y: cscalar!(flt, 0), z: cscalar!(flt, 0), w: cscalar!(flt, 1) };
     

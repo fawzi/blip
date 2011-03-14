@@ -37,7 +37,7 @@ class A: Serializable{
     int y;
     static ClassMetaInfo metaI;
     static this(){
-        metaI=ClassMetaInfo.createForType!(typeof(this))("AKlass");
+        metaI=ClassMetaInfo.createForType!(typeof(this))("AKlass","a test class");
         //("AKlass",null,typeid(typeof(this)),typeof(this).classinfo,typeKindForType!(typeof(this)));
         //SerializationRegistry().register!(typeof(this))(metaI);
         metaI.addFieldOfType!(int)("x","an int called x");
@@ -147,7 +147,7 @@ class B:A{
     version(Xpose){
         mixin(expose!(NewSerializationExpose)(`a|b|c|d|e|f|g|h|i|l|m|n|o|p|q|r|s|t|u|v|z`));
     } else {
-        mixin(serializeSome("",`a|b|c|d|e|f|g|h|i|l|m|n|o|p|q|r|s|t|u|v|z`));
+        mixin(serializeSome("","test",`a|b|c|d|e|f|g|h|i|l|m|n|o|p|q|r|s|t|u|v|z`));
     }
     version(SerializationTrace){
         version(Xpose){
@@ -190,7 +190,7 @@ class C{
         next
         `));
     } else {
-        mixin(serializeSome("",`
+        mixin(serializeSome("","test",`
         i: an integer
         next
         `));
@@ -225,7 +225,7 @@ struct TestStruct{
         }
         mixin(expose!(NewSerializationExpose)(`a|b|c|d|e`));
     } else {
-        mixin(serializeSome("",`a|b|c|d|e`));
+        mixin(serializeSome("","test",`a|b|c|d|e`));
     }
 
     void randomize(Rand r,int idx,ref int nEl, ref bool acceptable){

@@ -55,7 +55,8 @@ struct TargetHost{
         int c=((host<p.host)?-1:((host==p.host)?0:1));
         return ((c==0)?((port<p.port)?-1:((port==p.port)?0:1)):c);
     }
-    mixin(serializeSome("blip.TargetHost","host|port"));
+    mixin(serializeSome("blip.TargetHost","a host/post to connect to or connected to (identifes one end of a tpc socket)",
+        "host|port"));
     mixin printOut!();
     TargetHost dup(){
         TargetHost res;

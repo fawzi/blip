@@ -117,7 +117,8 @@ class ChunkGuard{
         }
     }
     // maybe it would be better not to implement serialization for this, as it cannot be unserialized...
-    mixin(serializeSome("blip.ChunkGuard",`dataPtr|dataLen|refCount|flags`));
+    mixin(serializeSome("blip.ChunkGuard","an object to 'guard' a chunk of memory, and dispose it",
+        `dataPtr|dataLen|refCount|flags`));
     void desc(CharSink s){
         dumper(s)("{ class:blip.ChunkGuard, at:")(cast(void*)this)(", dataPtr:")(cast(void*)dataPtr)
             (", dataLen:")(dataLen)(", refCount:")(refCount)(", flags:")(flags)(" }");
@@ -153,7 +154,7 @@ struct BulkArray(T){
         synchronized{
             if (metaI is null){
                 metaI=ClassMetaInfo.createForType!(BulkArray)
-                    ("BulkArray!("~T.stringof~")");
+                    ("BulkArray!("~T.stringof~")","a mallocated array of "~T.stringof);
                 metaI.kind=TypeKind.CustomK;
             }
         }

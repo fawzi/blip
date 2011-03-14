@@ -26,7 +26,7 @@ static this(){
     auto h=new ExternalSerializationHandlers;
     h.serialize=&serializeTime;
     h.unserialize=&unserializeTime;
-    timeMetaI=ClassMetaInfo.createForType!(Time)("blip.Time");
+    timeMetaI=ClassMetaInfo.createForType!(Time)("blip.Time","represents an absolute time");
     timeMetaI.addFieldOfType!(long)("ticks","the ticks since the epoch");
     timeMetaI.externalHandlers=h;
 }

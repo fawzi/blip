@@ -66,7 +66,7 @@ string rpcProxyMixin(string name,string extName,string extraInterfaces,string []
             this(`~extNameProxy~`,"");
         }
         `;
-    res~=serializeSome(extNameProxy,"");
+    res~=serializeSome(extNameProxy,"an rpc proxy","");
     for (int ifield=0;ifield<functionsComments.length/2;++ifield){
         auto functionName=functionsComments[2*ifield];
         auto comment=functionsComments[2*ifield+1];
