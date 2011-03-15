@@ -342,7 +342,7 @@ struct Vector(flt_, int dim_) {
     flt norm2() {
         assert (ok);
         flt sq = norm22();
-        if (sq != cscalar!(flt, 0)) {
+        if (sq > cscalar!(flt, 0)) {
             return scalar!(flt)(sqrt(scalar!(real)(sq)));
         }
         return sq;
@@ -668,7 +668,7 @@ struct Matrix(flt_, int rows_, int cols_) {
         return res;
     }
     
-    mixin(serializeSome("","a small vector","cell"));
+    mixin(serializeSome("","a small matrix","cell"));
     
     flt cgetRC(int r, int c)() {
         assert (ok);
