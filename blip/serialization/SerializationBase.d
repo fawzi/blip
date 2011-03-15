@@ -488,7 +488,17 @@ class SerializationRegistry {
         }
         Object key = keyOf!(T);
         synchronized(this){
-            name2metaInfos[metaInfo.className]=metaInfo;
+	    ClassMetaInfo *oldInfo=metaInfo.className in name2metaInfos;
+	    if (oldInfo!is null){
+		// exception in static constructors might be tricky...
+		// so we also print out
+		sout("Registering duplicated name:"~metaInfo.className~"\n");
+		throw new Exception(collectAppender(delegate void(CharSink s){
+			    dumper(s)("Registering duplicated name in SerializationRegistry@")(cast(void*)this)(":")(metaInfo.className)
+				(", oldVal:")(*oldInfo)(" newVal:")(metaInfo)("\n");
+			}),__FILE__,__LINE__);
+	    }
+	    name2metaInfos[metaInfo.className]=metaInfo;
             type2metaInfos[key] = metaInfo;
         }
     }    

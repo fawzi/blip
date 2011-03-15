@@ -62,6 +62,7 @@ string serializeSome(string typeName1,string doc,string fieldsDoc){
     string res="";
     res~="static ClassMetaInfo metaI;\n";
     res~="static this(){\n";
+    res~="    if (metaI!is null) return;\n";
     res~="    static if (is(typeof(this) == class)){\n";
     res~="        metaI=ClassMetaInfo.createForType!(typeof(this))(";
     if (typeName.length==0) {
