@@ -334,10 +334,6 @@ struct Vector(flt_, int dim_) {
         else    static if (4 == dim) return x * x + y * y + z * z + w * w;
         else    static assert (false);
     }
-
-    Vector dup(){
-        return *this;
-    }
     
     flt norm2() {
         assert (ok);
@@ -680,13 +676,20 @@ struct Matrix(flt_, int rows_, int cols_) {
     }
 
     Vector!(flt,cols) opIndex(int r){
-        static if (cols==1) return Vector!(flt,cols)(res.col[0].row[r]);
+        static if (cols==1) return Vector!(flt,cols)(col[0].row[r]);
         else static if (cols==2) return Vector!(flt,cols)(col[0].row[r],col[1].row[r]);
         else static if (cols==3) return Vector!(flt,cols)(col[0].row[r],col[1].row[r],col[2].row[r]);
         else static if (cols==4) return Vector!(flt,cols)(col[0].row[r],col[1].row[r],col[2].row[r],col[3].row[r]);
         else static assert(0);
     }
-    
+
+    void opIndexAssign(Vector!(flt,cols)v,int r){
+        static if (cols>=1) col[0].row[r]=v.x;
+        static if (cols>=2) col[1].row[r]=v.y;
+        static if (cols>=3) col[2].row[r]=v.z;
+        static if (cols>=4) col[3].row[r]=v.w;
+        static if (cols>=5) static assert(0);
+    }
     
     static string _rc(int r, int c)(string src) {
         static if (r == rows && isExtended) {
