@@ -51,12 +51,23 @@ bool maxHeapCompare(T)(T a, T b) {return a >= b;}
   *               probably want to keep this function small; it's called O(log N) 
   *               times per insertion or removal.
 */
-
-struct Heap (T, alias Compare = minHeapCompare!(T)/+, alias Move = defaultHeapSwap!(T)+/)
-{
+char[] heapMixinStr(char[]extraAttribs,char[] compareMixin,char[]moveMixin=""){
+    char[] res=`
         alias pop       remove;
         alias push      opCatAssign;
+        static if (is(typeof(*this))){
+            alias typeof(*this) thisT;
+        } else {
+            alias typeof(this) thisT;
+        }
+        `~extraAttribs~`
 
+        final void moveOp(ref T a, size_t idx){
+            `~moveMixin~`
+        }
+        final bool compareElsOp(T a,T b){
+            return `~compareMixin~`;
+        }
         // The actual data.
         private T[]     heap;
         
@@ -87,7 +98,7 @@ struct Heap (T, alias Compare = minHeapCompare!(T)/+, alias Move = defaultHeapSw
                        heap.length = 2 * heap.length + 32;
 
                 heap [index] = t;
-                //Move (t, index);
+                moveOp (t, index);
                 fixup (index);
         }
 
@@ -145,7 +156,7 @@ struct Heap (T, alias Compare = minHeapCompare!(T)/+, alias Move = defaultHeapSw
         {
                 if (next <= index)
                 {
-                        throw new NoSuchElementException ("Heap :: tried to remove an"
+                        throw new NoSuchElementException (thisT.stringof~" :: tried to remove an"
                                 ~ " element with index greater than the size of the heap "
                                 ~ "(did you call pop() from an empty heap?)");
                 }
@@ -158,7 +169,7 @@ struct Heap (T, alias Compare = minHeapCompare!(T)/+, alias Move = defaultHeapSw
                 if (next > index)
                 {
                         heap[index] = heap[next];
-                        //Move(heap[index], index);
+                        moveOp(heap[index], index);
                         fixdown(index);
 
                         // added via ticket 1885 (kudos to wolfwood)
@@ -171,7 +182,7 @@ struct Heap (T, alias Compare = minHeapCompare!(T)/+, alias Move = defaultHeapSw
         /** Gets the value at the top of the heap without removing it. */
         T peek ()
         {
-                assert (next > 0);
+                assert (next > 0,"next is 0");
                 return heap[0];
         }
 
@@ -205,16 +216,16 @@ struct Heap (T, alias Compare = minHeapCompare!(T)/+, alias Move = defaultHeapSw
         {
                 if (value < next)
                 {
-                        throw new IllegalArgumentException ("Heap :: illegal truncation");
+                        throw new IllegalArgumentException (thisT.stringof~" :: illegal truncation");
                 }
                 heap.length = value;
                 return value;
         }
 
         /** Return a shallow copy of this heap. */
-        Heap clone ()
+        typeof(this) clone ()
         {
-                Heap other;
+                typeof(this) other;
                 other.heap = this.heap.dup;
                 other.next = this.next;
                 return other;
@@ -231,7 +242,7 @@ struct Heap (T, alias Compare = minHeapCompare!(T)/+, alias Move = defaultHeapSw
         {
                 if (index == 0) return;
                 uint par = parent (index);
-                if (!Compare(heap[par], heap[index]))
+                if (!compareElsOp(heap[par], heap[index]))
                 {
                         swap (par, index);
                         fixup (par);
@@ -253,7 +264,7 @@ struct Heap (T, alias Compare = minHeapCompare!(T)/+, alias Move = defaultHeapSw
                 {
                         down = left;
                 }
-                else if (Compare (heap[left], heap[left + 1]))
+                else if (compareElsOp(heap[left], heap[left + 1]))
                 {
                         down = left;
                 }
@@ -262,7 +273,7 @@ struct Heap (T, alias Compare = minHeapCompare!(T)/+, alias Move = defaultHeapSw
                         down = left + 1;
                 }
 
-                if (!Compare(heap[index], heap[down]))
+                if (!compareElsOp(heap[index], heap[down]))
                 {
                         swap (index, down);
                         fixdown (down);
@@ -275,12 +286,21 @@ struct Heap (T, alias Compare = minHeapCompare!(T)/+, alias Move = defaultHeapSw
                 auto t1 = heap[a];
                 auto t2 = heap[b];
                 heap[a] = t2;
-                //Move(t2, a);
+                moveOp(t2, a);
                 heap[b] = t1;
-                //Move(t1, b);
+                moveOp(t1, b);
         }
+    `;
+    return res;
 }
 
+struct Heap (T,alias Compare=minHeapCompare!(T)){
+    mixin(heapMixinStr("","Compare(a,b)"));
+}
+
+struct SpecialCmpHeap(T){
+    mixin(heapMixinStr("bool delegate(T,T) cmpEls;","cmpEls(a,b)"));
+}
 
 /** A minheap implementation. This will have the smallest item as the top of the heap. 
   *
@@ -290,7 +310,7 @@ struct Heap (T, alias Compare = minHeapCompare!(T)/+, alias Move = defaultHeapSw
 
 template MinHeap(T)
 {
-        alias Heap!(T, minHeapCompare) MinHeap;
+        alias Heap!(T, minHeapCompare!(T)) MinHeap;
 }
 
 /** A maxheap implementation. This will have the largest item as the top of the heap. 
@@ -301,7 +321,7 @@ template MinHeap(T)
 
 template MaxHeap(T)
 {
-        alias Heap!(T, maxHeapCompare) MaxHeap;
+        alias Heap!(T, maxHeapCompare!(T)) MaxHeap;
 }
 
 /// multithread safe min heap
