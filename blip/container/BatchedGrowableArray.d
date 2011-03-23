@@ -411,7 +411,8 @@ class BatchedGrowableArray(T,int batchSize1=((2048/T.sizeof>128)?2048/T.sizeof:1
     this(){
     }
     
-    void appendArr(T[] a){
+    T *appendArrT(T[] a){
+        T* res;
         synchronized(this){
             auto rest=this.capacity-this.length;
             size_t toCopy=min(rest,a.length);
@@ -420,6 +421,7 @@ class BatchedGrowableArray(T,int batchSize1=((2048/T.sizeof>128)?2048/T.sizeof:1
                 size_t localStart=this.data.end-nextBatch*batchSize;
                 size_t localSize=batchSize-localStart;
                 size_t localToCopy=min(toCopy,localSize);
+                res=&(this.data.batches[nextBatch][localStart]);
                 this.data.batches[nextBatch][localStart..localStart+localToCopy]=a[0..localToCopy];
                 size_t toCopyL=toCopy-localToCopy;
                 auto pos=localToCopy;
@@ -440,6 +442,10 @@ class BatchedGrowableArray(T,int batchSize1=((2048/T.sizeof>128)?2048/T.sizeof:1
             writeBarrier(); // this allows using just a readBarrier to access the length...
             this.data.end+=a.length;
         }
+        return res;
+    }
+    final void appendArr(T[] a){
+        appendArrT(a);
     }
     /// grows the array to at least the requested capacity
     void growCapacityTo(size_t c){
@@ -486,19 +492,37 @@ class BatchedGrowableArray(T,int batchSize1=((2048/T.sizeof>128)?2048/T.sizeof:1
         assert(this.data.length>=c);
     }
     /// appends one element
-    void appendEl(T a){
+    T *appendElT(T a){
+        T* res;
         synchronized(this){
             auto len=this.data.length;
             auto lastBatch=(len+batchSize-1)/batchSize;
             if (len==lastBatch*batchSize){
                 this.growCapacityTo(len+1);
             }
-            *(this.data.ptrINoCheck(len))=a;
+            res=this.data.ptrINoCheck(len);
+            *res=a;
             writeBarrier();
             ++this.data.end;
         }
+        return res;
+    }
+    final void appendEl(T a){
+        appendElT(a);
     }
     
+    /// index from pointer
+    size_t ptr2Idx(T* p){
+        size_t res=size_t.max;
+        foreach(i,b;data.batches){
+            if (p>=b && p<b+batchSize){
+                res=i*batchSize+(p-b);
+                break;
+            }
+        }
+        return res;
+    }
+    /// description of the object
     void desc(void delegate(cstring)sink){
         // this is the only dependency on BasicIO...
         auto s=dumper(sink);
