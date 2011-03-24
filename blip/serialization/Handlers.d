@@ -32,7 +32,7 @@ static if (Tango.Major==1){
 }
 import blip.core.Variant;
 import tango.core.ByteSwap;
-import blip.core.Traits: RealTypeOf,ctfe_i2a, ElementTypeOfArray;
+import blip.core.Traits;
 import blip.math.Math:min;
 import tango.core.Exception: IOException;
 import blip.text.TextParser;
@@ -41,44 +41,6 @@ import blip.BasicModels;
 import blip.io.StreamConverters: ReadHandler;
 import blip.Comp;
 import blip.container.GrowableArray;
-
-/// the non array core types
-template isBasicCoreType(T){
-    const bool isBasicCoreType=is(T==bool)||is(T==byte)||is(T==ubyte)||is(T==short)
-     ||is(T==ushort)||is(T==int)||is(T==uint)||is(T==float)
-     ||is(T==long)||is(T==ulong)||is(T==double)||is(T==real)
-     ||is(T==ifloat)||is(T==idouble)||is(T==ireal)||is(T==cfloat)
-     ||is(T==cdouble)||is(T==creal)||is(T==char[])||is(T==wchar[])||is(T==dchar[]);
-}
-/// the basic types, out of these more complex types are built
-template isCoreType(T){
-    const bool isCoreType=is(T==bool)||is(T==byte)||is(T==ubyte)||is(T==short)
-     ||is(T==ushort)||is(T==int)||is(T==uint)||is(T==float)
-     ||is(T==long)||is(T==ulong)||is(T==double)||is(T==real)
-     ||is(T==ifloat)||is(T==idouble)||is(T==ireal)||is(T==cfloat)
-     ||is(T==cdouble)||is(T==creal)||is(T==char[])||is(T==wchar[])
-     ||is(T==dchar[])||is(T==ubyte[])||is(T==void[]);
-}
-
-alias Tuple!(bool,byte,ubyte,short,ushort,int,uint,long,ulong,
-    float,double,real,ifloat,idouble,ireal,cfloat,cdouble,creal,ubyte[],
-    char[],wchar[],dchar[],void[]) CoreTypes;
-alias Tuple!(char[],wchar[],dchar[]) CoreStringTypes;
-
-/// string suitable to build names for the core type T
-template strForCoreType(T){
-    static if (is(T S:S[])){
-        static if (is(T==ubyte[])){
-            const istring strForCoreType="binaryBlob";
-        } else static if (is(T==void[])){
-            const istring strForCoreType="binaryBlob2";
-        } else {
-            const istring strForCoreType=S.stringof~"Str";
-        }
-    } else{
-        const istring strForCoreType=T.stringof;
-    }
-}
 
 /// generates a delegate for each type, this can be used to buid a kind of VTable
 /// and hide the use of templates
