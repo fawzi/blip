@@ -31,6 +31,8 @@ import blip.math.Math;
 import blip.stdc.stdlib: malloc,free;
 import blip.Comp;
 import blip.io.Console;
+import blip.core.Traits;
+import blip.serialization.Serialization;
 
 private int nextPower2(int i){
     int res=1;
@@ -428,7 +430,7 @@ class BatchedGrowableArray(T,int batchSize1=((2048/T.sizeof>128)?2048/T.sizeof:1
                 while(toCopyL!=0){
                     ++nextBatch;
                     localToCopy=min(toCopyL,batchSize);
-                    data.batches[nextBatch][0..localToCopy]=a[pos..pos+localToCopy];
+                    this.data.batches[nextBatch][0..localToCopy]=a[pos..pos+localToCopy];
                     toCopyL-=localToCopy;
                     pos+=localToCopy;
                 }
@@ -445,7 +447,7 @@ class BatchedGrowableArray(T,int batchSize1=((2048/T.sizeof>128)?2048/T.sizeof:1
         return res;
     }
     final void appendArr(T[] a){
-        appendArrT(a);
+        this.appendArrT(a);
     }
     /// grows the array to at least the requested capacity
     void growCapacityTo(size_t c){
@@ -482,7 +484,7 @@ class BatchedGrowableArray(T,int batchSize1=((2048/T.sizeof>128)?2048/T.sizeof:1
     /// should initialize what is added...
     void growTo(size_t c){
         if (this.data.length<c){
-            growCapacityTo(c);
+            this.growCapacityTo(c);
             synchronized(this){
                 if (this.data.length<c){
                     this.data.end=this.data.start+c;
@@ -508,26 +510,19 @@ class BatchedGrowableArray(T,int batchSize1=((2048/T.sizeof>128)?2048/T.sizeof:1
         return res;
     }
     final void appendEl(T a){
-        appendElT(a);
+        this.appendElT(a);
     }
     
     /// index from pointer
     size_t ptr2Idx(T* p){
         size_t res=size_t.max;
-        foreach(i,b;data.batches){
+        foreach(i,b;this.data.batches){
             if (p>=b && p<b+batchSize){
                 res=i*batchSize+(p-b);
                 break;
             }
         }
         return res;
-    }
-    /// description of the object
-    void desc(void delegate(cstring)sink){
-        // this is the only dependency on BasicIO...
-        auto s=dumper(sink);
-        s("<BatchedGrowableArray@")(cast(void*)this)(" len:")(this.data.length);
-        s(" capacity:")(this.capacity)(">")("\n");
     }
     
     /// appends to the array
@@ -568,6 +563,7 @@ class BatchedGrowableArray(T,int batchSize1=((2048/T.sizeof>128)?2048/T.sizeof:1
                 b=null;
             }
             this.data.end=this.data.start;
+            this.data.batches=null;
         }
     }
     View view(){
@@ -587,4 +583,51 @@ class BatchedGrowableArray(T,int batchSize1=((2048/T.sizeof>128)?2048/T.sizeof:1
     void opIndexAssign(T val,size_t i){
         this.data[i]=val;
     }
+    
+    static if (isCoreType!(T) ||is(typeof(T.init.serialize(Serializer.init)))) {
+        static ClassMetaInfo metaI;
+        static this(){
+        if (metaI is null){
+        metaI=ClassMetaInfo.createForType!(typeof(this))("blip.container.BatchedGrowableArray("~T.mangleof~")","a batched growable array");
+        metaI.addFieldOfType!(T[])("array","the items in the array");
+        }
+        }
+        ClassMetaInfo getSerializationMetaInfo(){
+            return metaI;
+        }
+        void preSerialize(Serializer s){ }
+        void postSerialize(Serializer s){ }
+        void serialize(Serializer s){
+            LazyArray!(T) la=LazyArray!(T).opCall(delegate int(int delegate(ref T)loopBody){
+                int res=0;
+                foreach (b;this.view.sBatchLoop){
+                    for (size_t i=0;i<b.length;++i){
+                        res=loopBody(b[i]);
+                        if (res!=0) break;
+                    }
+                    if (res!=0) break;
+                }
+                return res;
+            },cast(ulong)this.length);
+            s.field(metaI[0],la);
+        }
+
+        void unserialize(Unserializer s){
+            LazyArray!(T) la=LazyArray!(T).opCall(&this.appendEl,delegate void(ulong l){ 
+                if (l!=ulong.max) this.growCapacityTo(cast(size_t) l);
+            });
+            s.field(metaI[0],la);
+        }
+    
+        mixin printOut!();
+    } else {
+        /// description of the object
+        void desc(void delegate(cstring)sink){
+            // this is the only dependency on BasicIO...
+            auto s=dumper(sink);
+            s("<BatchedGrowableArray@")(cast(void*)this)(" len:")(this.data.length);
+            s(" capacity:")(this.capacity)(">")("\n");
+        }
+    }
+    
 }
