@@ -587,7 +587,6 @@ class BatchedGrowableArray(T,int batchSize1=((2048/T.sizeof>128)?2048/T.sizeof:1
     static if (isCoreType!(T) ||is(typeof(T.init.serialize(Serializer.init)))) {
         static ClassMetaInfo metaI;
         static this(){
-            sout("metaI@")(cast(void*)&metaI)("\n");
             if (metaI is null){
                 metaI=ClassMetaInfo.createForType!(typeof(this))("blip.container.BatchedGrowableArray("~T.mangleof~")","a batched growable array");
                 metaI.addFieldOfType!(T[])("array","the items in the array");
