@@ -221,7 +221,7 @@ class BatchedGrowableArray(T,int batchSize1=((2048/T.sizeof>128)?2048/T.sizeof:1
             static size_t poolLevel;
             static Mutex poolLock;
             static this(){
-                poolLock=new Mutex(); // avoid prealloc?
+                if (poolLock is null) poolLock=new Mutex(); // avoid prealloc?
             }
             static void addPool(){
                 synchronized(poolLock){
