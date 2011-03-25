@@ -490,6 +490,7 @@ class SerializationRegistry {
         synchronized(this){
 	    ClassMetaInfo *oldInfo=metaInfo.className in name2metaInfos;
 	    if (oldInfo!is null){
+                if (oldInfo.ci is metaInfo.ci && oldInfo.ti is metaInfo.ti) return; // ignore double registation (tipically from multiple instance of the same template with the same parameter)
 		// exception in static constructors might be tricky...
 		// so we also print out
 		sout("Registering duplicated name:"~metaInfo.className~"\n");
