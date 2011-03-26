@@ -1335,113 +1335,37 @@ class Unserializer {
                         metaInfo = SerializationRegistry().getMetaInfo(T.classinfo);
                     }
                 }
-                if (metaInfo.kind==TypeKind.CustomK){
-                    t=cast(T)instantiateClass(metaInfo);
-                } else {
-                    t=cast(T)readAndInstantiateClass(fieldMeta,metaInfo,oid,cast(Object)t);
-                    version(UnserializationTrace) {
-                        sout(collectAppender(delegate void(CharSink s){
-                            s("Y instantiated object of class "); s(metaInfo.className);
-                            s(" ("~T.stringof~") at "); writeOut(s,cast(void*)t); s("\n");
-                        }));
-                    }
-                    assert(metaInfo!is null,
-                        "metaInfo not set by readAndInstantiateClass ("~T.stringof~")");
-                    assert(t!is null," object not allocated by readAndInstantiateClass ("
-                        ~T.stringof~")");
-                    assert(metaInfo.ci == (cast(Object)t).classinfo,"error in meta info of type '"
-                        ~(cast(Object)t).classinfo.name~"'("~T.stringof~") got to "~metaInfo.ci.name);
-                    if (recoverCycles && oid!=cast(objectId)0) {
-                        objectIdToPtr[oid]=cast(void*)cast(Object)t;
-                    }
-                }
-                int handle=push(t,metaInfo);
-                scope(exit) voidPop(handle);
-                // try first over the Serializable interface.
-                // this is faster but migh fail if a subclass has an external handler
-                // so this is disallowed
-                Serializable sObj=cast(Serializable)t;
-                if (sObj!is null){
-                    version(UnserializationTrace) sout("Y using Serializable interface\n");
-                    sObj=sObj.preUnserialize(this);
-                    top().value=Variant(cast(Object)sObj);
-                    version(UnserializationTrace) {
-                        sout(collectAppender(delegate void(CharSink s){
-                            s("Y after preUnserialize obj is at ");
-                            writeOut(s,cast(void*)cast(Object)sObj);
-                            s("\n");
-                        }));
-                    }
-                    scope(exit) {
-                        sObj=sObj.postUnserialize(this);
-                        t=cast(T)cast(Object)sObj;
+                bool didPre=false;
+                int handle=int.max;
+                void delegate() rrRead,doPost;
+                void allocT(){
+                    didPre=true;
+                    if (metaInfo.kind==TypeKind.CustomK){
+                        t=cast(T)instantiateClass(metaInfo);
+                    } else {
+                        t=cast(T)readAndInstantiateClass(fieldMeta,metaInfo,oid,cast(Object)t);
                         version(UnserializationTrace) {
                             sout(collectAppender(delegate void(CharSink s){
-                                s("Y after postUnserialize obj is at ");
-                                writeOut(s,cast(void*)cast(Object)sObj);
-                                s("\n");
+                                s("Y instantiated object of class "); s(metaInfo.className);
+                                s(" ("~T.stringof~") at "); writeOut(s,cast(void*)t); s("\n");
                             }));
                         }
+                        assert(metaInfo!is null,
+                            "metaInfo not set by readAndInstantiateClass ("~T.stringof~")");
+                        assert(t!is null," object not allocated by readAndInstantiateClass ("
+                            ~T.stringof~")");
+                        assert(metaInfo.ci == (cast(Object)t).classinfo,"error in meta info of type '"
+                            ~(cast(Object)t).classinfo.name~"'("~T.stringof~") got to "~metaInfo.ci.name);
+                        if (recoverCycles && oid!=cast(objectId)0) {
+                            objectIdToPtr[oid]=cast(void*)cast(Object)t;
+                        }
                     }
-                    void realRead1(){
-                        sObj.unserialize(this);
-                    }
-                    if (metaInfo.kind==TypeKind.CustomK){
-                        version(UnserializationTrace) sout("Y as customField\n");
-                        readCustomField(fieldMeta,&realRead1);
-                    } else {
-                        readObject(fieldMeta,metaInfo,
-                            &realRead1, cast(Object)sObj);
-                    }
-                } else {
-                    if (metaInfo.externalHandlers){
-                        version(UnserializationTrace) sout("Y using externalHandlers\n");
-                        ExternalSerializationHandlers *h=metaInfo.externalHandlers;
-                        assert(h.unserialize!is null,"externalHandlers with null unserialize");
-                        if (h.preUnserialize){
-                            t=cast(T)cast(Object)h.preUnserialize(this,metaInfo,cast(void*)t);
-                            top().value=Variant(t);
-                        }
-                        scope(exit){
-                            if (h.postUnserialize){
-                                t=cast(T)cast(Object)h.postUnserialize(this,metaInfo,cast(void*)t);
-                            }
-                        }
-                        void realRead2(){
-                            h.unserialize(this,metaInfo,cast(void*)t);
-                        }
-                        if (metaInfo.kind==TypeKind.CustomK){
-                            version(UnserializationTrace) sout("Y as customField\n");
-                            readCustomField(fieldMeta,&realRead2);
-                        } else {
-                            readObject(fieldMeta,metaInfo,&realRead2, cast(Object)t);
-                        }
-                    } else {
-                        version(UnserializationTrace) sout("Y using unserialize methods\n");
-                        static if(is(typeof(T.init.preUnserialize(this)))){
-                            t=cast(T)cast(Object)t.preUnserialize(this);
-                            top().value=Variant(t);
-                        }
-                        scope(exit){
-                            static if(is(typeof(T.init.postUnserialize(this)))){
-                                t=cast(T)cast(Object)t.postUnserialize(this);
-                                top().value=Variant(t);
-                            }
-                        }
-                        void realRead3(){
-                            t.unserialize(this);
-                        }
-                        static if(is(typeof(T.init.unserialize(this)))){
-                            if (metaInfo.kind==TypeKind.CustomK){
-                                version(UnserializationTrace) sout("Y as customField\n");
-                                readCustomField(fieldMeta,&realRead3);
-                            } else {
-                                readObject(fieldMeta,metaInfo,&realRead3,cast(Object)t);
-                            }
-                        } else {
-                            assert(0,"no unserialization function for "
-                                ~t.classinfo.name~"'("~T.stringof~")");
-                        }
+                    handle=push(t,metaInfo);
+                }
+                scope(exit){
+                    if (didPre){
+                        doPost();
+                        voidPop(handle);
                         version(UnserializationTrace) {
                             sout(collectAppender(delegate void(CharSink s){
                                 s("Y did read object now at ");
@@ -1450,11 +1374,83 @@ class Unserializer {
                         }
                     }
                 }
-                version(UnserializationTrace) {
-                    sout(collectAppender(delegate void(CharSink s){
-                        s("Y did read object now at ");
-                        writeOut(s,cast(void*)t); s("\n");
-                    }));
+                
+                // try first over the Serializable interface.
+                // this is faster but migh fail if a subclass has an external handler
+                // so this is disallowed
+                Serializable sObj=cast(Serializable)t;
+                // serializable interface
+                void realRead1(){
+                    if (!didPre){
+                        allocT();
+                        sObj=sObj.preUnserialize(this);
+                        top().value=Variant(cast(Object)sObj);
+                    }
+                    sObj.unserialize(this);
+                }
+                void post1(){
+                    sObj=sObj.postUnserialize(this);
+                    t=cast(T)cast(Object)sObj;
+                }
+                // externalHandlers
+                ExternalSerializationHandlers *h=metaInfo.externalHandlers;
+                void realRead2(){
+                    if (!didPre){
+                        allocT();
+                        assert(h.unserialize!is null,"externalHandlers with null unserialize");
+                        if (h.preUnserialize){
+                            t=cast(T)cast(Object)h.preUnserialize(this,metaInfo,cast(void*)t);
+                            top().value=Variant(t);
+                        }
+                    }
+                    h.unserialize(this,metaInfo,cast(void*)t);
+                }
+                void post2(){
+                    if (h.postUnserialize){
+                        t=cast(T)cast(Object)h.postUnserialize(this,metaInfo,cast(void*)t);
+                    }
+                }
+                void realRead3(){
+                    if (!didPre){
+                        allocT();
+                        static if(is(typeof(T.init.preUnserialize(this)))){
+                            t=cast(T)cast(Object)t.preUnserialize(this);
+                            top().value=Variant(t);
+                        }
+                    }
+                    t.unserialize(this);
+                }
+                void post3(){
+                    static if(is(typeof(T.init.postUnserialize(this)))){
+                        t=cast(T)cast(Object)t.postUnserialize(this);
+                        top().value=Variant(t);
+                    }
+                }
+                if (sObj!is null){
+                    version(UnserializationTrace) sout("Y using Serializable interface\n");
+                    rrRead=&realRead1;
+                    doPost=&post1;
+                } else {
+                    if (metaInfo.externalHandlers){
+                        version(UnserializationTrace) sout("Y using externalHandlers\n");
+                        rrRead=&realRead2;
+                        doPost=&post2;
+                    } else {
+                        version(UnserializationTrace) sout("Y using unserialize methods\n");
+                        static if(is(typeof(T.init.unserialize(this)))){
+                            rrRead=&realRead3;
+                            doPost=&post3;
+                        } else {
+                            assert(0,"no unserialization function for "
+                                ~t.classinfo.name~"'("~T.stringof~")");
+                        }
+                    }
+                }
+                if (metaInfo.kind==TypeKind.CustomK){
+                    version(UnserializationTrace) sout("Y as customField\n");
+                    readCustomField(fieldMeta,rrRead);
+                } else {
+                    readObject(fieldMeta,metaInfo,rrRead, cast(Object)t);
                 }
             }
             else static if (is(T == struct)) {
@@ -1495,15 +1491,19 @@ class Unserializer {
                     version(UnserializationTrace) sout("Y using external handlers\n");
                     ExternalSerializationHandlers *h=metaInfo.externalHandlers;
                     assert(h.unserialize!is null,"externalHandlers without valid unserialize");
-                    if (h.preUnserialize){
-                        h.preUnserialize(this,metaInfo,cast(void*)&t);
-                    }
                     scope(exit){
-                        if (h.postUnserialize){
+                        if (didPre && h.postUnserialize){
                             h.postUnserialize(this,metaInfo,cast(void*)&t);
                         }
                     }
+                    bool didPre=false;
                     void realRead4(){
+                        if (!didPre){
+                            didPre=true;
+                            if (h.preUnserialize){
+                                h.preUnserialize(this,metaInfo,cast(void*)&t);
+                            }
+                        }
                         h.unserialize(this,metaInfo,cast(void*)&t);
                     }
                     if (metaInfo.kind==TypeKind.CustomK){
@@ -1514,22 +1514,24 @@ class Unserializer {
                     }
                 } else {
                     version(UnserializationTrace) sout("Y using serialization methods\n");
-                    static if(is(typeof(T.init.preUnserialize(this)))){
-                        t.preUnserialize(this);
-                    }
+                    bool didPre=false;
                     scope(exit){
                         static if(is(typeof(T.init.postUnserialize(this)))){
-                            t.postUnserialize(this);
+                            if (didPre) t.postUnserialize(this);
                         }
                     }
                     static if(is(typeof(t.unserialize(this)))){
                         void realRead5(){
+                            if (!didPre){
+                                didPre=true;
+                                static if(is(typeof(T.init.preUnserialize(this)))){
+                                    t.preUnserialize(this);
+                                }
+                            }
                             t.unserialize(this);
                         }
                     } else {
                         throw new Exception("no external handlers and no internal unserialize, cannot unserialize "~T.stringof,__FILE__,__LINE__);
-/+                        void realRead5(){
-                        }+/
                     }
                     static if (is(typeof(T.init.unserialize(this)))){
                         if (metaInfo.kind==TypeKind.CustomK){
@@ -1543,8 +1545,7 @@ class Unserializer {
                             ~typeid(T).toString~"'("~T.stringof~")");
                     }
                 }
-            }
-            else static if (isArrayType!(T)) {
+            } else static if (isArrayType!(T)) {
                 version(UnserializationTrace) {
                     sout(collectAppender(delegate void(CharSink s){
                         s("Y unserializing array: "); s(fieldMeta?fieldMeta.name:"*NULL*");
