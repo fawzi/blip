@@ -171,7 +171,7 @@ final class BasicStrStream(T=char): OutStreamI{
         static if (is(T==char)){
             return this.sink;
         } else {
-            return &this.writeStr!(char); // cast(void delegate(cstring))rawWriteStr does not work on older compilers
+            return &this.writeStr!(Const!(char)[]); // cast(void delegate(cstring))rawWriteStr does not work on older compilers
         }
     }
     BinSink binSink(){

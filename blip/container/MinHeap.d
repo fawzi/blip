@@ -180,10 +180,16 @@ char[] heapMixinStr(char[]extraAttribs,char[] compareMixin,char[]moveMixin=""){
         }
 
         /** Gets the value at the top of the heap without removing it. */
-        T peek ()
-        {
-                assert (next > 0,"next is 0");
-                return heap[0];
+        T peek(){
+            assert(next>0);
+            return heap[0];
+        }
+        bool first(ref T res){
+            if (next>0){
+                res=heap[0];
+                return true;
+            }
+            return false;
         }
 
         /** Returns the number of elements in this heap. */
@@ -341,9 +347,13 @@ class MinHeapSync(T){
             heap.data(d);
         }
     }
-    T peek ()
+    T peek()
     {
-        return heap.peek;
+        return heap.peek();
+    }
+    bool first(ref T el)
+    {
+        return heap.first(el);
     }
     /** Returns the number of elements in this heap. */
     uint length ()

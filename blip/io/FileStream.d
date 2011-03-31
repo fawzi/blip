@@ -25,19 +25,59 @@ import blip.io.StreamConverters;
 import tango.io.device.File;
 import tango.io.stream.DataFile;
 import tango.io.device.Conduit;
+import blip.container.GrowableArray;
+import blip.math.random.Random;
 
 enum WriteMode{
     WriteClear, /// write on a clean file (reset if present)
     WriteAppend,/// append to a file (create if needed)
-    WriteUnique,/// write on a new (not yet existing) file
+    WriteUnique, /// write on a new (not yet existing) file (fails if it exists)
+    WriteUniqued,/// write on a new (not yet existing) file (changes name until is is unique)
 }
 
+enum StreamOptions{
+    BinBase=0,
+    CharBase=1,
+    WcharBase=2,
+    DcharBase=3,
+    BaseMask=3,
+    Sync=1<<3,
+}
 private const File.Style WriteUnique = {File.Access.Write, File.Open.New, File.Share.Read};
 
 /// general StreamStrWriter for the given file (normally you want strFile and binFile)
 StreamStrWriter!(T) outfileStrWriterT(T)(string path,WriteMode wMode){
     File.Style wStyle;
     switch (wMode){
+    case WriteMode.WriteUniqued:
+        {
+            wStyle=WriteUnique;
+            size_t lastPoint=path.length,lastSlash=path.length;
+            foreach(i,c;path){
+                if (c=='.') lastPoint=i;
+                if (c=='/') lastSlash=i;
+            }
+            string path0=path;
+            string ext="";
+            if (lastSlash+1<lastPoint){
+                path0=path[0..lastPoint];
+                ext=path[lastPoint..$];
+            }
+            string newPath=path;
+            for (size_t i=0;i<20;++i){
+                try{
+                    auto f=new DataFileOutput(newPath,wStyle);
+                    return new StreamStrWriter!(T)(f);
+                } catch (Exception e) { // should catch only creation failures...
+                    newPath=collectAppender(delegate void(CharSink s){
+                        uint uniqueId;
+                        rand(uniqueId);
+                        dumper(s)(path0)("-")(uniqueId)(ext);
+                    });
+                }
+            }
+            throw new Exception("could not create a unique path '"~path,__FILE__,__LINE__);
+        }
     case WriteMode.WriteUnique:
         wStyle=WriteUnique;
         break;
@@ -78,6 +118,35 @@ alias outfileStrSyncT!(char) outfileStrSync;
 StreamWriter outfileBinWriter(string path,WriteMode wMode){
     File.Style wStyle;
     switch (wMode){
+        case WriteMode.WriteUniqued:
+            {
+                wStyle=WriteUnique;
+                size_t lastPoint=path.length,lastSlash=path.length;
+                foreach(i,c;path){
+                    if (c=='.') lastPoint=i;
+                    if (c=='/') lastSlash=i;
+                }
+                string path0=path;
+                string ext="";
+                if (lastSlash+1<lastPoint){
+                    path0=path[0..lastPoint];
+                    ext=path[lastPoint..$];
+                }
+                string newPath=path;
+                for (size_t i=0;i<20;++i){
+                    try{
+                        auto f=new DataFileOutput(newPath,wStyle);
+                        return new StreamWriter(f);
+                    } catch (Exception e) { // should catch only creation failures...
+                        newPath=collectAppender(delegate void(CharSink s){
+                            uint uniqueId;
+                            rand(uniqueId);
+                            dumper(s)(path0)("-")(uniqueId)(ext);
+                        });
+                    }
+                }
+                throw new Exception("could not create a unique path '"~path,__FILE__,__LINE__);
+            }
     case WriteMode.WriteUnique:
         wStyle=WriteUnique;
         break;
@@ -105,6 +174,29 @@ BasicStreams.BasicBinStream outfileBinSync(string path,WriteMode wMode){
     auto sw=outfileBinWriter(path,wMode);
     auto res=new BasicStreams.BasicBinStream(&sw.desc,&sw.writeExactSync,&sw.flush,&sw.close);
     return res;
+}
+/// returns an output stream with the requested options
+OutStreamI outfile(string path,WriteMode wMode,StreamOptions sOpt){
+    switch(sOpt){
+    case StreamOptions.BinBase:
+        return outfileBin(path,wMode);
+    case StreamOptions.CharBase:
+        return outfileStr(path,wMode);
+    case StreamOptions.WcharBase:
+        return outfileStrT!(wchar)(path,wMode);
+    case StreamOptions.DcharBase:
+        return outfileStrT!(dchar)(path,wMode);
+    case (StreamOptions.Sync|StreamOptions.BinBase):
+        return outfileBinSync(path,wMode);
+    case (StreamOptions.Sync|StreamOptions.CharBase):
+        return outfileStrSync(path,wMode);
+    case (StreamOptions.Sync|StreamOptions.WcharBase):
+        return outfileStrSyncT!(wchar)(path,wMode);
+    case (StreamOptions.Sync|StreamOptions.DcharBase):
+        return outfileStrSyncT!(dchar)(path,wMode);
+    default:
+        assert(0,"unexpected writeMode");
+    }
 }
 /// input file using string
 Reader!(T) infileStrT(T)(string path){

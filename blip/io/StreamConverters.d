@@ -127,7 +127,7 @@ class StreamStrWriter(T){
         writeStr(src);
         writer.flush();
     }    
-    final void writeStrSync(cstring src){
+    final void writeStrSync(T[] src){
         synchronized(writer){
             writeStr(src);
         }
