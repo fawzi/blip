@@ -87,7 +87,8 @@ struct LocalGrowableArray(T){
         }
         assert(capacity>=c);
     }
-    /// grows the array to the requested size
+    /// grows the array to the requested size.
+    /// if c is less than the current length the array is trimmed.
     void growTo(size_t c){
         guaranteeCapacity(c);
         dataLen=c;
