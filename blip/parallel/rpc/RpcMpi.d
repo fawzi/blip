@@ -258,9 +258,5 @@ class MpiProtocolHandler: ProtocolHandler{
             }
         }
     }
-
-    override string proxyObjUrl(string objectName){
-        return handlerUrl()~"/obj/"~objectName;
-    }
 }
 

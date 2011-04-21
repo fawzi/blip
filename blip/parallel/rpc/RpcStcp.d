@@ -17,6 +17,7 @@
 // limitations under the License.
 module blip.parallel.rpc.RpcStcp;
 import blip.parallel.rpc.RpcBase;
+import blip.parallel.rpc.RpcMixins;
 import blip.io.Console;
 import blip.serialization.Serialization;
 import blip.container.GrowableArray;
@@ -391,6 +392,7 @@ class StcpConnection{
                 }
                 status=Status.Running;
             }
+            Task("checkUrl",&this.checkUrl).autorelease.submitYield();
             while(status<Status.Stopping){
                 processRequest();
             }
@@ -403,7 +405,36 @@ class StcpConnection{
         }
         protocolHandler.lostConnection(this,null);
     }
-    
+    /// ask other party for its url, and if not yet done, registers this connection as handling
+    /// that url (this helps to take care of different namings for the same host)
+    void checkUrl(){
+        char[128] buf=void;
+        auto arr=lGrowableArray!(char)(buf,0,GASharing.Local);
+        dumper(&arr.appendArr)("stcp://")(targetHost.host)(":")(targetHost.port);
+        if (protocolHandler.group.length!=1){
+            arr(protocolHandler.group);
+        }
+        arr("/serv/publisher/handlerUrl");
+        char[] otherUrl;
+        rpcManualResCall(otherUrl,arr.data);
+        auto pUrl=ParsedUrl.parseUrl(otherUrl);
+        if (pUrl.host!=targetHost.host || pUrl.port!=targetHost.port){
+            TargetHost newH;
+            newH.host=pUrl.host.dup;
+            auto l=find(pUrl.port,".");
+            newH.port=pUrl.port[0..l].dup;
+            synchronized(protocolHandler){
+                auto oldC=newH in protocolHandler.connections;
+                if (oldC!is null){
+                    if ((*oldC)is this) return;
+                    sinkTogether(log,delegate void(CharSink s){
+                        dumper(s)("replacing connection to ")(newH)(" from ")(*oldC)(" to ")(this)("\n");
+                    });
+                }
+                protocolHandler.connections[newH]=this;
+            }
+        }
+    }
     /// handler that handles a request from connection c
     void processRequest(){
         char[512] buf;
@@ -441,7 +472,7 @@ class StcpProtocolHandler: ProtocolHandler{
     ushort fallBackPortMin=49152;
     ushort fallBackPortMax=65535; // this is exclusive...
     
-    static StcpProtocolHandler[string ] stcpProtocolHandlers;
+    static StcpProtocolHandler[string] stcpProtocolHandlers;
     
     /// those that can actually handle the given protocol
     static ProtocolHandler findHandlerForUrl(ParsedUrl url){
@@ -493,6 +524,8 @@ class StcpProtocolHandler: ProtocolHandler{
         loop=noToutWatcher;
         rand=new RandomSync();
         connections=new HashMap!(TargetHost,StcpConnection)();
+        auto vendor=new DefaultVendor(this);
+        servPublisher.publishObject(vendor,"publisher",true,Publisher.Flags.Public);
     }
     this(string group,string port,void delegate(cstring) log=null){
         version(TrackRpc){
@@ -511,6 +544,8 @@ class StcpProtocolHandler: ProtocolHandler{
         this.port=port;
         updateUrl();
         newRequestId=UniqueNumber!(size_t)(10);
+        auto vendor=new DefaultVendor(this);
+        servPublisher.publishObject(vendor,"publisher",true,Publisher.Flags.Public);
     }
     /// updates the url of this handler (to be called when the port changes)
     void updateUrl(){
@@ -733,6 +768,9 @@ class StcpProtocolHandler: ProtocolHandler{
             case "obj":
                 publisher.handleRequest(url,u,sendRes);
                 break;
+            case "serv":
+                servPublisher.handleRequest(url,u,sendRes);
+                break;
             case "req":
                 PendingRequest req;
                 bool error=false;
@@ -776,10 +814,19 @@ class StcpProtocolHandler: ProtocolHandler{
             s("\n");
         });
     }
-
-    override string proxyObjUrl(string objectName){
-        return handlerUrl()~"/obj/"~objectName;
+    string[] listObjects(){
+        string[] res;
+        synchronized(publisher){
+            res = new string[](publisher.objects.length);
+            size_t ii=0;
+            foreach(k,v;publisher.objects){
+                res[ii]=k;
+                ++ii;
+            }
+        }
+        return res;
     }
+    mixin(rpcMixin("","",`handlerUrl|listObjects`));
 }
 
 static this(){

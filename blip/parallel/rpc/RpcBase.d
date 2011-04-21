@@ -337,7 +337,7 @@ class BasicVendor:ObjVendorI{
         return _proxyName;
     }
     string proxyObjUrl(){
-        return publisher.protocol.proxyObjUrl(_objName);
+        return publisher.proxyObjUrl(_objName);
     }
     string objName(){
         return _objName;
@@ -728,10 +728,12 @@ class Publisher{
     UniqueNumber!(int) idNr;
     ProtocolHandler protocol;
     CharSink log;
+    string namespace;
     
-    this(ProtocolHandler pH){
+    this(ProtocolHandler pH,string namespace="obj"){
         this.protocol=pH;
         this.log=pH.log;
+        this.namespace=namespace;
         this.objects=new HashMap!(string ,PublishedObject)();
         this.idNr=UniqueNumber!(int)(3);
         if (log==null){
@@ -753,7 +755,11 @@ class Publisher{
         PublishedObject po=publishedObjectNamed(name);
         return po.obj;
     }
-    
+    string proxyObjUrl(string objName){
+        return collectAppender(delegate void(CharSink s){
+            dumper(s)(protocol.handlerUrl())("/")(namespace)("/")(objName);
+        });
+    }
     void handleRequest(ParsedUrl url,Unserializer u, SendResHandler sendRes)
     {
         char[256] buf;
@@ -989,6 +995,7 @@ class ProtocolHandler{
     }
     // dynamic part
     Publisher publisher;
+    Publisher servPublisher;
     string _handlerUrl;
     
     this(CharSink log=null){
@@ -996,6 +1003,7 @@ class ProtocolHandler{
         if (log is null)
             this.log=serr.call;
         publisher=new Publisher(this);
+        servPublisher=new Publisher(this,"serv");
         failureManager=new FailureManager();
     }
     
@@ -1129,6 +1137,9 @@ class ProtocolHandler{
             case "obj":
                 publisher.handleRequest(url,u,sendRes);
                 break;
+            case "serv":
+                servPublisher.handleRequest(url,u,sendRes);
+                break;
             case "req":
                 PendingRequest req;
                 bool error=false;
@@ -1168,10 +1179,6 @@ class ProtocolHandler{
     void doRpcCallLocal(ParsedUrl url,void delegate(Serializer) serArgs, void delegate(Unserializer) unserRes,
         Variant firstArg){
         doRpcCall(url,serArgs,unserRes,firstArg);
-    }
-    
-    string proxyObjUrl(string objectName){
-        return handlerUrl()~"/obj/"~objectName;
     }
 }
 
