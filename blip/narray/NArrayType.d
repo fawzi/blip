@@ -220,6 +220,7 @@ else {
     final class NArray : CopiableObjectI, Serializable
     {
         alias V dtype;
+        enum int dim=rank;
         alias ArrayFlags Flags;
         // default optimal chunk size for parallel looping
         static index_type defaultOptimalChunkSize=defaultSimpleLoopSize/cast(index_type)V.sizeof;
