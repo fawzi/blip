@@ -314,7 +314,6 @@ struct Vector(flt_, int dim_) {
         }
     }
     
-    
     static if (dim==2) {
         Vector rotatedHalfPi() {
             assert (ok);
