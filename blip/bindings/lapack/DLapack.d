@@ -3217,7 +3217,7 @@ f_float slamch(char[]cmach) {
 f_double dlamch(char[]cmach) {
     return dlamch_(cmach.ptr, cast(uint)cmach.length);
 }
-
+/+ // not available on mac...
 ///
 lapack_float_ret_t second() {
     return second_();
@@ -3225,5 +3225,5 @@ lapack_float_ret_t second() {
 f_double secnd() {
     return dsecnd_();
 }
-
++/
 

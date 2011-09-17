@@ -9,7 +9,7 @@ tests=1
 build_dir=
 noopt=
 nodbg=
-noTangoUser=
+noTangoUser=1
 installLibs=
 BLIP_HOME=$PWD
 mpi=
@@ -42,7 +42,7 @@ do
             echo "  --d-home x      uses x as d home (default $D_HOME )"
             echo "  --blip-home x   uses x as blip home (defaults to $PWD )"
             echo "  --mpi           compiles the mpi version"
-            echo "  --no-tango-user does not link the tango-user library"
+            echo "  --tango-user    does link the tango-user library"
             echo "  --no-tests      does not compile the tests"
             echo "  --no-opt        does not compile the opt version"
             echo "  --no-dbg        does not compile the dbg version"
@@ -100,8 +100,8 @@ do
         --mpi)
             mpi=1
             ;;
-        --no-tango-user)
-            noTangoUser=1
+        --tango-user)
+            noTangoUser=
             ;;
         --no-tests)
             tests=0

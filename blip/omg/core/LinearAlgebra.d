@@ -80,8 +80,7 @@ struct Vector(flt_, int dim_) {
 
     union {
         flt[dim] cell;
-        Repeat!(flt, dim) tuple;
-        
+        //Repeat!(flt, dim) tuple; // bug http://d.puremagic.com/issues/show_bug.cgi?id=6681 in dmd 1.069-1.070
         struct {
             static if (dim >= 1)    union { flt x; flt r; }
             static if (dim >= 2)    union { flt y; flt g; }
@@ -610,7 +609,7 @@ struct Matrix(flt_, int rows_, int cols_) {
     // Column-major memory layout
     union {
         Column!(flt, rows)[cols]    col;
-        Repeat!(flt, rows*cols) tuple;
+        //Repeat!(flt, rows*cols) tuple; // bug in dmd 1.069
         flt[rows*cols]                  cell;
     }
     
@@ -1372,10 +1371,10 @@ struct Quaternion(flt_) {
     static assert (isFieldType!(flt));
     
     union {
+        Vector!(flt, 4) xyzw;
         struct {
             flt x, y, z, w;
         }
-        .Vector!(flt, 4) xyzw;
     }
     
     mixin(serializeSome("Quaternion!("~flt_.stringof~")","a quaternion","x|y|z|w"));

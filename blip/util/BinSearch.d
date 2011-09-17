@@ -53,18 +53,20 @@ bool moreThan(T,U)(T t,U u){
     }
 }
 
-/// finds the lower bund to toFind in the ordered arraylike (i.e. indexable) structure arr
-///     lowerbound means: lbound=max_i arr[i-1]<toFind
+/// finds the upper bund to toFind in the ordered arraylike (i.e. indexable) structure arr
+///     upperbound means: min_i arr[i]>toFind
 /// assuming arr[-1]=-inifinity, arr[arr.length]=inifinity.
 ///
 /// As usual in D ub is exclusive.
-/// If the value toFind is repeated it finds the first occurence
-/// The result is always within the array bounds if arr.length>0, lb otherwise.
-/// To keep the array ordered you want to insert before it (this is the first possible insertion point)
-/// toFind should be either the element to find or a comparison operator or a lessThan predicate
-/// this works correctly for unsigned IdxTypes.
+/// If the value toFind is repeated it finds the position just after last occurence
+/// the result is always within the array bounds if arr.length>0, lb otherwise.
+/// to keep the array ordered you want to insert at its position (this is the last possible insertion point).
+/// toFind should be either the element to find or a comparison operator or a moreThan predicate
 /// Using a predicate note that the predicate for lbound (lessThan) is not simply the opposite of 
 /// the one for ubound (moreThan)
+///
+/// all the repetitions of toFind are in
+/// array[lBound(array,toFind,0,array.length)..uBound(array,toFind,0,array.length)]
 typeof(IdxType1.init+IdxType2.init) uBound(ArrType,ToFind,IdxType1=size_t,IdxType2=size_t)(ArrType arr,ToFind toFind,IdxType1 lb_,IdxType2 ub_){
     alias typeof(IdxType1.init+IdxType2.init) IdxType;
     if (ub_<=lb_) return cast(IdxType)lb_;
@@ -88,17 +90,21 @@ PropType!(typeof(ArrType.init.length)) lBound(ArrType,ToFind)(ArrType arr,ToFind
         (arr,toFind,0,arr.length);
 }
 
-/// finds the upper bund to toFind in the ordered arraylike (i.e. indexable) structure arr
-///     upperbound means: min_i arr[i]>toFind
+/// finds the lower bund to toFind in the ordered arraylike (i.e. indexable) structure arr
+///     lowerbound means: lbound=max_i arr[i-1]<toFind
 /// assuming arr[-1]=-inifinity, arr[arr.length]=inifinity.
 ///
 /// As usual in D ub is exclusive.
-/// If the value toFind is repeated it finds the last occurence
-/// the result is always within the array bounds if arr.length>0, lb otherwise.
-/// to keep the array ordered you want to insert at its position (this is the last possible insertion point).
-/// toFind should be either the element to find or a comparison operator or a moreThan predicate
+/// If the value toFind is repeated it finds the first occurence
+/// The result is always within the array bounds if arr.length>0, lb otherwise.
+/// To keep the array ordered you want to insert before it (this is the first possible insertion point)
+/// toFind should be either the element to find or a comparison operator or a lessThan predicate
+/// this works correctly for unsigned IdxTypes.
 /// Using a predicate note that the predicate for lbound (lessThan) is not simply the opposite of 
 /// the one for ubound (moreThan)
+///
+/// all the repetitions of toFind are in
+/// array[lBound(array,toFind,0,array.length)..uBound(array,toFind,0,array.length)]
 typeof(IdxType1.init+IdxType2.init) lBound(ArrType,ToFind,IdxType1=size_t,IdxType2=size_t)(ArrType arr,ToFind toFind,IdxType1 lb_,IdxType2 ub_){
     alias typeof(IdxType1.init+IdxType2.init) IdxType;
     if (ub_<=lb_) return cast(IdxType)lb_;

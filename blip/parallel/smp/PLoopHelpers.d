@@ -252,7 +252,8 @@ PLoopArray!(T) pLoopArray(T)(T arr,size_t optimalBlockSize=1){
     return res;
 }
 
-// loops on an integer range
+/// loops on an integer range
+/// should be a struct... but had compiler related problems
 class PLoopIRange(T){
     T iStart;
     T iEnd;
@@ -327,6 +328,29 @@ PLoopIRange!(T) pLoopIRange(T)(T iStart,T iEnd,size_t optimalBlockSize=1){
     return res;
 }
 
+// loops on an integer range
+class SLoopIRange(T){
+    T iStart;
+    T iEnd;
+    this(T s,T t){
+        iStart=s;
+        iEnd=t;
+    }
+    int opApply(int delegate(ref T) loopBody){
+        for (T i=iStart;i<iEnd;++i){
+            T j=i;
+            int res=loopBody(j);
+            if (res) return res;
+        }
+        return 0;
+    }
+}
+
+/// returns a structure that does a parallel loop on the given range trying to do optimalBlockSize loops in each task
+SLoopIRange!(T) sLoopIRange(T)(T iStart,T iEnd){
+    SLoopIRange!(T) res=new SLoopIRange!(T)(iStart,iEnd);
+    return res;
+}
 
 /// structure to do a parallel loop on an iterator (each element has its own task)
 class PLoopIter(T){

@@ -1401,20 +1401,19 @@ class SequentialTask:RootTask{
     }
     
     /// spawn a task and waits for its completion
-    void spawnTaskSync(TaskI task)
-    in{
-        auto tNow=taskAtt.val;
-        while (tNow!is null && tNow.superTask!is null && tNow.superTask!is tNow){
-            if (tNow.superTask is this){
-                throw new ParaException(collectAppender(delegate void(CharSink s){
-                        dumper(s)(this)(".spawnTaskSync(")(task)(") called while executing ")
-                            (taskAtt)(" which is a subtask of ")(this)(" (wait between sequential tasks)");
-                    }),__FILE__,__LINE__);
+    void spawnTaskSync(TaskI task){
+        debug{
+            auto tNow=taskAtt.val;
+            while (tNow!is null && tNow.superTask!is null && tNow.superTask!is tNow){
+                if (tNow.superTask is this){
+                    throw new ParaException(collectAppender(delegate void(CharSink s){
+                            dumper(s)(this)(".spawnTaskSync(")(task)(") called while executing ")
+                                (taskAtt)(" which is a subtask of ")(this)(" (wait between sequential tasks)");
+                        }),__FILE__,__LINE__);
+                }
+                tNow=tNow.superTask;
             }
-            tNow=tNow.superTask;
         }
-    }
-    body{
         auto tAtt=taskAtt.val;
         if (tAtt is null || ((cast(RootTask)tAtt)!is null) || tAtt is noTask || !tAtt.mightYield){
             if (tAtt !is null && ((cast(RootTask)tAtt)is null) && tAtt !is noTask && !tAtt.mightYield) {
