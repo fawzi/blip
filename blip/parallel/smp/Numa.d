@@ -42,7 +42,7 @@ import blip.core.Thread;
 import blip.serialization.Serialization;
 import blip.math.random.Random;
 import blip.stdc.stringz;
-import blip.parallel.hwloc.hwloc;
+import blip.bindings.hwloc.hwloc;
 import blip.serialization.StringSerialize;
 import blip.BasicModels;
 import blip.util.Grow:growLength;

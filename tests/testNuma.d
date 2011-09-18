@@ -18,7 +18,7 @@ import blip.io.Console;
 import blip.serialization.Sout;
 import blip.parallel.smp.Numa;
 import blip.serialization.Serialization;
-import blip.parallel.hwloc.hwloc;
+import blip.bindings.hwloc.hwloc;
 version(NoTrace){} else { import blip.core.stacktrace.TraceExceptions; }
 
 void numaLooper(NumaNode n,NumaTopology topo,void delegate(NumaNode) loopBody){

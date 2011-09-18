@@ -16,13 +16,13 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-module blip.parallel.hwloc.hwloc;
+module blip.bindings.hwloc.hwloc;
 version(noHwloc){} else {
 import blip.stdc.config;
 import blip.stdc.stdlib:abort;
 import blip.stdc.string:strcmp;
-import blip.parallel.hwloc.bitmap;
-public import blip.parallel.hwloc.bitmap: hwloc_bitmap_t,hwloc_const_bitmap_t;
+import blip.bindings.hwloc.bitmap;
+public import blip.bindings.hwloc.bitmap: hwloc_bitmap_t,hwloc_const_bitmap_t;
 
 version(Windows){
     import tango.sys.win32.Types: HANDLE;

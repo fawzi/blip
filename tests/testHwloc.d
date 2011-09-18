@@ -22,7 +22,7 @@ version(noHwloc){
         sout("version(noHwloc): hwloc is not used\n");
     }
 } else {
-import blip.parallel.hwloc.hwloc;
+import blip.bindings.hwloc.hwloc;
 import tango.stdc.stdio;
 version(NoTrace){} else { import blip.core.stacktrace.TraceExceptions; }
 

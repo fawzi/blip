@@ -18,7 +18,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-module blip.parallel.hwloc.bitmap;
+module blip.bindings.hwloc.bitmap;
 version(noHwloc){} else {
 import blip.stdc.config;
 import blip.stdc.stringz;
