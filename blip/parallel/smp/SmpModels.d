@@ -92,6 +92,8 @@ TaskStatus taskStatusFromStr(string s){
 interface ExecuterI:BasicObjectI {
     /// logger for task execution messages
     Logger execLogger();
+    /// scheduler group of this executer, this can be used to deterministically distribute work
+    SchedGroupI schedGroup();
 }
 
 enum SchedulerRunLevel:int{
@@ -204,6 +206,8 @@ interface TaskI:SubtaskNotificationsI{
     /// submits the current task and maybe yields the current one (if not SequentialWorkManager)
     /// The current task must be a Fiber or Yieldable or RootTask
     TaskI submitYield(TaskI t=null);
+    /// spawns the task t from the present task on the given scheduler (no stealing)
+    void spawnTask0(TaskI t, TaskSchedulerI sched);
     /// spawns the task t from the present task
     void spawnTask(TaskI t);
     /// spawns the task t from the present task and waits for its completion
@@ -223,7 +227,6 @@ interface TaskI:SubtaskNotificationsI{
     /// executes the task, and waits for its completion
     void executeNow(TaskI t=null);
     //}
-    
 }
 
 /// notifications called by direct subtasks
@@ -233,7 +236,19 @@ interface SubtaskNotificationsI:BasicObjectI {
     /// subtask has finished
     void subtaskEnded(TaskI st);
 }
-
+/// a group of schedulers
+interface SchedGroupI {
+    /// activate all possible schedulers in the current group
+    void activateAll();
+    /// returns the currently active schedulers
+    TaskSchedulerI[] activeScheds();
+    /// logger for the group
+    Logger groupLogger();
+    /// global root task (should submit to the least used scheduler)
+    TaskI gRootTask();
+    /// root task for things that should ideally be executed only if executers are idle
+    TaskI onStarvingTask();
+}
 /// exception for parallelization problems
 class ParaException: Exception{
     this(string msg, string file, size_t line, Exception next = null){

@@ -143,6 +143,7 @@ class PriQScheduler:TaskSchedulerI {
         assert(superScheduler!is null);
         this.superScheduler=superScheduler;
         this._nnCache=superScheduler.nnCache();
+        this._executer=superScheduler.executer;
         version(NoReuse){
             queue=new PriQueue!(TaskI)();
         } else {
@@ -168,6 +169,7 @@ class PriQScheduler:TaskSchedulerI {
         assert(superScheduler!is null);
         this.superScheduler=superScheduler;
         this._nnCache=superScheduler.nnCache();
+        this._executer=superScheduler.executer;
         if (queue is null){
             version(NoReuse){
                 queue=new PriQueue!(TaskI)();
@@ -659,6 +661,10 @@ class MultiSched:TaskSchedulerI {
     }
     /// adds a task to be executed without checking for starvation of other schedulers
     void addTask0(TaskI t){
+        if (!(t.status==TaskStatus.NonStarted ||
+            t.status==TaskStatus.Started)){
+            sout("task:")(t)("\n");
+        }
         assert(t.status==TaskStatus.NonStarted ||
             t.status==TaskStatus.Started,"initial");
         debug(TrackQueues){
@@ -944,11 +950,11 @@ class MultiSched:TaskSchedulerI {
 /// starvation manager helps distribution the tasks when some scheduler have no tasks
 /// the algorithm is not perfect (does not lock always when it should),
 /// but it is fast, as incorrectness just leads to suboptimal work loading
-class StarvationManager: TaskSchedulerI,ExecuterI{
+class StarvationManager: TaskSchedulerI, ExecuterI, SchedGroupI {
     enum :int{ MaxScheds=64 }
     string name; /// name of the StarvationManager
     NumaTopology topo; /// numa topology
-    MultiSched[] scheds; /// schedulers (at the moment from just one level, normally 1 or 0)
+    TaskSchedulerI[] scheds; /// schedulers (at the moment from just one level, normally 1 or 0)
     TaskI _rootTask; /// root task
     int schedLevel;  /// numa level of the schedulers (normally 1 or 0)
     int exeLevel;    /// numa level of the executer threads (normally 0 or 1)
@@ -1005,7 +1011,7 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
         s("q:[ ");
         foreach(i,sched;schedsN){
             if (i!=0) { s(",\n"); ind(4); }
-            sched.writeStatus(sink,indentL+6);
+            (cast(MultiSched)sched).writeStatus(sink,indentL+6);
         }
         s("]}");
     }
@@ -1020,6 +1026,7 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
         this.nRunningScheds=0;
         this.pinLevel=int.max;
         this._rand=new RandomSync();
+        this._executer=this;
         starved=new BitVector!(MaxScheds)[](topo.maxLevel+1);
         runLevel=SchedulerRunLevel.Configuring;
         log=Log.lookup(loggerPath);
@@ -1036,11 +1043,6 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
     TaskI rootTask(){
         return _rootTask;
     }
-    /// root task for things that should be executed only if nothing else is executing
-    TaskI onStarvingTask(){
-        return onStarvingSched.rootTask();
-    }
-    
     /// numa node cache for the given node
     Cache nnCacheForNode(NumaNode node){
         auto n=node;
@@ -1099,7 +1101,7 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
     /// adds the given scheduler to the list of starving ones
     void addStarvingSched(MultiSched sched){
         assert(numa2pos(sched.numaNode)>=0 && numa2pos(sched.numaNode)<scheds.length,"pos out of range");
-        assert(scheds[numa2pos(sched.numaNode)] is sched,"mismatched sched.pos");
+        assert(scheds[numa2pos(sched.numaNode)] is cast(TaskSchedulerI)sched,"mismatched sched.pos");
         addStarvingSched(sched.numaNode);
     }
     /// removes a scheduler, regeneration of starved masks could be more efficient
@@ -1151,7 +1153,8 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
             superN=topo.superNode(superN);
             foreach(subN;randomSubnodesWithLevel(1,cast(Topology!(NumaNode))topo,superN,oldSuper)){
                 auto subP=numa2pos(subN);
-                if (subP<scheds.length && scheds[subP]!is el && scheds[subP].stealTask(superN.level,el)){
+                if (subP<scheds.length && scheds[subP]!is cast(TaskSchedulerI)el && 
+                    (cast(MultiSched)(scheds[subP])).stealTask(superN.level,el)){
                     t=el.nextTaskImmediate();
                     if (t !is null) {
                         return t;
@@ -1219,7 +1222,7 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
                     auto nAtt=pos2numa(pAtt);
                     auto nSched=new MultiSched(name,nAtt,this);
                     scheds~=nSched;
-                    assert(scheds[pAtt] is nSched);
+                    assert(scheds[pAtt] is cast(TaskSchedulerI)nSched);
                     rmStarvingSched(nSched);
                     if (exeLevel<schedLevel){
                         foreach(subN;subnodesWithLevel(exeLevel,cast(Topology!(NumaNode))topo,nAtt)){
@@ -1240,7 +1243,7 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
     /// starts a worker thread
     void startWorker(NumaNode n, MultiSched s){
         synchronized(this){
-            executers~=new MExecuter(name,n,s);
+            executers~=new MExecuter(name,n,s,this);
         }
     }
     /// adds a task to be executed
@@ -1275,7 +1278,7 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
                 size_t i=this.rand.uniformR(scheds.length);
                 size_t j=this.rand.uniformR(scheds.length-1);
                 if (j>=i) ++j;
-                if (scheds[i].queue.length<scheds[j].queue.length){
+                if ((cast(MultiSched)(scheds[i])).queue.length<(cast(MultiSched)(scheds[j])).queue.length){
                     selectedSched=i;
                 } else {
                     selectedSched=j;
@@ -1389,6 +1392,40 @@ class StarvationManager: TaskSchedulerI,ExecuterI{
     bool manyQueued() { return false; }
     /// number of simple tasks wanted
     int nSimpleTasksWanted(){ return max(2,topo.nNodes(exeLevel)/topo.nNodes(schedLevel)); }
+    
+    /// group of this executer, can be used for deterministic task distribution
+    SchedGroupI schedGroup(){
+        return this;
+    }
+    // schedGroupI
+    /// activate all possible schedulers in the current group
+    void activateAll() {
+        if (runLevel>=SchedulerRunLevel.Stopped) return;
+        size_t i, nTot;
+        synchronized(this){
+            i=scheds.length;
+            nTot=topo.nNodes(schedLevel);
+        }
+        while (i<nTot){
+            addIfNonExistent(i++);
+        }
+    }
+    /// returns the currently active schedulers
+    TaskSchedulerI[] activeScheds() {
+        return scheds;
+    }
+    /// logger for the group
+    Logger groupLogger() {
+        return log;
+    }
+    /// global root task (should submit to the least used scheduler)
+    TaskI gRootTask() {
+        return rootTask();
+    }
+    /// root task for things that should be executed only if nothing else is executing
+    TaskI onStarvingTask(){
+        return onStarvingSched.rootTask();
+    }
 }
 
 class MExecuter:ExecuterI{
@@ -1402,16 +1439,20 @@ class MExecuter:ExecuterI{
     Logger log;
     /// name of the executer
     string _name;
+    /// global group
+    StarvationManager sManager;
     /// name accessor
     string name(){
         return _name;
     }
     TaskSchedulerI scheduler(){ return _scheduler; }
     /// creates a new executer
-    this(string name,NumaNode exeNode, MultiSched scheduler){
+    this(string name,NumaNode exeNode, MultiSched scheduler, StarvationManager sManager){
         this._name=name;
         this._scheduler=scheduler;
         this.exeNode=exeNode;
+        this.sManager=sManager;
+        this._scheduler.executer=this;
         log=_scheduler.starvationManager.execLogger;
         worker=new Thread(&(this.workThreadJob),16*8192);
         worker.isDaemon=true;
@@ -1522,6 +1563,9 @@ class MExecuter:ExecuterI{
                 writeOut(s,exeNode);
             });
         }
+    }
+    SchedGroupI schedGroup(){
+        return sManager;
     }
 }
 

@@ -334,7 +334,7 @@ class Task:TaskI{
     /// returns the steal level of the task
     int stealLevel(){ return _stealLevel; }
     /// sets the steal level of the task
-    void stealLevel(int l){ assert(status==TaskStatus.Building); _stealLevel=l; }
+    void stealLevel(int l){ /+assert(status==TaskStatus.Building);+/ _stealLevel=l; }
     /// return the superTask of this task
     TaskI superTask(){ return _superTask; }
     /// sets the superTask of this task
@@ -938,6 +938,10 @@ class Task:TaskI{
     /// operation that spawn the given task as subtask of this one
     void spawnTask(TaskI task){
         spawnTask(task,delegate void(){ volatile auto sched=task.scheduler; sched.addTask(task); });
+    }
+    /// operation that spawn the given task as subtask of this onebut to a specific scheduler
+    void spawnTask0(TaskI task, TaskSchedulerI sched){
+        spawnTask(task,delegate void(){ task.scheduler=sched; sched.addTask0(task); });
     }
     /// spawn a task and waits for its completion
     void spawnTaskSync(TaskI task){

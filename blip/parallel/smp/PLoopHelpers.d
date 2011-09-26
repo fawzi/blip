@@ -29,6 +29,10 @@ import blip.container.Cache;
 import blip.core.sync.Mutex;
 import blip.parallel.smp.WorkManager;
 import blip.Comp;
+import blip.core.Thread;
+import blip.io.Console;
+import blip.io.BasicIO;
+import blip.container.GrowableArray;
 
 version(NoPLoop){
     version=NoPLoopIter;
@@ -37,8 +41,8 @@ version(NoPLoop){
 /// creates a context for a loop.
 /// ctxExtra should define a ctxName createNew() method, startLoop can define blockSize>0
 /// no exception handlers are set up, you can set them up with startLoop and endLoop
-string loopCtxMixin(string ctxName,string ctxExtra,string startLoop,string loopOp,string endLoop,
-    string idxType="size_t"){
+string loopCtxMixin(string ctxName,string ctxExtra,string startLoop, string taskOps,
+    string loopOp,string endLoop,string idxType="size_t"){
     return `
     struct `~ctxName~`{
         `~idxType~` start,end;
@@ -96,8 +100,11 @@ string loopCtxMixin(string ctxName,string ctxExtra,string startLoop,string loopO
                 newChunk.end=midP;
                 newChunk2.start=midP;
                 newChunk2.end=end;
-                Task("PLoopArraysub",&newChunk.exec).appendOnFinish(&newChunk.giveBack).autorelease.submit();
-                Task("PLoopArraysub2",&newChunk2.exec).appendOnFinish(&newChunk2.giveBack).autorelease.submit();
+                auto t1=Task("PLoopArraysub",&newChunk.exec).appendOnFinish(&newChunk.giveBack);
+                auto t2=Task("PLoopArraysub2",&newChunk2.exec).appendOnFinish(&newChunk2.giveBack);
+                `~taskOps~`
+                t1.autorelease.submit();
+                t2.autorelease.submit();
             } else {
                 for (`~idxType~` idx=start;idx<end;++idx){
                     `~loopOp~`;
@@ -111,244 +118,308 @@ string loopCtxMixin(string ctxName,string ctxExtra,string startLoop,string loopO
     }`; 
 }
 
+enum LoopType{
+    Sequential,
+    Parallel
+}
 // should use a slice in LoopBlock and thus specialize definitely on builtin arrays?
-class PLoopArray(T){
-    T arr;
-    alias typeof(arr[0]) ElT;
+class PLoopHelper(T,int loopType){
     size_t optimalBlockSize=1;
-    int delegate(ref ElT) loopBody1;
-    int delegate(ref size_t,ref ElT) loopBody2;
     Exception exception=null;
     int res=0;
-    
-    mixin(loopCtxMixin("LoopBlock1",`
-    PLoopArray context;
-    `,`
-    blockSize=context.optimalBlockSize;
-    if (context.res!=0||context.exception!is null) return;
-    try{`,`
-    static if (is(T:ElT[])){
-        auto r=context.loopBody1(context.arr[idx]);
-    } else {
-        auto el=context.arr[idx];
-        auto r=context.loopBody1(el);
-        static if(is(typeof(delegate void(){context.arr[idx]=el;}))){
-            context.arr[idx]=el;
+    size_t firstDistribution=1;
+    int stealLevel=int.max;
+    static if (is(typeof(T.init[0]))){
+        alias size_t IType;
+        T arr;
+        alias typeof(arr[0]) ElT;
+        int delegate(ref ElT) loopBody1;
+        int delegate(ref size_t,ref ElT) loopBody2;
+        size_t iStart(){
+            return 0;
         }
-    }
-    if (r!=0){
-        context.res=r;
-        return;
-    }`,`
-    }catch(Exception e){
-        context.exception=e;
-    }
-    `));
-    mixin(loopCtxMixin("LoopBlock2",`
-    PLoopArray context;
-    `,`
-    blockSize=context.optimalBlockSize;
-    if (context.res!=0||context.exception!is null) return;
-    try{`,`
-    static if (is(T:ElT[])){
-        auto r=context.loopBody2(idx,context.arr[idx]);
-    } else {
-        auto el=context.arr[idx];
-        auto r=context.loopBody2(idx,el);
-        static if(is(typeof(delegate void(){context.arr[idx]=el;}))){
-            context.arr[idx]=el;
+        size_t iEnd(){
+            return arr.length;
         }
-    }
-    if (r!=0){
-        context.res=r;
-        return;
-    }`,`
-    } catch(Exception e){
-        context.exception=e;
-    }
-    `));
-    this(T arr,size_t optimalBlockSize=1){
-        this.arr=arr;
-        this.optimalBlockSize=optimalBlockSize;
-    }
-    int opApply(int delegate(ref ElT) loopBody){
-        version(NoPLoop){} else {
-            this.loopBody1=loopBody;
-            if (arr.length>optimalBlockSize+optimalBlockSize/2){
-                LoopBlock1.addGPool();
-                scope(exit) LoopBlock1.rmGPool();
-                LoopBlock1 *looper=new LoopBlock1;
-                looper.context=this;
-                looper.start=0;
-                looper.end=arr.length;
-                Task("PLoopArrayMain",&looper.exec).autorelease.executeNow();
-                if (exception!is null)
-                    throw new Exception("exception in PLoopArray",__FILE__,__LINE__,exception);
-                return res;
+        mixin(loopCtxMixin("LoopBlock1",`
+        PLoopHelper context;
+        `,`
+        blockSize=context.optimalBlockSize;
+        if (context.res!=0||context.exception!is null) return;
+        volatile{
+            while (1){
+                if (context.firstDistribution==0) break;
+                Thread.yield();
             }
         }
-        Task("PLoopArrayMainSeq",delegate void(){
-            try{
-                size_t end=arr.length;
-                for (size_t idx=0;idx<end;++idx){
-                    auto r=loopBody(arr[idx]);
-                    if (r!=0){
-                        res=r;
+        try{`,`
+        t1.stealLevel=context.stealLevel;
+        t2.stealLevel=context.stealLevel;
+        `,`
+        static if (is(T:ElT[])){
+            auto r=context.loopBody1(context.arr[idx]);
+        } else {
+            auto el=context.arr[idx];
+            auto r=context.loopBody1(el);
+            static if(is(typeof(delegate void(){context.arr[idx]=el;}))){
+                context.arr[idx]=el;
+            }
+        }
+        if (r!=0){
+            context.res=r;
+            return;
+        }`,`
+        }catch(Exception e){
+            context.exception=e;
+        }
+        `));
+        mixin(loopCtxMixin("LoopBlock2",`
+        PLoopHelper context;
+        `,`
+        blockSize=context.optimalBlockSize;
+        if (context.res!=0||context.exception!is null) return;
+        try{`,`
+        t1.stealLevel=context.stealLevel;
+        t2.stealLevel=context.stealLevel;
+        `,`
+        static if (is(T:ElT[])){
+            auto r=context.loopBody2(idx,context.arr[idx]);
+        } else {
+            auto el=context.arr[idx];
+            auto r=context.loopBody2(idx,el);
+            static if(is(typeof(delegate void(){context.arr[idx]=el;}))){
+                context.arr[idx]=el;
+            }
+        }
+        if (r!=0){
+            context.res=r;
+            return;
+        }`,`
+        } catch(Exception e){
+            context.exception=e;
+        }
+        `));
+        this(T arr,size_t optimalBlockSize=1){
+            this.arr=arr;
+            this.optimalBlockSize=optimalBlockSize;
+        }
+    } else {
+        alias T IType;
+        int delegate(ref T) loopBody;
+        mixin(loopCtxMixin("LoopBlock3",`
+        PLoopHelper context;
+        `,`
+        blockSize=context.optimalBlockSize;
+        if (context.res!=0||context.exception!is null) return;
+        try{`,`
+        t1.stealLevel=context.stealLevel;
+        t2.stealLevel=context.stealLevel;
+        `,`
+        auto iAtt=context.iStart;
+        auto r=context.loopBody(iAtt);
+        if (r!=0){
+            context.res=r;
+            return;
+        }`,`
+        }catch(Exception e){
+            context.exception=e;
+        }
+        `,`T`));
+        this(T start, T end,size_t optimalBlockSize=1){
+            this.iStart=start;
+            this.iEnd=end;
+            this.optimalBlockSize=optimalBlockSize;
+        }
+    }
+    void doLoop(LoopBlockT,LoopBodyT)(){
+        try{
+            if (firstDistribution){
+                scope(exit){
+                    firstDistribution=0;
+                }
+                static if (loopType==LoopType.Parallel){
+                    auto tAtt=taskAtt.val;
+                    stealLevel=tAtt.stealLevel();
+                    SchedGroupI group=tAtt.scheduler().executer().schedGroup();
+                    auto scheds=group.activeScheds();
+                    if (iEnd >optimalBlockSize*scheds.length+iStart){
+                        Task[128] tasksB;
+                        Task[] tasks;
+                        if (scheds.length<=tasksB.length){
+                            tasks=tasksB[0..scheds.length];
+                        } else {
+                            tasks=new Task[](scheds.length);
+                        }
+                        IType nEl=cast(IType)(iEnd-iStart); // should be the unsigned type of IType
+                        auto bsLow=nEl/scheds.length;
+                        bsLow=(bsLow/optimalBlockSize)*optimalBlockSize;
+                        auto bsUp=bsLow+optimalBlockSize;
+                        auto nBsUp=(nEl-scheds.length*bsLow)/optimalBlockSize;
+                        auto nBsLow=scheds.length-nBsUp;
+                        if (nBsLow>0) --nBsLow;
+                        else if (nBsUp>0) --nBsUp;
+                        LoopBlockT *looper=new LoopBlockT;
+                        looper.context=this;
+                        looper.start=iStart;
+                        looper.end=iEnd;
+                        IType ii=iStart;
+                        for (size_t i=0;i<nBsUp;++i){
+                            auto blockAtt=looper.createNew();
+                            blockAtt.start=ii;
+                            ii+=bsUp;
+                            blockAtt.end=ii;
+                            auto t1=Task("PLoopArrayInitial",&blockAtt.exec).appendOnFinish(&blockAtt.giveBack);
+                            t1.stealLevel=0;
+                            tasks[i]=t1;
+                            tAtt.spawnTask0(t1,scheds[i]);
+                        }
+                        for (size_t i=0;i<nBsLow;++i){
+                            auto blockAtt=looper.createNew();
+                            blockAtt.start=ii;
+                            ii+=bsLow;
+                            blockAtt.end=ii;
+                            auto t1=Task("PLoopArrayInitial",&blockAtt.exec).appendOnFinish(&blockAtt.giveBack);
+                            t1.stealLevel=0;
+                            tasks[nBsUp+i]=t1;
+                            tAtt.spawnTask0(t1,scheds[nBsUp+i]);
+                        }
+                        auto rest=arr.length-nBsUp*nBsUp-nBsLow*nBsLow;
+                        if (nBsLow+nBsUp<scheds.length){
+                            auto blockAtt=looper.createNew();
+                            blockAtt.start=ii;
+                            blockAtt.end=arr.length;
+                            auto t1=Task("PLoopArrayInitial",&blockAtt.exec).appendOnFinish(&blockAtt.giveBack);
+                            t1.stealLevel=0;
+                            tasks[nBsUp+nBsLow]=t1;
+                            tAtt.spawnTask0(t1,scheds[nBsUp+nBsLow]);
+                        } else {
+                            assert(rest==0);
+                        }
+                        // a task might be stolen after this if stealLevel>0
+                        // reduces the probability of having all waiting for a slow thread
+                        for (size_t iTask=0;iTask<tasks.length;++iTask) {
+                            tasks[iTask].stealLevel=stealLevel;
+                            tasks[iTask].release();
+                        }
+                        if (tasks.length>tasksB.length) delete tasks;
                         return;
                     }
                 }
-            } catch (Exception e) {
-                exception=e;
             }
-        }).autorelease.executeNow();
-        if (exception!is null)
-            throw new Exception("exception in PLoopArray",__FILE__,__LINE__,exception);
-        return res;
-    }
-
-    int opApply(int delegate(ref size_t,ref ElT) loopBody){
-        version(NoPLoop){} else {
-            this.loopBody2=loopBody;
-            if (arr.length>optimalBlockSize+optimalBlockSize/2){
-                LoopBlock2.addGPool();
-                scope(exit) LoopBlock2.rmGPool();
-                LoopBlock2 *looper=new LoopBlock2;
-                looper.context=this;
-                looper.start=0;
-                looper.end=arr.length;
-                Task("PLoopArrayMain",&looper.exec).autorelease.executeNow();
-                if (exception!is null)
-                    throw new Exception("exception in PLoopArray",__FILE__,__LINE__,exception);
-                return res;
-            }
-        }
-        Task("PLoopArrayMainSeq",delegate void(){
-            size_t end=arr.length;
-            try{
-                for (size_t idx=0;idx<end;++idx){
-                    auto r=loopBody(idx,arr[idx]);
-                    if (r!=0){
-                        res=r;
-                        return;
-                    }
-                }
-            } catch (Exception e) {
-                exception=e;
-            }
-        }).autorelease.executeNow();
-        if (exception!is null)
-            throw new Exception("exception in PLoopArray",__FILE__,__LINE__,exception);
-        return res;
-    }
-    
-}
-
-
-/// returns a structure that does a parallel loop on the given array trying to do optimalBlockSize loops in each task
-/// loop on elements and loop with index are supported
-PLoopArray!(T) pLoopArray(T)(T arr,size_t optimalBlockSize=1){
-    assert(optimalBlockSize>0,"optimalBlockSize must be larger than 0");
-    PLoopArray!(T) res=new PLoopArray!(T)(arr,optimalBlockSize);
-    return res;
-}
-
-/// loops on an integer range
-/// should be a struct... but had compiler related problems
-class PLoopIRange(T){
-    T iStart;
-    T iEnd;
-    size_t optimalBlockSize=1;
-    int delegate(ref T) loopBody;
-    Exception exception=null;
-    int res=0;
-    
-    mixin(loopCtxMixin("LoopBlock1",`
-    PLoopIRange context;
-    `,`
-    blockSize=context.optimalBlockSize;
-    if (context.res!=0||context.exception!is null) return;
-    try{`,`
-    auto iAtt=context.iStart;
-    auto r=context.loopBody(iAtt);
-    if (r!=0){
-        context.res=r;
-        return;
-    }`,`
-    }catch(Exception e){
-        context.exception=e;
-    }
-    `,`T`));
-    this(T iStart,T iEnd,size_t optimalBlockSize=1){
-        this.iStart=iStart;
-        this.iEnd=iEnd;
-        this.optimalBlockSize=optimalBlockSize;
-    }
-    int opApply(int delegate(ref T) loopBody){
-        if (!(iStart<iEnd)) return 0;
-        version(NoPLoop){} else {
-            this.loopBody=loopBody;
-            if (iEnd>optimalBlockSize+optimalBlockSize/2+iStart){
-                LoopBlock1.addGPool();
-                scope(exit) LoopBlock1.rmGPool();
-                LoopBlock1 *looper=new LoopBlock1; // avoid alloc? gave problems...
+            if (loopType == LoopType.Parallel && iEnd>optimalBlockSize+optimalBlockSize/2+iStart){
+                LoopBlockT.addGPool();
+                scope(exit) LoopBlockT.rmGPool();
+                LoopBlockT *looper=new LoopBlockT;
                 looper.context=this;
                 looper.start=iStart;
                 looper.end=iEnd;
-                Task("PLoopIRangeMain",&looper.exec).autorelease.executeNow();
-                if (exception!is null)
-                    throw new Exception("exception in PLoopIRange",__FILE__,__LINE__,exception);
-                return res;
-            }
-        }
-        Task("PLoopIRangeMainSeq",delegate void(){
-            try{
-                auto end=iEnd;
-                for (T idx=iStart;idx<end;++idx){
-                    T idx2=idx;
-                    auto r=loopBody(idx2);
+                looper.exec();
+            } else {
+                IType end=iEnd;
+                for (IType idx=0;idx<end;++idx){
+                    static if (!is(typeof(T.init[0]))){
+                        T idx2=idx; // avoid copy?
+                        auto r=loopBody(idx2);
+                    } else static if (is(LoopBlockT==LoopBlock1)){
+                        auto r=loopBody1(arr[idx]);
+                    } else static if (is(LoopBlockT==LoopBlock2)){
+                        IType idx2=idx; // avoid copy?
+                        auto r=loopBody2(idx2,arr[idx]);
+                    } else {
+                        static assert(0,"unexpected type in PLoopHelper:"~LoopBlockT.stringof);
+                    }
                     if (r!=0){
                         res=r;
                         return;
                     }
                 }
-            } catch (Exception e) {
-                exception=e;
             }
-        }).autorelease.executeNow();
-        if (exception!is null)
-            throw new Exception("exception in PLoopIRange",__FILE__,__LINE__,exception);
-        return res;
+        } catch (Exception e) {
+            exception=e;
+        }
+    }
+
+    static if (is(typeof(T.init[0]))){
+        int opApply(int delegate(ref ElT) loopBody){
+            this.loopBody1=loopBody;
+            if (arr.length>optimalBlockSize+optimalBlockSize/2){
+                LoopBlock1.addGPool();
+            }
+            scope(exit) {
+                if (arr.length>optimalBlockSize+optimalBlockSize/2)
+                    LoopBlock1.rmGPool();
+            }
+            Task("PLoopArrayMain",&doLoop!(LoopBlock1,typeof(loopBody))).autorelease.executeNow();
+            if (exception!is null)
+                throw new Exception("exception in PLoopArray",__FILE__,__LINE__,exception);
+            return res;
+        }
+
+        int opApply(int delegate(ref size_t,ref ElT) loopBody){
+            this.loopBody2=loopBody;
+            if (arr.length>optimalBlockSize+optimalBlockSize/2){
+                LoopBlock2.addGPool();
+            }
+            scope(exit) {
+                if (arr.length>optimalBlockSize+optimalBlockSize/2)
+                    LoopBlock2.rmGPool();
+            }
+            Task("PLoopArrayMain",&doLoop!(LoopBlock2,typeof(loopBody))).autorelease.executeNow();
+            if (exception!is null)
+                throw new Exception("exception in PLoopArray",__FILE__,__LINE__,exception);
+            return res;
+        }
+    } else {
+        int opApply(int delegate(T) loopBody){
+            this.loopBody=loopBody;
+            if (end>optimalBlockSize+optimalBlockSize/2+start){
+                LoopBlock3.addGPool();
+            }
+            scope(exit) {
+                if (end>optimalBlockSize+optimalBlockSize/2+start)
+                    LoopBlock3.rmGPool();
+            }
+            Task("PLoopArrayMain",&doLoop!(LoopBlock3,typeof(loopBody))).autorelease.executeNow();
+            if (exception!is null)
+                throw new Exception("exception in PLoopArray",__FILE__,__LINE__,exception);
+            return res;
+        }
     }
 }
 
-/// returns a structure that does a parallel loop on the given range trying to do optimalBlockSize loops in each task
-PLoopIRange!(T) pLoopIRange(T)(T iStart,T iEnd,size_t optimalBlockSize=1){
+/// returns a structure that does a parallel loop on the given array trying to do optimalBlockSize loops in each task
+/// loop on elements and loop with index are supported
+PLoopHelper!(T,LoopType.Parallel) pLoopArray(T)(T arr,size_t optimalBlockSize=1){
     assert(optimalBlockSize>0,"optimalBlockSize must be larger than 0");
-    PLoopIRange!(T) res=new PLoopIRange!(T)(iStart,iEnd,optimalBlockSize);
+    auto res=new PLoopHelper!(T,LoopType.Parallel)(arr,optimalBlockSize);
     return res;
 }
 
-// loops on an integer range
-class SLoopIRange(T){
-    T iStart;
-    T iEnd;
-    this(T s,T t){
-        iStart=s;
-        iEnd=t;
-    }
-    int opApply(int delegate(ref T) loopBody){
-        for (T i=iStart;i<iEnd;++i){
-            T j=i;
-            int res=loopBody(j);
-            if (res) return res;
-        }
-        return 0;
-    }
+/// returns a structure that does a possibly parallel loop on the given array trying to do optimalBlockSize
+/// loops in each task. loop on elements and loop with index are supported
+PLoopHelper!(T,loopType) loopArray(int loopType,T)(T arr,size_t optimalBlockSize=1){
+    assert(optimalBlockSize>0,"optimalBlockSize must be larger than 0");
+    auto res=new PLoopHelper!(T,loopType)(arr,optimalBlockSize);
+    return res;
 }
 
 /// returns a structure that does a parallel loop on the given range trying to do optimalBlockSize loops in each task
-SLoopIRange!(T) sLoopIRange(T)(T iStart,T iEnd){
+PLoopHelper!(T,LoopType.Parallel) pLoopIRange(T)(T iStart,T iEnd,size_t optimalBlockSize=1){
+    assert(optimalBlockSize>0,"optimalBlockSize must be larger than 0");
+    auto res=new PLoopHelper!(T,LoopType.Parallel)(iStart,iEnd,optimalBlockSize);
+    return res;
+}
+
+/// returns a structure that does a sequential loop on the given range
+PLoopHelper!(T,LoopType.Sequential) sLoopIRange(T)(T iStart,T iEnd){
     SLoopIRange!(T) res=new SLoopIRange!(T)(iStart,iEnd);
+    return res;
+}
+
+/// returns a structure that does a possibly parallel loop on the given range trying to do optimalBlockSize loops in each task
+PLoopHelper!(T,loopType) loopIRange(int loopType, T)(T iStart,T iEnd,size_t optimalBlockSize=1){
+    assert(optimalBlockSize>0,"optimalBlockSize must be larger than 0");
+    auto res=new PLoopHelper!(T,loopType)(iStart,iEnd,optimalBlockSize);
     return res;
 }
 
@@ -543,3 +614,5 @@ PLoopIter!(T) pLoopIter(T)(bool delegate(ref T) iter){
     PLoopIter!(T) res=new PLoopIter!(T)(iter);
     return res;
 }
+
+

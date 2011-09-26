@@ -44,7 +44,7 @@ static this(){
 }
 
 /// executes the task immediately in the current context
-class ImmediateExecuter:ExecuterI,TaskSchedulerI{
+class ImmediateExecuter:ExecuterI,TaskSchedulerI,SchedGroupI{
     /// logger for problems/info
     Logger log;
     /// run level
@@ -57,6 +57,8 @@ class ImmediateExecuter:ExecuterI,TaskSchedulerI{
     string _name;
     Cache _nnCache;
     RandomSync _rand;
+    SchedGroupI _schedGroup;
+    TaskSchedulerI[1] _activeSchedulers;
     /// returns a random source for scheduling
     final RandomSync rand(){ return _rand; }
     /// name accessor
@@ -85,6 +87,8 @@ class ImmediateExecuter:ExecuterI,TaskSchedulerI{
         runLevel=SchedulerRunLevel.Running;
         _rand=new RandomSync();
         _rootTask=new RootTask(this,0,name~"DefaultTask",false);
+        _schedGroup=this;
+        _activeSchedulers[0]=this;
     }
     /// returns the scheduler (itself in this case)
     TaskSchedulerI scheduler(){
@@ -187,10 +191,32 @@ class ImmediateExecuter:ExecuterI,TaskSchedulerI{
     bool manyQueued() { return true; }
     /// executer log
     Logger execLogger(){ return log; }
+    /// group of this scheduler, this can be used to deterministically distribute work
+    SchedGroupI schedGroup(){ return _schedGroup; }
+    
+    // schedGroupI
+    /// activate all possible schedulers in the current group
+    void activateAll() { }
+    /// returns the currently active schedulers
+    TaskSchedulerI[] activeScheds() {
+        return _activeSchedulers;
+    }
+    /// logger for the group
+    Logger groupLogger() {
+        return log;
+    }
+    /// global root task (should submit to the least used scheduler)
+    TaskI gRootTask() {
+        return rootTask();
+    }
+    /// root task for things that should ideally be executed only if executers are idle
+    TaskI onStarvingTask(){
+        return rootTask();
+    }
 }
 
 
-class PExecuter:ExecuterI{
+class PExecuter:ExecuterI,SchedGroupI{
     /// number of processors (used as hint for the number of tasks)
     int nproc;
     /// worker threads
@@ -198,7 +224,7 @@ class PExecuter:ExecuterI{
     /// logger for problems/info
     Logger log;
     /// root task
-    TaskSchedulerI _scheduler;
+    TaskSchedulerI[1] _scheduler;
     /// name of the executer
     string _name;
     /// name accessor
@@ -209,13 +235,13 @@ class PExecuter:ExecuterI{
     void logMsg(cstring m){
         log.info(m);
     }
-    TaskSchedulerI scheduler(){ return _scheduler; }
+    TaskSchedulerI scheduler(){ return _scheduler[0]; }
     /// creates a new executer
     this(string name,TaskSchedulerI scheduler=null,int nproc=-1,string loggerPath="blip.parallel.smp.exec"){
         this._name=name;
-        this._scheduler=scheduler;
+        this._scheduler[0]=scheduler;
         if (scheduler is null) {
-            this._scheduler=new PriQTaskScheduler(this.name~"sched");
+            this._scheduler[0]=new PriQTaskScheduler(this.name~"sched");
         }
         this.scheduler.executer=this;
         if (nproc==-1){
@@ -303,5 +329,30 @@ class PExecuter:ExecuterI{
     Logger execLogger(){
         return log;
     }
+    
+    /// group of this executer, can be used for deterministic task distribution
+    SchedGroupI schedGroup(){
+        return this;
+    }
+    // schedGroupI
+    /// activate all possible schedulers in the current group
+    void activateAll() { }
+    /// returns the currently active schedulers
+    TaskSchedulerI[] activeScheds() {
+        return _scheduler;
+    }
+    /// logger for the group
+    Logger groupLogger() {
+        return log;
+    }
+    /// global root task (should submit to the least used scheduler)
+    TaskI gRootTask() {
+        return scheduler.rootTask();
+    }
+    /// root task for things that should ideally be executed only if executers are idle
+    TaskI onStarvingTask(){
+        return scheduler.rootTask();
+    }
+    
 }
 
