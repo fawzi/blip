@@ -33,6 +33,7 @@ import blip.core.Thread;
 import blip.io.Console;
 import blip.io.BasicIO;
 import blip.container.GrowableArray;
+public import blip.BasicModels: LoopType;
 
 version(NoPLoop){
     version=NoPLoopIter;
@@ -118,10 +119,6 @@ string loopCtxMixin(string ctxName,string ctxExtra,string startLoop, string task
     }`; 
 }
 
-enum LoopType{
-    Sequential,
-    Parallel
-}
 // should use a slice in LoopBlock and thus specialize definitely on builtin arrays?
 class PLoopHelper(T,int loopType){
     size_t optimalBlockSize=1;
@@ -412,7 +409,7 @@ PLoopHelper!(T,LoopType.Parallel) pLoopIRange(T)(T iStart,T iEnd,size_t optimalB
 
 /// returns a structure that does a sequential loop on the given range
 PLoopHelper!(T,LoopType.Sequential) sLoopIRange(T)(T iStart,T iEnd){
-    SLoopIRange!(T) res=new SLoopIRange!(T)(iStart,iEnd);
+    auto res=new PLoopHelper!(T,LoopType.Sequential)(iStart,iEnd);
     return res;
 }
 

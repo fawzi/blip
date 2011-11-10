@@ -18,6 +18,16 @@
 module blip.BasicModels;
 import blip.Comp;
 
+/// type of a loop
+// these values cannot be changed easily, as they have many hidden dependencies as:
+// - dchem.sys.PIndexes.KindRange
+// - dchem.sys.SegmentedArray
+// - dchem.neigh.HierarchicalSort
+enum LoopType{
+    Sequential=0,
+    Parallel=1,
+}
+
 /// interface of an object that can describe itself
 interface BasicObjectI{
     void desc(void delegate(cstring) s);

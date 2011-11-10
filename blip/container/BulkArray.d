@@ -599,6 +599,20 @@ struct BulkArray(T){
     PLoop pLoop(size_t optimalBlockSize=defaultOptimalBlockSize){
         return PLoop(*this,optimalBlockSize);
     }
+    template LoopReturnType(int loopType){
+        static if ((loopType&1)!=0){
+            alias PLoop LoopReturnType;
+        } else {
+            alias BulkArray LoopReturnType;
+        }
+    }
+    LoopReturnType!(loopType) loop(int loopType)(){
+        static if ((loopType&1)!=0){
+            return PLoop(*this,optimalBlockSize);
+        } else {
+            return *this;
+        }
+    }
     void opSliceAssign(T val){
         foreach(ref v;pLoop())
             v=val;
