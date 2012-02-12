@@ -31,6 +31,7 @@ private {
     import blip.serialization.SerializationMixins;
     import blip.util.Convert;
     import blip.Comp;
+    import blip.math.random.Random: Rand=Random;
 }
 
 private struct Column(flt, int rows) {
@@ -167,6 +168,20 @@ struct Vector(flt_, int dim_) {
     alias ok isOK;
     alias ok isCorrect;
 
+    static if (is(typeof(delegate void(Rand r){
+        flt xx;
+        r(xx);
+    } ))) {
+        static Vector randomGenerate(Rand r){
+            Vector res;
+            static if (dim >= 1) r(res.x);
+            static if (dim >= 2) r(res.y);
+            static if (dim >= 3) r(res.z);
+            static if (dim >= 4) r(res.w);
+            return res;
+        }
+    }
+    
     static Vector from(T)(T v) {
         Vector res = void;
         static if (dim >= 1) res.x = scalar!(flt)(v.x);
@@ -671,6 +686,14 @@ struct Matrix(flt_, int rows_, int cols_) {
         } else {
             return col[c].row[r];
         }
+    }
+
+    Vector!(flt,rows) column(int r){
+        static if (rows==1) return Vector!(flt,rows)(col[r].row[0]);
+        else static if (rows==2) return Vector!(flt,rows)(col[r].row[0],col[r].row[1]);
+        else static if (rows==3) return Vector!(flt,rows)(col[r].row[0],col[r].row[1],col[r].row[2]);
+        else static if (rows==4) return Vector!(flt,rows)(col[r].row[0],col[r].row[1],col[r].row[2],col[r].row[3]);
+        else static assert(0);
     }
 
     Vector!(flt,cols) opIndex(int r){
