@@ -90,31 +90,31 @@ string loopCtxMixin(string ctxName,string ctxExtra,string startLoop, string task
         void exec(){
             size_t blockSize=1;
             `~startLoop~`
-            if (end>start+cast(`~idxType~`)(blockSize+blockSize/2)){
-                auto newChunk=createNew();
-                auto newChunk2=createNew();
-                auto mid=(end-start)/2;
+            if (this.end>this.start+cast(`~idxType~`)(blockSize+blockSize/2)){
+                auto newChunk=this.createNew();
+                auto newChunk2=this.createNew();
+                auto mid=(this.end-this.start)/2;
                 if (blockSize<mid) // try to have exact multiples of optimalBlockSize (so that one can have a fast path for it)
                     mid=((mid+blockSize-1)/blockSize)*blockSize;
-                auto midP=start+mid;
-                newChunk.start=start;
+                auto midP=this.start+mid;
+                newChunk.start=this.start;
                 newChunk.end=midP;
                 newChunk2.start=midP;
-                newChunk2.end=end;
+                newChunk2.end=this.end;
                 auto t1=Task("PLoopArraysub",&newChunk.exec).appendOnFinish(&newChunk.giveBack);
                 auto t2=Task("PLoopArraysub2",&newChunk2.exec).appendOnFinish(&newChunk2.giveBack);
                 `~taskOps~`
                 t1.autorelease.submit();
                 t2.autorelease.submit();
             } else {
-                for (`~idxType~` idx=start;idx<end;++idx){
+                for (`~idxType~` idx=this.start;idx<this.end;++idx){
                     `~loopOp~`;
                 }
             }
             `~endLoop~`
         }
         void giveBack(){
-            if (pool) pool.giveBack(this);
+            if (this.pool) this.pool.giveBack(this);
         }
     }`; 
 }
@@ -203,23 +203,24 @@ class PLoopHelper(T,int loopType){
     } else {
         alias T IType;
         int delegate(ref T) loopBody;
+        IType iStart, iEnd;
+        
         mixin(loopCtxMixin("LoopBlock3",`
         PLoopHelper context;
         `,`
-        blockSize=context.optimalBlockSize;
-        if (context.res!=0||context.exception!is null) return;
+        blockSize=this.context.optimalBlockSize;
+        if (this.context.res!=0||this.context.exception!is null) return;
         try{`,`
-        t1.stealLevel=context.stealLevel;
-        t2.stealLevel=context.stealLevel;
+        t1.stealLevel=this.context.stealLevel;
+        t2.stealLevel=this.context.stealLevel;
         `,`
-        auto iAtt=context.iStart;
-        auto r=context.loopBody(iAtt);
+        auto r=this.context.loopBody(idx);
         if (r!=0){
-            context.res=r;
+            this.context.res=r;
             return;
         }`,`
         }catch(Exception e){
-            context.exception=e;
+            this.context.exception=e;
         }
         `,`T`));
         this(T start, T end,size_t optimalBlockSize=1){
@@ -230,9 +231,9 @@ class PLoopHelper(T,int loopType){
     }
     void doLoop(LoopBlockT,LoopBodyT)(){
         try{
-            if (firstDistribution){
+            if (this.firstDistribution){
                 scope(exit){
-                    firstDistribution=0;
+                    this.firstDistribution=0;
                 }
                 static if (loopType==LoopType.Parallel){
                     auto tAtt=taskAtt.val;
@@ -257,9 +258,9 @@ class PLoopHelper(T,int loopType){
                         else if (nBsUp>0) --nBsUp;
                         LoopBlockT *looper=new LoopBlockT;
                         looper.context=this;
-                        looper.start=iStart;
-                        looper.end=iEnd;
-                        IType ii=iStart;
+                        looper.start=this.iStart;
+                        looper.end=this.iEnd;
+                        IType ii=this.iStart;
                         for (size_t i=0;i<nBsUp;++i){
                             auto blockAtt=looper.createNew();
                             blockAtt.start=ii;
@@ -280,11 +281,11 @@ class PLoopHelper(T,int loopType){
                             tasks[nBsUp+i]=t1;
                             tAtt.spawnTask0(t1,scheds[nBsUp+i]);
                         }
-                        auto rest=arr.length-nBsUp*nBsUp-nBsLow*nBsLow;
+                        auto rest=nEl-nBsUp*nBsUp-nBsLow*nBsLow;
                         if (nBsLow+nBsUp<scheds.length){
                             auto blockAtt=looper.createNew();
                             blockAtt.start=ii;
-                            blockAtt.end=arr.length;
+                            blockAtt.end=iEnd;
                             auto t1=Task("PLoopArrayInitial",&blockAtt.exec).appendOnFinish(&blockAtt.giveBack);
                             t1.stealLevel=0;
                             tasks[nBsUp+nBsLow]=t1;
@@ -367,13 +368,13 @@ class PLoopHelper(T,int loopType){
             return res;
         }
     } else {
-        int opApply(int delegate(T) loopBody){
+        int opApply(int delegate(ref T) loopBody){
             this.loopBody=loopBody;
-            if (end>optimalBlockSize+optimalBlockSize/2+start){
+            if (this.iEnd>this.optimalBlockSize+this.optimalBlockSize/2+this.iStart){
                 LoopBlock3.addGPool();
             }
             scope(exit) {
-                if (end>optimalBlockSize+optimalBlockSize/2+start)
+                if (this.iEnd>this.optimalBlockSize+this.optimalBlockSize/2+this.iStart)
                     LoopBlock3.rmGPool();
             }
             Task("PLoopArrayMain",&doLoop!(LoopBlock3,typeof(loopBody))).autorelease.executeNow();

@@ -109,7 +109,7 @@ struct SizeLikeNumber(int mean=4,int hardMin=0,int hardMax=-3){
         return res;
     }
     void desc(void delegate(cstring)sink){
-        writeOut(sink,val);
+        writeOut(sink,this.val);
     }
 }
 

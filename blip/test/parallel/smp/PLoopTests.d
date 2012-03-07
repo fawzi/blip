@@ -162,10 +162,38 @@ void testPLoopIter(T)(T[] arr1){
     delete copyArr;
 }
 
+void testLoopIRange(T,LoopType lType)(T from, SizeLikeNumber!() dim){
+    T to=cast(T)(from+dim.val);
+    if (to<from) {
+        foreach(i;loopIRange!(lType,T)(from,to)){
+            assert(0,"loopIRange iterated with to<=from");
+        }
+    } else {
+        scope arr=new int[](dim.val);
+        foreach (i;loopIRange!(lType,T)(from,to)){
+            if (i<from || i>to)
+                assert(0,"out of bounds");
+            if (atomicAdd(arr[i],1)!=0)
+                throw new Exception(collectAppender(delegate void(CharSink s){
+                    dumper(s)("testLoopIRange double loop for ")(i);
+                }));
+        }
+        foreach (i,v;arr){
+            if (v!=1){
+                throw new Exception(collectAppender(delegate void(CharSink s){
+                    dumper(s)("testLoopIRange missing loop for ")(i);
+                }));
+            }
+        }
+    }
+}
+
 /// all ploop tests (a template to avoid compilation and instantiation unless really requested)
 TestCollection pLoopTests(TestCollection superColl=null){
     TestCollection coll=new TestCollection("PLoop",__LINE__,__FILE__,superColl);
     autoInitTst.testNoFailF("testPLoopArray",&testPLoopArray!(int),__LINE__,__FILE__,coll);
     autoInitTst.testNoFailF("testPLoopIter",&testPLoopIter!(int),__LINE__,__FILE__,coll);
+    autoInitTst.testNoFailF("testSLoopIRange",&testLoopIRange!(int,LoopType.Sequential),__LINE__,__FILE__,coll);
+    autoInitTst.testNoFailF("testPLoopIRange",&testLoopIRange!(int,LoopType.Parallel),__LINE__,__FILE__,coll);
     return coll;
 }

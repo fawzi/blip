@@ -606,9 +606,9 @@ struct BulkArray(T){
             alias BulkArray LoopReturnType;
         }
     }
-    LoopReturnType!(loopType) loop(int loopType)(){
+    LoopReturnType!(loopType) loop(int loopType)(size_t blockSize=defaultOptimalBlockSize){
         static if ((loopType&1)!=0){
-            return PLoop(*this,optimalBlockSize);
+            return PLoop(*this,blockSize);
         } else {
             return *this;
         }
