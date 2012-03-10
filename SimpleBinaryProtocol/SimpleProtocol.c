@@ -693,7 +693,7 @@ int sbpReadChars64(socket_t sock,char* p,uint64_t *len){
     uint32_t kind;
     if (sbpReadHeader64(sock,&kind,&rcvLen)!=0) return 13;
     if (kind!=kind_char) {
-	printf("kind was %d and not %d, len:%ld\n",kind,kind_char,rcvLen);
+	printf("kind was %d and not %d, len:%llu\n",kind,kind_char,rcvLen);
 	return 10;
     }
     if (rcvLen<= *len){
@@ -1042,8 +1042,28 @@ int sbpListenForService32(socket_t *sock,char *service,uint32_t len){
     }
     lSock.nSockets=0;
     for (res=res0;res;res=res->ai_next){
+        int tmp = 1;
         //printf("will create socket(%ld,%ld,%ld)\n",res->ai_family,res->ai_socktype,res->ai_protocol);
         s=socket(res->ai_family,res->ai_socktype,res->ai_protocol);
+        // allow rapid reuse of address
+        if (setsockopt (s, SOL_SOCKET, SO_REUSEADDR, (char *) &tmp,
+                        (socklen_t) sizeof (tmp)) != 0)
+        {
+            perror("setsockopt(s, SOL_SOCKET, SO_REUSEADDR,[1],4)");
+        }
+#ifndef SOL_IPV6
+#define SOL_IPV6 IPPROTO_IPV6
+#endif
+#ifdef IPV6_V6ONLY
+        // avoid skipping IPv6 if IPv4 is bound first on linux
+        if (res->ai_addr->sa_family == AF_INET6
+            && setsockopt (s, SOL_IPV6, IPV6_V6ONLY, (char *) &tmp,
+                           (socklen_t) sizeof (tmp)) != 0)
+        {
+            perror("setsockopt(s, SOL_IPV6, IPV6_V6ONLY,[1],4)");
+        }
+#endif
+        
         if (s<0) continue;
         if (bind(s,res->ai_addr,res->ai_addrlen)!=0){
             close(s);
