@@ -1042,10 +1042,11 @@ int sbpListenForService32(socket_t *sock,char *service,uint32_t len){
     }
     lSock.nSockets=0;
     for (res=res0;res;res=res->ai_next){
-        int tmp = 1;
+        int tmp;
         //printf("will create socket(%ld,%ld,%ld)\n",res->ai_family,res->ai_socktype,res->ai_protocol);
         s=socket(res->ai_family,res->ai_socktype,res->ai_protocol);
         // allow rapid reuse of address
+        tmp=1;
         if (setsockopt (s, SOL_SOCKET, SO_REUSEADDR, (char *) &tmp,
                         (socklen_t) sizeof (tmp)) != 0)
         {
@@ -1056,6 +1057,7 @@ int sbpListenForService32(socket_t *sock,char *service,uint32_t len){
 #endif
 #ifdef IPV6_V6ONLY
         // avoid skipping IPv6 if IPv4 is bound first on linux
+        tmp = 1;
         if (res->ai_addr->sa_family == AF_INET6
             && setsockopt (s, SOL_IPV6, IPV6_V6ONLY, (char *) &tmp,
                            (socklen_t) sizeof (tmp)) != 0)
