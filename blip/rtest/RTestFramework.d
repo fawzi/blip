@@ -286,21 +286,30 @@ class TextController: TestControllerI{
     /// test will run a test
     bool willRunTest(SingleRTest test) {
         if (printLevel==PrintLevel.AllVerbose) {
-            synchronized(_writeLock){ progressLog("."); }
+            synchronized(_writeLock) {
+                progressLog(collectAppender(delegate void(CharSink s){
+                    s("test`"); s(test.testName); s("`"); s(" STARTED\n"); }));
+            }
         }
         return !isStopping;
     }
     /// test has skipped one test, should return wether the testing should continue
     bool testSkipped(SingleRTest test) {
         if (printLevel==PrintLevel.AllVerbose) {
-            synchronized(_writeLock) { progressLog("-"); }
+            synchronized(_writeLock) {
+                progressLog(collectAppender(delegate void(CharSink s){
+                    s("test`"); s(test.testName); s("`"); s(" SKIPPED\n"); }));
+            }
         }
         return !isStopping;
     }
     /// test has passed one test, should return wether the testing should continue
     bool testPassed(SingleRTest test) {
         if (printLevel==PrintLevel.AllVerbose) {
-            synchronized(_writeLock) { progressLog("+"); }
+            synchronized(_writeLock) {
+                progressLog(collectAppender(delegate void(CharSink s){
+                    s("test`"); s(test.testName); s("`"); s(" SUCCESS\n"); }));
+            }
         }
         return !isStopping;
     }
