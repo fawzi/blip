@@ -2,4 +2,8 @@
 ///
 /// wrapping of a tango module
 module blip.stdc.stdint;
-public import tango.stdc.stdint;
+version(Tango){
+    public import tango.stdc.stdint;
+} else {
+    public import core.stdc.stdint;
+}

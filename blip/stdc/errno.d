@@ -1,6 +1,7 @@
 /// errno functions
 /// mainly wrapping of a tango module
 module blip.stdc.errno;
+version(Tango){
 public import tango.stdc.errno: errno;
 import tango.core.Version;
 static if (Tango.Major==1){
@@ -9,6 +10,10 @@ static if (Tango.Major==1){
     public import tango.stdc.constants.errno;
 }
 public import tango.stdc.string: strlen;
+} else { // !version(Tango)
+public import core.stdc.errno;
+public import core.stdc.string: strlen;
+}
 import blip.Comp;
 static if (! is(typeof(strerror_d))){
     version (Windows){

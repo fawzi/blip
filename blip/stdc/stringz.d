@@ -2,4 +2,8 @@
 ///
 /// wrapping of a tango module
 module blip.stdc.stringz;
-public import tango.stdc.stringz;
+version(Tango) {
+    public import tango.stdc.stringz: toStringz;
+} else {
+    public import std.string: toStringz;
+}

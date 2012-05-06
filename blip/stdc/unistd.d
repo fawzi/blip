@@ -2,5 +2,8 @@
 ///
 /// wrapping of a tango module
 module blip.stdc.unistd;
-
-public import tango.stdc.posix.unistd: read, write, close, gethostname;
+version(Tango){
+    public import tango.stdc.posix.unistd: read, write, close, gethostname;
+} else {
+    public import core.sys.posix.unistd: read, write, close, gethostname;
+}

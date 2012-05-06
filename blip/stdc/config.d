@@ -5,4 +5,8 @@
 ///
 /// wrapping of a tango module
 module blip.stdc.config;
-public import tango.stdc.config;
+version(Tango){
+    public import tango.stdc.config;
+} else {
+    public import core.stdc.config;
+}
