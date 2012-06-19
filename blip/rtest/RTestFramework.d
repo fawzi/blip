@@ -17,7 +17,7 @@
 module blip.rtest.RTestFramework;
 import blip.math.random.Random: Random;
 public import blip.util.TemplateFu: nArgs,ctfe_i2a,ctfe_hasToken, ctfe_replaceToken;
-public import blip.core.Traits:isStaticArrayType;
+public import blip.core.Traits:isStaticArrayType, ctfe_i2a;
 import blip.io.BasicIO;
 public import blip.io.Console;
 public import blip.core.Variant:Variant;
