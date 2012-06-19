@@ -618,7 +618,7 @@ struct BulkArray(T){
             v=val;
     }
     /// implement an FIterator compliant interface on T*
-    final class FIteratorP:FIteratorI!(DynamicArrayType!(T)*){
+    /+ final DMD 1.074 BUG 8069 +/ class FIteratorP:FIteratorI!(DynamicArrayType!(T)*){
         BulkArray it;
         bool parallel;
         size_t optimalChunkSize;
