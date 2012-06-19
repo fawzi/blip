@@ -25,8 +25,8 @@ import blip.container.Cache;
 import blip.bindings.ev.Libev;
 import blip.core.Traits;
 import blip.util.TemplateFu;
-public import blip.bindings.ev.Libev: EV_PERIODIC_ENABLED, EV_STAT_ENABLED, EV_IDLE_ENABLED, EV_FORK_ENABLED,
-    EV_EMBED_ENABLED, EV_ASYNC_ENABLED, EV_WALK_ENABLED,ev_loop_t, EV_READ, EV_WRITE, ev_tstamp;
+public import blip.bindings.ev.Libev: EV_PERIODIC_ENABLE, EV_STAT_ENABLE, EV_IDLE_ENABLE, EV_FORK_ENABLE,
+    EV_EMBED_ENABLE, EV_ASYNC_ENABLE, EV_WALK_ENABLE,ev_loop_t, EV_READ, EV_WRITE, ev_tstamp;
 import blip.container.HashSet;
 version(TrackEvents){
     import blip.io.Console;
@@ -60,24 +60,24 @@ enum EVBACKEND: uint{
 // without "ev_" at the beginning, separated by commas
 string baseEvTypesStr(){
     string str="io,timer,";
-    static if (EV_PERIODIC_ENABLED){
+    static if (EV_PERIODIC_ENABLE){
         str~="periodic,";
     }
     str~="signal,child,";
-    static if (EV_STAT_ENABLED){
+    static if (EV_STAT_ENABLE){
         str~="stat,";
     }
-    static if (EV_IDLE_ENABLED){
+    static if (EV_IDLE_ENABLE){
         str~="idle,";
     }
     str~="prepare,check,";
-    static if (EV_FORK_ENABLED){
+    static if (EV_FORK_ENABLE){
         str~="fork,";
     }
-    static if (EV_EMBED_ENABLED){
+    static if (EV_EMBED_ENABLE){
         str~="embed,";
     }
-    static if (EV_ASYNC_ENABLED){
+    static if (EV_ASYNC_ENABLE){
         str~="async,";
     }
     return str;
@@ -219,7 +219,7 @@ static GenericWatcher `~kind~`Create(S...)(`~extraArgsDeclsComma~` S args){
 struct GenericWatcher{
     enum Kind{
         none=EV_UNDEF,
-        watcher=EV_READ|EV_WRITE|EV_TIMEOUT|EV_PERIODIC|EV_SIGNAL|EV_CHILD|EV_STAT|
+        watcher=EV_READ|EV_WRITE|EV_TIMER|EV_PERIODIC|EV_SIGNAL|EV_CHILD|EV_STAT|
             EV_IDLE|EV_PREPARE|EV_CHECK|EV_EMBED|EV_FORK|EV_ASYNC,
         watcher_list=EV_READ|EV_WRITE|EV_SIGNAL|EV_CHILD|EV_STAT,
         watcher_time=EV_TIMER|EV_PERIODIC,
@@ -403,7 +403,7 @@ struct GenericWatcher{
         ev_feed_event(loop,ptr!(ev_watcher)(),revents);
     }
 
-    static if (EV_ASYNC_ENABLED){
+    static if (EV_ASYNC_ENABLE){
         /// sends an asynchronous signal (this should be of type async)
         void asyncSend(ev_loop_t* loop){
             ev_async_send(loop,ptr!(ev_async)());
@@ -495,24 +495,24 @@ struct GenericWatcher{
 
     mixin(mixinInitAndCreate("io","int fd, int what","fd,what"));
     mixin(mixinInitAndCreate("timer","ev_tstamp after, ev_tstamp repeat","after,repeat"));
-    static if (EV_PERIODIC_ENABLED){
+    static if (EV_PERIODIC_ENABLE){
         mixin(mixinInitAndCreate("periodic","ev_tstamp ofs, ev_tstamp ival,periodicF res","ofs,ival,periodicF"));
     }
     mixin(mixinInitAndCreate("signal","int signum","signum"));
     mixin(mixinInitAndCreate("child","int pid, int trace","pid,trace"));
-    static if (EV_STAT_ENABLED){
+    static if (EV_STAT_ENABLE){
         mixin(mixinInitAndCreate("stat","char* path, ev_tstamp interval","path,interval"));
     }
-    static if (EV_IDLE_ENABLED){
+    static if (EV_IDLE_ENABLE){
         mixin(mixinInitAndCreate("idle","",""));
     }
     mixin(mixinInitAndCreate("prepare","",""));
     mixin(mixinInitAndCreate("check","",""));
     mixin(mixinInitAndCreate("embed","ev_loop_t* other","other"));
-    static if (EV_FORK_ENABLED){
+    static if (EV_FORK_ENABLE){
         mixin(mixinInitAndCreate("fork","",""));
     }
-    static if (EV_ASYNC_ENABLED){
+    static if (EV_ASYNC_ENABLE){
         mixin(mixinInitAndCreate("async","",""));
     }
 }

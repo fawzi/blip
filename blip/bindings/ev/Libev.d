@@ -6,7 +6,7 @@
 /// <http://auriga.wearlab.de/~alb/bola/> which is compatible with the apache license 2.0 used in
 /// this project.
 ///
-/// Based on version libev 3.9, the new *ENABLE from 4.0 are not yet there...
+/// Based on version libev 4.11
 ///
 /// author: fawzi
 ///
@@ -23,81 +23,182 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
+/++ exceprt from the porting section of libev/ev.pod:
+=head1 PORTING FROM LIBEV 3.X TO 4.X
+
+The major version 4 introduced some incompatible changes to the API.
+
+At the moment, the C<ev.h> header file provides compatibility definitions
+for all changes, so most programs should still compile. The compatibility
+layer might be removed in later versions of libev, so better update to the
+new API early than late.
+
+=over 4
+
+=item C<EV_COMPAT3> backwards compatibility mechanism
+
+The backward compatibility mechanism can be controlled by
+C<EV_COMPAT3>. See L<PREPROCESSOR SYMBOLS/MACROS> in the L<EMBEDDING>
+section.
+
+=item C<ev_default_destroy> and C<ev_default_fork> have been removed
+
+These calls can be replaced easily by their C<ev_loop_xxx> counterparts:
+
+     ev_loop_destroy (ev_default_loop_uc_());
+     ev_loop_fork (ev_default_loop());
+
+=item function/symbol renames
+
+A number of functions and symbols have been renamed:
+
+  ev_loop         => ev_run
+  EVLOOP_NONBLOCK => EV_RUN.NOWAIT
+  EVLOOP_ONESHOT  => EV_RUN.ONCE
+
+  ev_unloop       => ev_break
+  EVUNLOOP_CANCEL => EV_BREAK.CANCEL
+  EVUNLOOP_ONE    => EV_BREAK.ONE
+  EVUNLOOP_ALL    => EV_BREAK.ALL
+
+  EV_TIMEOUT      => EV_TIMER
+
+  ev_loop_count   => ev_iteration
+  ev_loop_depth   => ev_depth
+  ev_loop_verify  => ev_verify
+
+Most functions working on C<struct ev_loop> objects don't have an
+C<ev_loop_> prefix, so it was removed; C<ev_loop>, C<ev_unloop> and
+associated constants have been renamed to not collide with the C<struct
+ev_loop> anymore and C<EV_TIMER> now follows the same naming scheme
+as all other watcher types. Note that C<ev_loop_fork> is still called
+C<ev_loop_fork> because it would otherwise clash with the C<ev_fork>
+typedef.
+
+=item C<EV_MINIMAL> mechanism replaced by C<EV_FEATURES>
+
+The preprocessor symbol C<EV_MINIMAL> has been replaced by a different
+mechanism, C<EV_FEATURES>. Programs using C<EV_MINIMAL> usually compile
+and work, but the library code will of course be larger.
+
++/
 module blip.bindings.ev.Libev;
 import blip.stdc.signal;
 import blip.Comp;
-extern (C){
-    //align (4):
 
-    // only EV_MULTIPLICITY==1, EV_PROTOTYPES==1 is supported...
-
-    version(EV_MANUAL_VERSIONS){
-        version (EV_PERIODIC_ENABLE ){  enum:bool { EV_PERIODIC_ENABLED =true  }
-        } else {                        enum:bool { EV_PERIODIC_ENABLED =false }}
-        version (EV_STAT_ENABLE     ){  enum:bool { EV_STAT_ENABLED     =true  }
-        } else {                        enum:bool { EV_STAT_ENABLED     =false }}
-        version (EV_IDLE_ENABLE     ){  enum:bool { EV_IDLE_ENABLED     =true  }
-        } else {                        enum:bool { EV_IDLE_ENABLED     =false }}
-        version (EV_FORK_ENABLE     ){  enum:bool { EV_FORK_ENABLED     =true  }
-        } else {                        enum:bool { EV_FORK_ENABLED     =false }}
-        version (EV_EMBED_ENABLE    ){  enum:bool { EV_EMBED_ENABLED    =true  }
-        } else {                        enum:bool { EV_EMBED_ENABLED    =false }}
-        version (EV_ASYNC_ENABLE    ){  enum:bool { EV_ASYNC_ENABLED    =true  }
-        } else {                        enum:bool { EV_ASYNC_ENABLED    =false }}
-        version (EV_WALK_ENABLE     ){  enum:bool { EV_WALK_ENABLED     =true  }
-        } else {                        enum:bool { EV_WALK_ENABLED     =false }}
-    } else version (darwin){
-        enum:bool {
-            EV_PERIODIC_ENABLED=true,
-            EV_STAT_ENABLED=true,
-            EV_IDLE_ENABLED=true,
-            EV_FORK_ENABLED=true,
-            EV_EMBED_ENABLED=true,
-            EV_ASYNC_ENABLED=true,
-            EV_WALK_ENABLED=false,
-        }
-    } else version (linux){
-        enum:bool {
-            EV_PERIODIC_ENABLED=true,
-            EV_STAT_ENABLED=true,
-            EV_IDLE_ENABLED=true,
-            EV_FORK_ENABLED=true,
-            EV_EMBED_ENABLED=true,
-            EV_ASYNC_ENABLED=true,
-            EV_WALK_ENABLED=false,
-        }
-    } else {
-        static assert(0,"system not supported, set the EV_*_ENABLED");
+version(EV_MANUAL_VERSIONS){
+    version(EV_FEATURE_CODE    ){ enum:bool {EV_FEATURE_CODE    =true  }
+    } else {                      enum:bool {EV_FEATURE_CODE    =false }}
+    version(EV_FEATURE_DATA    ){ enum:bool {EV_FEATURE_DATA    =true  }
+    } else {                      enum:bool {EV_FEATURE_DATA    =false }}
+    version(EV_FEATURE_CONFIG  ){ enum:bool {EV_FEATURE_CONFIG  =true  }
+    } else {                      enum:bool {EV_FEATURE_CONFIG  =false }}
+    version(EV_FEATURE_API     ){ enum:bool {EV_FEATURE_API     =true  }
+    } else {                      enum:bool {EV_FEATURE_API     =false }}
+    version(EV_FEATURE_WATCHERS){ enum:bool {EV_FEATURE_WATCHERS=true  }
+    } else {                      enum:bool {EV_FEATURE_WATCHERS=false }}
+    version(EV_FEATURE_BACKENDS){ enum:bool {EV_FEATURE_BACKENDS=true  }
+    } else {                      enum:bool {EV_FEATURE_BACKENDS=false }}
+    version(EV_FEATURE_OS      ){ enum:bool {EV_FEATURE_OS      =true  }
+    } else {                      enum:bool {EV_FEATURE_OS      =false }}
+} else version (darwin){
+    enum:bool {
+        EV_FEATURE_CODE    = true,
+        EV_FEATURE_DATA    = true,
+        EV_FEATURE_CONFIG  = true,
+        EV_FEATURE_API     = true,
+        EV_FEATURE_WATCHERS= true,
+        EV_FEATURE_BACKENDS= true,
+        EV_FEATURE_OS      = true,
     }
-    alias sig_atomic_t EV_ATOMIC_T;
-
-    enum: int
-    {
-        EV_UNDEF    = 0xFFFFFFFF, // guaranteed to be invalid
-        EV_NONE     =       0x00, // no events
-        EV_READ     =       0x01, // ev_io detected read will not block
-        EV_WRITE    =       0x02, // ev_io detected write will not block
-        EV_IO       = EV_READ|EV_WRITE,
-        EV_IOFDSET  =       0x80, // internal use only
-        EV_TIMEOUT  = 0x00000100, // timer timed out
-        EV_TIMER    = EV_TIMEOUT,
-        EV_PERIODIC = 0x00000200, // periodic timer timed out
-        EV_SIGNAL   = 0x00000400, // signal was received
-        EV_CHILD    = 0x00000800, // child/pid had status change
-        EV_STAT     = 0x00001000, // stat data changed
-        EV_IDLE     = 0x00002000, // event loop is idling
-        EV_PREPARE  = 0x00004000, // event loop about to poll
-        EV_CHECK    = 0x00008000, // event loop finished poll
-        EV_EMBED    = 0x00010000, // embedded event loop needs sweep
-        EV_FORK     = 0x00020000, // event loop resumed in child
-        EV_ASYNC    = 0x00040000, // async intra-loop signal */
-        EV_CUSTOM   = 0x01000000, // for use by user code */
-        EV_ERROR    = 0x80000000, // sent when an error occurs
+} else version (linux){
+    enum:bool {
+        EV_FEATURE_CODE    = true,
+        EV_FEATURE_DATA    = true,
+        EV_FEATURE_CONFIG  = true,
+        EV_FEATURE_API     = true,
+        EV_FEATURE_WATCHERS= true,
+        EV_FEATURE_BACKENDS= true,
+        EV_FEATURE_OS      = true,
     }
+} else {
+    static assert(0,"system not supported, set the EV_*_ENABLE");
+}
+enum { EV_FEATURES=
+	(EV_FEATURE_CODE    ?  1 : 0)+
+	(EV_FEATURE_DATA    ?  2 : 0)+
+	(EV_FEATURE_CONFIG  ?  4 : 0)+
+	(EV_FEATURE_API     ?  8 : 0)+
+	(EV_FEATURE_WATCHERS? 16 : 0)+
+	(EV_FEATURE_BACKENDS? 32 : 0)+
+	(EV_FEATURE_OS      ? 64 : 0)
+}
 
-    alias double ev_tstamp;
+/* these priorities are inclusive, higher priorities will be invoked earlier */
 
-    struct ev_loop_t;
+enum { EV_MINPRI = (EV_FEATURE_CONFIG ? -2 : 0) }
+enum { EV_MAXPRI = (EV_FEATURE_CONFIG ? +2 : 0) }
+
+enum { EV_MULTIPLICITY    = true }
+enum { EV_PERIODIC_ENABLE = EV_FEATURE_WATCHERS }
+enum { EV_STAT_ENABLE     = EV_FEATURE_WATCHERS }
+enum { EV_PREPARE_ENABLE  = EV_FEATURE_WATCHERS }
+enum { EV_CHECK_ENABLE    = EV_FEATURE_WATCHERS }
+enum { EV_IDLE_ENABLE     = EV_FEATURE_WATCHERS }
+enum { EV_FORK_ENABLE     = EV_FEATURE_WATCHERS }
+enum { EV_CLEANUP_ENABLE  = EV_FEATURE_WATCHERS }
+version(Windows) {
+    enum { EV_CHILD_ENABLE = false }
+} else {
+    enum { EV_CHILD_ENABLE = EV_FEATURE_WATCHERS }
+}
+enum { EV_SIGNAL_ENABLE   = EV_FEATURE_WATCHERS || EV_CHILD_ENABLE }
+
+enum { EV_ASYNC_ENABLE = EV_FEATURE_WATCHERS }
+enum { EV_EMBED_ENABLE = EV_FEATURE_WATCHERS }
+
+enum { EV_WALK_ENABLE = 0 /* not yet */ }
+
+/*****************************************************************************/
+
+
+alias sig_atomic_t EV_ATOMIC_T;
+
+enum: int {
+    EV_UNDEF    = 0xFFFFFFFF, // guaranteed to be invalid
+    EV_NONE     =       0x00, // no events
+    EV_READ     =       0x01, // ev_io detected read will not block
+    EV_WRITE    =       0x02, // ev_io detected write will not block
+    EV_IO       = EV_READ|EV_WRITE,
+    EV_IOFDSET  =       0x80, // internal use only
+    EV_TIMER    = 0x00000100, // timer timed out
+    EV_PERIODIC = 0x00000200, // periodic timer timed out
+    EV_SIGNAL   = 0x00000400, // signal was received
+    EV_CHILD    = 0x00000800, // child/pid had status change
+    EV_STAT     = 0x00001000, // stat data changed
+    EV_IDLE     = 0x00002000, // event loop is idling
+    EV_PREPARE  = 0x00004000, // event loop about to poll
+    EV_CHECK    = 0x00008000, // event loop finished poll
+    EV_EMBED    = 0x00010000, // embedded event loop needs sweep
+    EV_FORK     = 0x00020000, // event loop resumed in child
+    EV_CLEANUP  = 0x00040000, // event loop resumed in child
+    EV_ASYNC    = 0x00080000, // async intra-loop signal
+    EV_CUSTOM   = 0x01000000, // for use by user code
+    EV_ERROR    = 0x80000000, // sent when an error occurs
+}
+
+version (EV_COMPAT3) {
+    enum :int { EV_TIMEOUT  = EV_TIMER } // deprecated
+}    
+
+alias double ev_tstamp;
+
+struct ev_loop_t; // broken in dmd 1.074
+
+enum EV_VERSION {
+    MAJOR=4,
+    MINOR=11
 }
 
 template callBackF(TP){
@@ -112,11 +213,6 @@ template EV_COMMON()
 template EV_CB_DECLARE(TP)
 {
     callBackF!(TP) cb;
-}
-
-enum:int { // this is on osx, amke it platform dependent??
-    EV_MINPRI= -2,
-    EV_MAXPRI= +2,
 }
 
 template EV_WATCHER(TP)
@@ -173,7 +269,7 @@ extern(C){
         ev_tstamp repeat; // rw
     }
 
-    static if (EV_PERIODIC_ENABLED){
+    static if (EV_PERIODIC_ENABLE){
         alias ev_tstamp function(ev_periodic *w,ev_tstamp now) periodicF;
         /** invoked at some specific time, possibly repeating at regular intervals (based on UTC) */
         /** revent EV_PERIODIC */
@@ -207,7 +303,7 @@ extern(C){
         // macros from sys/wait.h
     }
 
-    static if (EV_STAT_ENABLED)
+    static if (EV_STAT_ENABLE)
     {
 
         version (Windows) // alias _stati64 ev_statdata;
@@ -241,7 +337,7 @@ extern(C){
         }
     }
 
-    static if (EV_IDLE_ENABLED)
+    static if (EV_IDLE_ENABLE)
     {
         /** invoked when the nothing else needs to be done, keeps the process from blocking */
         /** revent EV_IDLE */
@@ -266,16 +362,28 @@ extern(C){
         mixin EV_WATCHER!(ev_check*);
     }
 
-    static if (EV_FORK_ENABLED)
+    static if (EV_FORK_ENABLE)
     {
         /** the callback gets invoked before check in the child process when a fork was detected */
+	/* revent EV_FORK */
         struct ev_fork
         {
             mixin EV_WATCHER!(ev_fork*);
         }
     }
 
-    static if (EV_EMBED_ENABLED)
+    static if (EV_CLEANUP_ENABLE){
+	/* is invoked just before the loop gets destroyed */
+	/* revent EV_CLEANUP */
+	struct ev_cleanup
+	{
+	    mixin EV_WATCHER!(ev_cleanup*);
+	}
+    }
+
+
+
+    static if (EV_EMBED_ENABLE)
     {
         /** used to embed an event loop inside another */
         /** the callback gets invoked when the event loop has handled events, and can be 0 */
@@ -290,10 +398,13 @@ extern(C){
             ev_periodic periodic; // unused
             ev_idle idle;         // unused
             ev_fork fork;         // unused
+	    static if (EV_CLEANUP_ENABLE){
+		ev_cleanup cleanup;    /* unused */
+	    }
         }
     }
 
-    static if (EV_ASYNC_ENABLED){
+    static if (EV_ASYNC_ENABLE){
         /* invoked when somebody calls ev_async_send on the watcher */
         /* revent EV_ASYNC */
         struct ev_async
@@ -314,21 +425,24 @@ extern(C){
         ev_periodic periodic;
         ev_signal signal;
         ev_child child;
-        static if (EV_STAT_ENABLED){
+        static if (EV_STAT_ENABLE){
             ev_stat stat;
         }
-        static if (EV_IDLE_ENABLED){
+        static if (EV_IDLE_ENABLE){
             ev_idle idle;
         }
         ev_prepare prepare;
         ev_check check;
-        static if (EV_FORK_ENABLED){
+        static if (EV_FORK_ENABLE){
             ev_fork fork;
         }
-        static if (EV_EMBED_ENABLED){
+	static if (EV_CLEANUP_ENABLE){
+	    ev_cleanup cleanup;
+	}
+        static if (EV_EMBED_ENABLE){
             ev_embed embed;
         }
-        static if (EV_ASYNC_ENABLED){
+        static if (EV_ASYNC_ENABLE){
             ev_async async;
         }
     }
@@ -344,7 +458,8 @@ extern(C){
         EVFLAG_FORKCHECK  = 0x02000000, // check for a fork in each iteration
         /* debugging/feature disable */
         EVFLAG_NOINOTIFY  = 0x00100000, /* do not attempt to use inotify */
-        EVFLAG_SIGNALFD   = 0x00200000, /* attempt to use signalfd */
+	EVFLAG_SIGNALFD   = 0x00200000, /* attempt to use signalfd */
+	EVFLAG_NOSIGMASK = 0x00400000U, /* avoid modifying the signal mask */
         // method bits to be ored together
         EVBACKEND_SELECT  = 0x00000001, // about anywhere
         EVBACKEND_POLL    = 0x00000002, // !win
@@ -352,7 +467,8 @@ extern(C){
         EVBACKEND_KQUEUE  = 0x00000008, // bsd
         EVBACKEND_DEVPOLL = 0x00000010, // solaris 8 / NYI
         EVBACKEND_PORT    = 0x00000020, // solaris 10
-        EVBACKEND_ALL     = 0x0000003F,
+	EVBACKEND_ALL     = 0x0000003F, // all known backends
+	EVBACKEND_MASK    = 0x0000FFFFU  // all future backends
     }
 
     int ev_version_major();
@@ -380,66 +496,70 @@ extern(C){
     // (such as failed select, poll, epoll_wait)
     void ev_set_syserr_cb(errF);
 
-    extern ev_loop_t* ev_default_loop_ptr;
+    
+    /* the default loop is the only one that handles signals and child watchers */
+    /* you can call this as often as you like */
+    ev_loop_t *ev_default_loop (uint flags= 0);
     ev_loop_t* ev_default_loop_init(uint flags);
 
 }
 
+version(EV_API_STATIC)
+    ev_loop_t* ev_default_loop_ptr;
+else
+    extern(C) extern ev_loop_t* ev_default_loop_ptr;
+
 alias extern(C) void function(ev_loop_t*,ev_watcher*, int) watcherCbF;
 
 // d functions
-ev_loop_t*ev_default_loop_uc()
+ev_loop_t*ev_default_loop_uc_()
 {
-  return ev_default_loop_ptr;
+    return ev_default_loop_ptr;
 }
-/* the default loop is the only one that handles signals and child watchers */
-/* you can call this as often as you like */
-ev_loop_t*ev_default_loop (uint flags)
+
+int ev_is_default_loop(ev_loop_t *loop)
 {
-  ev_loop_t*loop = ev_default_loop_uc ();
-  if (loop is null)
-        loop = ev_default_loop_init (flags);
-  return loop;
+    return loop == ev_default_loop();
 }
 
 extern(C){
     // create and destroy alternative loops that don't handle signals
     ev_loop_t* ev_loop_new(uint flags);
-    void ev_loop_destroy(ev_loop_t*);
-    void ev_loop_fork(ev_loop_t*);
+    /* destroy event loops, also works for the default loop */
+    void ev_loop_destroy (ev_loop_t *);
 
     /* time w.r.t. timers and the eventloop, updated after each poll */
     ev_tstamp ev_now(ev_loop_t*);
     int ev_is_default_loop(ev_loop_t* loop){
-        return loop is ev_default_loop_ptr;
+        return loop is ev_default_loop();
     }
-    void ev_default_destroy();/* destroy the default loop */
     /* this needs to be called after fork, to duplicate the default loop */
     /* if you create alternative loops you have to call ev_loop_fork on them */
     /* you can call it in either the parent or the child */
     /* you can actually call it at any time, anywhere :) */
-    void ev_default_fork();
+    void ev_loop_fork(ev_loop_t*);
     uint ev_backend(ev_loop_t*);
     void ev_now_update(ev_loop_t*); /* update event loop time */
 
-    static if (EV_WALK_ENABLED){
+    static if (EV_WALK_ENABLE){
         /* walk (almost) all watchers in the loop of a given type, invoking the */
         /* callback on every such watcher. The callback might stop the watcher, */
         /* but do nothing else with the loop */
         void ev_walk (ev_loop_t* loop, int types, void function(ev_loop_t* loop, int type, void *w));
     }
 
-    enum
-    {
-        EVLOOP_NONBLOCK = 1, // do not block/wait
-        EVLOOP_ONESHOT  = 2, // block *once* only
-        EVUNLOOP_CANCEL = 0, // undo unloop
-        EVUNLOOP_ONE    = 1, // unloop once
-        EVUNLOOP_ALL    = 2, // unloop all loops
+    enum EV_RUN {
+	NO_WAIT = 1,
+	ONCE = 2,
+    }
+    enum EV_BREAK {
+        CANCEL = 0, // undo unloop
+        ONE    = 1, // unloop once
+        ALL    = 2, // unloop all loops
     }
 
-    void ev_loop(ev_loop_t*, int flags);
-    void ev_unloop(ev_loop_t*, int); /* set to 1 to break out of event loop, set to 2 to break out of all event loops */
+    void ev_run(ev_loop_t*, int flags=0);
+    void ev_break(ev_loop_t*, int=EV_BREAK.ONE); /* set to 1 to break out of event loop, set to 2 to break out of all event loops */
 
     /*
      * ref/unref can be used to add or remove a refcount on the mainloop. every watcher
@@ -450,6 +570,33 @@ extern(C){
     void ev_unref(ev_loop_t*);
     alias extern(C) void function(int revents, void* arg) onceF;
     void ev_once(ev_loop_t*, int fd, int events, ev_tstamp timeout,onceF, void* arg);
+
+    static if (EV_FEATURE_API) {
+	uint ev_iteration (ev_loop_t*); /* number of loop iterations */
+	uint ev_depth     (ev_loop_t*); /* #ev_loop enters - #ev_loop leaves */
+	void ev_verify    (ev_loop_t*); /* abort if loop data corrupted */
+
+	void ev_set_io_collect_interval (ev_loop_t*, ev_tstamp interval); /* sleep at least this time, default 0 */
+	void ev_set_timeout_collect_interval (ev_loop_t*, ev_tstamp interval); /* sleep at least this time, default 0 */
+
+	/* advanced stuff for threading etc. support, see docs */
+	void ev_set_userdata (ev_loop_t*, void *data);
+	void *ev_userdata (ev_loop_t*);
+	alias extern(C) void function(ev_loop_t*) invoke_pending_cb;
+	void ev_set_invoke_pending_cb (ev_loop_t*, invoke_pending_cb cb);
+	alias extern(C) void function(ev_loop_t*) release_cb;
+	alias extern(C) void function(ev_loop_t*) acquire_cb;
+	void ev_set_loop_release_cb (ev_loop_t*, release_cb release, acquire_cb acquire);
+
+	uint ev_pending_count (ev_loop_t*); /* number of pending events, if any */
+	void ev_invoke_pending (ev_loop_t*); /* invoke all pending watchers */
+
+	/*
+	 * stop/start the timer handling.
+	 */
+	void ev_suspend (ev_loop_t*);
+	void ev_resume  (ev_loop_t*);
+    }
 }
 
 /* these may evaluate ev multiple times, and the other arguments at most once */
@@ -474,7 +621,7 @@ void ev_timer_set(ev_timer* w, ev_tstamp after, ev_tstamp repeat)
     w.repeat = repeat;
 }
 
-static if (EV_PERIODIC_ENABLED){
+static if (EV_PERIODIC_ENABLE){
     void ev_periodic_set(ev_periodic* w, ev_tstamp ofs, ev_tstamp ival,periodicF res)
     {
         w.offset = ofs;
@@ -494,7 +641,7 @@ void ev_child_set(ev_child* w, int pid, int trace)
     w.flags = !!trace;
 }
 
-static if (EV_STAT_ENABLED){
+static if (EV_STAT_ENABLE){
     void ev_stat_set(ev_stat* w, char* path, ev_tstamp interval)
     {
         w.path = path;
@@ -503,7 +650,7 @@ static if (EV_STAT_ENABLED){
     }
 }
 
-static if (EV_IDLE_ENABLED){
+static if (EV_IDLE_ENABLE){
     void ev_idle_set(ev_idle* w)
     {
     }
@@ -521,17 +668,16 @@ void ev_embed_set(ev_embed* w, ev_loop_t* other)
     w.other = other;
 }
 
-static if (EV_FORK_ENABLED){
+static if (EV_FORK_ENABLE){
     void ev_fork_set(ev_fork* w)
     {
     }
 }
-
-static if (EV_ASYNC_ENABLED){
-    extern(D) void ev_async_set(ev_async* w)
-    {
-        w.sent=0;
-    }
+static if (EV_CLEANUP_ENABLE){
+    extern(D) void ev_cleanup_set(ev_cleanup * w) { }
+}
+static if (EV_ASYNC_ENABLE){
+    extern(D) void ev_async_set(ev_async* w) { }
 }
 
 alias callBackF!(ev_io*) ioCbF;
@@ -548,7 +694,7 @@ void ev_timer_init(ev_timer* w, timerCbF cb, ev_tstamp after, ev_tstamp repeat)
     ev_timer_set(w, after, repeat);
 }
 
-static if (EV_PERIODIC_ENABLED){
+static if (EV_PERIODIC_ENABLE){
     alias callBackF!(ev_periodic*) periodicCbF;
     void ev_periodic_init(ev_periodic* w, periodicCbF cb,
             ev_tstamp ofs, ev_tstamp ival,
@@ -573,7 +719,7 @@ void ev_child_init(ev_child* w, childCbF cb,
     ev_child_set(w, pid, trace);
 }
 
-static if (EV_STAT_ENABLED){
+static if (EV_STAT_ENABLE){
     alias callBackF!(ev_stat*) statCbF;
     void ev_stat_init(ev_stat* w, statCbF cb,
             char* path, ev_tstamp interval)
@@ -583,7 +729,7 @@ static if (EV_STAT_ENABLED){
     }
 }
 
-static if (EV_IDLE_ENABLED){
+static if (EV_IDLE_ENABLE){
     alias callBackF!(ev_idle*) idleCbF;
     void ev_idle_init(ev_idle* w, idleCbF cb)
     {
@@ -613,7 +759,7 @@ void ev_embed_init(ev_embed* w, embedCbF cb,
     ev_embed_set(w, other);
 }
 
-static if (EV_FORK_ENABLED){
+static if (EV_FORK_ENABLE){
     alias callBackF!(ev_fork*) forkCbF;
     void ev_fork_init(ev_fork* w, forkCbF cb)
     {
@@ -621,9 +767,17 @@ static if (EV_FORK_ENABLED){
         ev_fork_set(w);
     }
 }
-static if (EV_ASYNC_ENABLED){
+static if (EV_CLEANUP_ENABLE){
+    alias callBackF!(ev_cleanup*) cleanupCbF;
+    void ev_cleanup_init(ev_cleanup* w, cleanupCbF cb)
+    {
+        ev_init!(ev_cleanup*)(w, cb);
+        ev_cleanup_set(w);
+    }
+}
+static if (EV_ASYNC_ENABLE){
     alias callBackF!(ev_async*) asyncCbF;
-    void ev_fork_init(ev_async* w, asyncCbF cb){
+    void ev_async_init(ev_async* w, asyncCbF cb){
         ev_init!(ev_async*)(w, cb);
         ev_async_set(w);
     }
@@ -668,7 +822,10 @@ void ev_set_cb(TP)(TP w, callBackF!(TP) cb){
 extern(C){
     void ev_feed_event(ev_loop_t*, void *w, int revents);
     void ev_feed_fd_event(ev_loop_t*, int fd, int revents);
-    void ev_feed_signal_event (ev_loop_t*, int signum);
+    static if (EV_SIGNAL_ENABLE) {
+	void ev_feed_signal (int signum);
+	void ev_feed_signal_event (ev_loop_t*, int signum);
+    }
     void ev_invoke(ev_loop_t*, void *w, int revents);
     int  ev_clear_pending(ev_loop_t*, void *w);
 
@@ -682,52 +839,72 @@ extern(C){
     /* return remaining time */
     ev_tstamp ev_timer_remaining (ev_loop_t*, ev_timer *w);
 
-    static if (EV_PERIODIC_ENABLED){
+    static if (EV_PERIODIC_ENABLE){
         void ev_periodic_start(ev_loop_t*, ev_periodic *w);
         void ev_periodic_stop(ev_loop_t*, ev_periodic *w);
         void ev_periodic_again(ev_loop_t*, ev_periodic *w);
     }
 
     /* only supported in the default loop */
-    void ev_signal_start(ev_loop_t*, ev_signal *w);
-    void ev_signal_stop(ev_loop_t*, ev_signal *w);
+    static if (EV_SIGNAL_ENABLE) {
+	void ev_signal_start(ev_loop_t*, ev_signal *w);
+	void ev_signal_stop(ev_loop_t*, ev_signal *w);
+    }
 
     /* only supported in the default loop */
-    void ev_child_start(ev_loop_t*, ev_child *w);
-    void ev_child_stop(ev_loop_t*, ev_child *w);
-
-    static if (EV_STAT_ENABLED){
+    static if (EV_CHILD_ENABLE) {
+	void ev_child_start(ev_loop_t*, ev_child *w);
+	void ev_child_stop(ev_loop_t*, ev_child *w);
+    }
+    static if (EV_STAT_ENABLE){
         void ev_stat_start(ev_loop_t*, ev_stat *w);
         void ev_stat_stop(ev_loop_t*, ev_stat *w);
         void ev_stat_stat(ev_loop_t*, ev_stat *w);
     }
 
-    static if (EV_IDLE_ENABLED){
+    static if (EV_IDLE_ENABLE){
         void ev_idle_start(ev_loop_t*, ev_idle *w);
         void ev_idle_stop(ev_loop_t*, ev_idle *w);
     }
-
-    void ev_prepare_start(ev_loop_t*, ev_prepare *w);
-    void ev_prepare_stop(ev_loop_t*, ev_prepare *w);
-
+    static if (EV_PREPARE_ENABLE){
+	void ev_prepare_start(ev_loop_t*, ev_prepare *w);
+	void ev_prepare_stop(ev_loop_t*, ev_prepare *w);
+    }
     void ev_check_start(ev_loop_t*, ev_check *w);
     void ev_check_stop(ev_loop_t*, ev_check *w);
 
-    static if (EV_FORK_ENABLED){
+    static if (EV_FORK_ENABLE){
         void ev_fork_start(ev_loop_t*, ev_fork *w);
         void ev_fork_stop(ev_loop_t*, ev_fork *w);
     }
-
-    static if (EV_EMBED_ENABLED)
+    static if (EV_CLEANUP_ENABLE){
+	void ev_cleanup_start(ev_loop_t*, ev_cleanup *w);
+	void ev_cleanup_stop(ev_loop_t*, ev_cleanup *w);
+    }
+    static if (EV_EMBED_ENABLE)
     {
         // only supported when loop to be embedded is in fact embeddable
         void ev_embed_start(ev_loop_t*, ev_embed *w);
         void ev_embed_stop(ev_loop_t*, ev_embed *w);
         void ev_embed_sweep(ev_loop_t*, ev_embed *w);
     }
-    static if (EV_ASYNC_ENABLED){
+    static if (EV_ASYNC_ENABLE){
         void ev_async_start(ev_loop_t*, ev_async *w);
         void ev_async_stop(ev_loop_t*, ev_async *w);
         void ev_async_send(ev_loop_t*, ev_async *w);
+    }
+}
+
+version(EV_COMPAT3) {
+    extern(C) void ev_loop_fork(ev_loop_t*);
+    
+    static if (EV_PROTOTYPES) {
+	extern(D) void ev_default_destroy () { ev_loop_destroy (ev_default_loop()); }
+	extern(D) void ev_default_fork    () { ev_loop_fork    (ev_default_loop()); }
+	static if (EV_FEATURE_API) {
+	    extern(D) uint ev_loop_count  (ev_loop_t *loop) { return ev_iteration  (loop); }
+	    extern(D) uint ev_loop_depth  (ev_loop_t *loop) { return ev_depth      (loop); }
+	    extern(D) void         ev_loop_verify (ev_loop_t *loop) {        ev_verify     (loop); }
+	}
     }
 }

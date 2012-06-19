@@ -84,7 +84,7 @@ class EventWatcher:LoopHandlerI{
         DestroyLoop=1,
         LoopRunning=2,
     }
-    static assert(EV_ASYNC_ENABLED,"ev_async is needed for proper functioning"); // builds a version that uses a periodic instead?
+    static assert(EV_ASYNC_ENABLE,"ev_async is needed for proper functioning"); // builds a version that uses a periodic instead?
     Deque!(GenericWatcher) watchersToAdd;
     Deque!(void delegate()) actionsToDo;
     ev_loop_t*loop_;
@@ -173,7 +173,7 @@ class EventWatcher:LoopHandlerI{
             asyncWatcher.start(loop);
 
             // now wait for events to arrive
-            ev_loop (loop, 0);
+            ev_run (loop, 0);
 
             synchronized(this){
                 flags = flags & (~Flags.LoopRunning);
@@ -208,7 +208,7 @@ class EventWatcher:LoopHandlerI{
         Semaphore sem;
         auto tAtt=taskAtt.val;
         void stopOldLoop(){
-            ev_unloop(loop,EVUNLOOP_ALL);
+            ev_break(loop,EV_BREAK.ALL);
             if (sem){
                 sem.notify();
             } else {
