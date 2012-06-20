@@ -22,6 +22,7 @@ module blip.bindings.hwloc.bitmap;
 version(noHwloc){} else {
 import blip.stdc.config;
 import blip.stdc.stringz;
+import stdlib=blip.stdc.stdlib;
 import blip.Comp;
 /** \defgroup hwlocality_bitmap The Bitmap API
  *
@@ -70,19 +71,16 @@ struct hwloc_bitmap_t{
      * \return the number of character that were actually written if not truncating,
      * or that would have been written  (not including the ending \\0).
      */
-    int snprintf(string s){
+    int snprintf(char[] s){
         return hwloc_bitmap_snprintf(cast(char*)s.ptr,cast(size_t)s.length, *this);
     }
     
-    /** \brief Stringify a bitmap into a newly allocated string.
-     *
-     * \return the number of character that were actually written
-     * (not including the ending \\0).
-     */
     string toString(){
         char *res;
         auto len=hwloc_bitmap_asprintf(&res, *this);
-        return res[0..len];
+        auto s=res[0..len].dup;
+	stdlib.free(res);
+	return s;
     }
 
     /** \brief Parse a bitmap string.
@@ -94,6 +92,38 @@ struct hwloc_bitmap_t{
       return nRead;
     }
 
+    /** \brief Stringify a bitmap in the list format.
+    *
+    * Lists are comma-separated indexes or ranges.
+    * Ranges are dash separated indexes.
+    * The last range may not have a ending indexes if the bitmap is infinite.
+    *
+    * Up to \p buflen characters may be written in buffer \p buf.
+    *
+    * If \p buflen is 0, \p buf may safely be \c NULL.
+    *
+    * \return the number of character that were actually written if not truncating,
+    * or that would have been written (not including the ending \\0).
+    */
+    int listSprintf(string s){
+    	return hwloc_bitmap_list_snprintf(s.ptr, s.length, *this);
+    }
+
+    /** \brief Stringify a bitmap into a newly allocated list string.
+     */
+    cstring listString(){
+        char *res;
+        auto len = hwloc_bitmap_list_asprintf(&res, *this);
+	auto s=res[0..len].dup;
+	stdlib.free(res);
+	return s;
+    }
+
+    /** \brief Parse a list string and stores it in bitmap \p bitmap.
+     */
+    int fromListString(cstring s){
+	return hwloc_bitmap_list_sscanf(*this, toStringz(s));
+    }
 
     /** \brief
      *  Primitives & macros for building, modifying and consulting "sets" of cpus.
@@ -288,6 +318,29 @@ int hwloc_bitmap_asprintf(char ** strp, hwloc_bitmap_t set);
  * Must start and end with a digit.
  */
 int hwloc_bitmap_sscanf(hwloc_bitmap_t,char * string);
+
+/** \brief Stringify a bitmap in the list format.
+ *
+ * Lists are comma-separated indexes or ranges.
+ * Ranges are dash separated indexes.
+ * The last range may not have a ending indexes if the bitmap is infinite.
+ *
+ * Up to \p buflen characters may be written in buffer \p buf.
+ *
+ * If \p buflen is 0, \p buf may safely be \c NULL.
+ *
+ * \return the number of character that were actually written if not truncating,
+ * or that would have been written (not including the ending \\0).
+ */
+int hwloc_bitmap_list_snprintf(char *buf, size_t buflen, hwloc_const_bitmap_t bitmap);
+
+/** \brief Stringify a bitmap into a newly allocated list string.
+ */
+int hwloc_bitmap_list_asprintf(char ** strp, hwloc_const_bitmap_t bitmap);
+
+/** \brief Parse a list string and stores it in bitmap \p bitmap.
+ */
+int hwloc_bitmap_list_sscanf(hwloc_bitmap_t bitmap, char *string);
 
 
 /** \brief

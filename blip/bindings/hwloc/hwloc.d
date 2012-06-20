@@ -2,8 +2,9 @@
 /// released under the BSD license.
 ///
 /// the interface wrapped is the one of Revision: 3131 of http://svn.open-mpi.org/svn/hwloc/branches/v1.1
+// Copyright © 2009-2011 CNRS, INRIA, Université Bordeaux 1
 /// wrapping by fawzi
-// Copyright © 2009 CNRS, INRIA, Université Bordeaux 1, 2009-2010 the blip developer group
+// Copyright © 2009-2012 the blip developer group
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,6 +17,36 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
+/*=====================================================================
+ *                 PLEASE GO READ THE DOCUMENTATION!
+ *         ------------------------------------------------
+ *               $tarball_directory/doc/doxygen-doc/
+ *                                or                            
+ *           http://www.open-mpi.org/projects/hwloc/doc/
+ *=====================================================================
+ *
+ * FAIR WARNING: Do NOT expect to be able to figure out all the
+ * subtleties of hwloc by simply reading function prototypes and
+ * constant descrptions here in this file.
+ *
+ * Hwloc has wonderful documentation in both PDF and HTML formats for
+ * your reading pleasure.  The formal documentation explains a LOT of
+ * hwloc-specific concepts, provides definitions, and discusses the
+ * "big picture" for many of the things that you'll find here in this
+ * header file.
+ *
+ * The PDF/HTML documentation was generated via Doxygen; much of what
+ * you'll see in there is also here in this file.  BUT THERE IS A LOT
+ * THAT IS IN THE PDF/HTML THAT IS ***NOT*** IN hwloc.h!
+ *
+ * There are entire paragraph-length descriptions, discussions, and
+ * pretty prictures to explain subtle corner cases, provide concrete
+ * examples, etc.
+ *
+ * Please, go read the documentation.  :-)
+ *
+ *=====================================================================*/
 module blip.bindings.hwloc.hwloc;
 version(noHwloc){} else {
 import blip.stdc.config;
@@ -43,7 +74,7 @@ version(Windows){
  */
 
 /** \brief Indicate at build time which hwloc API version is being used. */
-    enum {HWLOC_API_VERSION=0x00010100}
+    enum {HWLOC_API_VERSION=0x00010400}
 
 /** @} */
 
@@ -165,11 +196,51 @@ enum HWLOC_OBJ {
     * Objects without particular meaning, that can e.g. be
     * added by the application for its own use.
     */
+
+  BRIDGE, /**< \brief Bridge.
+    * Any bridge that connects the host or an I/O bus,
+    * to another I/O bus.
+    * Bridge objects have neither CPU sets nor node sets.
+    * They are not added to the topology unless I/O discovery
+    * is enabled with hwloc_topology_set_flags().
+    */
+  PCI_DEVICE,  /**< \brief PCI device.
+    * These objects have neither CPU sets nor node sets.
+    * They are not added to the topology unless I/O discovery
+    * is enabled with hwloc_topology_set_flags().
+    */
+  OS_DEVICE,  /**< \brief Operating system device.
+    * These objects have neither CPU sets nor node sets.
+    * They are not added to the topology unless I/O discovery
+    * is enabled with hwloc_topology_set_flags().
+    */
+  TYPE_MAX,  /**< \private Sentinel value */
 }
 alias HWLOC_OBJ hwloc_obj_type_t;
 
-///** \brief Maximal value of an object type */
-//enum {HWLOC_OBJ_TYPE_MAX=hwloc_obj_type_t.max}
+
+/** \brief Type of one side (upstream or downstream) of an I/O bridge. */
+enum HWLOC_OBJ_BRIDGE {
+  HOST,  /**< \brief Host-side of a bridge, only possible upstream. */
+  PCI    /**< \brief PCI-side of a bridge. */
+}
+alias HWLOC_OBJ_BRIDGE hwloc_obj_bridge_type_t;
+
+/** \brief Type of a OS device. */
+enum HWLOC_OBJ_OSDEV {
+  BLOCK,        /**< \brief Operating system block device.
+                 * For instance "sda" on Linux. */
+  GPU,          /**< \brief Operating system GPU device.
+                 * For instance the "card0" DRM device on Linux. */
+  NETWORK,      /**< \brief Operating system network device.
+                 * For instance the "eth0" interface on Linux. */
+  OPENFABRICS,  /**< \brief Operating system openfabrics device.
+                 * For instance the "mlx4_0" InfiniBand HCA device on Linux. */
+  OSDEV_DMA,    /**< \brief Operating system dma engine device.
+                  * For instance the "dma0chan0" DMA channel on Linux. */
+}
+
+alias HWLOC_OBJ_OSDEV hwloc_obj_osdev_type_t;
 
  enum HWLOC_TYPE:int{
      /**< \brief Value returned by hwloc_compare_types when types can not be compared. \hideinitializer */
@@ -210,6 +281,8 @@ extern(C){
      ulong size;          /**< \brief Size of cache */
      uint depth;           /**< \brief Depth of cache */
      uint linesize;                    /**< \brief Cache-line size in bytes */
+     int associativity;			  /**< \brief Ways of associativity,
+    					    *  -1 if fully associative, 0 if unknown */
    }
    hwloc_cache_attr_s cache;
    /** \brief Group-specific Object Attributes */
@@ -217,6 +290,75 @@ extern(C){
        uint depth;                       /**< \brief Depth of group object */ 
    }
    hwloc_group_attr_s group;
+
+  /** \brief PCI Device specific Object Attributes */
+  struct hwloc_pcidev_attr_s {
+    ushort domain;
+    ubyte bus, dev, func;
+    ushort class_id;
+    ushort vendor_id, device_id, subvendor_id, subdevice_id;
+    ubyte revision;
+    float linkspeed; /* in GB/s */
+  };
+  hwloc_pcidev_attr_s pcidev;
+  /** \brief Bridge specific Object Attribues */
+  struct hwloc_bridge_attr_s {
+    union upstream_u {
+      hwloc_pcidev_attr_s pci;
+    };
+    upstream_u upstream;
+    hwloc_obj_bridge_type_t upstream_type;
+    union downstream_u{
+      struct pci_t {
+	ushort domain;
+	ubyte secondary_bus, subordinate_bus;
+      };
+      pci_t pci;
+    };
+    downstream_u downstream;
+    hwloc_obj_bridge_type_t downstream_type;
+    uint depth;
+  };
+  hwloc_bridge_attr_s bridge;
+  /** \brief OS Device specific Object Attributes */
+  struct hwloc_osdev_attr_s {
+    hwloc_obj_osdev_type_t type;
+  };
+  hwloc_osdev_attr_s osdev;
+}
+
+/** \brief Distances between objects
+ *
+ * One object may contain a distance structure describing distances
+ * between all its descendants at a given relative depth. If the
+ * containing object is the root object of the topology, then the
+ * distances are available for all objects in the machine.
+ *
+ * If the \p latency pointer is not \c NULL, the pointed array contains
+ * memory latencies (non-zero values), as defined by the ACPI SLIT
+ * specification.
+ *
+ * In the future, some other types of distances may be considered.
+ * In these cases, \p latency may be \c NULL.
+ */
+struct hwloc_distances_s {
+  uint relative_depth;	/**< \brief Relative depth of the considered objects
+				 * below the object containing this distance information. */
+  uint nbobjs;		/**< \brief Number of objects considered in the matrix.
+				 * It is the number of descendant objects at \p relative_depth
+				 * below the containing object.
+				 * It corresponds to the result of hwloc_get_nbobjs_inside_cpuset_by_depth. */
+
+  float *latency;		/**< \brief Matrix of latencies between objects, stored as a one-dimension array.
+				 * May be \c NULL if the distances considered here are not latencies.
+				 * Values are normalized to get 1.0 as the minimal value in the matrix.
+				 * Latency from i-th to j-th object is stored in slot i*nbobjs+j.
+				 */
+  float latency_max;		/**< \brief The maximal value in the latency matrix. */
+  float latency_base;		/**< \brief The multiplier that should be applied to latency matrix
+				 * to retrieve the original OS-provided latencies.
+				 * Usually 10 on Linux since ACPI SLIT uses 10 for local latency.
+				 */
 }
 
 /** \brief Object info */
@@ -361,8 +503,17 @@ struct hwloc_obj {
                                           * \note Its value must not be changed, hwloc_cpuset_dup must be used instead.
                                           */
 
+  hwloc_distances_s **distances;	/**< \brief Distances between all objects at same depth below this object */
+  uint distances_count; 
+
+
   hwloc_obj_info_s *infos;	/**< \brief Array of stringified info type=name. */
   uint infos_count;			/**< \brief Size of infos array. */
+
+  int symmetric_subtree;		/**< \brief Set if the subtree of objects below this object is symmetric,
+					  * which means all children and their children have identical subtrees.
+					  */
+
 }
 }//extern(C)
 alias hwloc_obj * hwloc_obj_t;
@@ -489,6 +640,33 @@ enum HWLOC_TOPOLOGY_FLAG {
    * backend, but still having binding functions actually do bind.
    */
   IS_THISSYSTEM = (1<<1),
+
+  /** \brief Detect PCI devices.
+   *
+   * By default, I/O devices are ignored. This flag enables I/O device
+   * detection using the libpci backend. Only the common PCI devices (GPUs,
+   * NICs, block devices, ...) and host bridges (objects that connect the host
+   * objects to an I/O subsystem) will be added to the topology.
+   * Uncommon devices and other bridges (such as PCI-to-PCI bridges) will be
+   * ignored.
+   */
+  IO_DEVICES = (1<<2),
+
+  /** \brief Detect PCI bridges.
+   *
+   * This flag should be combined with HWLOC_TOPOLOGY_FLAG_IO_DEVICES to enable
+   * the detection of both common devices and of all useful bridges (bridges that
+   * have at least one device behind them).
+   */
+  IO_BRIDGES = (1<<3),
+
+  /** \brief Detect the whole PCI hierarchy.
+   *
+   * This flag enables detection of all I/O devices (even the uncommon ones)
+   * and bridges (even those that have no device behind them) using the libpci
+   * backend.
+   */
+  WHOLE_IO = (1<<4),
 }
 alias HWLOC_TOPOLOGY_FLAG hwloc_topology_flags_e;
 
@@ -498,21 +676,6 @@ alias HWLOC_TOPOLOGY_FLAG hwloc_topology_flags_e;
  */
 extern(C) int hwloc_topology_set_flags (hwloc_topology_t topology, c_ulong flags);
 
-/** \brief Change the file-system root path when building the topology from sysfs/procfs.
- *
- * On Linux system, use sysfs and procfs files as if they were mounted on the given
- * \p fsroot_path instead of the main file-system root. Setting the environment
- * variable HWLOC_FSROOT may also result in this behavior.
- * Not using the main file-system root causes hwloc_topology_is_thissystem()
- * to return 0.
- *
- * \note For conveniency, this backend provides empty binding hooks which just
- * return success.  To have hwloc still actually call OS-specific hooks, the
- * HWLOC_TOPOLOGY_FLAG_IS_THISSYSTEM has to be set to assert that the loaded
- * file is really the underlying system.
- */
-extern(C) int hwloc_topology_set_fsroot(hwloc_topology_t topology, char * fsroot_path);
-
 /** \brief Change which pid the topology is viewed from
  *
  * On some systems, processes may have different views of the machine, for
@@ -521,12 +684,39 @@ extern(C) int hwloc_topology_set_fsroot(hwloc_topology_t topology, char * fsroot
  * expose the topology of the machine from the point of view of another
  * process.
  *
- * \note hwloc_pid_t is pid_t on unix platforms, and HANDLE on native Windows
- * platforms
- * \note The ENOSYS error is returned on platforms that does not support this
- * feature.
+ * \note \p hwloc_pid_t is \p pid_t on Unix platforms,
+ * and \p HANDLE on native Windows platforms.
+ *
+ * \note -1 is returned and errno is set to ENOSYS on platforms that do not
+ * support this feature.
  */
 extern(C) int hwloc_topology_set_pid(hwloc_topology_t topology, hwloc_pid_t pid);
+
+/** \brief Change the file-system root path when building the topology from sysfs/procfs.
+ *
+ * On Linux system, use sysfs and procfs files as if they were mounted on the given
+ * \p fsroot_path instead of the main file-system root. Setting the environment
+ * variable HWLOC_FSROOT may also result in this behavior.
+ * Not using the main file-system root causes hwloc_topology_is_thissystem()
+ * to return 0.
+ *
+ * Note that this function does not actually load topology
+ * information; it just tells hwloc where to load it from.  You'll
+ * still need to invoke hwloc_topology_load() to actually load the
+ * topology information.
+ *
+ * \return -1 with errno set to ENOSYS on non-Linux and on Linux systems that
+ * do not support it.
+ * \return -1 with the appropriate errno if \p fsroot_path cannot be used.
+ *
+ * \note For convenience, this backend provides empty binding hooks which just
+ * return success.  To have hwloc still actually call OS-specific hooks, the
+ * HWLOC_TOPOLOGY_FLAG_IS_THISSYSTEM has to be set to assert that the loaded
+ * file is really the underlying system.
+ *
+ * \note The existing topology is cleared even on failure.
+ */
+extern(C) int hwloc_topology_set_fsroot(hwloc_topology_t topology, char * fsroot_path);
 
 /** \brief Enable synthetic topology.
  *
@@ -563,6 +753,38 @@ extern(C) int hwloc_topology_set_xml(hwloc_topology_t topology, char * xmlpath);
  */
 extern(C) int hwloc_topology_set_xmlbuffer(hwloc_topology_t topology, char * buffer, int size);
 
+/** \brief Prepare the topology for custom assembly.
+ *
+ * The topology then contains a single root object.
+ * It may then be built by inserting other topologies with
+ * hwloc_custom_insert_topology() or single objects with
+ * hwloc_custom_insert_group_object_by_parent().
+ * hwloc_topology_load() must be called to finalize the new
+ * topology as usual.
+ */
+extern(C) int hwloc_topology_set_custom(hwloc_topology_t topology);
+
+/** \brief Provide a distance matrix.
+ *
+ * Provide the matrix of distances between a set of objects of the given type.
+ * The set may or may not contain all the existing objects of this type.
+ * The objects are specified by their OS/physical index in the \p os_index
+ * array. The \p distances matrix follows the same order.
+ * The distance from object i to object j in the i*nbobjs+j.
+ *
+ * A single latency matrix may be defined for each type.
+ * If another distance matrix already exists for the given type,
+ * either because the user specified it or because the OS offers it,
+ * it will be replaced by the given one.
+ * If \p nbobjs is \c 0, \p os_index is \c NULL and \p distances is \c NULL,
+ * the existing distance matrix for the given type is removed.
+ *
+ * \note Distance matrices are ignored in multi-node topologies.
+ */
+extern(C) int hwloc_topology_set_distance_matrix(hwloc_topology_t topology,
+    hwloc_obj_type_t type, uint nbobjs,
+    uint *os_index, float *distances);
+
 /** \brief Set of flags describing actual support for this topology.
  *
  * This is retrieved with hwloc_topology_get_support() and will be valid until
@@ -595,6 +817,12 @@ struct hwloc_topology_support {
 	ubyte set_thread_cpubind;
 	/** Getting the binding of a given thread only is supported.  */
 	ubyte get_thread_cpubind;
+	/** Getting the last processors where the whole current process ran is supported */
+  	ubyte get_thisproc_last_cpu_location;
+  	/** Getting the last processors where a whole process ran is supported */
+  	ubyte get_proc_last_cpu_location;
+  	/** Getting the last processors where the current thread ran is supported */
+  	ubyte get_thisthread_last_cpu_location;
     }
     hwloc_topology_cpubind_support *cpubind;
 
@@ -651,7 +879,7 @@ extern(C) hwloc_topology_support *hwloc_topology_get_support(hwloc_topology_t to
  *
  * This file may be loaded later through hwloc_topology_set_xml().
  */
-extern(C) void hwloc_topology_export_xml(hwloc_topology_t topology, char *xmlpath);
+extern(C) int hwloc_topology_export_xml(hwloc_topology_t topology, char *xmlpath);
 
 /** \brief Export the topology into a newly-allocated XML memory buffer.
  *
@@ -659,7 +887,7 @@ extern(C) void hwloc_topology_export_xml(hwloc_topology_t topology, char *xmlpat
  *
  * This memory buffer may be loaded later through hwloc_topology_set_xmlbuffer().
  */
-extern(C) void hwloc_topology_export_xmlbuffer(hwloc_topology_t topology, char **xmlbuffer, int *buflen);
+extern(C) int hwloc_topology_export_xmlbuffer(hwloc_topology_t topology, char **xmlbuffer, int *buflen);
 
 
 /** \brief Add a MISC object to the topology
@@ -683,6 +911,40 @@ extern(C) hwloc_obj_t hwloc_topology_insert_misc_object_by_cpuset(hwloc_topology
  * \return the newly-created object
  */
 extern(C) hwloc_obj_t hwloc_topology_insert_misc_object_by_parent(hwloc_topology_t topology, hwloc_obj_t parent, char *name);
+
+/** \brief Flags to be given to hwloc_topology_restrict(). */
+enum HWLOC_RESTRICT_FLAG {
+  ADAPT_DISTANCES = (1<<0),
+ /**< \brief Adapt distance matrices according to objects being removed during restriction.
+   * If this flag is not set, distance matrices are removed.
+   * \hideinitializer
+   */
+  ADAPT_MISC = (1<<1),
+ /**< \brief Move Misc objects to ancestors if their parents are removed during restriction.
+   * If this flag is not set, Misc objects are removed when their parents are removed.
+   * \hideinitializer
+   */
+  ADAPT_IO = (1<<2),
+ /**< \brief Move I/O objects to ancestors if their parents are removed during restriction.
+   * If this flag is not set, I/O devices and bridges are removed when their parents are removed.
+   * \hideinitializer
+   */
+}
+alias HWLOC_RESTRICT_FLAG hwloc_restrict_flags_e;
+
+/** \brief Restrict the topology to the given CPU set.
+ *
+ * Topology \p topology is modified so as to remove all objects that
+ * are not included (or partially included) in the CPU set \p cpuset.
+ * All objects CPU and node sets are restricted accordingly.
+ *
+ * \p flags is a OR'ed set of ::hwloc_restrict_flags_e.
+ *
+ * \note This call may not be reverted by restricting back to a larger
+ * cpuset. Once dropped during restriction, objects may not be brought
+ * back, except by reloading the entire topology with hwloc_topology_load().
+ */
+extern(C) int hwloc_topology_restrict(hwloc_topology_t topology, hwloc_const_cpuset_t cpuset, c_ulong flags);
 
 /** @} */
 
@@ -711,6 +973,9 @@ extern(C) int hwloc_get_type_depth (hwloc_topology_t topology, hwloc_obj_type_t 
 enum HWLOC_TYPE_DEPTH {
     UNKNOWN=-1, /**< \brief No object of given type exists in the topology. */
     MULTIPLE=-2, /**< \brief Objects of given type exist at different depth in the topology. */
+    BRIDGE = -3,     /**< \brief Virtual depth for bridge object level. \hideinitializer */
+    PCI_DEVICE = -4, /**< \brief Virtual depth for PCI device object level. \hideinitializer */
+    OS_DEVICE = -5,   /**< \brief Virtual depth for software device object level. \hideinitializer */
 }
 
 /** \brief Returns the type of objects at depth \p depth. */
@@ -1492,6 +1757,54 @@ extern(C) void *hwloc_alloc_membind(hwloc_topology_t topology, size_t len, hwloc
  * or hwloc_alloc_membind().
  */
 extern(C) int hwloc_free(hwloc_topology_t topology, void *addr, size_t len);
+
+/** @} */
+
+/** \defgroup hwlocality_custom Building Custom Topologies
+ *
+ * A custom topology may be initialized by calling hwloc_topology_set_custom()
+ * after hwloc_topology_init(). It may then be modified by inserting objects
+ * or entire topologies. Once done assembling, hwloc_topology_load() should
+ * be invoked as usual to finalize the topology.
+ * @{
+ */
+
+/** \brief Insert an existing topology inside a custom topology
+ *
+ * Duplicate the existing topology \p oldtopology inside a new
+ * custom topology \p newtopology as a leaf of object \p newparent.
+ *
+ * If \p oldroot is not \c NULL, duplicate \p oldroot and all its
+ * children instead of the entire \p oldtopology. Passing the root
+ * object of \p oldtopology in \p oldroot is equivalent to passing
+ * \c NULL.
+ *
+ * The custom topology \p newtopology must have been prepared with
+ * hwloc_topology_set_custom() and not loaded with hwloc_topology_load()
+ * yet.
+ *
+ * \p newparent may be either the root of \p newtopology or an object
+ * that was added through hwloc_custom_insert_group_object_by_parent().
+ */
+extern(C) int hwloc_custom_insert_topology(hwloc_topology_t newtopology, hwloc_obj_t newparent, hwloc_topology_t oldtopology, hwloc_obj_t oldroot);
+
+/** \brief Insert a new group object inside a custom topology
+ *
+ * An object with type ::HWLOC_OBJ_GROUP is inserted as a new child
+ * of object \p parent.
+ *
+ * \p groupdepth is the depth attribute to be given to the new object.
+ * It may for instance be 0 for top-level groups, 1 for their children,
+ * and so on.
+ *
+ * The custom topology \p newtopology must have been prepared with
+ * hwloc_topology_set_custom() and not loaded with hwloc_topology_load()
+ * yet.
+ *
+ * \p parent may be either the root of \p topology or an object that
+ * was added earlier through hwloc_custom_insert_group_object_by_parent().
+ */
+extern(C) hwloc_obj_t hwloc_custom_insert_group_object_by_parent(hwloc_topology_t topology, hwloc_obj_t parent, int groupdepth);
 
 /** @} */
 
