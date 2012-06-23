@@ -171,9 +171,9 @@ void testLoopIRange(T,LoopType lType)(T from, SizeLikeNumber!() dim){
     } else {
         scope arr=new int[](dim.val);
         foreach (i;loopIRange!(lType,T)(from,to)){
-            if (i<from || i>to)
+            if (i<from || i>=to)
                 assert(0,"out of bounds");
-            if (atomicAdd(arr[i],1)!=0)
+            if (atomicAdd(arr[i-from],1)!=0)
                 throw new Exception(collectAppender(delegate void(CharSink s){
                     dumper(s)("testLoopIRange double loop for ")(i);
                 }));
@@ -181,7 +181,7 @@ void testLoopIRange(T,LoopType lType)(T from, SizeLikeNumber!() dim){
         foreach (i,v;arr){
             if (v!=1){
                 throw new Exception(collectAppender(delegate void(CharSink s){
-                    dumper(s)("testLoopIRange missing loop for ")(i);
+			    dumper(s)("testLoopIRange missing loop for ")(from)("+")(i);
                 }));
             }
         }

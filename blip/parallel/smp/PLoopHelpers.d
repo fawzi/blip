@@ -314,7 +314,7 @@ class PLoopHelper(T,int loopType){
                 looper.exec();
             } else {
                 IType end=iEnd;
-                for (IType idx=0;idx<end;++idx){
+                for (IType idx=iStart;idx<end;++idx){
                     static if (!is(typeof(T.init[0]))){
                         T idx2=idx; // avoid copy?
                         auto r=loopBody(idx2);
