@@ -76,8 +76,8 @@ private {
                                            is( T == ulong )/+||
                                            is( T == ucent  )+/;
     }
-    
-    /// substitutes classes with void* 
+
+    /// substitutes classes with void*
     template ClassPtr(T){
         static if (is(T==class)){
             alias void* ClassPtr;
@@ -100,42 +100,57 @@ template atomicValueIsProperlyAligned( T )
     }
 }
 
-/// a barrier does not allow some kinds of intermixing and out of order execution
-/// and ensures that all operations of one kind are executed before the operations of the other type
-/// which kind of mixing are not allowed depends from the template arguments
-/// These are global barriers: the whole memory is synchronized (devices excluded if device is false)
-///
-/// the actual barrier eforced might be stronger than the requested one
-///
-/// if ll is true loads before the barrier are not allowed to mix with loads after the barrier
-/// if ls is true loads before the barrier are not allowed to mix with stores after the barrier
-/// if sl is true stores before the barrier are not allowed to mix with loads after the barrier
-/// if ss is true stores before the barrier are not allowed to mix with stores after the barrier
-/// if device is true als uncached and device memory is synchronized
-///
-/// barriers are typically paired
-/// 
-/// for example if you want to ensure that all writes
-/// are done before setting a flags that communicates that an objects is initialized you would
-/// need memoryBarrier(false,false,false,true) before setting the flag.
-/// To read that flag before reading the rest of the object you would need a
-/// memoryBarrier(true,false,false,false) after having read the flag
-///
-/// I believe that these two barriers are called acquire and release, but you find several
-/// incompatible definitions around (some obviously wrong), so some care migth be in order
-/// To be safer memoryBarrier(false,true,false,true) might be used for acquire, and
-/// memoryBarrier(true,false,true,false) for release which are slighlty stronger.
-/// 
-/// these barriers are also called write barrier and read barrier respectively.
-///
-/// A full memory fence is (true,true,true,true) and ensures that stores and loads before the
-/// barrier are done before stores and loads after it.
-/// Keep in mind even with a full barrier you still normally need two of them, to avoid that the
-/// other process reorders loads (for example) and still sees things in the wrong order.
+/*
+ * A barrier does not allow some kinds of intermixing and out of order execution
+ * and ensures that all operations of one kind are executed before the operations of the other type
+ * which kind of mixing are not allowed depends from the template arguments
+ * These are global barriers: the whole memory is synchronized (devices excluded if device is false)
+ *
+ * the actual barrier eforced might be stronger than the requested one
+ *
+ * if ll is true loads before the barrier are not allowed to mix with loads after the barrier
+ * if ls is true loads before the barrier are not allowed to mix with stores after the barrier
+ * if sl is true stores before the barrier are not allowed to mix with loads after the barrier
+ * if ss is true stores before the barrier are not allowed to mix with stores after the barrier
+ * if device is true als uncached and device memory is synchronized
+ *
+ * Barriers are typically paired
+ *
+ * For example if you want to ensure that all writes
+ * are done before setting a flags that communicates that an objects is initialized you would
+ * need memoryBarrier(false,false,false,true) before setting the flag.
+ * To read that flag before reading the rest of the object you would need a
+ * memoryBarrier(true,false,false,false) after having read the flag.
+ *
+ * I believe that these two barriers are called acquire and release, but you find several
+ * incompatible definitions around (some obviously wrong), so some care migth be in order
+ * To be safer memoryBarrier(false,true,false,true) might be used for acquire, and
+ * memoryBarrier(true,false,true,false) for release which are slighlty stronger.
+ *
+ * These barriers are also called write barrier and read barrier respectively.
+ *
+ * A full memory fence is (true,true,true,true) and ensures that stores and loads before the
+ * barrier are done before stores and loads after it.
+ * Keep in mind even with a full barrier you still normally need two of them, to avoid that the
+ * other process reorders loads (for example) and still sees things in the wrong order.
+*/
 version( LDC )
 {
     void memoryBarrier(bool ll, bool ls, bool sl,bool ss,bool device=false)(){
-        llvm_memory_barrier(ll,ls,sl,ss,device);
+	// in the weaker barriers one migh want to have a stronger (Sequentially consistent) single thread
+	// barrier, currently (7.7.2012) this is not exposed by ldc intrinsics
+	static if (ls || sl) {
+	    llvm_memory_fence(AtomicOrdering.SequentiallyConsistent);
+	} else static if (ll && !ss) {
+	    llvm_memory_fence(AtomicOrdering.Acquire);
+	} else static if (ss && !ll) {
+	    llvm_memory_fence(AtomicOrdering.Release);
+        } else static if (ll && ss) {
+	    llvm_memory_fence(AtomicOrdering.AquireRelease);
+	}
+	if (device) {
+	    // here one might want to use the gc barriers, but those are not exposed
+	}
     }
 } else version(D_InlineAsm_X86){
     void memoryBarrier(bool ll, bool ls, bool sl,bool ss,bool device=false)(){
@@ -215,22 +230,24 @@ static if (!is(typeof(LockVersion))) {
 // use stricter fences
 enum{strictFences=false}
 
-/// utility function for a write barrier (disallow store and store reorderig)
+/// Utility function for a write barrier (disallow store and store reorderig.)
 void writeBarrier(){
     memoryBarrier!(false,false,strictFences,true)();
 }
-/// utility function for a read barrier (disallow load and load reorderig)
+/// Utility function for a read barrier (disallow load and load reorderig.)
 void readBarrier(){
     memoryBarrier!(true,strictFences,false,false)();
 }
-/// utility function for a full barrier (disallow reorderig)
+/// Utility function for a full barrier (disallow reorderig.)
 void fullBarrier(){
     memoryBarrier!(true,true,true,true)();
 }
 
-/// atomic swap
-/// val and newval in one atomic operation
-/// barriers are not implied, just atomicity!
+/*
+ * Atomic swap.
+ * val and newval in one atomic operation
+ * barriers are not implied, just atomicity!
+*/
 version(LDC){
     T atomicSwap( T )( ref T val, T newval )
     {
@@ -363,7 +380,7 @@ private T aCasT(T,V)(ref T val, T newval, T equalTo){
     vAtt.v=atomicCAS(*valPtr.v,vNew.v,vOld.v);
     return vAtt.t;
 }
-/// internal reduction 
+/// internal reduction
 private T aCas(T)(ref T val, T newval, T equalTo){
     static if (T.sizeof==1){
         return aCasT!(T,ubyte)(val,newval,equalTo);
@@ -377,11 +394,14 @@ private T aCas(T)(ref T val, T newval, T equalTo){
         static assert(0,"invalid type "~T.stringof);
     }
 }
-/// atomic compare & exchange (can be used to implement everything else)
-/// stores newval into val if val==equalTo in one atomic operation
-/// barriers are not implied, just atomicity!
-/// returns the value that is checked against equalTo (i.e. an exchange was performed 
-/// if result==equalTo, otherwise one can use the result as the current value)
+
+/*
+ * Atomic compare & exchange (can be used to implement everything else)
+ * stores newval into val if val==equalTo in one atomic operation.
+ * Barriers are not implied, just atomicity!
+ * Returns the value that is checked against equalTo (i.e. an exchange was performed
+ * if result==equalTo, otherwise one can use the result as the current value).
+*/
 version(LDC){
     T atomicCAS( T )( ref T val, T newval, T equalTo )
     {
@@ -479,7 +499,7 @@ version(LDC){
                     mov EDX, 4[EDI];
                     mov EDI, val;
                     lock; // lock always needed to make this op atomic
-                    cmpxch8b [EDI];
+                    cmpxchg8b [EDI];
                     lea EDI, res;
                     mov [EDI], EAX;
                     mov 4[EDI], EDX;
@@ -561,40 +581,45 @@ bool atomicCASB(T)( ref T val, T newval, T equalTo ){
     return (equalTo is atomicCAS(val,newval,equalTo));
 }
 
-/// loads a value from memory
-///
-/// at the moment it is assumed that all aligned memory accesses are atomic
-/// in the sense that all bits are consistent with some store
-///
-/// remove this? I know no actual architecture where this would be different
+/*
+ * Loads a value from memory.
+ *
+ * At the moment it is assumed that all aligned memory accesses are atomic
+ * in the sense that all bits are consistent with some store.
+ *
+ * Remove this? I know no actual architecture where this would be different.
+*/
 T atomicLoad(T)(ref T val)
 in {
     assert( atomicValueIsProperlyAligned!(T)( cast(size_t) &val ) );
     static assert(ClassPtr!(T).sizeof<=size_t.sizeof,"invalid size for "~T.stringof);
 } body {
-    volatile res=val;
+    volatile T res=val;
     return res;
 }
 
-/// stores a value the the memory
-///
-/// at the moment it is assumed that all aligned memory accesses are atomic
-/// in the sense that a load either sees the complete store or the previous value
-///
-/// remove this? I know no actual architecture where this would be different
+/*
+ * Stores a value the the memory.
+ *
+ * At the moment it is assumed that all aligned memory accesses are atomic
+ * in the sense that a load either sees the complete store or the previous value.
+ *
+ * Remove this? I know no actual architecture where this would be different.
+*/
 void atomicStore(T)(ref T val, T newVal)
 in {
         assert( atomicValueIsProperlyAligned!(T)( cast(size_t) &val ), "invalid alignment" );
         static assert(ClassPtr!(T).sizeof<=size_t.sizeof,"invalid size for "~T.stringof);
 } body {
-    volatile newVal=val;
+    volatile val=newVal;
 }
 
-/// increments the given value and returns the previous value with an atomic operation
-///
-/// some architectures might allow just increments/decrements by 1
-///
-/// no barriers implied, only atomicity!
+/*
+ * Increments the given value and returns the previous value with an atomic operation.
+ *
+ * Some architectures might allow just increments/decrements by 1.
+ * No barriers implied, only atomicity!
+*/
 version(LDC){
     T atomicAdd(T,U)(ref T val, U incV_){
         T incV=incV_;
@@ -728,11 +753,13 @@ version(LDC){
     }
 }
 
-/// applies a pure function atomically
-/// the function should be pure as it might be called several times to ensure atomicity
-/// the function should take a short time to compute otherwise contention is possible
-/// and no "fair" share is applied between fast function (more likely to succeed) and
-/// the others (i.e. do not use this in case of high contention)
+/*
+ * Applies a pure function atomically.
+ * The function should be pure as it might be called several times to ensure atomicity
+ * The function should take a short time to compute otherwise contention is possible
+ * and no "fair" share is applied between fast function (more likely to succeed) and
+ * the others (i.e. do not use this in case of high contention).
+*/
 T atomicOp(T)(ref T val, T delegate(T) f){
     T oldV,newV,nextV;
     int i=0;
@@ -752,7 +779,9 @@ T atomicOp(T)(ref T val, T delegate(T) f){
     }
 }
 
-/// reads a flag (ensuring that other accesses can not happen before you read it)
+/*
+ * Reads a flag (ensuring that other accesses can not happen before you read it).
+*/
 T flagGet(T)(ref T flag){
     T res;
     volatile res=flag;
@@ -760,30 +789,38 @@ T flagGet(T)(ref T flag){
     return res;
 }
 
-/// sets a flag (ensuring that all pending writes are executed before this)
-/// the original value is returned
+/*
+ * Sets a flag (ensuring that all pending writes are executed before this).
+ * the original value is returned.
+*/
 T flagSet(T)(ref T flag,T newVal){
     memoryBarrier!(false,strictFences,false,true)();
     return atomicSwap(flag,newVal);
 }
 
-/// writes a flag (ensuring that all pending writes are executed before this)
-/// the original value is returned
+/*
+ * Writes a flag (ensuring that all pending writes are executed before this).
+ * the original value is returned.
+*/
 T flagOp(T)(ref T flag,T delegate(T) op){
     memoryBarrier!(false,strictFences,false,true)();
     return atomicOp(flag,op);
 }
 
-/// reads a flag (ensuring that all pending writes are executed before this)
+/*
+ * Reads a flag (ensuring that all pending writes are executed before this).
+*/
 T flagAdd(T)(ref T flag,T incV=cast(T)1){
     static if (!LockVersion)
         memoryBarrier!(false,strictFences,false,true)();
     return atomicAdd(flag,incV);
 }
 
-/// returns the value of val and increments it in one atomic operation
-/// useful for counters, and to generate unique values (fast)
-/// no barriers are implied
+/*
+ * Returns the value of val and increments it in one atomic operation
+ * useful for counters, and to generate unique values (fast)
+ * no barriers are implied.
+*/
 T nextValue(T)(ref T val){
     return atomicAdd(val,cast(T)1);
 }
