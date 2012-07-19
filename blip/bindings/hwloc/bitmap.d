@@ -105,7 +105,7 @@ struct hwloc_bitmap_t{
     * \return the number of character that were actually written if not truncating,
     * or that would have been written (not including the ending \\0).
     */
-    int listSprintf(string s){
+    int listSprintf(char[] s){
     	return hwloc_bitmap_list_snprintf(s.ptr, s.length, *this);
     }
 
