@@ -26,7 +26,7 @@ import blip.bindings.ev.Libev;
 import blip.core.Traits;
 import blip.util.TemplateFu;
 public import blip.bindings.ev.Libev: EV_PERIODIC_ENABLE, EV_STAT_ENABLE, EV_IDLE_ENABLE, EV_FORK_ENABLE,
-    EV_EMBED_ENABLE, EV_ASYNC_ENABLE, EV_WALK_ENABLE,ev_loop_t, EV_READ, EV_WRITE, ev_tstamp;
+    EV_EMBED_ENABLE, EV_ASYNC_ENABLE, EV_WALK_ENABLE,ev_loop_t, EV_READ, EV_WRITE, ev_tstamp, ev_time;
 import blip.container.HashSet;
 version(TrackEvents){
     import blip.io.Console;
