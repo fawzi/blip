@@ -22,9 +22,9 @@ die() {
 if [ -z "$D_HOME" ] ; then
     D_HOME=$HOME
 fi
-if [ -n "`which gmake`" ] ; then
+if [ -n "`which gmake >& /dev/null`" ] ; then
     make="gmake"
-elif [ -n "`which gnumake`" ] ; then
+elif [ -n "`which gnumake >& /dev/null`" ] ; then
     make="gnumake"
 else
     make="make"
