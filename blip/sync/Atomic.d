@@ -104,7 +104,7 @@ template atomicValueIsProperlyAligned( T )
  * A barrier does not allow some kinds of intermixing and out of order execution
  * and ensures that all operations of one kind are executed before the operations of the other type
  * which kind of mixing are not allowed depends from the template arguments
- * These are global barriers: the whole memory is synchronized (devices excluded if device is false)
+ * These are global barriers: the whole memory is synchronized
  *
  * the actual barrier eforced might be stronger than the requested one
  *
@@ -112,7 +112,6 @@ template atomicValueIsProperlyAligned( T )
  * if ls is true loads before the barrier are not allowed to mix with stores after the barrier
  * if sl is true stores before the barrier are not allowed to mix with loads after the barrier
  * if ss is true stores before the barrier are not allowed to mix with stores after the barrier
- * if device is true als uncached and device memory is synchronized
  *
  * Barriers are typically paired
  *
@@ -136,7 +135,7 @@ template atomicValueIsProperlyAligned( T )
 */
 version( LDC )
 {
-    void memoryBarrier(bool ll, bool ls, bool sl,bool ss,bool device=false)(){
+    void memoryBarrier(bool ll, bool ls, bool sl,bool ss)(){
 	// in the weaker barriers one migh want to have a stronger (Sequentially consistent) single thread
 	// barrier, currently (7.7.2012) this is not exposed by ldc intrinsics
 	static if (ls || sl) {
@@ -148,23 +147,10 @@ version( LDC )
         } else static if (ll && ss) {
 	    llvm_memory_fence(AtomicOrdering.AquireRelease);
 	}
-	if (device) {
-	    // here one might want to use the gc barriers, but those are not exposed
-	}
     }
 } else version(D_InlineAsm_X86){
-    void memoryBarrier(bool ll, bool ls, bool sl,bool ss,bool device=false)(){
-        static if (device) {
-            if (ls || sl || ll || ss){
-                // cpid should sequence even more than mfence
-                volatile asm {
-                    push EBX;
-                    mov EAX, 0; // model, stepping
-                    cpuid;
-                    pop EBX;
-                }
-            }
-        } else static if (ls || sl || (ll && ss)){ // use a sequencing operation like cpuid or simply cmpxch instead?
+    void memoryBarrier(bool ll, bool ls, bool sl,bool ss)(){
+	static if (ls || sl || (ll && ss)){ // use a sequencing operation like cpuid or simply cmpxch instead?
             volatile asm {
                 mfence;
             }
@@ -183,18 +169,8 @@ version( LDC )
         }
     }
 } else version(D_InlineAsm_X86_64){
-    void memoryBarrier(bool ll, bool ls, bool sl,bool ss,bool device=false)(){
-        static if (device) {
-            if (ls || sl || ll || ss){
-                // cpid should sequence even more than mfence
-                volatile asm {
-                    push RBX;
-                    mov RAX, 0; // model, stepping
-                    cpuid;
-                    pop RBX;
-                }
-            }
-        } else static if (ls || sl || (ll && ss)){ // use a sequencing operation like cpuid or simply cmpxch instead?
+    void memoryBarrier(bool ll, bool ls, bool sl,bool ss)(){
+        static if (ls || sl || (ll && ss)){ // use a sequencing operation like cpuid or simply cmpxch instead?
             volatile asm {
                 mfence;
             }
@@ -217,7 +193,7 @@ version( LDC )
     pragma(msg,"WARNING: this is *slow* you probably want to change this!");
     int dummy;
     // acquires a lock... probably you will want to skip this
-    synchronized void memoryBarrier(bool ll, bool ls, bool sl,bool ss,bool device=false)(){
+    synchronized void memoryBarrier(bool ll, bool ls, bool sl,bool ss)(){
         dummy=1;
     }
     enum{LockVersion=true}
