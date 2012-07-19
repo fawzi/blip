@@ -1080,7 +1080,7 @@ class StarvationManager: TaskSchedulerI, ExecuterI, SchedGroupI {
     NumaNode pos2numa(size_t pos){
         NumaNode res;
         res.level=schedLevel;
-        res.pos=pos;
+        res.pos=cast(typeof(res.pos))pos;
         return res;
     }
     void addStarvingSched(NumaNode pos){
@@ -1118,7 +1118,7 @@ class StarvationManager: TaskSchedulerI, ExecuterI, SchedGroupI {
                         foreach(indx; starved[schedLevel].loopTrue){
                             NumaNode posAtt;
                             posAtt.level=schedLevel;
-                            posAtt.pos=indx;
+                            posAtt.pos=cast(typeof(posAtt.pos))indx;
                             for(int i=schedLevel;i<ilevel;++i){
                                 posAtt=topo.superNode(posAtt);
                             }
