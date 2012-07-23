@@ -426,9 +426,11 @@ class StcpConnection{
             synchronized(protocolHandler){
                 auto oldC=newH in protocolHandler.connections;
                 if (oldC!is null){
-                    if ((*oldC)is this) return;
+                    if ((*oldC) is this) return;
                     sinkTogether(log,delegate void(CharSink s){
-                        dumper(s)("replacing connection to ")(newH)(" from ")(*oldC)(" to ")(this)("\n");
+			    dumper(s)("replacing connection to ")(newH)
+				(" from ")(*oldC)("@")(cast(void*)*oldC)
+				(" to ")(this)("@")(cast(void*)this)("\n");
                     });
                 }
                 protocolHandler.connections[newH]=this;
