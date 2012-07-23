@@ -236,13 +236,13 @@ template GrowableArray(T){
     alias LocalGrowableArray!(T)* GrowableArray;
 }
 /// utility method to create a new GrowableArray that can be passed around
-GrowableArray!(T) growableArray(T)(T[]buf=null,size_t len=size_t.max,GASharing sharing=GASharing.GlobalNoFree){
+GrowableArray!(T) growableArray(T)(T[]buf=null,size_t len=size_t.max,GASharing sharing=GASharing.Local){
     auto res=new LocalGrowableArray!(T);
     res.init(buf,len,sharing);
     return res;
 }
 /// utility method to initialize a LocalGrowableArray
-LocalGrowableArray!(T) lGrowableArray(T)(T[]buf=null,size_t len=size_t.max,GASharing sharing=GASharing.GlobalNoFree){
+LocalGrowableArray!(T) lGrowableArray(T)(T[]buf=null,size_t len=size_t.max,GASharing sharing=GASharing.Local){
     LocalGrowableArray!(T) res;
     res.init(buf,len,sharing);
     return res;
