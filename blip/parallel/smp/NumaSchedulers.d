@@ -1598,7 +1598,7 @@ class OnStarvingScheduler:TaskSchedulerI{
         synchronized(mainSched){
             foreach(p;mainSched.starved[mainSched.schedLevel].loopTrue){
                 if (queue.popFront(t2)){
-                    isched=p;
+                    isched=cast(typeof(isched))p;
                 }
                 break;
             }
