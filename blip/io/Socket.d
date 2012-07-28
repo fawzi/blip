@@ -109,7 +109,7 @@ struct BasicSocket{
         addrinfo* addressInfo,addrAtt;
 
         res.sock=-1;
-        auto a1=lGrowableArray(buf,0);
+        auto a1=lGrowableArray(buf,0,GASharing.GlobalNoFree);
         dumper(&a1)(address)("\0")(service)("\0");
         auto addr0=a1.data();
         nodeName=a1.ptr;
