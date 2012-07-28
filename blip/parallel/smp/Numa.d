@@ -455,11 +455,11 @@ class ExplicitTopology(NodeType): Topology!(NodeType){
     
     /// maximum (whole system) level
     int maxLevel(){
-        return levels.length-1;
+        return cast(int)levels.length-1;
     }
     /// maximum number of nodes at the given level (actual nodes might be less)
     int nNodes(int level){
-        return levels[level].nodes.length;
+        return cast(int)(levels[level].nodes.length);
     }
     /// it the given level is a partition (no overlap between the nodes)
     /// if false it might still be a partition, or not
@@ -490,7 +490,7 @@ class ExplicitTopology(NodeType): Topology!(NodeType){
         int mLevel=skipSubnode.level;
         if (mLevel>=levels.length) mLevel=-1;
         for (int i=1;i<10;++i){
-            start=rand.uniformR!(uint)(subNs.length);
+            start=rand.uniformR!(uint)(cast(uint)subNs.length);
             auto subN=subNs[start];
             for (int iLevel=subN.level;iLevel<=mLevel;++iLevel){
                 subN=levels[iLevel].superNodes[subN.pos];
@@ -729,8 +729,8 @@ version(noHwloc){} else {
                 if (childrens.length>0 && level>=0){
                     this.childrens[0]=childrens;
                     lastStack=0;
-                    left[0]=childrens.length;
-                    pos[0]=start%(childrens.length);
+                    left[0]=cast(typeof(left[0]))childrens.length;
+                    pos[0]=cast(typeof(pos[0]))(start % childrens.length);
                     start/=childrens.length;
                     while(start!=0 && descend()){
                         pos[lastStack]=start%left[lastStack];
@@ -920,7 +920,7 @@ version(noHwloc){} else {
     
         /// maximum (whole system) level
         int maxLevel(){
-            return levelMapping.length-1;
+            return cast(int)(levelMapping.length-1);
         }
     
         /// maximum number of nodes at the given level (actual nodes might be less)
@@ -1015,7 +1015,7 @@ version(noHwloc){} else {
             int mLevel=skipSubnode.level;
             if (mLevel>=levelMapping.length) mLevel=-1;
             for (int i=1;i<5;++i){
-                start=rand.uniformR!(uint)(childrens.length);
+                start=rand.uniformR!(uint)(cast(uint)childrens.length);
                 if (mLevel==-1) break;
                 auto depthAtt=levelMapping[mLevel].depth;
                 auto subN=childrens[start];
