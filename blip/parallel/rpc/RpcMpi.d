@@ -26,7 +26,7 @@ import blip.io.IOArray;
 import blip.parallel.smp.WorkManager;
 import blip.io.BasicIO;
 import blip.io.StreamConverters;
-import blip.core.Variant;
+import blip.core.Boxer;
 import blip.Comp;
 
 /// handles vending (and possibly also receiving the results if using one channel for both)
@@ -120,7 +120,7 @@ class MpiProtocolHandler: ProtocolHandler{
         return to!(int)(pUrl.host)==comm.myRank;
     }
     
-    override void doRpcCall(ParsedUrl url,void delegate(Serializer) serArgs, void delegate(Unserializer) unserRes,Variant addrArg){
+    override void doRpcCall(ParsedUrl url,void delegate(Serializer) serArgs, void delegate(Unserializer) unserRes,Box addrArg){
         ubyte[256] buf=void;
         char[256] buf2=void; // ugly duplication should be removed (direct custom serialization of url)
         auto target=to!(int)(url.host);

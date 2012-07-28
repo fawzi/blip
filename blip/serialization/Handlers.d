@@ -30,7 +30,6 @@ static if (Tango.Major==1){
 } else {
   import tango.io.encode.Base64: encode,decode,allocateEncodeSize;
 }
-import blip.core.Variant;
 import tango.core.ByteSwap;
 import blip.core.Traits;
 import blip.math.Math:min;

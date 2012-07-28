@@ -43,7 +43,7 @@ import blip.math.random.Random;
 import blip.container.Pool;
 import blip.container.Cache;
 import blip.util.RefCount;
-import blip.core.Variant;
+import blip.core.Boxer;
 import blip.stdc.string:strlen;
 import blip.io.EventWatcher;
 import blip.Comp;
@@ -593,7 +593,7 @@ class StcpProtocolHandler: ProtocolHandler{
         return false;
     }
 /+    /// local rpc call, oneway methods are *not* executed in background (change?)
-    override void doRpcCallLocal(ParsedUrl url,void delegate(Serializer) serArgs, void delegate(Unserializer) unserRes,Variant addrArg){
+    override void doRpcCallLocal(ParsedUrl url,void delegate(Serializer) serArgs, void delegate(Unserializer) unserRes,Box addrArg){
         sinkTogether(sout,delegate void(CharSink s){
             dumper(s)("doRpcCallLocal with url ")(url)("\n");
         });
@@ -653,7 +653,7 @@ class StcpProtocolHandler: ProtocolHandler{
         assert(d2.length==0,"res not fully read");
     }+/
     /// perform rpc call using sockets
-    override void doRpcCall(ParsedUrl url,void delegate(Serializer) serArgs, void delegate(Unserializer) unserRes,Variant addrArg){
+    override void doRpcCall(ParsedUrl url,void delegate(Serializer) serArgs, void delegate(Unserializer) unserRes,Box addrArg){
         version(TrackRpc){
             sinkTogether(sout,delegate void(CharSink s){
                 dumper(s)("doRpcCall(")(&url.urlWriter)(",")(serArgs)(",")(unserRes)(",__)\n"); // don't trust variant serialization...

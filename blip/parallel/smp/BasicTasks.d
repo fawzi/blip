@@ -19,7 +19,6 @@
 module blip.parallel.smp.BasicTasks;
 import blip.parallel.smp.SmpModels;
 import blip.core.Thread;
-import blip.core.Variant:Variant;
 import blip.core.sync.Mutex;
 import blip.math.Math;
 import blip.util.TangoLog;

@@ -22,7 +22,7 @@
 module blip.serialization.SerializationBase;
 import blip.serialization.Handlers;
 import tango.core.Tuple;
-import blip.core.Variant;
+import blip.core.Boxer;
 import blip.io.Console;
 import blip.io.BasicIO;
 import blip.BasicModels;
@@ -435,7 +435,7 @@ mixin(coreTypesMetaInfoMixStr());
 /// struct that helps the reading of an array and dictionaries
 struct PosCounter{
     ulong pos,length;
-    Variant data;
+    Box data;
     static PosCounter opCall(ulong length){
         PosCounter ac;
         ac.length=length;
@@ -564,7 +564,7 @@ class Serializer {
     
     objectId[void*]             ptrToObjectId;
     objectId                    lastObjectId;
-    Variant[string ]             context;
+    Box[string ]             context;
     SerializationLevel serializationLevel;
     bool removeCycles;
     bool structHasId;
@@ -1107,7 +1107,7 @@ class Unserializer {
 
     void*[objectId]             objectIdToPtr;
     objectId                    lastObjectId;
-    Variant[string ]             context;
+    Box[string ]                context;
     SerializationLevel serializationLevel;
     bool recoverCycles=true;
     bool readStructProxy;
@@ -1122,8 +1122,8 @@ class Unserializer {
         int iFieldRead;
         ClassMetaInfo metaInfo;
         HashSet!(string ) missingLabels;
-        Variant value;
-        static StackEntry opCall(TypeKind k,Variant value,ClassMetaInfo metaInfo){
+        Box value;
+        static StackEntry opCall(TypeKind k,Box value,ClassMetaInfo metaInfo){
             StackEntry res;
             res.kind=k;
             res.value=value;
@@ -1153,7 +1153,7 @@ class Unserializer {
         if (nStack==stack.length){
             stack.length=stack.length+stack.length/2+5;
         }
-        stack[nStack]=StackEntry(typeKindForType!(T),Variant(el),metaInfo);
+        stack[nStack]=StackEntry(typeKindForType!(T),box(el),metaInfo);
         ++nStack;
         return nStack;
     }
@@ -1165,15 +1165,15 @@ class Unserializer {
     T pop(T)(int handle){
         assert(nStack==handle && nStack>0);
         --nStack;
-        T res=stack[nStack].value.get!(T)();
-        stack[nStack].value=Variant(null);
+        T res=unbox!(T)(stack[nStack].value);
+        stack[nStack].value=box(null);
         return res;
     }
 
     void voidPop(int handle){
         assert(nStack==handle && nStack>0);
         --nStack;
-        stack[nStack].value=Variant(null);
+        stack[nStack].value=box(null);
     }
     
     StackEntry *top(){
@@ -1384,7 +1384,7 @@ class Unserializer {
                     if (!didPre){
                         allocT();
                         sObj=sObj.preUnserialize(this);
-                        top().value=Variant(cast(Object)sObj);
+                        top().value=box(cast(Object)sObj);
                     }
                     sObj.unserialize(this);
                 }
@@ -1400,7 +1400,7 @@ class Unserializer {
                         assert(h.unserialize!is null,"externalHandlers with null unserialize");
                         if (h.preUnserialize){
                             t=cast(T)cast(Object)h.preUnserialize(this,metaInfo,cast(void*)t);
-                            top().value=Variant(t);
+                            top().value=box(t);
                         }
                     }
                     h.unserialize(this,metaInfo,cast(void*)t);
@@ -1415,7 +1415,7 @@ class Unserializer {
                         allocT();
                         static if(is(typeof(T.init.preUnserialize(this)))){
                             t=cast(T)cast(Object)t.preUnserialize(this);
-                            top().value=Variant(t);
+                            top().value=box(t);
                         }
                     }
                     t.unserialize(this);
@@ -1423,7 +1423,7 @@ class Unserializer {
                 void post3(){
                     static if(is(typeof(T.init.postUnserialize(this)))){
                         t=cast(T)cast(Object)t.postUnserialize(this);
-                        top().value=Variant(t);
+                        top().value=box(t);
                     }
                 }
                 if (sObj!is null){
@@ -1717,7 +1717,7 @@ class Unserializer {
     /// start of a dictionary
     PosCounter readDictStart(FieldMetaInfo *field, bool stringKeys=false) {
         auto res=PosCounter(ulong.max);
-        res.data=Variant(stringKeys);
+        res.data=box(stringKeys);
         return res;
     }
     /// writes an entry of the dictionary
