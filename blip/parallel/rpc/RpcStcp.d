@@ -308,7 +308,9 @@ class StcpConnection{
         log=protocolHandler.log;
         version(TrackRpc){
             sinkTogether(log,delegate void(CharSink s){
-                dumper(s)("created new connection to ")(targetHost)(" on socket ")(this.sock)("\n");
+		    dumper(s)("created new connection StcpConnection@")(cast(void*)this)
+			(" in StcpProtocolHandler@")(cast(void*)protocolHandler)
+			(" to ")(targetHost)(" on socket ")(this.sock)("\n");
             });
         }
     }
@@ -703,14 +705,14 @@ class StcpProtocolHandler: ProtocolHandler{
         auto newC=new StcpConnection(this,th,h.sock);
         version(TrackRpc){
             sinkTogether(log,delegate void(CharSink s){
-                dumper(s)(taskAtt.val)(" got connection to ")(th)("\n");
+                dumper(s)(taskAtt.val)(" got connection from ")(th)("\n");
             });
         }
         synchronized(connections){
             auto dConn=th in connections;
             if (dConn !is null){
                 sinkTogether(log,delegate void(CharSink s){
-                    dumper(s)(taskAtt.val)(" has double connection to ")(th)("\n");
+                    dumper(s)(taskAtt.val)(" has double connection from ")(th)("\n");
                 });
                 doubleConnections~=*dConn;
             }
