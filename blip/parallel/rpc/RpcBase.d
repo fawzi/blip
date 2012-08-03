@@ -468,7 +468,7 @@ class BasicVendor:ObjVendorI{
         default:
             char[256] buf;
             auto appender=lGrowableArray!(char)(buf,0,GASharing.Local);
-            dumper(&appender)("unknown function ")(fName)(" ")(__FILE__)(" ");
+            dumper(&appender.appendArr)("unknown function ")(fName)(" ")(__FILE__)(" ");
             writeOut(&appender.appendArr,__LINE__);
             exceptionReplyBg(sendRes,reqId,appender.takeData());
         }

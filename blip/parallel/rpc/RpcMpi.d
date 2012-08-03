@@ -58,7 +58,7 @@ class MpiProtocolHandler: ProtocolHandler{
     static void registerMpiProtocolHandler(MpiProtocolHandler pH){
         char[128] buf;
         auto arr=lGrowableArray!(char)(buf,0,GASharing.Local);
-        dumper(&arr)(pH.comm.name)("-")(pH.tag);
+        dumper(&arr.appendArr)(pH.comm.name)("-")(pH.tag);
         string commName=cast(string)arr.takeData();
         synchronized(MpiProtocolHandler.classinfo){
             if ((commName in mpiProtocolHandlers)is null)
@@ -87,7 +87,7 @@ class MpiProtocolHandler: ProtocolHandler{
         this.tag=tag;
         char[128] buf;
         auto arr=lGrowableArray!(char)(buf,0,GASharing.Local);
-        dumper(&arr)("mpi-sbin://")(comm.myRank)(":")(comm.name)("-")(tag);
+        dumper(&arr.appendArr)("mpi-sbin://")(comm.myRank)(":")(comm.name)("-")(tag);
         _handlerUrl=arr.takeData();
         newRequestId=UniqueNumber!(size_t)(10);
     }

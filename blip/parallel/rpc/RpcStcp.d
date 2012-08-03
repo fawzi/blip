@@ -417,6 +417,7 @@ class StcpConnection{
         arr("/serv/publisher/handlerUrl");
         char[] otherUrl;
         rpcManualResCall(otherUrl,arr.data);
+       	arr.deallocData();
         auto pUrl=ParsedUrl.parseUrl(otherUrl);
         if (pUrl.host!=targetHost.host || pUrl.port!=targetHost.port){
             TargetHost newH;

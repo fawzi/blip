@@ -110,7 +110,10 @@ struct BasicSocket{
 
         res.sock=-1;
         auto a1=lGrowableArray(buf,0,GASharing.GlobalNoFree);
-        dumper(&a1)(address)("\0")(service)("\0");
+	scope(exit){
+	    a1.deallocData();
+	}
+        dumper(&a1.appendArr)(address)("\0")(service)("\0");
         auto addr0=a1.data();
         nodeName=a1.ptr;
         serviceName=a1.ptr+address.length+1;
@@ -124,7 +127,7 @@ struct BasicSocket{
             char *errStr= gai_strerror(err);
 	    char[256] errBuf;
 	    auto errA=lGrowableArray(errBuf,0);
-	    dumper(&errA)("getaddrinfo error:")(errStr[0..strlen(errStr)])
+	    dumper(&errA.appendArr)("getaddrinfo error:")(errStr[0..strlen(errStr)])
 		(" with address:")(address)(" and service:")(service);
             throw new BIOException(errA.takeData(),__FILE__,__LINE__);
         }
