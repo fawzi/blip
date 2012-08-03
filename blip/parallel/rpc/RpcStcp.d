@@ -415,7 +415,9 @@ class StcpConnection{
         dumper(&arr.appendArr)("stcp://")(targetHost.host)(":")(targetHost.port);
         if (protocolHandler.group.length!=1){
             arr(protocolHandler.group);
-        }
+        } else if (protocolHandler.port.length>0 && protocolHandler.server !is null) {
+	    dumper(&arr.appendArr)(".lp")(protocolHandler.port);
+	}
         arr("/serv/publisher/handlerUrl");
         char[] otherUrl;
         rpcManualResCall(otherUrl,arr.data);
@@ -426,7 +428,7 @@ class StcpConnection{
             newH.host=pUrl.host.dup;
             auto l=find(pUrl.port,".");
             newH.port=pUrl.port[0..l].dup;
-            synchronized(protocolHandler){
+            synchronized(protocolHandler.connections){
                 auto oldC=newH in protocolHandler.connections;
                 if (oldC!is null){
                     if ((*oldC) is this) return;
@@ -574,6 +576,21 @@ class StcpProtocolHandler: ProtocolHandler{
             stcpProtocolHandlers[group]=this;
         }
     }
+    /// registers a local group using the listening port
+    void registerLocalPort(){
+        synchronized(StcpProtocolHandler.classinfo){
+	    char[128] buf;
+	    auto arr=lGrowableArray(buf,0,GASharing.Local);
+	    dumper(&arr.appendArr)(".lp")(port);
+	    char[] lGroup=arr.takeData();
+            auto pHP= lGroup in stcpProtocolHandlers;
+            if (pHP !is null && (*pHP) !is this){
+                log("replacing already registred protocol for group "~lGroup~"\n");
+            }
+            stcpProtocolHandlers[lGroup]=this;
+        }
+    }
+
     /// checks if the given url is local
     override bool localUrl(ParsedUrl pUrl){
         if (pUrl.host.length==0 || find(selfHostnames,pUrl.host)<selfHostnames.length){
@@ -752,6 +769,7 @@ class StcpProtocolHandler: ProtocolHandler{
                 throw new BIONoBindException("could not bind server started with port "~origPort,__FILE__,__LINE__,bindE);
             }
             updateUrl();
+	    registerLocalPort();
         }
     }
     
