@@ -31,8 +31,6 @@ import blip.io.EventWatcher;
 import blip.Comp;
 import blip.core.Boxer;
 
-version=TestRpcNoOneway;
-
 version(NoTrace){} else { import blip.core.stacktrace.TraceExceptions; }
 
 class A{
