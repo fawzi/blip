@@ -80,6 +80,8 @@ void manualCalls(string proxyUrl){
 void rpcTests(){
     try{
         //GC.disable();
+	StcpProtocolHandler.pushSelfHostname("0::1");
+
         auto ol=new A.AProxyLocal();
         ol.targetObj=A.globalA;
         ol.objTask=defaultTask;

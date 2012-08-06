@@ -84,10 +84,18 @@ struct ParsedUrl{
         pathPtr=p.ptr;
         pathLen=p.length;
     }
+    static void dumpHost(void delegate(cstring)sink, string host) {
+	bool ipv6ip=false;
+	foreach (c;host)
+	    if (c == ':') ipv6ip=true;
+	if (ipv6ip) sink("[");
+        sink(host);
+	if (ipv6ip) sink("]");
+    }
     void urlWriter(void delegate(cstring)sink){
         sink(protocol);
         sink("://");
-        sink(host);
+	dumpHost(sink,host);
         if (port.length!=0){
             sink(":");
             sink(port);
@@ -211,12 +219,23 @@ struct ParsedUrl{
             ++i;
         }
         size_t j;
-        for (j=i;j<url.length;++j){
-            if (url[j]=='/'||url[j]==':') break;
-        }
-        host=url[i..j];
-        if (j==url.length) return j;
-        i=j+1;
+	if (url[i]=='[') {
+	    for (j=++i;j<url.length;++j){
+		if (url[j]==']') break;
+	    }
+	    if (j==url.length) return j;
+	    host=url[i..j];
+	    ++j;
+	    if (j==url.length) return j;
+	    if (url[j]!='/' && url[j]!=':') return j;
+	} else {
+	    for (j=i;j<url.length;++j){
+		if (url[j]=='/'||url[j]==':') break;
+	    }
+	    host=url[i..j];
+	    if (j==url.length) return j;
+	}
+	i=j+1;
         if (url[j]==':'){
             for (j=i;j<url.length;++j){
                 if (url[j]=='/') break;
@@ -265,7 +284,7 @@ struct ParsedUrl{
 string urlEncode(ubyte[]str,bool query=false){
     for(size_t i=0;i<str.length;++i){
         char c=cast(char)str[i];
-        if ((c<'a' || c>'z')&&(c<'A' || c>'Z')&&(c<'-' || c>'9' || c=='/') && c!='_'){
+        if ((c<'a' || c>'z')&&(c<'A' || c>'Z')&&(c<'-' || c>'9' || c=='/') && c!='_' && c!='[' && c!=']'){
             throw new Exception("only clean (not needing decoding) strings are supported, not '"~(cast(string )str)~"' (more efficient)",
                 __FILE__,__LINE__);
         }
@@ -276,7 +295,7 @@ string urlEncode(ubyte[]str,bool query=false){
 cstring urlEncode2(Const!(ubyte[])str,bool query=false){
     for(size_t i=0;i<str.length;++i){
         auto c=cast(Const!(char))str[i];
-        if ((c<'a' || c>'z')&&(c<'A' || c>'Z')&&(c<'-' || c>'9' || c=='/') && c!='_'){
+        if ((c<'a' || c>'z')&&(c<'A' || c>'Z')&&(c<'-' || c>'9' || c=='/') && c!='_' && c!='[' && c!=']'){
             return collectAppender(delegate void(CharSink s){
                 dumper(s)("'")(str)("'");
             });
@@ -289,7 +308,7 @@ cstring urlEncode2(Const!(ubyte[])str,bool query=false){
 Const!(ubyte)[] urlDecode(Const!(char[])str,bool query=false){
     for(size_t i=0;i<str.length;++i){
         char c=str[i];
-        if ((c<'a' || c>'z')&&(c<'A' || c>'Z')&&(c<'-' || c>'9' || c=='/') && c!='_'){
+        if ((c<'a' || c>'z')&&(c<'A' || c>'Z')&&(c<'-' || c>'9' || c=='/') && c!='_' && c!='[' && c!=']'){
             throw new Exception("only clean (not needing decoding) strings are supported (more efficient)",
                 __FILE__,__LINE__);
         }

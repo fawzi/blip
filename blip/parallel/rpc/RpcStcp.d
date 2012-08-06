@@ -412,7 +412,9 @@ class StcpConnection{
     void checkUrl(){
         char[128] buf=void;
         auto arr=lGrowableArray!(char)(buf,0,GASharing.Local);
-        dumper(&arr.appendArr)("stcp://")(targetHost.host)(":")(targetHost.port);
+        arr("stcp://");
+	ParsedUrl.dumpHost(&arr.appendArr,targetHost.host);
+	dumper(&arr.appendArr)(":")(targetHost.port);
         if (protocolHandler.group.length!=1){
             arr(protocolHandler.group);
         } else if (protocolHandler.port.length>0 && protocolHandler.server !is null) {
@@ -481,6 +483,11 @@ class StcpProtocolHandler: ProtocolHandler{
     
     static StcpProtocolHandler[string] stcpProtocolHandlers;
     
+    /// adds a hostname for this host (or an ip address), and begins to use it to build urls
+    static void pushSelfHostname(string hostName) {
+	string[] newNames= [hostName]~selfHostnames;
+	selfHostnames=newNames;
+    }
     /// those that can actually handle the given protocol
     static ProtocolHandler findHandlerForUrl(ParsedUrl url){
         if (url.protocol.length>0 && url.protocol!="stcp"){
@@ -558,7 +565,9 @@ class StcpProtocolHandler: ProtocolHandler{
     void updateUrl(){
         char[128] buf=void;
         auto arr=lGrowableArray!(char)(buf,0,GASharing.Local);
-        dumper(&arr.appendArr)("stcp://")(selfHostnames[0])(":")(port);
+        arr("stcp://");
+	ParsedUrl.dumpHost(&arr.appendArr,selfHostnames[0]);
+	dumper(&arr.appendArr)(":")(port);
         if (group.length!=1){
             arr(group);
         }
@@ -871,3 +880,4 @@ static this(){
     }
 }
 
+    
