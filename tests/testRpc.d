@@ -29,8 +29,7 @@ import Integer=tango.text.convert.Integer;
 import tango.core.Tuple;
 import blip.io.EventWatcher;
 import blip.Comp;
-
-version=TestRpcNoOneway;
+import blip.core.Boxer;
 
 version(NoTrace){} else { import blip.core.stacktrace.TraceExceptions; }
 
@@ -81,6 +80,8 @@ void manualCalls(string proxyUrl){
 void rpcTests(){
     try{
         //GC.disable();
+	StcpProtocolHandler.pushSelfHostname("0::1");
+
         auto ol=new A.AProxyLocal();
         ol.targetObj=A.globalA;
         ol.objTask=defaultTask;
@@ -356,7 +357,7 @@ void rpcTestClient(string url){
             {
                 ParsedUrl pUrl2=pUrl;
                 pUrl2.appendToPath("iVal");
-                Variant firstArg;
+                Box firstArg;
                 auto closure=new SerUnser;
                 callH.doRpcCall(pUrl2,&closure.serialArgs,&closure.unserialRes,firstArg);
                 res=closure.res;
@@ -437,7 +438,7 @@ void rpcTestClient(string url){
                         sinkTogether(sout,delegate void(CharSink s){
                             dumper(s)("pUrl2:")(&pUrl2.urlWriter)("\n");
                         });
-                        Variant firstArg;
+                        Box firstArg;
                         auto closure=new SerUnser;
                         callH.doRpcCall(pUrl2,&closure.serialArgs,&closure.unserialRes,firstArg);
                         sout("cld\n");

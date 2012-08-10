@@ -196,8 +196,8 @@ extern (C) static void cbstat(ev_loop_t* loop, ev_stat* w, int revents)
     else
     {
         sout("\t\tev_stat: in child, calling "
-                "ev_default_fork...\n");
-        ev_default_fork();
+	     "ev_default_fork...\n");
+        ev_loop_fork(ev_default_loop());
     }
 }
 extern (C) static void cbchild(ev_loop_t* loop, ev_child* w, int revents)
@@ -312,14 +312,16 @@ extern (C) static void ecbio(ev_loop_t* loop, ev_io* w, int revents)
     aassert (buffer.dup == TEST_TEXT.dup,__LINE__);
     sout("\tread '")(buffer)("'\n");
     sout("\tstoping the loop\n");
-    ev_unloop(loop, EVUNLOOP_ONE);
+    //    ev_break(loop, EV_BREAK.ONE);
+    ev_break(ev_default_loop(), EV_BREAK.ALL);
+    sout("\tstopped the loop\n");
 }
 extern (C) static void cbembed(ev_loop_t* loop, ev_embed* w, int revents)
 {
     sout("ev_embed\n");
     sout("\tsweeping embeded loop...\n");
     ev_embed_sweep(w.other, w);
-    //ev_embed_stop(loop, w);
+    // ev_embed_stop(loop, w);
 }
 
 void main(){
@@ -397,7 +399,7 @@ void main(){
     ev_fork_init(&wfork, &cbfork);
     ev_fork_start(loop, &wfork);
 
-    ev_loop(loop, 0);
+    ev_run(loop, 0);
 
     aassert (prepare_done,__LINE__);
     aassert (check_done,__LINE__);

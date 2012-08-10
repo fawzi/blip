@@ -236,8 +236,8 @@ enum HWLOC_OBJ_OSDEV {
                  * For instance the "eth0" interface on Linux. */
   OPENFABRICS,  /**< \brief Operating system openfabrics device.
                  * For instance the "mlx4_0" InfiniBand HCA device on Linux. */
-  HWLOC_OBJ_OSDEV_DMA, /**< \brief Operating system dma engine device.
-                        * For instance the "dma0chan0" DMA channel on Linux. */
+  OSDEV_DMA,    /**< \brief Operating system dma engine device.
+                  * For instance the "dma0chan0" DMA channel on Linux. */
 }
 
 alias HWLOC_OBJ_OSDEV hwloc_obj_osdev_type_t;
@@ -303,23 +303,28 @@ extern(C){
   hwloc_pcidev_attr_s pcidev;
   /** \brief Bridge specific Object Attribues */
   struct hwloc_bridge_attr_s {
-    union {
+    union upstream_u {
       hwloc_pcidev_attr_s pci;
-    } upstream;
+    };
+    upstream_u upstream;
     hwloc_obj_bridge_type_t upstream_type;
-    union {
-      struct {
+    union downstream_u{
+      struct pci_t {
 	ushort domain;
 	ubyte secondary_bus, subordinate_bus;
-      } pci;
-    } downstream;
+      };
+      pci_t pci;
+    };
+    downstream_u downstream;
     hwloc_obj_bridge_type_t downstream_type;
     uint depth;
-  } bridge;
+  };
+  hwloc_bridge_attr_s bridge;
   /** \brief OS Device specific Object Attributes */
   struct hwloc_osdev_attr_s {
     hwloc_obj_osdev_type_t type;
-  } osdev;
+  };
+  hwloc_osdev_attr_s osdev;
 }
 
 /** \brief Distances between objects

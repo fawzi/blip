@@ -26,7 +26,7 @@ import blip.io.IOArray;
 import blip.parallel.smp.WorkManager;
 import blip.io.BasicIO;
 import blip.io.StreamConverters;
-import blip.core.Variant;
+import blip.core.Boxer;
 import blip.Comp;
 
 /// handles vending (and possibly also receiving the results if using one channel for both)
@@ -58,7 +58,7 @@ class MpiProtocolHandler: ProtocolHandler{
     static void registerMpiProtocolHandler(MpiProtocolHandler pH){
         char[128] buf;
         auto arr=lGrowableArray!(char)(buf,0,GASharing.Local);
-        dumper(&arr)(pH.comm.name)("-")(pH.tag);
+        dumper(&arr.appendArr)(pH.comm.name)("-")(pH.tag);
         string commName=cast(string)arr.takeData();
         synchronized(MpiProtocolHandler.classinfo){
             if ((commName in mpiProtocolHandlers)is null)
@@ -87,7 +87,7 @@ class MpiProtocolHandler: ProtocolHandler{
         this.tag=tag;
         char[128] buf;
         auto arr=lGrowableArray!(char)(buf,0,GASharing.Local);
-        dumper(&arr)("mpi-sbin://")(comm.myRank)(":")(comm.name)("-")(tag);
+        dumper(&arr.appendArr)("mpi-sbin://")(comm.myRank)(":")(comm.name)("-")(tag);
         _handlerUrl=arr.takeData();
         newRequestId=UniqueNumber!(size_t)(10);
     }
@@ -120,7 +120,7 @@ class MpiProtocolHandler: ProtocolHandler{
         return to!(int)(pUrl.host)==comm.myRank;
     }
     
-    override void doRpcCall(ParsedUrl url,void delegate(Serializer) serArgs, void delegate(Unserializer) unserRes,Variant addrArg){
+    override void doRpcCall(ParsedUrl url,void delegate(Serializer) serArgs, void delegate(Unserializer) unserRes,Box addrArg){
         ubyte[256] buf=void;
         char[256] buf2=void; // ugly duplication should be removed (direct custom serialization of url)
         auto target=to!(int)(url.host);

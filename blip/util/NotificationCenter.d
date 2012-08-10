@@ -22,7 +22,7 @@
 // limitations under the License.
 module blip.util.NotificationCenter;
 import blip.sync.Atomic;
-import blip.core.Variant;
+import blip.core.Boxer;
 import blip.container.AtomicSLink;
 import blip.Comp;
 
@@ -33,7 +33,7 @@ struct Callback{
         ReceiveWhenInProcess=2, /// receive when a notification happens while processing the first one (callback has to be threadsafe)
         ReceiveAll=7, /// receive all notification (even if you are still waiting for the first to start executing, the callback should be threadsafe)
     }
-    void delegate(cstring,Callback*,Variant) callback;
+    void delegate(cstring,Callback*,Box) callback;
     Callback *next;
     Flags flags;
     
@@ -42,7 +42,7 @@ struct Callback{
     }
     
     static Callback *freeList;
-    static Callback *newCallback(void delegate(cstring,Callback*,Variant) callback,
+    static Callback *newCallback(void delegate(cstring,Callback*,Box) callback,
         Flags flags=Flags.None)
     {
         auto newC=popFrom(freeList);
@@ -85,7 +85,7 @@ class NotificationCenter{
         }
         return false;
     }
-    Callback * registerCallback(string name,void delegate(cstring,Callback*,Variant) callback,
+    Callback * registerCallback(string name,void delegate(cstring,Callback*,Box) callback,
         Callback.Flags flags=Callback.Flags.None){
         auto res=Callback.newCallback(callback,flags);
         if (registerCallback(name,res)){
@@ -113,7 +113,7 @@ class NotificationCenter{
             return true;
         }
     }
-    void notify(string name,Variant args){
+    void notify(string name,Box args){
         CallbackList*res;
         synchronized(this){
             auto res2=name in notificationLists;

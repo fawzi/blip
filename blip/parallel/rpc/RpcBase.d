@@ -34,7 +34,7 @@ import blip.container.HashMap;
 import blip.BasicModels;
 import blip.core.sync.Mutex;
 import blip.io.BasicIO;
-import blip.core.Variant;
+import blip.core.Boxer;
 import blip.io.Console;
 import blip.container.Pool;
 import blip.container.Cache;
@@ -84,10 +84,18 @@ struct ParsedUrl{
         pathPtr=p.ptr;
         pathLen=p.length;
     }
+    static void dumpHost(void delegate(cstring)sink, string host) {
+	bool ipv6ip=false;
+	foreach (c;host)
+	    if (c == ':') ipv6ip=true;
+	if (ipv6ip) sink("[");
+        sink(host);
+	if (ipv6ip) sink("]");
+    }
     void urlWriter(void delegate(cstring)sink){
         sink(protocol);
         sink("://");
-        sink(host);
+	dumpHost(sink,host);
         if (port.length!=0){
             sink(":");
             sink(port);
@@ -211,12 +219,23 @@ struct ParsedUrl{
             ++i;
         }
         size_t j;
-        for (j=i;j<url.length;++j){
-            if (url[j]=='/'||url[j]==':') break;
-        }
-        host=url[i..j];
-        if (j==url.length) return j;
-        i=j+1;
+	if (url[i]=='[') {
+	    for (j=++i;j<url.length;++j){
+		if (url[j]==']') break;
+	    }
+	    if (j==url.length) return j;
+	    host=url[i..j];
+	    ++j;
+	    if (j==url.length) return j;
+	    if (url[j]!='/' && url[j]!=':') return j;
+	} else {
+	    for (j=i;j<url.length;++j){
+		if (url[j]=='/'||url[j]==':') break;
+	    }
+	    host=url[i..j];
+	    if (j==url.length) return j;
+	}
+	i=j+1;
         if (url[j]==':'){
             for (j=i;j<url.length;++j){
                 if (url[j]=='/') break;
@@ -265,7 +284,7 @@ struct ParsedUrl{
 string urlEncode(ubyte[]str,bool query=false){
     for(size_t i=0;i<str.length;++i){
         char c=cast(char)str[i];
-        if ((c<'a' || c>'z')&&(c<'A' || c>'Z')&&(c<'-' || c>'9' || c=='/') && c!='_'){
+        if ((c<'a' || c>'z')&&(c<'A' || c>'Z')&&(c<'-' || c>'9' || c=='/') && c!='_' && c!='[' && c!=']'){
             throw new Exception("only clean (not needing decoding) strings are supported, not '"~(cast(string )str)~"' (more efficient)",
                 __FILE__,__LINE__);
         }
@@ -276,7 +295,7 @@ string urlEncode(ubyte[]str,bool query=false){
 cstring urlEncode2(Const!(ubyte[])str,bool query=false){
     for(size_t i=0;i<str.length;++i){
         auto c=cast(Const!(char))str[i];
-        if ((c<'a' || c>'z')&&(c<'A' || c>'Z')&&(c<'-' || c>'9' || c=='/') && c!='_'){
+        if ((c<'a' || c>'z')&&(c<'A' || c>'Z')&&(c<'-' || c>'9' || c=='/') && c!='_' && c!='[' && c!=']'){
             return collectAppender(delegate void(CharSink s){
                 dumper(s)("'")(str)("'");
             });
@@ -289,7 +308,7 @@ cstring urlEncode2(Const!(ubyte[])str,bool query=false){
 Const!(ubyte)[] urlDecode(Const!(char[])str,bool query=false){
     for(size_t i=0;i<str.length;++i){
         char c=str[i];
-        if ((c<'a' || c>'z')&&(c<'A' || c>'Z')&&(c<'-' || c>'9' || c=='/') && c!='_'){
+        if ((c<'a' || c>'z')&&(c<'A' || c>'Z')&&(c<'-' || c>'9' || c=='/') && c!='_' && c!='[' && c!=']'){
             throw new Exception("only clean (not needing decoding) strings are supported (more efficient)",
                 __FILE__,__LINE__);
         }
@@ -468,7 +487,7 @@ class BasicVendor:ObjVendorI{
         default:
             char[256] buf;
             auto appender=lGrowableArray!(char)(buf,0,GASharing.Local);
-            dumper(&appender)("unknown function ")(fName)(" ")(__FILE__)(" ");
+            dumper(&appender.appendArr)("unknown function ")(fName)(" ")(__FILE__)(" ");
             writeOut(&appender.appendArr,__LINE__);
             exceptionReplyBg(sendRes,reqId,appender.takeData());
         }
@@ -481,9 +500,9 @@ void rpcManualVoidCallPUrl(T...)(ParsedUrl pUrl,T args){
             dumper(s)("will do rpcManualVoidCallPUrl with url ")(pUrl)("\n");
         });
     }
-    Variant firstArg;
-    static if (is(typeof(Variant(args[0])))){
-        firstArg=Variant(args[0]);
+    Box firstArg;
+    static if (is(typeof(box(args[0])))){
+        firstArg=box(args[0]);
     }
     void serialArgs(Serializer s){ s(args); }
     void unserialRes(Unserializer u){ };
@@ -516,9 +535,9 @@ void rpcManualVoidCall(T...)(string url,T args){
 }
 /// utility method to call a oneway method
 void rpcManualOnewayCallPUrl(T...)(ParsedUrl pUrl,T args){
-    Variant firstArg;
-    static if (is(typeof(Variant(args[0])))){
-        firstArg=Variant(args[0]);
+    Box firstArg;
+    static if (is(typeof(box(args[0])))){
+        firstArg=box(args[0]);
     }
     void serialArgs(Serializer s){ s(args); }
     auto handler=ProtocolHandler.protocolForUrl(pUrl);
@@ -541,9 +560,9 @@ void rpcManualResCallPUrl(U,T...)(out U res,ParsedUrl pUrl,T args){
             dumper(s)("will do rpcManualResCallPUrl with url ")(pUrl)("\n");
         });
     }
-    Variant firstArg;
-    static if (is(typeof(Variant(args[0])))){
-        firstArg=Variant(args[0]);
+    Box firstArg;
+    static if (is(typeof(box(args[0])))){
+        firstArg=box(args[0]);
     }
     void serialArgs(Serializer s){ s(args); }
     void unserialRes(Unserializer u){ u(res); };
@@ -584,7 +603,7 @@ U rpcManualResCall1(U,T...)(string url,T args){
 
 /// handler that performs an Rpc call
 alias void delegate(ParsedUrl url,void delegate(Serializer) serArgs,
-    void delegate(Unserializer) unserRes,Variant firstArg) RpcCallHandler;
+    void delegate(Unserializer) unserRes,Box firstArg) RpcCallHandler;
 
 /// one can get a proxy for that object
 interface Proxiable{
@@ -1011,7 +1030,7 @@ class ProtocolHandler{
     string simpleCall(ParsedUrl url){
         string res;
         doRpcCall(url,delegate void(Serializer){},
-            delegate void(Unserializer u){ u(res); },Variant.init);
+            delegate void(Unserializer u){ u(res); },Box.init);
         return res;
     }
     
@@ -1172,12 +1191,12 @@ class ProtocolHandler{
     }
     /// rpc call to a potentially remote server
     void doRpcCall(ParsedUrl url,void delegate(Serializer) serArgs, void delegate(Unserializer) unserRes,
-        Variant firstArg){
+        Box firstArg){
         assert(0,"unimplemented");
     }
     /// local rpc call, oneway methods might *not* executed in background (change?)
     void doRpcCallLocal(ParsedUrl url,void delegate(Serializer) serArgs, void delegate(Unserializer) unserRes,
-        Variant firstArg){
+        Box firstArg){
         doRpcCall(url,serArgs,unserRes,firstArg);
     }
 }

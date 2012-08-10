@@ -17,10 +17,10 @@
 module blip.rtest.RTestFramework;
 import blip.math.random.Random: Random;
 public import blip.util.TemplateFu: nArgs,ctfe_i2a,ctfe_hasToken, ctfe_replaceToken;
-public import blip.core.Traits:isStaticArrayType;
+public import blip.core.Traits:isStaticArrayType, ctfe_i2a;
 import blip.io.BasicIO;
 public import blip.io.Console;
-public import blip.core.Variant:Variant;
+public import blip.core.Boxer;
 import blip.core.Array: find,remove;
 import blip.core.sync.Mutex: Mutex;
 import blip.parallel.smp.WorkManager;
@@ -123,15 +123,15 @@ string completeInitStr(S...)(string checks,string manualInit,string indent="    
 string callF(S...)(string retType){
     string res="";
     if (retType=="void") {
-        res~="test.baseDelegate.get!( void delegate(";
+        res~="unbox!( void delegate(";
     } else {
-        res~=retType~" callRes=test.baseDelegate.get!("~retType~" delegate(";
+        res~=retType~" callRes=unbox!("~retType~" delegate(";
     }
     foreach (i,T;S){
         if (i!=0) res~=",";
         res~=T.stringof;
     }
-    res~="))()(arg);\n";
+    res~="))(test.baseDelegate)(arg);\n";
     return res;
 }
 
@@ -318,6 +318,9 @@ class TextController: TestControllerI{
         synchronized(_writeLock) {
             char[512] buf;
             auto arr=lGrowableArray!(char)(buf,0,GASharing.GlobalNoFree);
+	    scope(exit){
+		arr.deallocData();
+	    }
             progressLog("\n");
             progressLog("To reproduce:\n");
             if (exeName.length==0){
@@ -335,7 +338,7 @@ class TextController: TestControllerI{
                 progressLog(arr.data);
                 arr.clearData;
             } else {
-                dumper(&arr)(exeName)(" --test='")(test.testName)("'");
+                dumper(&arr.appendArr)(exeName)(" --test='")(test.testName)("'");
                 arr(" --counter='[");
                 foreach (i,c;test.counter){
                     if (i!=0) arr(", ");
@@ -470,7 +473,7 @@ class SingleRTest{
         }
     }
     /// internal storage for the final test delegate
-    Variant baseDelegate;
+    Box baseDelegate;
     
     /+  --- run machinery --- +/
     Rand r; /// random source
@@ -572,7 +575,7 @@ class SingleRTest{
     this(string testName,long sourceLine,string sourceFile,
         int nargs,TestResult delegate(SingleRTest) testDlg,
         TestSize testSize=TestSize(),TestControllerI testController=null,
-        CharSink failureLog=null, Rand r=null, Variant baseDelegate=Variant(null)){
+        CharSink failureLog=null, Rand r=null, Box baseDelegate=box(null)){
         this.testName=testName;
         this.sourceFile=sourceFile;
         this.sourceLine=sourceLine;
@@ -621,7 +624,7 @@ class TestCollection: SingleRTest, TestControllerI {
         SingleRTest[] subTests=[],CharSink failureLog=null, Rand r=null)
     {
         super(testName,sourceLine,sourceFile,1,null,TestSize(1,1,1.5), testController,
-            failureLog, r, Variant(null));
+            failureLog, r, box(null));
         statLock=new Mutex();
         subTests=[];
         this.addSubtests(subTests);
@@ -815,7 +818,7 @@ template testInit(string checkInit="", string manualInit=""){
                 if (!doSetup(test)){
                     return TestResult.Skip;
                 }
-                test.baseDelegate.get!(void delegate(S))()(arg);
+                unbox!(void delegate(S))(test.baseDelegate)(arg);
             } catch (SkipException s){
                 return TestResult.Skip;
             } catch (Exception e){
@@ -832,7 +835,7 @@ template testInit(string checkInit="", string manualInit=""){
             return TestResult.Pass;
         }
         return new SingleRTest(testName,sourceLine,sourceFile,nArgs!(S),&doTest,
-            testSize, testController, failureLog, r,Variant(testF));
+            testSize, testController, failureLog, r,box(testF));
     }
     /// ditto
     SingleRTest testNoFailF(S...)(string testName, void function(S) testF,long sourceLine=-1,
@@ -860,7 +863,7 @@ template testInit(string checkInit="", string manualInit=""){
             mixin(completeInitStr!(S)(checkInit,manualInit));
             if (!doSetup(test)) return TestResult.Skip;
             try{
-                test.baseDelegate.get!(void delegate(S))()(arg);
+                unbox!(void delegate(S))(test.baseDelegate)(arg);
             } catch (SkipException s){
                 return TestResult.Skip;
             } catch (Exception e){
@@ -869,7 +872,7 @@ template testInit(string checkInit="", string manualInit=""){
             synchronized(test.testController.writeLock){
                 char[256] buf;
                 auto arr=lGrowableArray!(char)(buf,0,GASharing.GlobalNoFree);
-                dumper(&arr)("test`")(test.testName)("` failed (no exception thrown and one expected)\n");
+                dumper(&arr.appendArr)("test`")(test.testName)("` failed (no exception thrown and one expected)\n");
                 test.failureLog(arr.takeData);
                 //test.failureLog.flush();
                 mixin(printArgs(nArgs!(S),"test.failureLog"));
@@ -877,7 +880,7 @@ template testInit(string checkInit="", string manualInit=""){
             return TestResult.Fail;
         }
         return new SingleRTest(testName,sourceLine,sourceFile,nArgs!(S),&doTest,
-            testSize, testController, failureLog, r,Variant(testF));
+            testSize, testController, failureLog, r,box(testF));
     }
     /// ditto
     SingleRTest testFailF(S...)(string testName, void function(S) testF,long sourceLine=-1,
@@ -905,14 +908,14 @@ template testInit(string checkInit="", string manualInit=""){
             mixin(completeInitStr!(S)(checkInit,manualInit));
             if (!doSetup(test)) return TestResult.Skip;
             try{
-                bool callRes=test.baseDelegate.get!(bool delegate(S))()(arg);
+                bool callRes=unbox!(bool delegate(S))(test.baseDelegate)(arg);
                 if (callRes){
                     return TestResult.Pass;
                 } else {
                     synchronized(test.testController.writeLock){
                         char[256] buf;
                         auto arr=lGrowableArray!(char)(buf,0,GASharing.GlobalNoFree);
-                        dumper(&arr)("test`")(test.testName)("` failed (returned false instead of true)\n");
+                        dumper(&arr.appendArr)("test`")(test.testName)("` failed (returned false instead of true)\n");
                         test.failureLog(arr.data);
                         mixin(printArgs(nArgs!(S),"test.failureLog"));
                     }
@@ -924,7 +927,8 @@ template testInit(string checkInit="", string manualInit=""){
                 synchronized(test.testController.writeLock){
                     char[256] buf;
                     auto arr=lGrowableArray!(char)(buf,0,GASharing.GlobalNoFree);
-                    test.failureLog(dumper(&arr)("test`")(test.testName)("` failed with exception\n").call.data);
+		    dumper(&arr.appendArr)("test`")(test.testName)("` failed with exception\n");
+                    test.failureLog(arr.data);
                     //test.failureLog.flush();
                     e.writeOut(test.failureLog);
                     //test.failureLog.flush();
@@ -934,7 +938,7 @@ template testInit(string checkInit="", string manualInit=""){
             }
         }
         return new SingleRTest(testName,sourceLine,sourceFile,nArgs!(S),&doTest,
-            testSize, testController, failureLog, r,Variant(testF));
+            testSize, testController, failureLog, r,box(testF));
     }
     /// ditto
     SingleRTest testTrueF(S...)(string testName, bool function(S) testF,long sourceLine=-1,
@@ -963,12 +967,12 @@ template testInit(string checkInit="", string manualInit=""){
             mixin(completeInitStr!(S)(checkInit,manualInit));
             if (!doSetup(test)) return TestResult.Skip;
             try{
-                bool callRes=test.baseDelegate.get!(bool delegate(S))()(arg);
+                bool callRes=unbox!(bool delegate(S))(test.baseDelegate)(arg);
                 if (callRes){
                     synchronized(test.testController.writeLock){
                         char[256] buf;
                         auto arr=lGrowableArray!(char)(buf,0,GASharing.GlobalNoFree);
-                        dumper(&arr)("test`")(test.testName)("` failed (returned true instead of false)\n");
+                        dumper(&arr.appendArr)("test`")(test.testName)("` failed (returned true instead of false)\n");
                         test.failureLog(arr.data);
                         mixin(printArgs(nArgs!(S),"test.failureLog"));
                     }
@@ -983,7 +987,7 @@ template testInit(string checkInit="", string manualInit=""){
                     //test.failureLog.flush();
                     char[256] buf;
                     auto arr=lGrowableArray!(char)(buf,0,GASharing.GlobalNoFree);
-                    dumper(&arr)("test`")(test.testName)("` unexpectedly failed with exception\n");
+                    dumper(&arr.appendArr)("test`")(test.testName)("` unexpectedly failed with exception\n");
                     test.failureLog(arr.data);
                     //test.failureLog.flush();
                     e.writeOut(test.failureLog);
@@ -994,7 +998,7 @@ template testInit(string checkInit="", string manualInit=""){
             }
         }
         return new SingleRTest(testName,sourceLine,sourceFile,nArgs!(S),&doTest,
-            testSize, testController, failureLog, r,Variant(testF));
+            testSize, testController, failureLog, r,box(testF));
     }
     /// ditto
     SingleRTest testFalseF(S...)(string testName, bool function(S) testF,long sourceLine=-1,

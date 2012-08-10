@@ -24,6 +24,7 @@ import blip.util.NotificationCenter;
 import blip.sync.Atomic;
 import blip.parallel.smp.WorkManager;
 import blip.Comp;
+import blip.core.Boxer;
 
 void checkLb(T)(T[]arr,T val,size_t lb,size_t ub){
     auto lb1=lBound(arr,val,lb,ub);
@@ -103,11 +104,11 @@ class Summer{
     int sum;
     LocalGrowableArray!(int) log;
     string name;
-    void callBack(string n,Callback* cl,Variant v){
+    void callBack(string n,Callback* cl,Box v){
         if (n!=name) throw new Exception("error",__FILE__,__LINE__);
-        atomicAdd(sum,v.get!(int)());
+        atomicAdd(sum,unbox!(int)(v));
         synchronized(this){
-            log(v.get!(int)());
+            log(unbox!(int)(v));
         }
     }
     this(string n){
@@ -119,7 +120,7 @@ class DoNotify{
     string name;
     NotificationCenter nc;
     void doNotify(){
-        nc.notify(name,Variant(msg));
+        nc.notify(name,box(msg));
     }
     this(NotificationCenter nc,string n,int m){
         this.nc=nc;

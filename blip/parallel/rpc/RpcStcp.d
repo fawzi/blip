@@ -43,7 +43,7 @@ import blip.math.random.Random;
 import blip.container.Pool;
 import blip.container.Cache;
 import blip.util.RefCount;
-import blip.core.Variant;
+import blip.core.Boxer;
 import blip.stdc.string:strlen;
 import blip.io.EventWatcher;
 import blip.Comp;
@@ -308,7 +308,9 @@ class StcpConnection{
         log=protocolHandler.log;
         version(TrackRpc){
             sinkTogether(log,delegate void(CharSink s){
-                dumper(s)("created new connection to ")(targetHost)(" on socket ")(this.sock)("\n");
+		    dumper(s)("created new connection StcpConnection@")(cast(void*)this)
+			(" in StcpProtocolHandler@")(cast(void*)protocolHandler)
+			(" to ")(targetHost)(" on socket ")(this.sock)("\n");
             });
         }
     }
@@ -410,25 +412,32 @@ class StcpConnection{
     void checkUrl(){
         char[128] buf=void;
         auto arr=lGrowableArray!(char)(buf,0,GASharing.Local);
-        dumper(&arr.appendArr)("stcp://")(targetHost.host)(":")(targetHost.port);
+        arr("stcp://");
+	ParsedUrl.dumpHost(&arr.appendArr,targetHost.host);
+	dumper(&arr.appendArr)(":")(targetHost.port);
         if (protocolHandler.group.length!=1){
             arr(protocolHandler.group);
-        }
+        } else if (protocolHandler.port.length>0 && protocolHandler.server !is null) {
+	    dumper(&arr.appendArr)(".lp")(protocolHandler.port);
+	}
         arr("/serv/publisher/handlerUrl");
         char[] otherUrl;
         rpcManualResCall(otherUrl,arr.data);
+       	arr.deallocData();
         auto pUrl=ParsedUrl.parseUrl(otherUrl);
         if (pUrl.host!=targetHost.host || pUrl.port!=targetHost.port){
             TargetHost newH;
             newH.host=pUrl.host.dup;
             auto l=find(pUrl.port,".");
             newH.port=pUrl.port[0..l].dup;
-            synchronized(protocolHandler){
+            synchronized(protocolHandler.connections){
                 auto oldC=newH in protocolHandler.connections;
                 if (oldC!is null){
-                    if ((*oldC)is this) return;
+                    if ((*oldC) is this) return;
                     sinkTogether(log,delegate void(CharSink s){
-                        dumper(s)("replacing connection to ")(newH)(" from ")(*oldC)(" to ")(this)("\n");
+			    dumper(s)("replacing connection to ")(newH)
+				(" from ")(*oldC)("@")(cast(void*)*oldC)
+				(" to ")(this)("@")(cast(void*)this)("\n");
                     });
                 }
                 protocolHandler.connections[newH]=this;
@@ -474,6 +483,11 @@ class StcpProtocolHandler: ProtocolHandler{
     
     static StcpProtocolHandler[string] stcpProtocolHandlers;
     
+    /// adds a hostname for this host (or an ip address), and begins to use it to build urls
+    static void pushSelfHostname(string hostName) {
+	string[] newNames= [hostName]~selfHostnames;
+	selfHostnames=newNames;
+    }
     /// those that can actually handle the given protocol
     static ProtocolHandler findHandlerForUrl(ParsedUrl url){
         if (url.protocol.length>0 && url.protocol!="stcp"){
@@ -551,7 +565,9 @@ class StcpProtocolHandler: ProtocolHandler{
     void updateUrl(){
         char[128] buf=void;
         auto arr=lGrowableArray!(char)(buf,0,GASharing.Local);
-        dumper(&arr.appendArr)("stcp://")(selfHostnames[0])(":")(port);
+        arr("stcp://");
+	ParsedUrl.dumpHost(&arr.appendArr,selfHostnames[0]);
+	dumper(&arr.appendArr)(":")(port);
         if (group.length!=1){
             arr(group);
         }
@@ -569,6 +585,21 @@ class StcpProtocolHandler: ProtocolHandler{
             stcpProtocolHandlers[group]=this;
         }
     }
+    /// registers a local group using the listening port
+    void registerLocalPort(){
+        synchronized(StcpProtocolHandler.classinfo){
+	    char[128] buf;
+	    auto arr=lGrowableArray(buf,0,GASharing.Local);
+	    dumper(&arr.appendArr)(".lp")(port);
+	    char[] lGroup=arr.takeData();
+            auto pHP= lGroup in stcpProtocolHandlers;
+            if (pHP !is null && (*pHP) !is this){
+                log("replacing already registred protocol for group "~lGroup~"\n");
+            }
+            stcpProtocolHandlers[lGroup]=this;
+        }
+    }
+
     /// checks if the given url is local
     override bool localUrl(ParsedUrl pUrl){
         if (pUrl.host.length==0 || find(selfHostnames,pUrl.host)<selfHostnames.length){
@@ -591,7 +622,7 @@ class StcpProtocolHandler: ProtocolHandler{
         return false;
     }
 /+    /// local rpc call, oneway methods are *not* executed in background (change?)
-    override void doRpcCallLocal(ParsedUrl url,void delegate(Serializer) serArgs, void delegate(Unserializer) unserRes,Variant addrArg){
+    override void doRpcCallLocal(ParsedUrl url,void delegate(Serializer) serArgs, void delegate(Unserializer) unserRes,Box addrArg){
         sinkTogether(sout,delegate void(CharSink s){
             dumper(s)("doRpcCallLocal with url ")(url)("\n");
         });
@@ -651,7 +682,7 @@ class StcpProtocolHandler: ProtocolHandler{
         assert(d2.length==0,"res not fully read");
     }+/
     /// perform rpc call using sockets
-    override void doRpcCall(ParsedUrl url,void delegate(Serializer) serArgs, void delegate(Unserializer) unserRes,Variant addrArg){
+    override void doRpcCall(ParsedUrl url,void delegate(Serializer) serArgs, void delegate(Unserializer) unserRes,Box addrArg){
         version(TrackRpc){
             sinkTogether(sout,delegate void(CharSink s){
                 dumper(s)("doRpcCall(")(&url.urlWriter)(",")(serArgs)(",")(unserRes)(",__)\n"); // don't trust variant serialization...
@@ -700,14 +731,14 @@ class StcpProtocolHandler: ProtocolHandler{
         auto newC=new StcpConnection(this,th,h.sock);
         version(TrackRpc){
             sinkTogether(log,delegate void(CharSink s){
-                dumper(s)(taskAtt.val)(" got connection to ")(th)("\n");
+                dumper(s)(taskAtt.val)(" got connection from ")(th)("\n");
             });
         }
         synchronized(connections){
             auto dConn=th in connections;
             if (dConn !is null){
                 sinkTogether(log,delegate void(CharSink s){
-                    dumper(s)(taskAtt.val)(" has double connection to ")(th)("\n");
+                    dumper(s)(taskAtt.val)(" has double connection from ")(th)("\n");
                 });
                 doubleConnections~=*dConn;
             }
@@ -747,6 +778,7 @@ class StcpProtocolHandler: ProtocolHandler{
                 throw new BIONoBindException("could not bind server started with port "~origPort,__FILE__,__LINE__,bindE);
             }
             updateUrl();
+	    registerLocalPort();
         }
     }
     
@@ -848,3 +880,4 @@ static this(){
     }
 }
 
+    

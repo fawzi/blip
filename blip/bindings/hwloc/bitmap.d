@@ -22,6 +22,7 @@ module blip.bindings.hwloc.bitmap;
 version(noHwloc){} else {
 import blip.stdc.config;
 import blip.stdc.stringz;
+import stdlib=blip.stdc.stdlib;
 import blip.Comp;
 /** \defgroup hwlocality_bitmap The Bitmap API
  *
@@ -78,7 +79,7 @@ struct hwloc_bitmap_t{
         char *res;
         auto len=hwloc_bitmap_asprintf(&res, *this);
         auto s=res[0..len].dup;
-	free(res);
+	stdlib.free(res);
 	return s;
     }
 

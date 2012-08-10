@@ -18,7 +18,6 @@
 // limitations under the License.
 module blip.parallel.smp.NumaSchedulers;
 import blip.core.Thread;
-import blip.core.Variant:Variant;
 import blip.core.sync.Mutex;
 import blip.core.sync.Semaphore;
 import blip.math.Math;
@@ -1080,7 +1079,7 @@ class StarvationManager: TaskSchedulerI, ExecuterI, SchedGroupI {
     NumaNode pos2numa(size_t pos){
         NumaNode res;
         res.level=schedLevel;
-        res.pos=pos;
+        res.pos=cast(typeof(res.pos))pos;
         return res;
     }
     void addStarvingSched(NumaNode pos){
@@ -1118,7 +1117,7 @@ class StarvationManager: TaskSchedulerI, ExecuterI, SchedGroupI {
                         foreach(indx; starved[schedLevel].loopTrue){
                             NumaNode posAtt;
                             posAtt.level=schedLevel;
-                            posAtt.pos=indx;
+                            posAtt.pos=cast(typeof(posAtt.pos))indx;
                             for(int i=schedLevel;i<ilevel;++i){
                                 posAtt=topo.superNode(posAtt);
                             }
@@ -1598,7 +1597,7 @@ class OnStarvingScheduler:TaskSchedulerI{
         synchronized(mainSched){
             foreach(p;mainSched.starved[mainSched.schedLevel].loopTrue){
                 if (queue.popFront(t2)){
-                    isched=p;
+                    isched=cast(typeof(isched))p;
                 }
                 break;
             }

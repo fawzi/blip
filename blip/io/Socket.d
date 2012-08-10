@@ -38,6 +38,13 @@ import blip.core.sync.Semaphore;
 import blip.io.Console;
 import blip.Comp;
 
+version(linux) {
+    enum { IPV6_V6ONLY=26 }
+}
+version(solarix) {
+    enum { IPV6_V6ONLY=27 }
+}
+
 struct TargetHost{
     string host;
     string port;
@@ -95,15 +102,18 @@ struct BasicSocket{
     static BasicSocket opCall(string address,string service){
         BasicSocket res;
         int err;
-        char buf[256];
+        char[256] buf;
         char * nodeName,serviceName;
         sockaddr_storage addrName;
         addrinfo hints;
         addrinfo* addressInfo,addrAtt;
 
         res.sock=-1;
-        auto a1=lGrowableArray(buf,0);
-        dumper(&a1)(address)("\0")(service)("\0");
+        auto a1=lGrowableArray(buf,0,GASharing.GlobalNoFree);
+	scope(exit){
+	    a1.deallocData();
+	}
+        dumper(&a1.appendArr)(address)("\0")(service)("\0");
         auto addr0=a1.data();
         nodeName=a1.ptr;
         serviceName=a1.ptr+address.length+1;
@@ -115,7 +125,11 @@ struct BasicSocket{
         err=getaddrinfo(nodeName,serviceName,&hints,&addressInfo);
         if (err!=0){
             char *errStr= gai_strerror(err);
-            throw new BIOException("getaddrinfo error:"~errStr[0..strlen(errStr)],__FILE__,__LINE__);
+	    char[256] errBuf;
+	    auto errA=lGrowableArray(errBuf,0);
+	    dumper(&errA.appendArr)("getaddrinfo error:")(errStr[0..strlen(errStr)])
+		(" with address:")(address)(" and service:")(service);
+            throw new BIOException(errA.takeData(),__FILE__,__LINE__);
         }
 
         socket_t s=-1;
@@ -525,6 +539,25 @@ class SocketServer{
             //printf("will create socket(%d,%d,%d)\n",res.ai_family,res.ai_socktype,res.ai_protocol);
             socket_t s=socket(res.ai_family,res.ai_socktype,res.ai_protocol);
             if (s<0) continue;
+	    static if (is(typeof(IPV6_V6ONLY))) {
+		{
+		    static if (!is(typeof(SOL_IPV6))) {
+			enum { SOL_IPV6 = IPPROTO_IPV6 }
+		    }
+		    // avoid skipping IPv6 if IPv4 is bound first on linux
+		    int tmp = 1;
+		    if (res.ai_family == AF_INET6
+			&& setsockopt (s, SOL_IPV6, IPV6_V6ONLY, cast(char *) &tmp,
+				       cast(socklen_t) tmp.sizeof) != 0)
+			{
+			    sinkTogether(log,delegate void(CharSink s){
+				    char[256] buf;
+				    dumper(s)(strerror_d(errno(), buf))
+					(", in setsockopt(s, SOL_IPV6, IPV6_V6ONLY,[1],4)\n");
+				});
+			}
+		}
+	    }
             version(TrackSocketServer){
                 sinkTogether(log,delegate void(CharSink s){
                     dumper(s)("trying bind to ");

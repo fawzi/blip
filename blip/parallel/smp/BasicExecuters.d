@@ -19,6 +19,7 @@
 // limitations under the License.
 module blip.parallel.smp.BasicExecuters;
 import blip.core.Thread;
+import blip.core.Traits: ctfe_i2a;
 import blip.math.Math;
 import blip.math.random.Random;
 import blip.io.Console;
