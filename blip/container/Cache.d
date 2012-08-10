@@ -20,7 +20,7 @@
 // limitations under the License.
 module blip.container.Cache;
 import blip.time.Time;
-import blip.core.Boxer;
+import blip.core.Variant;
 import blip.time.Clock;
 import blip.sync.UniqueNumber;
 import blip.sync.Atomic;
@@ -46,8 +46,8 @@ static this(){
 
 /// an object that can create cache entries
 interface CacheElFactory{
-    Box createEl();
-    void deleteEl(Box);
+    Variant createEl();
+    void deleteEl(Variant);
     EntryFlags flags();
     string name();
     CKey key();// this should be constant!!!
@@ -55,7 +55,7 @@ interface CacheElFactory{
 
 class Cache{
     static struct CacheEntry{
-        Box entry;
+        Variant entry;
         CacheElFactory factory;
         Time lastUsed; // avoid storing??
         size_t idNr; // used to detect looping wrapping
@@ -96,7 +96,7 @@ class Cache{
     }
     /// clears a cache entry, returns true if it was present
     bool clear(CKey key){
-        Box entry;
+        Variant entry;
         CacheElFactory factory;
         synchronized(this){
             auto e=key in entries;
@@ -153,18 +153,18 @@ class Cache{
     T get(T)(CacheElFactory factory){
         T res;
         cacheOp(factory,delegate void(ref CacheEntry c){
-            res=unbox!(T)(c.entry); });
+            res=c.entry.get!(T)(); });
         return res;
     }
     /// sets a value in the cache (and returns the old value as variant)
-    Box set(T)(CacheElFactory factory,T newVal){
-        Box res;
+    Variant set(T)(CacheElFactory factory,T newVal){
+        Variant res;
         cacheOp(factory,delegate void(ref CacheEntry c){
             res=c.entry;
-            static if (is(T==Box)){
+            static if (is(T==Variant)){
                 c.entry=newVal;
             } else {
-                c.entry=box(newVal);
+                c.entry=Variant(newVal);
             }
         });
         return res;
@@ -267,10 +267,10 @@ class Cached:CacheElFactory{
         }
         this._flags=flags;
     }
-    Box createEl(){
-        return Box.init;
+    Variant createEl(){
+        return Variant.init;
     }
-    void deleteEl(Box x){}
+    void deleteEl(Variant x){}
     
     EntryFlags flags(){
         return _flags;
@@ -308,24 +308,24 @@ final class CachedT(T):Cached{
         this.createOp=c;
         this.freeOp=d;
     }
-    Box createEl(){
-        static if (is(T==Box)){
+    Variant createEl(){
+        static if (is(T==Variant)){
             return createOp();
         } else {
-            return box(createOp());
+            return Variant(createOp());
         }
     }
-    void deleteEl(Box e){
-        static if (is(T==Box)){
+    void deleteEl(Variant e){
+        static if (is(T==Variant)){
             if (freeOp !is null) {
                 freeOp(e);
             }
         } else {
             if (freeOp !is null) {
-                freeOp(unbox!(T)(e));
+                freeOp(e.get!(T)());
             } else {
                 static if (is(typeof(T.init.stopCaching()))){
-                    T el=unbox!(T)(e);
+                    T el=e.get!(T)();
                     static if(is(typeof(el !is null))){
                         if (el !is null) el.stopCaching();
                     } else {
@@ -340,7 +340,7 @@ final class CachedT(T):Cached{
     }
     T setInCache(Cache cache,T newVal){
         auto res=cache.set!(T)(this,newVal);
-        return unbox!(T)(res);
+        return res.get!(T)();
     }
     T opCall(Cache cache){
         return getFromCache(cache);
@@ -395,14 +395,14 @@ class CachedPool(T):Cached,PoolI!(T){
         giveBack(defaultCache(),obj);
     }
     /// internal method, creates a new Pool for the cache
-    Box createEl(){
+    Variant createEl(){
         auto res=poolCreator();
         if (cacheStopped) res.stopCaching();
-        return box(res);
+        return Variant(res);
     }
     /// deletes the NFreeList from the cache
-    void deleteEl(Box el){
-        auto c=unbox!(PoolI!(T))(el);
+    void deleteEl(Variant el){
+        auto c=el.get!(PoolI!(T))();
         if (c!is null){
             c.stopCaching();
         }
@@ -411,7 +411,7 @@ class CachedPool(T):Cached,PoolI!(T){
     /// discards all the cached objects from all the caches
     void flush(Cache cache){
         foreach(cAtt;cache.allCaches){
-            cAtt.cacheOpIf(this,delegate void(ref Cache.CacheEntry c){ unbox!(PoolI!(T))(c.entry).flush(); });
+            cAtt.cacheOpIf(this,delegate void(ref Cache.CacheEntry c){ c.entry.get!(PoolI!(T))().flush(); });
         }
     }
     /// ditto

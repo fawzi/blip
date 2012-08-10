@@ -21,7 +21,7 @@ public import blip.serialization.Serialization;
 public import blip.container.Pool;
 public import blip.container.Cache;
 public import blip.core.sync.Mutex;
-public import blip.core.Boxer;
+public import blip.core.Variant;
 public import blip.parallel.smp.WorkManager;
 public import blip.container.GrowableArray;
 public import blip.io.BasicIO;
@@ -84,9 +84,9 @@ string rpcProxyMixin(string name,string extName,string extraInterfaces,string []
                 `~functionName~`Return `~functionName~`(`~functionName~`Args args){
                     ParsedUrl pUrl2=proxyObjPUrl();
                     pUrl2.appendToPath("`~functionName~`");
-                    Box firstArg;
-                    static if (is(typeof(box(args[0])))){
-                        firstArg=box(args[0]);
+                    Variant firstArg;
+                    static if (is(typeof(Variant(args[0])))){
+                        firstArg=Variant(args[0]);
                     }
                     void serialArgs(Serializer s){ s(args); }
                     void delegate(Unserializer u) unserialRes;`;

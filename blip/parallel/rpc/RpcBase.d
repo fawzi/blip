@@ -34,7 +34,7 @@ import blip.container.HashMap;
 import blip.BasicModels;
 import blip.core.sync.Mutex;
 import blip.io.BasicIO;
-import blip.core.Boxer;
+import blip.core.Variant;
 import blip.io.Console;
 import blip.container.Pool;
 import blip.container.Cache;
@@ -500,9 +500,9 @@ void rpcManualVoidCallPUrl(T...)(ParsedUrl pUrl,T args){
             dumper(s)("will do rpcManualVoidCallPUrl with url ")(pUrl)("\n");
         });
     }
-    Box firstArg;
-    static if (is(typeof(box(args[0])))){
-        firstArg=box(args[0]);
+    Variant firstArg;
+    static if (is(typeof(Variant(args[0])))){
+        firstArg=Variant(args[0]);
     }
     void serialArgs(Serializer s){ s(args); }
     void unserialRes(Unserializer u){ };
@@ -535,9 +535,9 @@ void rpcManualVoidCall(T...)(string url,T args){
 }
 /// utility method to call a oneway method
 void rpcManualOnewayCallPUrl(T...)(ParsedUrl pUrl,T args){
-    Box firstArg;
-    static if (is(typeof(box(args[0])))){
-        firstArg=box(args[0]);
+    Variant firstArg;
+    static if (is(typeof(Variant(args[0])))){
+        firstArg=Variant(args[0]);
     }
     void serialArgs(Serializer s){ s(args); }
     auto handler=ProtocolHandler.protocolForUrl(pUrl);
@@ -560,9 +560,9 @@ void rpcManualResCallPUrl(U,T...)(out U res,ParsedUrl pUrl,T args){
             dumper(s)("will do rpcManualResCallPUrl with url ")(pUrl)("\n");
         });
     }
-    Box firstArg;
-    static if (is(typeof(box(args[0])))){
-        firstArg=box(args[0]);
+    Variant firstArg;
+    static if (is(typeof(Variant(args[0])))){
+        firstArg=Variant(args[0]);
     }
     void serialArgs(Serializer s){ s(args); }
     void unserialRes(Unserializer u){ u(res); };
@@ -603,7 +603,7 @@ U rpcManualResCall1(U,T...)(string url,T args){
 
 /// handler that performs an Rpc call
 alias void delegate(ParsedUrl url,void delegate(Serializer) serArgs,
-    void delegate(Unserializer) unserRes,Box firstArg) RpcCallHandler;
+    void delegate(Unserializer) unserRes,Variant firstArg) RpcCallHandler;
 
 /// one can get a proxy for that object
 interface Proxiable{
@@ -1030,7 +1030,7 @@ class ProtocolHandler{
     string simpleCall(ParsedUrl url){
         string res;
         doRpcCall(url,delegate void(Serializer){},
-            delegate void(Unserializer u){ u(res); },Box.init);
+            delegate void(Unserializer u){ u(res); },Variant.init);
         return res;
     }
     
@@ -1191,12 +1191,12 @@ class ProtocolHandler{
     }
     /// rpc call to a potentially remote server
     void doRpcCall(ParsedUrl url,void delegate(Serializer) serArgs, void delegate(Unserializer) unserRes,
-        Box firstArg){
+        Variant firstArg){
         assert(0,"unimplemented");
     }
     /// local rpc call, oneway methods might *not* executed in background (change?)
     void doRpcCallLocal(ParsedUrl url,void delegate(Serializer) serArgs, void delegate(Unserializer) unserRes,
-        Box firstArg){
+        Variant firstArg){
         doRpcCall(url,serArgs,unserRes,firstArg);
     }
 }

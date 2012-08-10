@@ -20,7 +20,7 @@ public import blip.util.TemplateFu: nArgs,ctfe_i2a,ctfe_hasToken, ctfe_replaceTo
 public import blip.core.Traits:isStaticArrayType, ctfe_i2a;
 import blip.io.BasicIO;
 public import blip.io.Console;
-public import blip.core.Boxer;
+public import blip.core.Variant:Variant;
 import blip.core.Array: find,remove;
 import blip.core.sync.Mutex: Mutex;
 import blip.parallel.smp.WorkManager;
@@ -123,15 +123,15 @@ string completeInitStr(S...)(string checks,string manualInit,string indent="    
 string callF(S...)(string retType){
     string res="";
     if (retType=="void") {
-        res~="unbox!( void delegate(";
+        res~="test.baseDelegate.get!( void delegate(";
     } else {
-        res~=retType~" callRes=unbox!("~retType~" delegate(";
+        res~=retType~" callRes=test.baseDelegate.get!("~retType~" delegate(";
     }
     foreach (i,T;S){
         if (i!=0) res~=",";
         res~=T.stringof;
     }
-    res~="))(test.baseDelegate)(arg);\n";
+    res~="))()(arg);\n";
     return res;
 }
 
@@ -473,7 +473,7 @@ class SingleRTest{
         }
     }
     /// internal storage for the final test delegate
-    Box baseDelegate;
+    Variant baseDelegate;
     
     /+  --- run machinery --- +/
     Rand r; /// random source
@@ -575,7 +575,7 @@ class SingleRTest{
     this(string testName,long sourceLine,string sourceFile,
         int nargs,TestResult delegate(SingleRTest) testDlg,
         TestSize testSize=TestSize(),TestControllerI testController=null,
-        CharSink failureLog=null, Rand r=null, Box baseDelegate=box(null)){
+        CharSink failureLog=null, Rand r=null, Variant baseDelegate=Variant(null)){
         this.testName=testName;
         this.sourceFile=sourceFile;
         this.sourceLine=sourceLine;
@@ -624,7 +624,7 @@ class TestCollection: SingleRTest, TestControllerI {
         SingleRTest[] subTests=[],CharSink failureLog=null, Rand r=null)
     {
         super(testName,sourceLine,sourceFile,1,null,TestSize(1,1,1.5), testController,
-            failureLog, r, box(null));
+            failureLog, r, Variant(null));
         statLock=new Mutex();
         subTests=[];
         this.addSubtests(subTests);
@@ -818,7 +818,7 @@ template testInit(string checkInit="", string manualInit=""){
                 if (!doSetup(test)){
                     return TestResult.Skip;
                 }
-                unbox!(void delegate(S))(test.baseDelegate)(arg);
+                test.baseDelegate.get!(void delegate(S))()(arg);
             } catch (SkipException s){
                 return TestResult.Skip;
             } catch (Exception e){
@@ -835,7 +835,7 @@ template testInit(string checkInit="", string manualInit=""){
             return TestResult.Pass;
         }
         return new SingleRTest(testName,sourceLine,sourceFile,nArgs!(S),&doTest,
-            testSize, testController, failureLog, r,box(testF));
+            testSize, testController, failureLog, r,Variant(testF));
     }
     /// ditto
     SingleRTest testNoFailF(S...)(string testName, void function(S) testF,long sourceLine=-1,
@@ -863,7 +863,7 @@ template testInit(string checkInit="", string manualInit=""){
             mixin(completeInitStr!(S)(checkInit,manualInit));
             if (!doSetup(test)) return TestResult.Skip;
             try{
-                unbox!(void delegate(S))(test.baseDelegate)(arg);
+                test.baseDelegate.get!(void delegate(S))()(arg);
             } catch (SkipException s){
                 return TestResult.Skip;
             } catch (Exception e){
@@ -880,7 +880,7 @@ template testInit(string checkInit="", string manualInit=""){
             return TestResult.Fail;
         }
         return new SingleRTest(testName,sourceLine,sourceFile,nArgs!(S),&doTest,
-            testSize, testController, failureLog, r,box(testF));
+            testSize, testController, failureLog, r,Variant(testF));
     }
     /// ditto
     SingleRTest testFailF(S...)(string testName, void function(S) testF,long sourceLine=-1,
@@ -908,7 +908,7 @@ template testInit(string checkInit="", string manualInit=""){
             mixin(completeInitStr!(S)(checkInit,manualInit));
             if (!doSetup(test)) return TestResult.Skip;
             try{
-                bool callRes=unbox!(bool delegate(S))(test.baseDelegate)(arg);
+                bool callRes=test.baseDelegate.get!(bool delegate(S))()(arg);
                 if (callRes){
                     return TestResult.Pass;
                 } else {
@@ -938,7 +938,7 @@ template testInit(string checkInit="", string manualInit=""){
             }
         }
         return new SingleRTest(testName,sourceLine,sourceFile,nArgs!(S),&doTest,
-            testSize, testController, failureLog, r,box(testF));
+            testSize, testController, failureLog, r,Variant(testF));
     }
     /// ditto
     SingleRTest testTrueF(S...)(string testName, bool function(S) testF,long sourceLine=-1,
@@ -967,7 +967,7 @@ template testInit(string checkInit="", string manualInit=""){
             mixin(completeInitStr!(S)(checkInit,manualInit));
             if (!doSetup(test)) return TestResult.Skip;
             try{
-                bool callRes=unbox!(bool delegate(S))(test.baseDelegate)(arg);
+                bool callRes=test.baseDelegate.get!(bool delegate(S))()(arg);
                 if (callRes){
                     synchronized(test.testController.writeLock){
                         char[256] buf;
@@ -998,7 +998,7 @@ template testInit(string checkInit="", string manualInit=""){
             }
         }
         return new SingleRTest(testName,sourceLine,sourceFile,nArgs!(S),&doTest,
-            testSize, testController, failureLog, r,box(testF));
+            testSize, testController, failureLog, r,Variant(testF));
     }
     /// ditto
     SingleRTest testFalseF(S...)(string testName, bool function(S) testF,long sourceLine=-1,

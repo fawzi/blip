@@ -25,7 +25,7 @@ import blip.serialization.Serialization;
 import blip.io.BasicIO;
 import blip.container.GrowableArray;
 import blip.container.Deque;
-import blip.core.Boxer;
+import blip.core.Variant;
 import blip.time.Time;
 import blip.time.Clock;
 import blip.util.NotificationCenter;
@@ -253,7 +253,7 @@ class WeakList(T){
 /// a cluster of peer to peer servers
 class Cluster{
     NotificationCenter nCenter; // notifications
-    Box[string ] info;
+    Variant[string ] info;
     string sourceId;
     WeakList!(Peer) workersList;
     Peer[string ] workersDict;

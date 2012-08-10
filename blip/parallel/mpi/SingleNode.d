@@ -28,7 +28,7 @@ import blip.sync.UniqueNumber;
 import blip.io.IOArray;
 import blip.serialization.Handlers;
 import blip.math.random.Random;
-import blip.core.Boxer;
+import blip.core.Variant;
 import blip.container.GrowableArray;
 import blip.io.BasicIO;
 import blip.io.StreamConverters;
@@ -37,8 +37,8 @@ import blip.Comp;
 // duplication of serializer/unserilizer with blip.parallel.Mpi ugly, should probably be abstracted away
 struct SNMessage{
     int tag;
-    Box msg;
-    static SNMessage opCall(int tag,Box msg){
+    Variant msg;
+    static SNMessage opCall(int tag,Variant msg){
         SNMessage res;
         res.tag=tag;
         res.msg=msg;
@@ -76,9 +76,9 @@ class SNSerializer:SBinSerializer{
         super.close();
         assert(res.tag==tag);
         assert(target!is null);
-        res.msg=box(content.takeData());
+        res.msg=Variant(content.takeData());
         target.data.append(res);
-        res.msg=Box.init;
+        res.msg=Variant.init;
         res.tag=AnyTag;
         tag=AnyTag;
     }
@@ -99,7 +99,7 @@ class SNUnserializer:SBinUnserializer{
     void readStartRoot() {
         assert(msg.tag!=AnyTag);
         auto arr=cast(IOArray)((cast(BinaryReadHandlers!())handlers).reader);
-        auto m=unbox!(ubyte[])(msg.msg);
+        auto m=msg.msg.get!(ubyte[])();
         arr.assign(m,m.length);
         super.readStartRoot();
     }
@@ -108,7 +108,7 @@ class SNUnserializer:SBinUnserializer{
         assert(msg.tag!=AnyTag);
     }
     void close(){
-        msg.msg=Box.init;
+        msg.msg=Variant.init;
         msg.tag=AnyTag;
         auto arr=cast(IOArray)((cast(BinaryReadHandlers!())handlers).reader);
         auto tmp=arr.assign;
@@ -188,7 +188,7 @@ class SNChannel:Channel,BasicObjectI{
     }
     template sendT(T){
         void send(Const!(T) v,int tag=0){
-            recevingChannel.data.append(SNMessage(tag,box(v)));
+            recevingChannel.data.append(SNMessage(tag,Variant(v)));
             recevingChannel.notify();
         }
     }
@@ -277,7 +277,7 @@ class SNChannel:Channel,BasicObjectI{
             }
             if (immediate && data.length && (tag==AnyTag || data[0].tag==tag)){
                 auto msg=data.popFront();
-                v=unbox!(T)(msg.msg);
+                v=msg.msg.get!(T)();
                 return msg.tag;
             }
             auto tAtt=taskAtt.val;
@@ -299,7 +299,7 @@ class SNChannel:Channel,BasicObjectI{
                     msg=data.popFront();
                 }
                 assert(msg.tag==tag||tag==AnyTag,"unexpected tag in recv");
-                v=unbox!(T)(msg.msg);
+                v=msg.msg.get!(T)();
                 return msg.tag;
             } else {
                 throw new Exception("delayed recv works only in Yieldable tasks",__FILE__,__LINE__);

@@ -19,6 +19,7 @@
 module blip.serialization.SBinSerialization;
 import blip.serialization.SerializationBase;
 import blip.serialization.Handlers;
+import blip.core.Variant;
 import blip.BasicModels;
 import blip.text.TextParser;
 import blip.container.GrowableArray;

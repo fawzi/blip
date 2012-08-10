@@ -20,7 +20,7 @@ import blip.serialization.SerializationBase;
 import blip.serialization.Handlers;
 import blip.io.Console;
 import tango.io.model.IConduit:IOStream;
-import blip.core.Boxer;
+import blip.core.Variant;
 import blip.BasicModels;
 import blip.text.TextParser;
 import blip.text.UtfUtils;
@@ -120,17 +120,17 @@ class JsonSerializer(T=char) : Serializer {
     /// writes a separator of the array
     override void writeArrayEl(ref PosCounter ac, void delegate() writeEl) {
         if (ac.pos==0){
-            ac.data=box(writeCount+10*lineCount);
+            ac.data=Variant(writeCount+10*lineCount);
         } else if (ac.pos==1){
-            auto diff=writeCount+10*lineCount-unbox!(long)(ac.data);
+            auto diff=writeCount+10*lineCount-ac.data.get!(long);
             auto newlineEach=20L/(++diff);
             if (newlineEach>8) newlineEach=8;
             else if (newlineEach<1) newlineEach=1;
-            ac.data=box(cast(int)newlineEach);
+            ac.data=Variant(cast(int)newlineEach);
         }
         if (ac.pos>0){
             handlers.rawWriteStr([cast(T)',',' ']);
-            if (ac.pos % unbox!(int)(ac.data) ==0) {  /// wrap lines
+            if (ac.pos % ac.data.get!(int) ==0) {  /// wrap lines
                 newline;
                 indent(depth);
             }
@@ -160,7 +160,7 @@ class JsonSerializer(T=char) : Serializer {
             atStart=false;
         }
         auto res=PosCounter(l);
-        res.data=box(stringKeys);
+        res.data=Variant(stringKeys);
         ++depth;
         return res;
     }
@@ -171,7 +171,7 @@ class JsonSerializer(T=char) : Serializer {
         ac.next();
         indent(depth);
         ++depth;
-        if (unbox!(bool)(ac.data)){
+        if (ac.data.get!(bool)){
             writeKey();
             handlers.rawWriteStr([cast(T)':']);
             writeVal();
@@ -372,7 +372,7 @@ class JsonUnserializer(T=char) : Unserializer {
     override PosCounter readDictStart(FieldMetaInfo *field, bool stringKeys=false) {
         readField(field);
         auto res=PosCounter(ulong.max);
-        res.data=box(stringKeys);
+        res.data=Variant(stringKeys);
         reader.skipString(cast(S)"{");
         if (reader.skipString2(cast(S)`class`,false)){
             reader.skipString(cast(S)":");
@@ -402,7 +402,7 @@ class JsonUnserializer(T=char) : Unserializer {
             }
         }
         ac.next;
-        if (unbox!(bool)(ac.data)){
+        if (ac.data.get!(bool)){
             readKey();
             reader.skipString(cast(S)":");
             readVal();

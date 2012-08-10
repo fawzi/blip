@@ -18,6 +18,7 @@
 // limitations under the License.
 module blip.parallel.smp.NumaSchedulers;
 import blip.core.Thread;
+import blip.core.Variant:Variant;
 import blip.core.sync.Mutex;
 import blip.core.sync.Semaphore;
 import blip.math.Math;
