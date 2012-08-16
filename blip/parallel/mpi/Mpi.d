@@ -95,7 +95,7 @@ version(mpi)
     }
 
     class MpiSerializer:SBinSerializer{
-        static MpiSerializer freeList;
+	__gshared static MpiSerializer freeList;
         MpiSerializer next;
         int tag;
         LocalGrowableArray!(ubyte) msgData;
@@ -160,7 +160,7 @@ version(mpi)
     }
 
     class MpiUnserializer:SBinUnserializer{
-        static MpiUnserializer freeList;
+        __gshared static MpiUnserializer freeList;
         SerializedMessage msg;
         MpiUnserializer next;
         static MpiUnserializer opCall(SerializedMessage msg){
@@ -441,7 +441,7 @@ version(mpi)
                         handler(comm[status.MPI_SOURCE],status.MPI_TAG);
                     }
                 } catch (Exception e){
-                    serr(collectAppender(delegate void(CharSink s){
+                    serr(collectIAppender(delegate void(CharSink s){
                         dumper(s)("Error in mpi handler for comm ")(comm.name)(" tag:")(tag)("\n");
                         e.writeOut(serr.call);
                     }));
@@ -483,7 +483,7 @@ version(mpi)
             auto res=channels[rank];
             if (res is null){
                 synchronized(this){
-                    volatile res=channels[rank];
+                    res=channels[rank];
                     if (res is null){
                         res=new MpiChannel(this,rank);
                         channels[rank]=res;
@@ -789,7 +789,7 @@ version(mpi)
         void registerHandler(ChannelHandler handler,int tag){
             auto serv=new HandlerServer(this,handler,tag);
             if ((tag in handlers)is null){
-                throw new MpiException(collectAppender(delegate void(CharSink s){
+                throw new MpiException(collectIAppender(delegate void(CharSink s){
                     s("handler already present for tag "); writeOut(s,tag); }),
                     __FILE__,__LINE__);
             }
@@ -822,8 +822,8 @@ version(mpi)
     
     }
 
-    static LinearComm mpiWorld;
-    static this(){
+    __gshared static LinearComm mpiWorld;
+    shared static this(){
         mpiWorld=new MpiLinearComm();
     }
 
@@ -831,8 +831,8 @@ version(mpi)
     public import blip.parallel.mpi.MpiModels;
     import blip.parallel.mpi.SingleNode;
     
-    static LinearComm mpiWorld;
-    static this(){
+    __gshared static LinearComm mpiWorld;
+    shared static this(){
         mpiWorld=new SNLinearComm();
     }
 }

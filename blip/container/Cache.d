@@ -38,9 +38,9 @@ enum EntryFlags{
 
 alias size_t CKey; // use ulong in all cases???
 
-UniqueNumber!(CKey) cacheKey;
+__gshared UniqueNumber!(CKey) cacheKey;
 
-static this(){
+shared static this(){
     cacheKey=UniqueNumber!(size_t)(1); // skip init and begin at 0?
 }
 
@@ -71,7 +71,7 @@ class Cache{
             nextCache=this;
         } else {
             synchronized(addTo){
-                volatile nextCache=addTo.nextCache;
+                nextCache=addTo.nextCache;
                 memoryBarrier!(false,false,false,true)();
                 addTo.nextCache=this;
             }
@@ -220,7 +220,7 @@ class Cache{
 }
 
 /// global (one per process) cache
-Cache gCache;
+__gshared Cache gCache;
 static this(){
     gCache=new Cache();
 }
@@ -253,12 +253,12 @@ class Cached:CacheElFactory{
     this(string name="", EntryFlags flags=EntryFlags.Purge){
         this._key=cacheKey.next();
         if (name.length==0){
-            this._name=collectAppender(delegate void(CharSink sink){
+            this._name=collectIAppender(delegate void(CharSink sink){
                 sink("Cache_");
                 writeOut(sink,key);
             });
         } else if (name[$-1]=='_') {
-            this._name=collectAppender(delegate void(CharSink s){
+            this._name=collectIAppender(delegate void(CharSink s){
                 s(name);
                 writeOut(s,key);
             });

@@ -27,7 +27,7 @@ struct Wisper(T){
         } else {
             static assert(0,"Wisper!("~T.stingof~") cannot handle "~U.stringof);
         }
-        return *this;
+        return this;
     }
 }
 /// ditto

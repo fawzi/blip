@@ -45,7 +45,7 @@ import blip.container.GrowableArray;
 /// generates a delegate for each type, this can be used to buid a kind of VTable
 /// and hide the use of templates
 string coreTypeDelegates(string indent="    "){
-    string res="".dup;
+    string res="";
     foreach (T;CoreTypes){
         res~=indent~"void delegate(ref "~T.stringof~" el) coreHandler_"~strForCoreType!(T)~";\n";
     }
@@ -540,7 +540,7 @@ class FormattedWriteHandlers(U=char): WriteHandlers{
         } else {
             static assert(0,U.stringof~" unsupported");
         }
-        dsc=collectAppender(&w.desc);
+        dsc=collectIAppender(&w.desc);
     }
     this(string dsc,void delegate(U[]) writer,void delegate() flusher=null,void delegate() _close=null,OutWriter dscW=null){
         super(dsc,flusher,dscW);

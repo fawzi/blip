@@ -91,8 +91,8 @@ class EmptyFIterator(T):FIteratorI!(T){
     }
     ForeachableI!(T) parallelLoop(size_t optimalChunkSize){ return this; }
     ForeachableI!(T) parallelLoop() { return this; }
-    static EmptyFIterator instance;
-    static this(){ instance=new EmptyFIterator; }
+    __gshared static EmptyFIterator instance;
+    shared static this(){ instance=new EmptyFIterator; }
 }
 
 /// template to mixin opApply based on a next operation

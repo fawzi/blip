@@ -44,18 +44,20 @@ enum{ MPI_VERSION=2,MPI_SUBVERSION=1 }
 /*
  * Typedefs
  */
-typedef ptrdiff_t MPI_Aint;
-typedef long MPI_Offset;
-typedef void *MPI_Comm;
-typedef void *MPI_Datatype;
-typedef void *MPI_Errhandler;
-typedef void *MPI_File;
-typedef void *MPI_Group;
-typedef void *MPI_Info;
-typedef void *MPI_Op;
-typedef void *MPI_Request;
+alias ptrdiff_t MPI_Aint;
+alias long MPI_Offset;
+alias void *MPI_Comm;
+alias void *MPI_Datatype;
+alias void *MPI_Errhandler;
+alias void *MPI_File;
+alias void *MPI_Group;
+alias void *MPI_Info;
+alias void *MPI_Op;
+alias void *MPI_Request;
+
 alias ompi_status_public_t MPI_Status;
-typedef void *MPI_Win;
+
+alias void *MPI_Win;
 /*
  * MPI_Status
  */
@@ -331,7 +333,7 @@ const MPI_Errhandler MPI_ERRHANDLER_NULL;
 const MPI_Info MPI_INFO_NULL;
 const MPI_Win MPI_WIN_NULL;
 const MPI_File MPI_FILE_NULL;
-static this(){
+shared static this(){
     MPI_GROUP_NULL = cast(MPI_Group)&ompi_mpi_group_null;
     MPI_COMM_NULL = cast(MPI_Comm)&ompi_mpi_comm_null;
     MPI_REQUEST_NULL = cast(MPI_Request)&ompi_request_null;
@@ -597,7 +599,7 @@ MPI_Op MPI_MAXLOC;
 MPI_Op MPI_MINLOC;
 MPI_Op MPI_REPLACE;
 
-static this(){
+shared static this(){
     MPI_COMM_WORLD = cast(MPI_Comm)&ompi_mpi_comm_world;
     MPI_COMM_SELF= cast(MPI_Comm)&ompi_mpi_comm_self;
     MPI_GROUP_EMPTY = cast(MPI_Group)&ompi_mpi_group_empty;
@@ -646,7 +648,7 @@ MPI_Datatype MPI_UNSIGNED_LONG_LONG;
 MPI_Datatype MPI_2COMPLEX;
 MPI_Datatype MPI_2DOUBLE_COMPLEX;
 
-static this(){
+shared static this(){
     MPI_DATATYPE_NULL = cast(MPI_Datatype)&ompi_mpi_datatype_null;
     MPI_BYTE = cast(MPI_Datatype)&ompi_mpi_byte;
     MPI_PACKED = cast(MPI_Datatype)&ompi_mpi_packed;
@@ -705,7 +707,7 @@ MPI_Datatype MPI_2INTEGER;
 MPI_Errhandler MPI_ERRORS_ARE_FATAL;
 MPI_Errhandler MPI_ERRORS_RETURN;
 
-static this(){
+shared static this(){
  MPI_CHARACTER = cast(MPI_Datatype)&ompi_mpi_character;
  MPI_LOGICAL = cast(MPI_Datatype)&ompi_mpi_logic;
 /+ MPI_LOGICAL1 = cast(MPI_Datatype)&ompi_mpi_logical1;
@@ -1754,7 +1756,7 @@ double PMPI_Wtick();
 double PMPI_Wtime();
 } else {
     
-    typedef uint MPI_Op;
+    alias uint MPI_Op;
     
     enum :MPI_Op{
         MPI_MAX    ,

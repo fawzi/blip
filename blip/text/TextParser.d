@@ -105,7 +105,7 @@ class TextParser(T) : InputFilter
     /// exception during parsing (adds parser position info)
     static class ParsingException:Exception{
         this(TextParser p,string desc,string filename,long line,Exception next=null){
-            super(collectAppender(delegate void(CharSink s){ s(desc); s(" parsing "); p.parserPos(s); }),filename,line,next);
+            super(collectIAppender(delegate void(CharSink s){ s(desc); s(" parsing "); p.parserPos(s); }),filename,line,next);
         }
     }
     /// exception for when the cached part is too small

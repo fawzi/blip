@@ -19,7 +19,6 @@
 module blip.parallel.smp.BasicTasks;
 import blip.parallel.smp.SmpModels;
 import blip.core.Thread;
-import blip.core.Variant:Variant;
 import blip.core.sync.Mutex;
 import blip.math.Math;
 import blip.util.TangoLog;
@@ -120,7 +119,7 @@ class TaskPoolT(int batchSize=16):Pool!(Task,batchSize){
     
     override void giveBack(Task obj){
         if (obj.status!=TaskStatus.Finished && obj.status>=TaskStatus.Started){
-            throw new Exception(collectAppender(delegate void(CharSink s){
+            throw new Exception(collectIAppender(delegate void(CharSink s){
                 dumper(s)("unexpected status ")(obj.status)(" in given back task ")(obj)("\n");
             }),__FILE__,__LINE__);
         }
@@ -146,18 +145,18 @@ class SchedulerPools{
 }
 ThreadLocal!(SchedulerPools) _schedulerPools;
 
-static this(){
+/+static this(){
     _schedulerPools=new ThreadLocal!(SchedulerPools)(null);
-}
+}+/
 
 SchedulerPools defaultSchedulerPools(){
-    auto sPool=_schedulerPools.val;
+    auto sPool=_schedulerPools;
     if (sPool is null){
         synchronized{
-            volatile sPool=_schedulerPools.val;
+            sPool=_schedulerPools;
             if (sPool is null){
                 sPool=new SchedulerPools();
-                _schedulerPools.val=sPool;
+                _schedulerPools=sPool;
             }
         }
     }
@@ -198,14 +197,16 @@ struct YieldableCall{
 const int SimpleTaskLevel=int.max/2;
 
 /// no task is executing (just a way to get an error when spawning)
-TaskI noTask;
+__gshared TaskI noTask;
 
 /// thread local data to store current task
 ThreadLocal!(TaskI) taskAtt;
 
-static this(){
+shared static this(){
     noTask=new RootTask(null,0,"noTask",true);
-    taskAtt=new ThreadLocal!(TaskI)(noTask);
+}
+static this(){
+    taskAtt=noTask;
 }
 
 class Task:TaskI{
@@ -247,7 +248,7 @@ class Task:TaskI{
     }
     /// yields the current task (which must be yieldable)
     static bool yield(){
-        auto tAtt=taskAtt.val;
+        auto tAtt=taskAtt;
         if (tAtt is null || !tAtt.mightYield()){
             return false;
         }
@@ -258,10 +259,10 @@ class Task:TaskI{
     /// root tasks are ignored (and no yielding is performed) to make the use of maybeYield simpler.
     /// should ignore all non yieldable tasks???
     static void maybeYield(){
-        auto tAtt=taskAtt.val;
+        auto tAtt=taskAtt;
         if (tAtt is null || !tAtt.mightYield()){
             if (tAtt !is null || cast(RootTask)tAtt !is null) return;
-            throw new Exception(collectAppender(delegate void(CharSink s){
+            throw new Exception(collectIAppender(delegate void(CharSink s){
                 dumper(s)("asked to yield task ")(tAtt)(" which cannot be yielded");
             }),__FILE__,__LINE__);
         }
@@ -488,7 +489,7 @@ class Task:TaskI{
         return cast(uint)(cast(void*)this);
     }
     /// equality of tasks
-    override int opEquals(Object o){ return (o is this); }
+    override equals_t opEquals(Object o){ return (o is this); }
     /// executes the actual task (after all the required setup)
     void internalExe(){
         assert(taskOp !is null);
@@ -547,9 +548,9 @@ class Task:TaskI{
         if (status==TaskStatus.Started){
             {
                 scope(exit){
-                    taskAtt.val=noTask;
+                    taskAtt=noTask;
                 }
-                taskAtt.val=this;
+                taskAtt=this;
                 internalExe();
             }
             bool resub=resubmit;
@@ -581,7 +582,7 @@ class Task:TaskI{
                 }
             }
             if (resub) {
-                volatile auto sched=scheduler;
+                auto sched=scheduler;
                 sched.addTask(this);
             } else if(delayLevel==0){
                 startWaiting();
@@ -626,9 +627,9 @@ class Task:TaskI{
     {
         {
             scope(exit){
-                taskAtt.val=noTask;
+                taskAtt=noTask;
             }
-            taskAtt.val=this;
+            taskAtt=this;
             assert(status==TaskStatus.PostExec);
             if (onFinish0 !is null){
                 onFinish0();
@@ -644,7 +645,7 @@ class Task:TaskI{
             version(NoTaskLock){
                 assert(status==TaskStatus.PostExec);
                 status=TaskStatus.Finished;
-                volatile auto waitSemAtt=waitSem;
+                auto waitSemAtt=waitSem;
                 if (waitSemAtt !is null) waitSemAtt.notify();
             } else {
                 synchronized(taskLock){
@@ -701,7 +702,7 @@ class Task:TaskI{
     /// the current delay level
     int delayLevel(){
         auto res=bsr(delayFlags);
-        assert((res&1)==0,collectAppender(delegate void(CharSink s){
+        assert((res&1)==0,collectIAppender(delegate void(CharSink s){
             dumper(s)("unexpected delayFlags:")(delayFlags);
         }));
         return (res>>1);
@@ -710,18 +711,18 @@ class Task:TaskI{
     void subtaskEnded(TaskI st){
         bool callOnFinish=false;
         version(NoTaskLock){ // mmh suspicious, I should recheck this... especially barriers wrt. to the rest
-            volatile auto oldTasks=flagAdd(spawnTasks,-1);
+            auto oldTasks=flagAdd(spawnTasks,-1);
             if (oldTasks==1){
                 if (atomicCASB(statusAtt,TaskStatus.PostExec,TaskStatus.WaitingEnd)){
                     callOnFinish=true;
                     assert((flags & TaskFlags.WaitingSubtasks)==0 && delayFlags==1);
                 } else {
-                    volatile memoryBarrier!(true,false,false,true)();
+                     memoryBarrier!(true,false,false,true)();
                      while ((flagsAtt & TaskFlags.WaitingSubtasks)!=0){
                         if (atomicCASB(flags,flagsAtt & (~TaskFlags.WaitingSubtasks),flagsAtt)){
                             callOnFinish=true;
                         }
-                        volatile flagsAtt=flags;
+                        flagsAtt=flags;
                     }
                 }
             }
@@ -786,7 +787,7 @@ class Task:TaskI{
                     default: assert(0);
                 }
             }
-            volatile auto sched=scheduler;
+	    auto sched=scheduler;
             if (resub){
                 debug(TrackDelayFlags){
                     sinkTogether(sout,delegate void(CharSink s){
@@ -814,7 +815,7 @@ class Task:TaskI{
     /// a similar thing could be done using a "delay count" but I find this cleaner and safer
     void delay(void delegate() opStart=null){
         int myDelayLevel;
-        auto tAtt=taskAtt.val;
+        auto tAtt=taskAtt;
         if (tAtt !is this){
             throw new ParaException("delay '"~taskName~"' called while executing '"~((tAtt is null)?"*null*":tAtt.taskName),
                 __FILE__,__LINE__);
@@ -855,12 +856,12 @@ class Task:TaskI{
                     dumper(s)("delay postTask, flags:")(delayFlags,"x")("\n");
                 });
             }
-            volatile auto flagAtt=flags;
+            auto flagAtt=flags;
             bool do_yield=false;
             synchronized(taskLock){
                 auto levelAtt=bsr(delayFlags);
                 if (levelAtt!=myDelayLevel+2){
-                    throw new ParaException(collectAppender(delegate void(CharSink s){
+                    throw new ParaException(collectIAppender(delegate void(CharSink s){
                         dumper(s)("unexpected 2*delay level at the end of delay of (")(taskName)("), ")
                             (levelAtt)(" vs ")(myDelayLevel);
                     }), __FILE__,__LINE__);
@@ -937,7 +938,7 @@ class Task:TaskI{
     }
     /// operation that spawn the given task as subtask of this one
     void spawnTask(TaskI task){
-        spawnTask(task,delegate void(){ volatile auto sched=task.scheduler; sched.addTask(task); });
+        spawnTask(task,delegate void(){ auto sched=task.scheduler; sched.addTask(task); });
     }
     /// operation that spawn the given task as subtask of this onebut to a specific scheduler
     void spawnTask0(TaskI task, TaskSchedulerI sched){
@@ -945,7 +946,7 @@ class Task:TaskI{
     }
     /// spawn a task and waits for its completion
     void spawnTaskSync(TaskI task){
-        auto tAtt=taskAtt.val;
+        auto tAtt=taskAtt;
         if (tAtt is null || ((cast(RootTask)tAtt)!is null) || tAtt is noTask || !tAtt.mightYield){
             if (tAtt !is null && ((cast(RootTask)tAtt)is null) && tAtt !is noTask && !tAtt.mightYield) {
                 scheduler.logger.warn("unsafe execution in spawnTaskSync of task "~task.taskName~" in "~tAtt.taskName~"\n");
@@ -961,7 +962,7 @@ class Task:TaskI{
                 if ((flags & TaskFlags.ImmediateSyncSubtasks)!=0){
                     // add something like && rand.uniform!(bool)() to avoid excessive task length?
                     this.spawnTask(task,delegate void(){
-                        volatile auto sched=task.scheduler; // this is wrong if sched is a MultiScheduler...
+                        auto sched=task.scheduler; // this is wrong if sched is a MultiScheduler...
                         sched.subtaskActivated(task);
                         task.execute();
                         sched.subtaskDeactivated(task);
@@ -969,7 +970,7 @@ class Task:TaskI{
                 } else {
                     // to do: allowing the task to be stolen here introduces some problems
                     // not sure why, should investigate (probably connected with scheduler change)
-                    spawnTask(task,delegate void(){ volatile auto sched=task.scheduler; sched.addTask0(task); });
+                    spawnTask(task,delegate void(){ auto sched=task.scheduler; sched.addTask0(task); });
                 }
             });
         }
@@ -1018,7 +1019,7 @@ class Task:TaskI{
                 }
                 spawnTask(t.autorelease);
             }
-        } while (!scheduler.manyQueued() && subCost<maxCost)
+        } while (!scheduler.manyQueued() && subCost<maxCost);
     }
     
     // ------------------------ task setup ops -----------------------
@@ -1094,7 +1095,7 @@ class Task:TaskI{
             if (scheduler !is null){
                 this.superTask=scheduler.rootTask;
             } else {
-                this.superTask=taskAtt.val;
+                this.superTask=taskAtt;
             }
         }
         superTask.spawnTaskSync(this);
@@ -1109,7 +1110,7 @@ class Task:TaskI{
             if (scheduler !is null){
                 this.superTask=scheduler.rootTask;
             } else {
-                this.superTask=taskAtt.val;
+                this.superTask=taskAtt;
             }
         }
         this.superTask.spawnTask(this);
@@ -1120,7 +1121,7 @@ class Task:TaskI{
     Task submitYield(TaskI superTask=null){
         retain();
         submit(superTask);
-        auto tAtt=taskAtt.val;
+        auto tAtt=taskAtt;
         if (tAtt.mightYield)
             scheduler.maybeYield();
         else if ((cast(RootTask)tAtt)is null){
@@ -1135,7 +1136,7 @@ class Task:TaskI{
     /// then adds to the tasks to do at the end a task that continues the fiber of the current one
     /// remove? not really worth having...
     void finishSubtasks(){
-        auto tAtt=taskAtt.val;
+        auto tAtt=taskAtt;
         if (cast(Object)tAtt !is this){
             throw new ParaException("finishSubtasks called on task '"~taskName~"' while executing '"~((tAtt is null)?"*null*"[]:tAtt.taskName),
                 __FILE__,__LINE__);
@@ -1171,7 +1172,7 @@ class Task:TaskI{
     /// description (for debugging)
     /// non threadsafe
     string toString(){
-        return cast(string)collectAppender(cast(OutWriter)&desc);
+        return collectIAppender(cast(OutWriter)&desc);
     }
     /// description (for debugging)
     void desc(void delegate(cstring) s){
@@ -1258,14 +1259,14 @@ class Task:TaskI{
     void wait()
     in{
         if (refCount<=0){
-            throw new Exception(collectAppender(delegate void(CharSink s){
+            throw new Exception(collectIAppender(delegate void(CharSink s){
                 dumper(s)("waiting on released task ")(this)(" is dangerous (and you should have retained it before starting it)");
             }),__FILE__,__LINE__);
         }
     }
     out{
         if (refCount<=0){
-            throw new Exception(collectAppender(delegate void(CharSink s){
+            throw new Exception(collectIAppender(delegate void(CharSink s){
                 dumper(s)("waiting on released task ")(this)(" (after wait) is dangerous (and you should have retained it before starting it)");
             }),__FILE__,__LINE__);
         }
@@ -1273,10 +1274,10 @@ class Task:TaskI{
     body{
         Semaphore wSem;
         if (status!=TaskStatus.Finished){
-            volatile wSem=waitSem;
+            wSem=waitSem;
             if (waitSem is null) {
                 version(NoTaskLock){
-                    volatile auto statusAtt=statusAtt;
+                    auto statusAtt=statusAtt;
                     if (statusAtt!=TaskStatus.Finished){
                         if (waitSem is null){
                             auto waitSemNew=new Semaphore();
@@ -1299,7 +1300,7 @@ class Task:TaskI{
             }
             if (status!=TaskStatus.Finished) {
                 assert(waitSem !is null);
-                volatile wSem=waitSem;
+                wSem=waitSem;
                 wSem.wait();
                 //assert(status==TaskStatus.Finished,"unexpected status after wait");
                 wSem.notify();
@@ -1341,7 +1342,7 @@ class RootTask: Task{
         this.warnSpawn=warnSpawn;
     }
     override void internalExe(){
-        auto msg =collectAppender(delegate void(CharSink s){
+        auto msg =collectIAppender(delegate void(CharSink s){
             dumper(s)("root task ")(this)(" should not be executed"); });
         log.error(msg);
         assert(0,msg);
@@ -1349,7 +1350,7 @@ class RootTask: Task{
     override void willSpawn(TaskI t){
         if (warnSpawn){
             if (this is noTask){
-                log.warn("root task '"~taskName~"' spawned task "~t.taskName~" if you want to implicitly spawn from this thread without this warning you should do some thing like taskAtt.val=defaultTask; in it");
+                log.warn("root task '"~taskName~"' spawned task "~t.taskName~" if you want to implicitly spawn from this thread without this warning you should do some thing like taskAtt=defaultTask; in it");
             } else {
                 log.warn("root task '"~taskName~"' spawned task "~t.taskName);
             }
@@ -1407,10 +1408,10 @@ class SequentialTask:RootTask{
     /// spawn a task and waits for its completion
     void spawnTaskSync(TaskI task){
         debug{
-            auto tNow=taskAtt.val;
+            auto tNow=taskAtt;
             while (tNow!is null && tNow.superTask!is null && tNow.superTask!is tNow){
                 if (tNow.superTask is this){
-                    throw new ParaException(collectAppender(delegate void(CharSink s){
+                    throw new ParaException(collectIAppender(delegate void(CharSink s){
                             dumper(s)(this)(".spawnTaskSync(")(task)(") called while executing ")
                                 (taskAtt)(" which is a subtask of ")(this)(" (wait between sequential tasks)");
                         }),__FILE__,__LINE__);
@@ -1418,7 +1419,7 @@ class SequentialTask:RootTask{
                 tNow=tNow.superTask;
             }
         }
-        auto tAtt=taskAtt.val;
+        auto tAtt=taskAtt;
         if (tAtt is null || ((cast(RootTask)tAtt)!is null) || tAtt is noTask || !tAtt.mightYield){
             if (tAtt !is null && ((cast(RootTask)tAtt)is null) && tAtt !is noTask && !tAtt.mightYield) {
                 scheduler.logger.warn("unsafe execution in spawnTaskSync of task "~task.taskName~" in "~tAtt.taskName~"\n");

@@ -28,14 +28,14 @@ version(Xpose){
     template NewSerializationExpose_mix0() {
         static string begin(string target) {
             return `
-            static ClassMetaInfo serializationMetaInfo;
+            __gshared static ClassMetaInfo serializationMetaInfo;
         
             ClassMetaInfo getSerializationMetaInfo() {
                 return serializationMetaInfo;
             }
 
             /* private template SerializationInitializerMix() { */
-                static this() {
+                shared static this() {
                     alias `~("" == target ? `UnrefType!(typeof(this))` : target)~` TargetType;
                     serializationMetaInfo=ClassMetaInfo.createForType!(TargetType)();
                     static if(!is(TargetType==UnrefType!(typeof(this)))){

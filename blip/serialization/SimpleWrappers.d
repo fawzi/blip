@@ -52,10 +52,10 @@ struct LazyArray(T) {
         res.setLen=setLen;
         return res;
     }
-    static ClassMetaInfo metaI;
-    static this(){
+    __gshared static ClassMetaInfo metaI;
+    shared static this(){
         if (metaI is null){
-            metaI=ClassMetaInfo.createForType!(typeof(*this))("LazyArray!("~T.mangleof~")",
+            metaI=ClassMetaInfo.createForType!(typeof(this))("LazyArray!("~T.mangleof~")",
                     "array of "~T.stringof);
             metaI.kind=TypeKind.CustomK;
         }
@@ -135,10 +135,10 @@ struct LazyAA(K,V) {
         res.setLen=setLen;
         return res;
     }
-    static ClassMetaInfo metaI;
-    static this(){
+    __gshared static ClassMetaInfo metaI;
+    shared static this(){
         if (metaI is null){
-            metaI=ClassMetaInfo.createForType!(typeof(*this))("LazyAA!("~K.mangleof~","~V.mangleof~")",
+            metaI=ClassMetaInfo.createForType!(typeof(this))("LazyAA!("~K.mangleof~","~V.mangleof~")",
                     "associative array from "~K.stringof~" to "~V.stringof);
             metaI.kind=TypeKind.CustomK;
         }

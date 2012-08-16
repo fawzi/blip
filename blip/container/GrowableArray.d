@@ -73,7 +73,7 @@ struct LocalGrowableArray(T){
                 newData.length=growLength(c,T.sizeof);
                 if (newData.ptr!is dataPtr){
                     // actively destroy old data, it is an error to use it
-                    delete (dataPtr[0..capacity]);
+                    delete (dataPtr);
                 }
                 dataPtr=newData.ptr;
                 capacity=newData.length;
@@ -104,16 +104,16 @@ struct LocalGrowableArray(T){
         opCatAssign(v);
     }
     static if(is(T==ubyte)||is(T==byte)){
-        void appendVoid(void[]t){
+        void appendVoid(const(void)[]t){
             if (t.length!=0){
                 growTo(data.length+t.length);
                 dataPtr[(dataLen-t.length)..dataLen]=cast(T[])t;
             }
         }
         //alias appendVoid opCatAssign;
-        void opCatAssign(void[]t){ appendVoid(t); }
+        void opCatAssign(const(void)[]t){ appendVoid(t); }
     }
-    void appendEl(T t){
+    void appendEl(const T t){
         guaranteeCapacity(dataLen+1);
         dataPtr[dataLen]=t;
         // with a write barrier here one can guarantee that the data seen is always initialized...
@@ -122,7 +122,7 @@ struct LocalGrowableArray(T){
         // initializedLen might get messy
         ++dataLen;
     }
-    void appendArr(T[] t){
+    void appendArr(const(T)[] t){
         if (t.length!=0){
             assert(dataLen<=dataLen+t.length,"wrapping, garbled memory?");
             guaranteeCapacity(dataLen+t.length);
@@ -141,16 +141,16 @@ struct LocalGrowableArray(T){
     }
     /// appends an element
     //alias appendEl opCatAssign;
-    void opCatAssign(T t){ appendEl(t); }
+    void opCatAssign(const T t){ appendEl(t); }
     /// appends a slice
     //alias appendArr opCatAssign;
-    void opCatAssign(T[] t){ appendArr(t); }
+    void opCatAssign(const(T)[] t){ appendArr(t); }
     /// appends what the appender delegate sends
-    void opCatAssign(void delegate(void delegate(T)) appender){
+    void opCatAssign(void delegate(void delegate(const T)) appender){
         appender(&this.appendEl);
     }
     /// appends what the appender delegate sends
-    void opCatAssign(void delegate(void delegate(T[])) appender){
+    void opCatAssign(void delegate(void delegate(const(T)[])) appender){
         appender(&this.appendArr);
     }
     /// slice of the data contained in this object, will be invalided at the next append,...
@@ -171,10 +171,15 @@ struct LocalGrowableArray(T){
         dataLen=0;
         return res;
     }
+    /// returns of the data contained in this object as immutable data, and clears the content of this object.
+    /// data is guaranteed to be global if guaranteeGlobal is true (default)
+    immutable(T)[] takeIData(bool guaranteeGlobal=true){
+	return cast(immutable(T)[])takeData(guaranteeGlobal);
+    }
     /// deallocates data
     void deallocData(){
         if (sharing==GASharing.Global){
-            delete (dataPtr[0..capacity]);
+            delete (dataPtr);
         }
         dataPtr=null;
         capacity=0;
@@ -264,6 +269,17 @@ MutableEl!(T)[] collectAppender(T,U=MutableEl!(T))(void delegate(void delegate(T
     auto arr=lGrowableArray(buf,0,((buf.ptr is buf2.ptr)?GASharing.Local:GASharing.GlobalNoFree));
     arr(appender);
     return arr.takeData();
+}
+
+/// collects what is appended by the appender in a single array and returns it
+/// it buf is provided the appender tries to use it (but allocates if extra space is needed)
+immutable(MutableEl!(T))[] collectIAppender(T,U=MutableEl!(T))(void delegate(void delegate(T)) appender,U[] buf=null){
+    static assert(is(U==MutableEl!(T)));
+    MutableEl!(T)[512/T.sizeof] buf2;
+    if (buf.length==0) buf=buf2;
+    auto arr=lGrowableArray(buf,0,((buf.ptr is buf2.ptr)?GASharing.Local:GASharing.GlobalNoFree));
+    arr(appender);
+    return arr.takeIData();
 }
 
 /// collects what is appended by the appender and adds it at once to the given sink

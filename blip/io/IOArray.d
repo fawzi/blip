@@ -61,10 +61,10 @@ class IOArray : Conduit, InputBuffer, OutputBuffer, Conduit.Seek
         private size_t  dimension;              // maximum extent of content
         private size_t  expansion;              // for growing instances
 
-        private static string overflow  = "output buffer is full";
-        private static string underflow = "input buffer is empty";
-        private static string eofRead   = "end-of-flow while reading";
-        private static string eofWrite  = "end-of-flow while writing";
+        private static immutable string overflow  = "output buffer is full";
+        private static immutable string underflow = "input buffer is empty";
+        private static immutable string eofRead   = "end-of-flow while reading";
+        private static immutable string eofWrite  = "end-of-flow while writing";
 
         /***********************************************************************
 
@@ -72,7 +72,7 @@ class IOArray : Conduit, InputBuffer, OutputBuffer, Conduit.Seek
 
         ***********************************************************************/
 
-        invariant
+        invariant()
         {
                 assert (index <= extent);
                 assert (extent <= dimension);
@@ -209,7 +209,7 @@ class IOArray : Conduit, InputBuffer, OutputBuffer, Conduit.Seek
 
         ***********************************************************************/
 
-        final override size_t write (void[] src)
+        final override size_t write (const(void)[] src)
         {
                 auto len = src.length;
                 if (len)

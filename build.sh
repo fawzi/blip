@@ -144,6 +144,11 @@ case $compShort in
     versionFlag="-d-version="
     extra_libs_comp=
     ;;
+    ldc2)
+    linkFlag="-L="
+    versionFlag="-d-version="
+    extra_libs_comp=
+    ;;
     *)
     die "unsupported compiler"
 esac

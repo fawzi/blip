@@ -31,6 +31,15 @@ version( LDC )
 {
     import ldc.intrinsics;
 }
+import std.traits:Unqual;
+
+template Unshared(T){
+    static if (is(T U==shared)){
+	alias U Unshared;
+    } else {
+	alias T Unshared;
+    }
+}
 
 private {
     // from tango.core.traits:
@@ -151,7 +160,7 @@ version( LDC )
 } else version(D_InlineAsm_X86){
     void memoryBarrier(bool ll, bool ls, bool sl,bool ss)(){
 	static if (ls || sl || (ll && ss)){ // use a sequencing operation like cpuid or simply cmpxch instead?
-            volatile asm {
+            asm {
                 mfence;
             }
             // this is supposedly faster and correct, but let's play it safe and use the specific instruction
@@ -159,11 +168,11 @@ version( LDC )
             // xchg rax
             // pop rax
         } else static if (ll){
-            volatile asm {
+            asm {
                 lfence;
             }
         } else static if( ss ){
-            volatile asm {
+            asm {
                 sfence;
             }
         }
@@ -171,7 +180,7 @@ version( LDC )
 } else version(D_InlineAsm_X86_64){
     void memoryBarrier(bool ll, bool ls, bool sl,bool ss)(){
         static if (ls || sl || (ll && ss)){ // use a sequencing operation like cpuid or simply cmpxch instead?
-            volatile asm {
+            asm {
                 mfence;
             }
             // this is supposedly faster and correct, but let's play it safe and use the specific instruction
@@ -179,11 +188,11 @@ version( LDC )
             // xchg rax
             // pop rax
         } else static if (ll){
-            volatile asm {
+            asm {
                 lfence;
             }
         } else static if( ss ){
-            volatile asm {
+            asm {
                 sfence;
             }
         }
@@ -225,9 +234,12 @@ void fullBarrier(){
  * barriers are not implied, just atomicity!
 */
 version(LDC){
-    T atomicSwap( T )( ref T val, T newval )
+    TT atomicSwap( TT, U=TT )( ref shared(TT) val, U newval0 )
     {
-        T oldval = void;
+	
+        alias Unshared!(TT) T;
+	T newval=cast(T)newval0;
+	T oldval = void;
         static if (isPointerOrClass!(T))
         {
             oldval = cast(T)llvm_atomic_swap!(size_t)(cast(size_t*)&val, cast(size_t)newval);
@@ -240,21 +252,23 @@ version(LDC){
         {
             oldval = llvm_atomic_swap!(T)(&val, newval);
         }
-        return oldval;
+        return cast(TT)oldval;
     }
 } else version(D_InlineAsm_X86) {
-    T atomicSwap( T )( ref T val, T newval )
+    TT atomicSwap( TT, U=TT )( ref shared(TT) val, U newval0 )
     in {
         // NOTE: 32 bit x86 systems support 8 byte CAS, which only requires
         //       4 byte alignment, so use size_t as the align type here.
-        static if( T.sizeof > size_t.sizeof )
+        static if( TT.sizeof > size_t.sizeof )
             assert( atomicValueIsProperlyAligned!(size_t)( cast(size_t) &val ) );
         else
-            assert( atomicValueIsProperlyAligned!(T)( cast(size_t) &val ) );
+            assert( atomicValueIsProperlyAligned!(TT)( cast(size_t) &val ) );
     } body {
-        T*posVal=&val;
+	alias Unshared!(TT) T;
+	T newval=cast(T)newval0;
+        T*posVal=cast(T*)&val;
         static if( T.sizeof == byte.sizeof ) {
-            volatile asm {
+            asm {
                 mov AL, newval;
                 mov ECX, posVal;
                 lock; // lock always needed to make this op atomic
@@ -262,7 +276,7 @@ version(LDC){
             }
         }
         else static if( T.sizeof == short.sizeof ) {
-            volatile asm {
+            asm {
                 mov AX, newval;
                 mov ECX, posVal;
                 lock; // lock always needed to make this op atomic
@@ -270,7 +284,7 @@ version(LDC){
             }
         }
         else static if( T.sizeof == int.sizeof ) {
-            volatile asm {
+            asm {
                 mov EAX, newval;
                 mov ECX, posVal;
                 lock; // lock always needed to make this op atomic
@@ -287,13 +301,15 @@ version(LDC){
         }
     }
 } else version (D_InlineAsm_X86_64){
-    T atomicSwap( T )( ref T val, T newval )
+    TT atomicSwap( TT, U=TT )( ref shared(TT) val, U newval0 )
     in {
-        assert( atomicValueIsProperlyAligned!(T)( cast(size_t) &val ) );
+        assert( atomicValueIsProperlyAligned!(TT)( cast(size_t) &val ) );
     } body {
-        T*posVal=&val;
+	alias Unshared!(TT) T;
+	T newval=cast(T)newval0;
+        T*posVal=cast(T*)&val;
         static if( T.sizeof == byte.sizeof ) {
-            volatile asm {
+            asm {
                 mov AL, newval;
                 mov RCX, posVal;
                 lock; // lock always needed to make this op atomic
@@ -301,7 +317,7 @@ version(LDC){
             }
         }
         else static if( T.sizeof == short.sizeof ) {
-            volatile asm {
+            asm {
                 mov AX, newval;
                 mov RCX, posVal;
                 lock; // lock always needed to make this op atomic
@@ -309,7 +325,7 @@ version(LDC){
             }
         }
         else static if( T.sizeof == int.sizeof ) {
-            volatile asm {
+            asm {
                 mov EAX, newval;
                 mov RCX, posVal;
                 lock; // lock always needed to make this op atomic
@@ -317,7 +333,7 @@ version(LDC){
             }
         }
         else static if( T.sizeof == long.sizeof ) {
-            volatile asm {
+            asm {
                 mov RAX, newval;
                 mov RCX, posVal;
                 lock; // lock always needed to make this op atomic
@@ -330,13 +346,15 @@ version(LDC){
         }
     }
 } else {
-    T atomicSwap( T )( ref T val, T newval )
+    TT atomicSwap( TT, U=TT )( ref shared(TT) val, U newval0 )
     in {
-        assert( atomicValueIsProperlyAligned!(T)( cast(size_t) &val ) );
+        assert( atomicValueIsProperlyAligned!(TT)( cast(size_t) &val ) );
     } body {
-        T oldVal;
-        synchronized(typeid(T)){
-            oldVal=val;
+	alias Unshared!(TT) T;
+	T newval=cast(T)newval0;
+        TT oldVal;
+        synchronized(typeid(T)){ // this is actually slightly incorrect, use a global lock instead?
+            oldVal=cast(TT)val;
             val=newval;
         }
         return oldVal;
@@ -345,27 +363,32 @@ version(LDC){
 
 //---------------------
 // internal conversion template
-private T aCasT(T,V)(ref T val, T newval, T equalTo){
+private T aCasT(T,V)(ref shared(T) val, T newval, T equalTo){
     union UVConv{V v; T t;}
     union UVPtrConv{V *v; T *t;}
     UVConv vNew,vOld,vAtt;
     UVPtrConv valPtr;
     vNew.t=newval;
     vOld.t=equalTo;
-    valPtr.t=&val;
+    valPtr.t=cast(T*)&val;
     vAtt.v=atomicCAS(*valPtr.v,vNew.v,vOld.v);
     return vAtt.t;
 }
 /// internal reduction
-private T aCas(T)(ref T val, T newval, T equalTo){
+private T aCas(T,U=T,V=T)(ref shared(T) val, U newval, V equalTo){
+    static if (is(T TT == shared)){
+	alias TT TBase;
+    } else {
+	alias T TBase;
+    }
     static if (T.sizeof==1){
-        return aCasT!(T,ubyte)(val,newval,equalTo);
-    } else static if (T.sizeof==2){
-        return aCasT!(T,ushort)(val,newval,equalTo);
-    } else static if (T.sizeof==4){
-        return aCasT!(T,uint)(val,newval,equalTo);
-    } else static if (T.sizeof==8){ // unclear if it is always supported...
-        return aCasT!(T,ulong)(val,newval,equalTo);
+        return aCasT!(TBase,ubyte)(val,cast(TBase)newval,cast(TBase)equalTo);
+    } else static if (TBase.sizeof==2){
+        return aCasT!(TBase,ushort)(val,cast(TBase)newval,cast(TBase)equalTo);
+    } else static if (TBase.sizeof==4){
+        return aCasT!(TBase,uint)(val,cast(TBase)newval,cast(TBase)equalTo);
+    } else static if (TBase.sizeof==8){ // unclear if it is always supported...
+        return aCasT!(TBase,ulong)(val,cast(TBase)newval,cast(TBase)equalTo);
     } else {
         static assert(0,"invalid type "~T.stringof);
     }
@@ -379,22 +402,25 @@ private T aCas(T)(ref T val, T newval, T equalTo){
  * if result==equalTo, otherwise one can use the result as the current value).
 */
 version(LDC){
-    T atomicCAS( T )( ref T val, T newval, T equalTo )
+    TT atomicCAS( TT,U=TT,V=TT )( ref shared(TT) val, U newval0, V equalTo0 )
     {
-        T oldval = void;
+	alias Unshared!(TT) T;
+	T newval=cast(T)newval0;
+	T equalTo=cast(T)equalTo0;
+        TT oldval = void;
         static if (isPointerOrClass!(T))
         {
-            oldval = cast(T)cast(void*)llvm_atomic_cmp_swap!(size_t)(cast(size_t*)cast(void*)&val, cast(size_t)cast(void*)equalTo, cast(size_t)cast(void*)newval);
+            oldval = cast(TT)cast(void*)llvm_atomic_cmp_swap!(size_t)(cast(size_t*)cast(void*)&val, cast(size_t)cast(void*)equalTo, cast(size_t)cast(void*)newval);
         }
         else static if (is(T == bool)) // correct also if bol has different size?
         {
-            oldval = aCas(val,newval,equalTo); // assuming true is *always* 1 and not a non zero value...
+            oldval = cast(TT)aCas(val,newval,equalTo); // assuming true is *always* 1 and not a non zero value...
         }
         else static if (isIntegerType!(T))
         {
-            oldval = llvm_atomic_cmp_swap!(T)(&val, equalTo, newval);
+            oldval = cast(TT)llvm_atomic_cmp_swap!(T)(&val, equalTo, newval);
         } else {
-            oldval = aCas(val,newval,equalTo);
+	    oldval = cast(TT)aCas(val,newval,equalTo);
         }
         return oldval;
     }
@@ -403,18 +429,21 @@ version(LDC){
         extern(C) ubyte OSAtomicCompareAndSwap64(long oldValue, long newValue,
                  long *theValue); // assumes that in C sizeof(_Bool)==1 (as given in osx IA-32 ABI)
     }
-    T atomicCAS( T )( ref T val, T newval, T equalTo )
+    TT atomicCAS( TT,U=TT,V=TT )( ref shared(TT) val, U newval0, V equalTo0 )
     in {
         // NOTE: 32 bit x86 systems support 8 byte CAS, which only requires
         //       4 byte alignment, so use size_t as the align type here.
-        static if( ClassPtr!(T).sizeof > size_t.sizeof )
+        static if( ClassPtr!(TT).sizeof > size_t.sizeof )
             assert( atomicValueIsProperlyAligned!(size_t)( cast(size_t) &val ) );
         else
-            assert( atomicValueIsProperlyAligned!(ClassPtr!(T))( cast(size_t) &val ) );
+            assert( atomicValueIsProperlyAligned!(ClassPtr!(TT))( cast(size_t) &val ) );
     } body {
-        T*posVal=&val;
+	alias Unshared!(TT) T;
+	T newval=cast(T)newval0;
+	T equalTo=cast(T)equalTo0;
+        T*posVal=cast(T*)&val;
         static if( T.sizeof == byte.sizeof ) {
-            volatile asm {
+            asm {
                 mov DL, newval;
                 mov AL, equalTo;
                 mov ECX, posVal;
@@ -423,7 +452,7 @@ version(LDC){
             }
         }
         else static if( T.sizeof == short.sizeof ) {
-            volatile asm {
+            asm {
                 mov DX, newval;
                 mov AX, equalTo;
                 mov ECX, posVal;
@@ -432,7 +461,7 @@ version(LDC){
             }
         }
         else static if( ClassPtr!(T).sizeof == int.sizeof ) {
-            volatile asm {
+            asm {
                 mov EDX, newval;
                 mov EAX, equalTo;
                 mov ECX, posVal;
@@ -455,15 +484,15 @@ version(LDC){
                     {
                         return equalTo;
                     } else {
-                        volatile {
+                        {
                             T res=val;
-                            if (res!is equalTo) return res;
+                            if (res!is equalTo) return cast(TT)res;
                         }
                     }
                 }
             } else {
                 T res;
-                volatile asm
+                asm
                 {
                     push EDI;
                     push EBX;
@@ -482,22 +511,25 @@ version(LDC){
                     pop EBX;
                     pop EDI;
                 }
-                return res;
+                return cast(TT)res;
             }
         }
         else
         {
-            static assert( false, "Invalid template type specified: "~T.stringof );
+            static assert( false, "Invalid template type specified: "~TT.stringof );
         }
     }
 } else version (D_InlineAsm_X86_64){
-    T atomicCAS( T )( ref T val, T newval, T equalTo )
+    TT atomicCAS( TT,U=TT,V=TT )( ref shared(TT) val, U newval0, V equalTo0 )
     in {
-        assert( atomicValueIsProperlyAligned!(T)( cast(size_t) &val ) );
+        assert( atomicValueIsProperlyAligned!(TT)( cast(size_t) &val ) );
     } body {
-        T*posVal=&val;
+	alias Unshared!(TT) T;
+	T newval=cast(T)newval0;
+	T equalTo=cast(T)equalTo0;
+        T*posVal=cast(T*)&val;
         static if( T.sizeof == byte.sizeof ) {
-            volatile asm {
+            asm {
                 mov DL, newval;
                 mov AL, equalTo;
                 mov RCX, posVal;
@@ -506,7 +538,7 @@ version(LDC){
             }
         }
         else static if( T.sizeof == short.sizeof ) {
-            volatile asm {
+            asm {
                 mov DX, newval;
                 mov AX, equalTo;
                 mov RCX, posVal;
@@ -515,7 +547,7 @@ version(LDC){
             }
         }
         else static if( ClassPtr!(T).sizeof == int.sizeof ) {
-            volatile asm {
+            asm {
                 mov EDX, newval;
                 mov EAX, equalTo;
                 mov RCX, posVal;
@@ -524,7 +556,7 @@ version(LDC){
             }
         }
         else static if( ClassPtr!(T).sizeof == long.sizeof ) {
-            volatile asm {
+            asm {
                 mov RDX, newval;
                 mov RAX, equalTo;
                 mov RCX, posVal;
@@ -538,13 +570,16 @@ version(LDC){
         }
     }
 } else {
-    T atomicCAS( T )( ref T val, T newval, T equalTo )
+    TT atomicCAS( TT,U=TT,V=TT )( ref shared(TT) val, U newval0, V equalTo0 )
     in {
-        assert( atomicValueIsProperlyAligned!(T)( cast(size_t) &val ) );
+        assert( atomicValueIsProperlyAligned!(TT)( cast(size_t) &val ) );
     } body {
-        T oldval;
+	alias Unshared!(TT) T;
+	T newval=cast(T)newval0;
+	T equalTo=cast(T)equalTo0;
+        TT oldval;
         synchronized(typeid(T)){
-            oldval=val;
+            oldval=cast(TT)val;
             if(oldval==equalTo) {
                 val=newval;
             }
@@ -553,8 +588,9 @@ version(LDC){
     }
 }
 
-bool atomicCASB(T)( ref T val, T newval, T equalTo ){
-    return (equalTo is atomicCAS(val,newval,equalTo));
+bool atomicCASB(T,U=T,V=T)( ref shared(T) val, U newval, V equalTo0 ){
+    auto equalTo=cast(T)equalTo0;
+    return (equalTo is atomicCAS!(T,U,T)(val,newval,equalTo));
 }
 
 /*
@@ -565,12 +601,12 @@ bool atomicCASB(T)( ref T val, T newval, T equalTo ){
  *
  * Remove this? I know no actual architecture where this would be different.
 */
-T atomicLoad(T)(ref T val)
+T atomicLoad(T)(ref shared(T) val)
 in {
     assert( atomicValueIsProperlyAligned!(T)( cast(size_t) &val ) );
     static assert(ClassPtr!(T).sizeof<=size_t.sizeof,"invalid size for "~T.stringof);
 } body {
-    volatile T res=val;
+    T res=val;
     return res;
 }
 
@@ -582,12 +618,12 @@ in {
  *
  * Remove this? I know no actual architecture where this would be different.
 */
-void atomicStore(T)(ref T val, T newVal)
+void atomicStore(T,U)(ref shared(T) val, U newVal)
 in {
         assert( atomicValueIsProperlyAligned!(T)( cast(size_t) &val ), "invalid alignment" );
         static assert(ClassPtr!(T).sizeof<=size_t.sizeof,"invalid size for "~T.stringof);
 } body {
-    volatile val=newVal;
+    val=newVal;
 }
 
 /*
@@ -597,28 +633,33 @@ in {
  * No barriers implied, only atomicity!
 */
 version(LDC){
-    T atomicAdd(T,U)(ref T val, U incV_){
-        T incV=incV_;
+    TT atomicAdd(TT,U=TT)(ref shared(TT) val, U incV){
+	alias Unshared!(TT) T;
         static if (isPointerOrClass!(T))
         {
-            return cast(T)llvm_atomic_load_add!(size_t)(cast(size_t*)&val, incV);
+            return cast(TT)llvm_atomic_load_add!(size_t)(cast(size_t*)&val, cast(size_t)incV*T.sizeof);
         }
         else static if (isIntegerType!(T))
         {
             static assert( isIntegerType!(T), "invalid type "~T.stringof );
-            return llvm_atomic_load_add!(T)(&val, cast(T)incV);
+            return cast(TT)llvm_atomic_load_add!(T)(&val, cast(T)incV);
         } else {
-            return atomicOp(val,delegate T(T a){ return a+incV; });
+	    return cast(TT)atomicOp(val,delegate T(const(T) a){ return a+incV; });
         }
     }
 } else version (D_InlineAsm_X86){
-    T atomicAdd(T,U=T)(ref T val, U incV_){
-        T incV=cast(T)incV_;
+    TT atomicAdd(TT,U=TT)(ref shared(TT) val, U incV_){
+	alias Unshared!(TT) T;
         static if (isIntegerType!(T)||isPointerOrClass!(T)){
             T* posVal=&val;
+	    static if (isPointerOrClass!(T)) {
+		size_t incV=cast(size_t)incV_*T.sizeof;
+	    } else {
+		T incV=cast(T)incV_;
+	    }
             T res;
             static if (T.sizeof==1){
-                volatile asm {
+                asm {
                     mov DL, incV;
                     mov ECX, posVal;
                     lock;
@@ -626,7 +667,7 @@ version(LDC){
                     mov byte ptr res[EBP],DL;
                 }
             } else static if (T.sizeof==2){
-                volatile asm {
+                asm {
                     mov DX, incV;
                     mov ECX, posVal;
                     lock;
@@ -634,7 +675,7 @@ version(LDC){
                     mov short ptr res[EBP],DX;
                 }
             } else static if (T.sizeof==4){
-                volatile asm
+                asm
                 {
                     mov EDX, incV;
                     mov ECX, posVal;
@@ -643,23 +684,28 @@ version(LDC){
                     mov int ptr res[EBP],EDX;
                 }
             } else static if (T.sizeof==8){
-                return atomicOp(val,delegate (T x){ return x+incV; });
+                return atomicOp(val,delegate (const T x){ return x+incV; });
             } else {
                 static assert(0,"Unsupported type size");
             }
-            return res;
+            return cast(TT)res;
         } else {
-            return atomicOp(val,delegate T(T a){ return a+incV; });
+            return cast(TT)atomicOp(val,delegate T(const T a){ return a+incV_; });
         }
     }
 } else version (D_InlineAsm_X86_64){
-    T atomicAdd(T,U=T)(ref T val, U incV_){
-        T incV=cast(T)incV_;
+    TT atomicAdd(TT,U=TT)(ref shared(TT) val, U incV_){
+	alias Unshared!(TT) T;
         static if (isIntegerType!(T)||isPointerOrClass!(T)){
-            T* posVal=&val;
+	    static if (isPointerOrClass!(T)) {
+		size_t incV=cast(size_t)incV_*T.sizeof;
+	    } else {
+		T incV=cast(T)incV_;
+	    }
+            T* posVal=cast(T*)&val;
             T res;
             static if (T.sizeof==1){
-                volatile asm {
+                asm {
                     mov DL, incV;
                     mov RCX, posVal;
                     lock;
@@ -667,7 +713,7 @@ version(LDC){
                     mov byte ptr res[EBP],DL;
                 }
             } else static if (T.sizeof==2){
-                volatile asm {
+                asm {
                     mov DX, incV;
                     mov RCX, posVal;
                     lock;
@@ -675,7 +721,7 @@ version(LDC){
                     mov short ptr res[EBP],DX;
                 }
             } else static if (T.sizeof==4){
-                volatile asm
+                asm
                 {
                     mov EDX, incV;
                     mov RCX, posVal;
@@ -684,7 +730,7 @@ version(LDC){
                     mov int ptr res[EBP],EDX;
                 }
             } else static if (T.sizeof==8){
-                volatile asm
+                asm
                 {
                     mov RAX, val;
                     mov RDX, incV;
@@ -695,34 +741,34 @@ version(LDC){
             } else {
                 static assert(0,"Unsupported type size for type:"~T.stringof);
             }
-            return res;
+            return cast(TT)res;
         } else {
-            return atomicOp(val,delegate T(T a){ return a+incV; });
+            return cast(TT)atomicOp(val,delegate T(const T a){ return a+incV_; });
         }
     }
 } else {
     static if (LockVersion){
-        T atomicAdd(T,U=T)(ref T val, U incV_){
-            T incV=cast(T)incV_;
+        TT atomicAdd(TT,U=TT)(ref shared(TT) val, U incV){
+	    alias Unshared!(TT) T;
             static assert( isIntegerType!(T)||isPointerOrClass!(T),"invalid type: "~T.stringof );
             synchronized(typeid(T)){
-                T oldV=val;
+                TT oldV=cast(TT)val;
                 val+=incV;
                 return oldV;
             }
         }
     } else {
-        T atomicAdd(T,U=T)(ref T val, U incV_){
-            T incV=cast(T)incV_;
+        TT atomicAdd(TT,U=T)(ref shared(TT) val, U incV){
+	    alias Unshared!(TT) T;
             static assert( isIntegerType!(T)||isPointerOrClass!(T),"invalid type: "~T.stringof );
             synchronized(typeid(T)){
-                T oldV,newVal,nextVal;
-                volatile nextVal=val;
-                do{
+                TT oldV,newVal,nextVal;
+                nextVal=cast(TT)val;
+                do {
                     oldV=nextVal;
                     newV=oldV+incV;
-                    auto nextVal=atomicCAS!(T)(val,newV,oldV);
-                } while(nextVal!=oldV)
+                    nextVal=atomicCAS!(TT)(val,newV,oldV);
+                } while(nextVal!=oldV);
                 return oldV;
             }
         }
@@ -736,20 +782,22 @@ version(LDC){
  * and no "fair" share is applied between fast function (more likely to succeed) and
  * the others (i.e. do not use this in case of high contention).
 */
-T atomicOp(T)(ref T val, T delegate(T) f){
+T atomicOp(T,U,V)(ref shared(T) val, U delegate(const(V)) f)
+    if (is(Unqual!(T)==Unqual!(U)) && is(Unqual!(T)==Unqual!(V)))
+{
     T oldV,newV,nextV;
     int i=0;
-    nextV=val;
+    nextV=cast(T)val;
     do {
         oldV=nextV;
-        newV=f(oldV);
+        newV=cast(T)f(oldV);
         nextV=aCas!(T)(val,newV,oldV);
         if (nextV is oldV || newV is oldV) return oldV;
-    } while(++i<200)
+    } while(++i<200);
     while (true){
         thread_yield();
-        volatile oldV=val;
-        newV=f(oldV);
+        oldV=cast(T)val;
+        newV=cast(T)f(oldV);
         nextV=aCas!(T)(val,newV,oldV);
         if (nextV is oldV || newV is oldV) return oldV;
     }
@@ -758,9 +806,9 @@ T atomicOp(T)(ref T val, T delegate(T) f){
 /*
  * Reads a flag (ensuring that other accesses can not happen before you read it).
 */
-T flagGet(T)(ref T flag){
+T flagGet(T)(ref shared(T) flag){
     T res;
-    volatile res=flag;
+    res=cast(T)flag;
     memoryBarrier!(true,false,strictFences,false)();
     return res;
 }
@@ -769,27 +817,27 @@ T flagGet(T)(ref T flag){
  * Sets a flag (ensuring that all pending writes are executed before this).
  * the original value is returned.
 */
-T flagSet(T)(ref T flag,T newVal){
+T flagSet(T,U=T)(ref shared(T) flag,U newVal){
     memoryBarrier!(false,strictFences,false,true)();
     return atomicSwap(flag,newVal);
 }
 
 /*
- * Writes a flag (ensuring that all pending writes are executed before this).
+ * Performs an operation on a flag (ensuring that all pending writes are executed before this).
  * the original value is returned.
 */
-T flagOp(T)(ref T flag,T delegate(T) op){
+T flagOp(T,U=T,V=T)(ref shared(T) flag,U delegate(const(V)) op){
     memoryBarrier!(false,strictFences,false,true)();
-    return atomicOp(flag,op);
+    return atomicOp!(T,U,V)(flag,op);
 }
 
 /*
  * Reads a flag (ensuring that all pending writes are executed before this).
 */
-T flagAdd(T)(ref T flag,T incV=cast(T)1){
+T flagAdd(T,U=T)(ref shared(T) flag,U incV=cast(T)1){
     static if (!LockVersion)
         memoryBarrier!(false,strictFences,false,true)();
-    return atomicAdd(flag,incV);
+    return atomicAdd!(T,U)(flag,incV);
 }
 
 /*
@@ -797,6 +845,6 @@ T flagAdd(T)(ref T flag,T incV=cast(T)1){
  * useful for counters, and to generate unique values (fast)
  * no barriers are implied.
 */
-T nextValue(T)(ref T val){
+T nextValue(T)(ref shared(T) val){
     return atomicAdd(val,cast(T)1);
 }

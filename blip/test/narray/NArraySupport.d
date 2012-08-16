@@ -123,13 +123,13 @@ class Dottable(T,int rank1,S,int rank2,bool scanAxis=false, bool randomLayout=fa
         s(indent)("}\n");
     }
     string toString(){
-        return collectAppender(delegate void(void delegate(cstring)s){ this.desc(s); });
+        return collectIAppender(delegate void(void delegate(cstring)s){ this.desc(s); });
     }
 }
 
 /// a random 1D NArray type T and dimension i (in the arr attribute)
 class SizedRandomNArray(T,int i){
-    static const int rank=1;
+    static immutable int rank=1;
     NArray!(T,rank) arr;
     this(){
         arr=zeros!(T)([i]);
@@ -148,12 +148,12 @@ class SizedRandomNArray(T,int i){
         arr.printData(sink,formatEl,elPerLine,indent);
     }
     string toString(){
-        return collectAppender(delegate void(void delegate(cstring)s){ this.desc(s); });
+        return collectIAppender(delegate void(void delegate(cstring)s){ this.desc(s); });
     }
 }
 /// a random 2D NArray type T and dimension i,j (in the arr attribute)
 class SizedRandomNArray(T,int i,int j){
-    static const int rank=2;
+    static immutable int rank=2;
     NArray!(T,rank) arr;
     this(){
         arr=zeros!(T)([i,j]);
@@ -172,12 +172,12 @@ class SizedRandomNArray(T,int i,int j){
         arr.printData(sink,formatEl,elPerLine,indent);
     }
     string toString(){
-        return collectAppender(delegate void(void delegate(cstring)s){ this.desc(s); });
+        return collectIAppender(delegate void(void delegate(cstring)s){ this.desc(s); });
     }
 }
 /// a random 3D NArray type T and dimension i,j,k (in the arr attribute)
 class SizedRandomNArray(T,int i,int j,int k){
-    static const int rank=3;
+    static immutable int rank=3;
     NArray!(T,rank) arr;
     this(){
         arr=zeros!(T)([i,j,k]);
@@ -196,6 +196,6 @@ class SizedRandomNArray(T,int i,int j,int k){
         arr.printData(sink,formatEl,elPerLine,indent);
     }
     string toString(){
-        return cast(string)collectAppender(delegate void(void delegate(cstring)s){ this.desc(s); });
+        return collectIAppender(delegate void(void delegate(cstring)s){ this.desc(s); });
     }
 }

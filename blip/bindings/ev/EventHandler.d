@@ -73,7 +73,7 @@ struct EventHandler{
             inlineAction();
         }
         if (task!is null){
-            throw new Exception(collectAppender(delegate void(CharSink s){
+            throw new Exception(collectIAppender(delegate void(CharSink s){
                 dumper(s)("cannot resume or start a task periodically for task ")(task)
                     (" and watcher ")(w);
             }));
@@ -92,8 +92,8 @@ struct EventHandler{
             clear();
         }
     }
-    static PoolI!(EventHandler*) gPool;
-    static this(){
+    __gshared static PoolI!(EventHandler*) gPool;
+    shared static this(){
         gPool=cachedPool(function EventHandler*(PoolI!(EventHandler*)p){
             auto res=new EventHandler;
             res.pool=p;

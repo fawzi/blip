@@ -74,10 +74,10 @@ class BatchedGrowableArray(T,int batchSize1=((2048/T.sizeof>128)?2048/T.sizeof:1
             return &(this.batches[bIndex][ii-bIndex*batchSize]);
         }
         T opIndex(size_t i){
-            return *this.ptrI(i);
+            return this.ptrI(i);
         }
         void opIndexAssign(T val,size_t i){
-            *this.ptrI(i)=val;
+            this.ptrI(i)=val;
         }
         /// loops on a view one batch at a time
         static struct BatchLoop{
@@ -217,10 +217,10 @@ class BatchedGrowableArray(T,int batchSize1=((2048/T.sizeof>128)?2048/T.sizeof:1
                 }
             }
             
-            static PoolI!(Batch *) pool;
-            static size_t poolLevel;
-            static Mutex poolLock;
-            static this(){
+            __gshared static PoolI!(Batch *) pool;
+            __gshared static size_t poolLevel;
+            __gshared static Mutex poolLock;
+            shared static this(){
                 if (poolLock is null) poolLock=new Mutex(); // avoid prealloc?
             }
             static void addPool(){
@@ -375,11 +375,11 @@ class BatchedGrowableArray(T,int batchSize1=((2048/T.sizeof>128)?2048/T.sizeof:1
         }
         /// sequential batch loop
         BatchLoop sBatchLoop(){
-            return BatchLoop(*this);
+            return BatchLoop(this);
         }
         /// parallel batch loop
         PLoop pBatchLoop(){
-            return PLoop(*this);
+            return PLoop(this);
         }
         int delegate(ref T[]) toBatch(int delegate(ref T)l){
             auto res=new ElLoop;
@@ -585,8 +585,8 @@ class BatchedGrowableArray(T,int batchSize1=((2048/T.sizeof>128)?2048/T.sizeof:1
     }
     
     static if (isCoreType!(T) ||is(typeof(T.init.serialize(Serializer.init)))) {
-        static ClassMetaInfo metaI;
-        static this(){
+        __gshared static ClassMetaInfo metaI;
+        shared static this(){
             if (metaI is null){
                 metaI=ClassMetaInfo.createForType!(typeof(this))("blip.container.BatchedGrowableArray("~T.mangleof~")","a batched growable array");
                 metaI.addFieldOfType!(T[])("array","the items in the array");

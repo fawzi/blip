@@ -45,7 +45,7 @@ struct BitVector(size_t len){
     {
         assert(bits.length==len);
         for (size_t i=0;i<len;++i){
-            (*this)[i]=(bits[i]!=0);
+            this[i]=(bits[i]!=0);
         }
     }+/
     
@@ -53,7 +53,7 @@ struct BitVector(size_t len){
     {
         assert(bits.length==len);
         for (size_t i=0;i<len;++i){
-            (*this)[i]=bits[i];
+            this[i]=bits[i];
         }
     }
     
@@ -193,7 +193,7 @@ struct BitVector(size_t len){
      * Returns:
      *  zero if not equal and non-zero otherwise.
      */
-    int opEquals( BitVector rhs )
+    bool opEquals( BitVector rhs )
     {
         internal_t* p1 = this.ptr;
         internal_t* p2 = rhs.ptr;
@@ -202,7 +202,7 @@ struct BitVector(size_t len){
         for( i = 0; i < n; ++i )
         {
             if( p1[i] != p2[i] )
-            return 0; // not equal
+            return false; // not equal
         }
         int rest = cast(int)(len & cast(size_t)(internal_t.sizeof*8-1));
         internal_t mask = ~((~cast(internal_t)0)<<rest);
@@ -474,7 +474,7 @@ struct BitVector(size_t len){
     {
         auto dim = this.dim();
         data[]=rhs.data;
-        return *this;
+        return this;
     }
 
     /**
@@ -497,7 +497,7 @@ struct BitVector(size_t len){
 
         for( size_t i = 0; i < dim; ++i )
             ptr[i] &= rhs.ptr[i];
-        return *this;
+        return this;
     }
 
 
@@ -521,7 +521,7 @@ struct BitVector(size_t len){
 
         for( size_t i = 0; i < dim; ++i )
             ptr[i] |= rhs.ptr[i];
-        return *this;
+        return this;
     }
 
 
@@ -545,7 +545,7 @@ struct BitVector(size_t len){
 
         for( size_t i = 0; i < dim; ++i )
             ptr[i] ^= rhs.ptr[i];
-        return *this;
+        return this;
     }
 
 
@@ -570,7 +570,7 @@ struct BitVector(size_t len){
 
         for( size_t i = 0; i < dim; ++i )
             ptr[i] &= ~rhs.ptr[i];
-        return *this;
+        return this;
     }
 
 }

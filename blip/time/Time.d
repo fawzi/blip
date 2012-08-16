@@ -6,7 +6,7 @@ public import tango.time.Time:Time;
 import blip.serialization.Serialization;
 
 /// add serialization of Time struct...
-static ClassMetaInfo timeMetaI;
+__gshared static ClassMetaInfo timeMetaI;
 /// serialization of Time struct
 void serializeTime(Serializer s,ClassMetaInfo mInfo,void* o){
     assert(mInfo is timeMetaI);
@@ -22,7 +22,7 @@ void  unserializeTime(Unserializer s,ClassMetaInfo mInfo,void* o){
     s.field(mInfo[0],ticks);
     *t=Time(ticks);
 }
-static this(){
+shared static this(){
     auto h=new ExternalSerializationHandlers;
     h.serialize=&serializeTime;
     h.unserialize=&unserializeTime;

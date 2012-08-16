@@ -24,20 +24,28 @@ import blip.sync.Atomic: atomicOp,memoryBarrier;
 import blip.io.BasicIO;
 
 /// inserts newHead before head, and returns the value at head when the insertion took place
-T insertAt(T)(ref T head,T newHead){
+T insertAt(T)(ref shared T head,T newHead){
     static if(is(typeof(newHead is null))){
         assert(!(newHead is null),"cannot add a null head");
     }
+    memoryBarrier!(false,false,false,true)();
     return atomicOp(head,delegate T(T val){
         newHead.next=val;
-        memoryBarrier!(false,false,false,true)();
         return newHead;
     });
 }
 
 /// removes one element from the top of list
-T popFrom(T)(ref T list){
-    return atomicOp(list,delegate T(T val){ memoryBarrier!(true,false,false,false)(); return ((val is null)?null:val.next); /+ do we really need a barrier? only alpha needed a barrier for dependent loads... +/ });
+T popFrom(T)(ref shared T list){
+    return atomicOp(list,delegate T(T val){
+	    if (val is null) {
+		return null;
+	    } else {
+		/+ do we really need a barrier? only alpha needed a barrier for dependent loads... +/
+		memoryBarrier!(true,false,false,false)();
+		return val.next;
+	    }
+	});
 }
 
 /// very basic single linked list structure
@@ -50,7 +58,7 @@ struct SLinkT(T){
         res.next=next;
         return res;
     }
-    void desc(void delegate(char[])sink){
+    void desc(void delegate(const(char)[])sink){
         sink("SLinkT@");
         writeOut(sink,cast(void*)this);
         sink("{");

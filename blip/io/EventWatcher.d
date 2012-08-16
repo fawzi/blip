@@ -487,8 +487,8 @@ class TimeoutManager:LoopHandlerI{
             delayLevel=0;
             status=Status.NotStarted;
         }
-        static PoolI!(TimedEvent*) gPool;
-        static this(){
+        __gshared static PoolI!(TimedEvent*) gPool;
+        shared static this(){
             gPool=cachedPool(function TimedEvent*(PoolI!(TimedEvent*)p){
                 auto res=new TimedEvent;
                 res.pool=p;
@@ -617,7 +617,7 @@ EventWatcher noToutWatcher;
 TimeoutManager sToutWatcher;
 /// default watcher
 LoopHandlerI defaultWatcher;
-static this(){
+shared static this(){
     noToutWatcher=new EventWatcher(true);
     noToutWatcher.startThread();
     sToutWatcher=new TimeoutManager(noToutWatcher,10.0);

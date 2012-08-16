@@ -5,7 +5,7 @@ module blip.text.Utils;
 public import tango.text.Util:trim,contains;
 
 /// escapes a string with a c like notation
-void cEscapeString(void delegate(char[])outF,char[] str){
+void cEscapeString(void delegate(const(char)[])outF,char[] str){
     size_t wrote=0;
     foreach(i,c;str){
         switch (c){

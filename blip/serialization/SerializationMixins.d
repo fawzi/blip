@@ -60,11 +60,10 @@ string serializeSome(string typeName1,string doc,string fieldsDoc){
     bool classAddPost=true;
     string typeName=typeName1;
     string res="";
-    res~="static ClassMetaInfo metaI;\n";
-    res~="static this(){\n";
+    res~="__gshared static ClassMetaInfo metaI;\n";
+    res~="shared static this(){\n";
     res~="    if (metaI!is null) return;\n";
-    res~="    static if (is(typeof(this) == class)){\n";
-    res~="        metaI=ClassMetaInfo.createForType!(typeof(this))(";
+    res~="    metaI=ClassMetaInfo.createForType!(typeof(this))(";
     if (typeName.length==0) {
         res~="typeof(this).mangleof";
     } else {
@@ -72,16 +71,6 @@ string serializeSome(string typeName1,string doc,string fieldsDoc){
     }
     res~=",`"~doc~"`";
     res~=");\n";
-    res~="    }else{\n";
-    res~="        metaI=ClassMetaInfo.createForType!(typeof(*this))(";
-    if (typeName.length==0) {
-        res~="typeof(*this).mangleof";
-    } else {
-        res~="`"~typeName~"`";
-    }
-    res~=",`"~doc~"`";
-    res~=");\n";
-    res~="    }\n";
     auto fieldsDocArray=extractFieldsAndDocs(fieldsDoc);
     for (int ifield=0;ifield<fieldsDocArray.length/2;++ifield){
         auto field=fieldsDocArray[2*ifield];
@@ -148,7 +137,7 @@ string serializeSome(string typeName1,string doc,string fieldsDoc){
             }
             serial(s);
         }
-    } else static if (is(typeof(*this) == struct)) {
+    } else static if (is(typeof(this) == struct)) {
         void serialize(Serializer s){
             serial(s);
         }
@@ -182,9 +171,9 @@ string createView(string viewName,string doc,string fieldsDoc,string baseType=""
         `~baseType~` el;`;
     
     res~=`
-        static ClassMetaInfo metaI;
-        static this(){
-            metaI=ClassMetaInfo.createForType!(typeof(*this))(typeof(*this).mangleof,`~
+        __gshared static ClassMetaInfo metaI;
+        shared static this(){
+            metaI=ClassMetaInfo.createForType!(typeof(this))(typeof(this).mangleof,`~
             "`"~doc~"`);";
     auto fieldsDocArray=extractFieldsAndDocs(fieldsDoc);
     for (int ifield=0;ifield<fieldsDocArray.length/2;++ifield){

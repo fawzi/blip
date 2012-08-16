@@ -147,7 +147,7 @@ string printArgs(int nargs,string printC="sout.call",string indent="    "){
         res~=indent~"    }\n";
     }
     res~=indent~"}catch (Exception e) {\n";
-    res~=indent~"    sout.call(collectAppender(delegate void(void delegate(cstring)s){ s(\"\\nError: could not print arguments due to exception \"); writeOut(s,e); s(\"\\n\");}));\n";
+    res~=indent~"    sout.call(collectIAppender(delegate void(void delegate(cstring)s){ s(\"\\nError: could not print arguments due to exception \"); writeOut(s,e); s(\"\\n\");}));\n";
     res~=indent~"}\n";
     return res;
 }
@@ -257,7 +257,7 @@ class TextController: TestControllerI{
         if (shouldPrint) {
             synchronized(_writeLock){
                 if (printLevel!=PrintLevel.AllVerbose || test.stat.failedTests>0){
-                    progressLog(collectAppender(delegate void(CharSink s){
+                    progressLog(collectIAppender(delegate void(CharSink s){
                         s("test`");
                         s(test.testName);
                         s("`");
@@ -287,7 +287,7 @@ class TextController: TestControllerI{
     bool willRunTest(SingleRTest test) {
         if (printLevel==PrintLevel.AllVerbose) {
             synchronized(_writeLock) {
-                progressLog(collectAppender(delegate void(CharSink s){
+                progressLog(collectIAppender(delegate void(CharSink s){
                     s("test`"); s(test.testName); s("`"); s(" STARTED\n"); }));
             }
         }
@@ -297,7 +297,7 @@ class TextController: TestControllerI{
     bool testSkipped(SingleRTest test) {
         if (printLevel==PrintLevel.AllVerbose) {
             synchronized(_writeLock) {
-                progressLog(collectAppender(delegate void(CharSink s){
+                progressLog(collectIAppender(delegate void(CharSink s){
                     s("test`"); s(test.testName); s("`"); s(" SKIPPED\n"); }));
             }
         }
@@ -307,7 +307,7 @@ class TextController: TestControllerI{
     bool testPassed(SingleRTest test) {
         if (printLevel==PrintLevel.AllVerbose) {
             synchronized(_writeLock) {
-                progressLog(collectAppender(delegate void(CharSink s){
+                progressLog(collectIAppender(delegate void(CharSink s){
                     s("test`"); s(test.testName); s("`"); s(" SUCCESS\n"); }));
             }
         }
@@ -444,8 +444,8 @@ class RunTestsArgs{
 /// test* functions in the testInit template
 class SingleRTest{
     /// the default test controller
-    static TestControllerI defaultTestController;
-    static this(){ defaultTestController=new TextController(); }
+    __gshared static TestControllerI defaultTestController;
+    shared static this(){ defaultTestController=new TextController(); }
 
     /+  --- test info --- +/
     string testName; /// name of the current test
@@ -748,7 +748,7 @@ class TestCollection: SingleRTest, TestControllerI {
     /// test has failed one test, should return werether the testing should continue
     bool testFailed(SingleRTest test){
         synchronized(testController.writeLock()){
-            test.failureLog(collectAppender(delegate void(CharSink s){
+            test.failureLog(collectIAppender(delegate void(CharSink s){
                 dumper(s)("test failed in collection`")(testName)("` created at `");
                 dumper(s)(sourceFile)(":")(sourceLine)("`\n");
             }));
@@ -823,7 +823,7 @@ template testInit(string checkInit="", string manualInit=""){
                 return TestResult.Skip;
             } catch (Exception e){
                 synchronized(test.testController.writeLock()){
-                    test.failureLog(collectAppender(delegate void(void delegate(cstring) s){
+                    test.failureLog(collectIAppender(delegate void(void delegate(cstring) s){
                             dumper(s)("test`")(test.testName)("` failed with exception\n"); }));
                     //test.failureLog.flush();
                     e.writeOut(test.failureLog);

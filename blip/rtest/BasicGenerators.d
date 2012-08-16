@@ -260,7 +260,7 @@ struct Randomizer {
     }
     Randomizer opCall(T)(ref T t){
         add(t);
-        return *this;
+        return this;
     }
     void end(ref int nEl, ref bool acceptable){
         nEl=this.nEl;

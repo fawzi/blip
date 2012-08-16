@@ -32,7 +32,7 @@ struct CoordSys {
     vec3fi  origin;
     quat        rotation;
     
-    static const CoordSys identity = { origin: vec3fi.zero, rotation: quat.identity };
+    static immutable CoordSys identity = { origin: vec3fi.zero, rotation: quat.identity };
     
     
     static CoordSys opCall(vec3fi origin, quat rotation) {
@@ -63,7 +63,7 @@ struct CoordSys {
     
     
     CoordSys deltaFrom(CoordSys from) {
-        return *this in from.inverse;
+        return this in from.inverse;
     }
 
 
@@ -83,7 +83,7 @@ struct CoordSys {
     
     
     CoordSys worldToLocal(CoordSys global) {
-        CoordSys inv = *this;
+        CoordSys inv = this;
         inv.invert();
         return global in inv;
     }
@@ -96,7 +96,7 @@ struct CoordSys {
     
     
     CoordSys inverse() {
-        CoordSys res = *this;
+        CoordSys res = this;
         res.invert();
         return res;
     }

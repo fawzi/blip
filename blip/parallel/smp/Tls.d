@@ -56,7 +56,7 @@ string tlsMixin(string type,string varName){
         `;
     } else {
         return `
-        static TlsClass!(`~type~`) _`~varName~`;
+        __gshared static TlsClass!(`~type~`) _`~varName~`;
         static this(){
             _`~varName~`=new TlsClass!(`~type~`)();
         }

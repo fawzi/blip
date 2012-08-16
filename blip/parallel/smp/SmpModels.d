@@ -276,8 +276,8 @@ struct Resubmitter{
             delete this;
         }
     }
-    static PoolI!(Resubmitter*) gPool;
-    static this(){
+    __gshared static PoolI!(Resubmitter*) gPool;
+    shared static this(){
         gPool=cachedPool(function Resubmitter*(PoolI!(Resubmitter*)p){
             auto res=new Resubmitter;
             res.pool=p;

@@ -33,7 +33,7 @@ void testPLoopArray(T)(T[] arr1,SizeLikeNumber!(3,1) blockSize){
     if (nEl!=arr1.length) throw new Exception("wrong size",__FILE__,__LINE__);
     foreach(i,e;arr1){
         if (copyArr[i] !is e){
-            throw new Exception(collectAppender(delegate void(CharSink sink){
+            throw new Exception(collectIAppender(delegate void(CharSink sink){
                 dumper(sink)("parallel copy failed, generated ")(copyArr)(" which differs at ")(i);
             }),__FILE__,__LINE__);
         }
@@ -46,7 +46,7 @@ void testPLoopArray(T)(T[] arr1,SizeLikeNumber!(3,1) blockSize){
     if (nEl!=arr1.length) throw new Exception("wrong size",__FILE__,__LINE__);
     foreach(i,e;arr1){
         if (copyArr[i] !is e+1){
-            throw new Exception(collectAppender(delegate void(CharSink sink){
+            throw new Exception(collectIAppender(delegate void(CharSink sink){
                 dumper(sink)("pLoop modification failed, generated ")(copyArr)(" which differs from orig+1 at ")(i);
             }),__FILE__,__LINE__);
         }
@@ -81,7 +81,7 @@ void testPLoopIter(T)(T[] arr1){
     if (nEl!=arr1.length) throw new Exception("wrong size",__FILE__,__LINE__);
     foreach(i,e;arr1){
         if (copyArr[i] !is e){
-            throw new Exception(collectAppender(delegate void(CharSink sink){
+            throw new Exception(collectIAppender(delegate void(CharSink sink){
                 dumper(sink)("pLoopIter copy failed, generated ")(copyArr)(" which differs at ")(i);
             }),__FILE__,__LINE__);
         }
@@ -102,7 +102,7 @@ void testPLoopIter(T)(T[] arr1){
     if (nEl!=arr1.length) throw new Exception("wrong size",__FILE__,__LINE__);
     foreach(i,e;arr1){
         if (copyArr[i] !is e+1){
-            throw new Exception(collectAppender(delegate void(CharSink sink){
+            throw new Exception(collectIAppender(delegate void(CharSink sink){
                 dumper(sink)("pLoopIter modification failed, generated ")(copyArr)(" which differs from orig+1 at ")(i);
             }),__FILE__,__LINE__);
         }
@@ -125,7 +125,7 @@ void testPLoopIter(T)(T[] arr1){
     if (copyArr!=arr1) throw new Exception("copy is different",__FILE__,__LINE__);
     foreach(i,e;arr1){
         if (copyArr[i] !is e){
-            throw new Exception(collectAppender(delegate void(CharSink sink){
+            throw new Exception(collectIAppender(delegate void(CharSink sink){
                 dumper(sink)("pIter2 copy failed, generated ")(copyArr)(" which differs at ")(i);
             }),__FILE__,__LINE__);
         }
@@ -143,7 +143,7 @@ void testPLoopIter(T)(T[] arr1){
         synchronized{
             auto idx=find(copyArr,e);
             if (idx==copyArr.length){
-                throw new Exception(collectAppender(delegate void(CharSink sink){
+                throw new Exception(collectIAppender(delegate void(CharSink sink){
                     dumper(sink)("pLoopIter2 modification failed, generated ")(e)(" which which was not found in ")(copyArr);
                 }),__FILE__,__LINE__);
             }
@@ -154,7 +154,7 @@ void testPLoopIter(T)(T[] arr1){
     if (nEl!=arr1.length) throw new Exception("wrong length",__FILE__,__LINE__);
     foreach(i,e;copyArr){
         if (copyArr[i] != 0){
-            throw new Exception(collectAppender(delegate void(CharSink sink){
+            throw new Exception(collectIAppender(delegate void(CharSink sink){
                 dumper(sink)("pLoopIter2 modification failed, it was not fully nullified at ")(i)(":")(copyArr);
             }),__FILE__,__LINE__);
         }
@@ -174,13 +174,13 @@ void testLoopIRange(T,LoopType lType)(T from, SizeLikeNumber!() dim){
             if (i<from || i>=to)
                 assert(0,"out of bounds");
             if (atomicAdd(arr[i-from],1)!=0)
-                throw new Exception(collectAppender(delegate void(CharSink s){
+                throw new Exception(collectIAppender(delegate void(CharSink s){
                     dumper(s)("testLoopIRange double loop for ")(i);
                 }));
         }
         foreach (i,v;arr){
             if (v!=1){
-                throw new Exception(collectAppender(delegate void(CharSink s){
+                throw new Exception(collectIAppender(delegate void(CharSink s){
 			    dumper(s)("testLoopIRange missing loop for ")(from)("+")(i);
                 }));
             }

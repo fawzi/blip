@@ -67,8 +67,8 @@ import blip.stdc.stdlib: abort;
 /// integrate PriQueue in this? it would be slighly more efficient, and already now
 /// depends on its implementation details, or they should be better separated
 class PriQScheduler:TaskSchedulerI {
-    static CachedT!(PriQueue!(TaskI).PriQPool) pQLevelPool;
-    static this(){
+    __gshared static CachedT!(PriQueue!(TaskI).PriQPool) pQLevelPool;
+    shared static this(){
         pQLevelPool=new CachedT!(PriQueue!(TaskI).PriQPool)("PriQPool_",function PriQueue!(TaskI).PriQPool(){
             auto res=new PriQueue!(TaskI).PriQPool();
             return res;
@@ -281,7 +281,7 @@ class PriQScheduler:TaskSchedulerI {
                 }
             }
             if (runLevel==SchedulerRunLevel.Stopped){
-                throw new Exception(collectAppender(delegate void(CharSink s){
+                throw new Exception(collectIAppender(delegate void(CharSink s){
                         dumper(s)("addTask0 to stopped PriQScheduler@")(cast(void*)this);
                     }));
             }
@@ -292,7 +292,7 @@ class PriQScheduler:TaskSchedulerI {
     void addTask(TaskI t){
         assert(t.status==TaskStatus.NonStarted ||
             t.status==TaskStatus.Started,"initial");
-        debug(TrackQueues) log.info(collectAppender(delegate void(CharSink s){
+        debug(TrackQueues) log.info(collectIAppender(delegate void(CharSink s){
             dumper(s)("task ")(t)(" might be added to queue ")(this,true);
         }));
         if (shouldAddTask(t)){
@@ -421,7 +421,7 @@ class PriQScheduler:TaskSchedulerI {
     /// description (for debugging)
     /// non threadsafe
     string toString(){
-        return collectAppender(cast(OutWriter)&desc);
+        return collectIAppender(cast(OutWriter)&desc);
     }
     /// locks the scheduler (to perform task reorganization)
     /// if you call this then toString is threadsafe
@@ -580,8 +580,8 @@ class PriQScheduler:TaskSchedulerI {
     int nSimpleTasksWanted(){ return 4; }
     // add ref counting
     mixin RefCountMixin!();
-    static CachedPool!(PriQScheduler) gPool;
-    static this(){
+    __gshared static CachedPool!(PriQScheduler) gPool;
+    shared static this(){
         gPool=cachedPoolNext(function PriQScheduler(PoolI!(PriQScheduler)p){
             auto res=new PriQScheduler(p);
             debug(TrackQueues){
@@ -638,7 +638,7 @@ class MultiSched:TaskSchedulerI {
         StarvationManager starvationManager,
         string loggerPath="blip.parallel.smp.queue")
     {
-        this.name=collectAppender(delegate void(CharSink s){
+        this.name=collectIAppender(delegate void(CharSink s){
             s(name); s("_"); writeOut(s,numaNode.level); s("_"); writeOut(s,numaNode.pos);
         });
         this.starvationManager=starvationManager;
@@ -819,7 +819,7 @@ class MultiSched:TaskSchedulerI {
     /// description (for debugging)
     /// non threadsafe
     string toString(){
-        return collectAppender(cast(OutWriter)&desc);
+        return collectIAppender(cast(OutWriter)&desc);
     }
     /// subtask has started execution (automatically called by nextTask)
     void subtaskActivated(TaskI st){
@@ -1006,7 +1006,7 @@ class StarvationManager: TaskSchedulerI, ExecuterI, SchedGroupI {
             }
             s("\"],\n");
             ind(2);
-            volatile schedsN=scheds;
+            schedsN=scheds;
         }
         s("q:[ ");
         foreach(i,sched;schedsN){
@@ -1308,7 +1308,7 @@ class StarvationManager: TaskSchedulerI, ExecuterI, SchedGroupI {
     /// description (for debugging)
     /// non threadsafe
     string toString(){
-        return collectAppender(cast(OutWriter)&desc);
+        return collectIAppender(cast(OutWriter)&desc);
     }
     /// subtask has started execution (not meaningful for this scheduler)
     void subtaskActivated(TaskI st){
@@ -1456,7 +1456,7 @@ class MExecuter:ExecuterI{
         log=_scheduler.starvationManager.execLogger;
         worker=new Thread(&(this.workThreadJob),16*8192);
         worker.isDaemon=true;
-        worker.name=collectAppender(delegate void(CharSink s){
+        worker.name=collectIAppender(delegate void(CharSink s){
             s(name); s("_"); writeOut(s,exeNode.level); s("_"); writeOut(s,exeNode.pos);
         });
         worker.start();
@@ -1479,13 +1479,13 @@ class MExecuter:ExecuterI{
             setDefaultCache(_scheduler.nnCache());
         } catch(Exception e){
             log.error("setDefaultCache failed, continuing...");
-            log.error(collectAppender(&e.writeOut));
+            log.error(collectIAppender(&e.writeOut));
         }
         try{
             pin(_scheduler.starvationManager.pinLevel);
         } catch(Exception e){
             log.error("pinning failed, continuing...");
-            log.error(collectAppender(&e.writeOut));
+            log.error(collectIAppender(&e.writeOut));
         }
         while(1){
             try{
@@ -1509,7 +1509,7 @@ class MExecuter:ExecuterI{
             }
             catch(Exception e) {
                 log.error("exception in working thread ");
-                log.error(collectAppender(&e.writeOut));
+                log.error(collectIAppender(&e.writeOut));
                 soutStream.flush();
                 scheduler.raiseRunlevel(SchedulerRunLevel.Stopped);
                 abort();
@@ -1519,7 +1519,7 @@ class MExecuter:ExecuterI{
     /// description (for debugging)
     /// non threadsafe
     string toString(){
-        return collectAppender(cast(OutWriter)&desc);
+        return collectIAppender(cast(OutWriter)&desc);
     }
     /// description (for debugging)
     void desc(CharSink s){ desc(s,false); }

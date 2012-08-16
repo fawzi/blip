@@ -322,8 +322,8 @@ struct Vector(flt_, int dim_) {
                 *v1 = zero;
                 v1.cell[k] = 1;
                 
-                *v2 = .cross(*this, *v1);
-                *v1 = .cross(*v2, *this);
+                *v2 = .cross(this, *v1);
+                *v1 = .cross(*v2, this);
             }
         }
     }
@@ -364,15 +364,15 @@ struct Vector(flt_, int dim_) {
             if (l != cscalar!(flt, 0)) {
                 static if (isFloatingPointType!(flt)) {
                     flt inv = cscalar!(flt, 1) / l;
-                    *this *= inv;
+                    this *= inv;
                 } else {
-                    *this /= l;
+                    this /= l;
                 }
             }
         }
         
         Vector normalized() {
-            Vector res = *this;
+            Vector res = this;
             res.normalize();
             return res;
         }
@@ -382,12 +382,12 @@ struct Vector(flt_, int dim_) {
     static if (is(flt == float)) {
         void quickNormalize() {
             flt inv = invSqrt(norm22);
-            *this *= inv;
+            this *= inv;
         }
 
 
         Vector quickNormalized() {
-            Vector res = *this;
+            Vector res = this;
             res.quickNormalize();
             return res;
         }
@@ -397,8 +397,8 @@ struct Vector(flt_, int dim_) {
     private template opXVAssign(string op) {
         void opXVAssign(T)(T rhs) {
             assert (ok);
-            static if (is(typeof(rhs.opVecMul_r(*this)) : Vector)) {
-                *this = rhs.opVecMul_r(*this);
+            static if (is(typeof(rhs.opVecMul_r(this)) : Vector)) {
+                this = rhs.opVecMul_r(this);
             } else static if (isVectorType!(T, dim)) {
                 assert (rhs.ok);
                 static if (dim >= 1) mixin("x"~op~"=rhs.x;");
@@ -428,21 +428,21 @@ struct Vector(flt_, int dim_) {
     
     
     Vector opAdd(T)(T rhs) {
-        auto res = *this;
+        auto res = this;
         res += rhs;
         return res;
     }
     
     
     Vector opSub(T)(T rhs) {
-        auto res = *this;
+        auto res = this;
         res -= rhs;
         return res;
     }
     
     
     Vector opMul(T)(T rhs) {
-        auto res = *this;
+        auto res = this;
         res *= rhs;
         return res;
     }
@@ -478,7 +478,7 @@ struct Vector(flt_, int dim_) {
         }
 
         Vector opDiv(T)(T rhs) {
-            auto res = *this;
+            auto res = this;
             res /= rhs;
             return res;
         }
@@ -558,7 +558,7 @@ struct Vector(flt_, int dim_) {
     flt distance(Vector other) {
         assert (ok);
         assert (other.ok);
-        other -= *this;
+        other -= this;
         return other.norm2;
     }
     
@@ -766,13 +766,13 @@ struct Matrix(flt_, int rows_, int cols_) {
     }
     
     static if (2 == cols) {
-        const static Matrix identity = {
+        immutable static Matrix identity = {
             col: [
                 { row: oneAtPos!(0) },
                 { row: oneAtPos!(1) }
             ]
         };
-        const static Matrix zero = {
+        immutable static Matrix zero = {
             col: [
                 { row: oneAtPos!(rows) },
                 { row: oneAtPos!(rows) }
@@ -780,14 +780,14 @@ struct Matrix(flt_, int rows_, int cols_) {
         };
     } else
     static if (3 == cols) {
-        const static Matrix identity = {
+        immutable static Matrix identity = {
             col: [
                 { row: oneAtPos!(0) },
                 { row: oneAtPos!(1) },
                 { row: oneAtPos!(2) }
             ]
         };
-        const static Matrix zero = {
+        immutable static Matrix zero = {
             col: [
                 { row: oneAtPos!(rows) },
                 { row: oneAtPos!(rows) },
@@ -796,7 +796,7 @@ struct Matrix(flt_, int rows_, int cols_) {
         };
     } else
     static if (4 == cols) {
-        const static Matrix identity = {
+        immutable static Matrix identity = {
             col: [
                 { row: oneAtPos!(0) },
                 { row: oneAtPos!(1) },
@@ -804,7 +804,7 @@ struct Matrix(flt_, int rows_, int cols_) {
                 { row: oneAtPos!(3) }
             ]
         };
-        const static Matrix zero = {
+        immutable static Matrix zero = {
             col: [
                 { row: oneAtPos!(rows) },
                 { row: oneAtPos!(rows) },
@@ -847,12 +847,12 @@ struct Matrix(flt_, int rows_, int cols_) {
     
     
     void makeIdentity() {
-        *this = identity;
+        this = identity;
     }
     
     
     void transpose() {
-        *this = this.transposed();
+        this = this.transposed();
     }
     
     
@@ -965,7 +965,7 @@ struct Matrix(flt_, int rows_, int cols_) {
         
         
         void invert() {
-            *this = inverse();
+            this = inverse();
         }
     }
     
@@ -988,7 +988,7 @@ struct Matrix(flt_, int rows_, int cols_) {
     }
 
     private Matrix opX_(string x)(flt rhs) {
-        Matrix res = *this;
+        Matrix res = this;
         res.opXAssign_!(x)(rhs);
         return res;
     }
@@ -1059,7 +1059,7 @@ struct Matrix(flt_, int rows_, int cols_) {
     
     
     void opMulAssign(ref Matrix rhs) {
-        *this = opMul(rhs);
+        this = opMul(rhs);
     }
     
     
@@ -1402,7 +1402,7 @@ struct Quaternion(flt_) {
     
     mixin(serializeSome("Quaternion!("~flt_.stringof~")","a quaternion","x|y|z|w"));
     
-    const static Quaternion identity = { x: cscalar!(flt, 0), y: cscalar!(flt, 0), z: cscalar!(flt, 0), w: cscalar!(flt, 1) };
+    immutable static Quaternion identity = { x: cscalar!(flt, 0), y: cscalar!(flt, 0), z: cscalar!(flt, 0), w: cscalar!(flt, 1) };
     
     static Quaternion from(T)(Quaternion!(T) q){
         Quaternion res;
@@ -1512,7 +1512,7 @@ struct Quaternion(flt_) {
     
     
     Quaternion normalized() {
-        Quaternion res = *this;
+        Quaternion res = this;
         res.normalize();
         return res;
     }
@@ -1592,7 +1592,7 @@ struct Quaternion(flt_) {
     }
 
     Quaternion opAdd(ref Quaternion b){
-        Quaternion res=*this;
+        Quaternion res=this;
         res+=b;
         return res;
     }
@@ -1675,7 +1675,7 @@ struct Quaternion(flt_) {
 
 
     void opMulAssign(ref Quaternion rhs) {
-        *this = this.opMul(rhs);
+        this = this.opMul(rhs);
     }
 
 
@@ -1692,12 +1692,12 @@ struct Quaternion(flt_) {
     
 
     Quaternion inverseMult(Quaternion rhs) {
-        return rhs.opMul(*this);
+        return rhs.opMul(this);
     }
 
 
     Quaternion opMul(real t) {
-        Quaternion res = slerp(Quaternion.identity, *this, t);
+        Quaternion res = slerp(Quaternion.identity, this, t);
         return res;
     }
     
@@ -1782,7 +1782,7 @@ struct Quaternion(flt_) {
         assert (ok);
         assert (other.ok);
         other.invert();
-        return other * *this;
+        return other * this;
     }
 
 

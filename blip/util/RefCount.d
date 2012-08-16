@@ -21,7 +21,7 @@ public import blip.sync.Atomic;
 /// adds reference counting, calls release0() (that should be implemented by the user)
 /// when the reference count becomes 0
 template RefCountMixin(){
-    size_t refCount=1;
+    shared size_t refCount=1;
     
     void retain(){
         if (atomicAdd(refCount,cast(size_t)1)==0){

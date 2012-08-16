@@ -1,12 +1,12 @@
 #!/bin/bash
-TANGO_HOME=../../tango
+TANGO_HOME=../../Tango-D2
 if [ $# -gt 0 ]; then
     TANGO_HOME=$1
 fi
 # add a -g=basic in the newest versions of tango
 # $TANGO_HOME/build/bin/linux64/bob -v -r=ldc -c=ldc -p=linux -l=libtango-base-ldc -o="-O3 -release"  $TANGO_HOME
-# $TANGO_HOME/build/bin/linux64/bob -v -u -c=ldc -p=linux -l=libtango-user-ldc -o="-O3 -release"  $TANGO_HOME
-# $TANGO_HOME/build/bin/linux64/bob -v -u -c=ldc -p=linux -l=libtango-user-ldc-dbg -o="-g -O"  $TANGO_HOME
+$TANGO_HOME/build/bin/linux64/bob -v -u -c=dmd -p=linux -l=libtango-user-dmd -o="-O3 -release"  $TANGO_HOME
+$TANGO_HOME/build/bin/linux64/bob -v -u -c=dmd -p=linux -l=libtango-user-dmd-dbg -o="-g -O"  $TANGO_HOME
 # $TANGO_HOME/build/bin/linux64/bob -v -u -c=ldc -p=linux -l=libtango-user-ldc-tst -o="-d -d-version=UnitTest -d-debug=UnitTest -unittest -g -L-ltango-dbg"  $TANGO_HOME
 rm *.o
 dirldc="`which ldc`"

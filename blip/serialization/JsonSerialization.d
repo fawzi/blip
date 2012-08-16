@@ -315,7 +315,7 @@ class JsonUnserializer(T=char) : Unserializer {
                     if (fieldReadName.length>0)
                         this.reader.skipString(cast(S)":");
                     throw new FieldMismatchException(field,fieldReadName,
-                        collectAppender(delegate void(CharSink s){
+                        collectIAppender(delegate void(CharSink s){
                             dumper(s)("unexpected field '")(fieldReadName)("' at "); this.reader.parserPos(s);
                         }),__FILE__,__LINE__);
                 }
@@ -531,7 +531,7 @@ class JsonUnserializer(T=char) : Unserializer {
             }
             while(1){
                 if(!stackTop.missingLabels.remove(stackTop.labelToRead)){
-                    serializationError(collectAppender(delegate void(CharSink sink){ auto s=dumper(sink);
+                    serializationError(collectIAppender(delegate void(CharSink sink){ auto s=dumper(sink);
                         s("unexpected extra object field '")(stackTop.labelToRead)("'");
                         if (field !is null){
                             if (field.name.length!=0)

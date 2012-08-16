@@ -84,7 +84,7 @@ version(Windows){
  *
  * To be initialized with hwloc_topology_init() and built with hwloc_topology_load().
  */
-typedef void * hwloc_topology_t;
+alias void * hwloc_topology_t;
 
 /** \defgroup hwlocality_sets Object sets (hwloc_cpuset_t and hwloc_nodeset_t)
  *

@@ -41,7 +41,7 @@ struct Callback{
         return callback==c.callback && flags==c.flags;
     }
     
-    static Callback *freeList;
+    __gshared static Callback *freeList;
     static Callback *newCallback(void delegate(cstring,Callback*,Variant) callback,
         Flags flags=Flags.None)
     {

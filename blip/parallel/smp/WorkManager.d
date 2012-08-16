@@ -192,21 +192,21 @@ string mkActionMixin(string name,string locals_,string action){
 /// size_t the default size for simple work
 /// this is used to calculate the default block size for splitting up parallel tasks
 /// (this should probably be at least comparable to the l1 cache per thread)
-const size_t defaultSimpleLoopSize=64*1024;
+immutable size_t defaultSimpleLoopSize=64*1024;
 
 /// a real scheduler (unless one has version SequentialWorkManager)
 /// shares the work on a pool of threads
-TaskSchedulerI defaultScheduler;
+__gshared TaskSchedulerI defaultScheduler;
 /// the root task that can be used to add work to the defaultScheduler
-TaskI defaultTask;
+__gshared TaskI defaultTask;
 /// a root task that can be used to add work to a sequential worker that never
 /// executes two tasks concurrently
-TaskI sequentialTask;
+__gshared TaskI sequentialTask;
 /// a task that can be used as supertask to the tasks that should be
 /// executed immediately, if possible in the current context
-TaskI immediateTask;
+__gshared TaskI immediateTask;
 
-static this(){
+shared static this(){
     version(SequentialWorkManager){
         auto defaultExecuter=new ImmediateExecuter("defaultWorkManager");
         defaultScheduler=defaultExecuter.scheduler();
@@ -241,6 +241,6 @@ static this(){
     }
     
     // allow implicit submission form the main thread
-    taskAtt.val=defaultTask;
+    taskAtt=defaultTask;
 }
 

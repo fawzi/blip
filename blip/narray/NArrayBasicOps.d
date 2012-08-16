@@ -830,7 +830,7 @@ string axisFilterLoop(T,int rank,V,S...)(string loopBody)
     string res;
     string indent;
     indent~="    ";
-    static const Immutable!(int) rank2=rank-reductionFactorFilt!(S);
+    static immutable int rank2=rank-reductionFactorFilt!(S);
     res~=indent~"const int rank2=rank-reductionFactorFilt!(S);";
     res~=indent~"index_type from,to,step;\n";
     res~=indent~"T* aPtr"~ctfe_i2a(rank)~"=a.startPtrArray;\n";

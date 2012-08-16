@@ -348,7 +348,7 @@ string preConvolveIJSetup(string indent,string inAName,string outAName,Border bo
         res~=indent~"T[] outBaseSlice="~outAName~".data;\n";
         res~=indent~"void safeOut(T* ptr,long lineNr){\n";
         res~=indent~"    if (ptr<outBaseSlice.ptr || ptr>=(outBaseSlice.ptr+outBaseSlice.length)){\n";
-        res~=indent~"        string msg=collectAppender(void delegate(CharSink sink){\n";
+        res~=indent~"        string msg=collectIAppender(void delegate(CharSink sink){\n";
         res~=indent~"            sink(\"ERROR convolve kernel invalid write\\n\");\n";
         res~=indent~"            dumper(sink)(\" invalid access of out array in convolution kernel, T=\")\n";
         res~=indent~"            (T.stringof)(\",rank=\")(rank)(\",switchTag=\")(switchTag)(\", line=\")\n";
@@ -358,7 +358,7 @@ string preConvolveIJSetup(string indent,string inAName,string outAName,Border bo
         res~=indent~"}\n";
         res~=indent~"void safeIn(T* ptr,long lineNr){\n";
         res~=indent~"    if (ptr<inBaseSlice.ptr || ptr>=(inBaseSlice.ptr+inBaseSlice.length)){\n";
-        res~=indent~"        string msg=collectAppender(void delegate(CharSink sink){\n";
+        res~=indent~"        string msg=collectIAppender(void delegate(CharSink sink){\n";
         res~=indent~"            dumper(s)(\"ERROR convolve kernel invalid read\\n\")\n";
         res~=indent~"            (\" invalid access of in array in convolution kernel, T=\")\n";
         res~=indent~"            (T.stringof)(\",rank=\")(rank)(\",switchTag=\")(switchTag)(\", line=\")\n";

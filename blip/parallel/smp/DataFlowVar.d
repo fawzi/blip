@@ -45,14 +45,14 @@ struct WaitListPtr{
         void*    ptr;
         size_t   data;
     }
-    WaitListU data;
-    bool ifNoVal(void delegate(WaitList) op){
-        volatile void *p=data.ptr;
+    shared WaitListU data;
+    bool ifNoVal(void delegate(shared WaitList) op){
+        shared void *p=data.ptr;
         if (((cast(size_t)p)&1)==1){
             while(((cast(size_t)p)&3)==3){
                 assert((cast(size_t)p)==3,"invalid value ");
                 Thread.yield();
-                volatile p=data.ptr; // spin
+                p=data.ptr; // spin
             }
             return false;
         } else if (p is null){
@@ -62,18 +62,18 @@ struct WaitListPtr{
             p=data.ptr;
         }
         assert(p!is null,"unexpected null");
-        WaitList wl=cast(WaitList)p;
+        shared(WaitList) wl=cast(shared(WaitList))p;
         synchronized(wl){
             if (wl is data.wlist){
                 op(wl);
                 return true;
             } else {
                 while(true) {
-                    volatile p=data.ptr;
+                    p=data.ptr;
                     if (((cast(size_t)p)&3)!=3) break;
                     Thread.yield();
                 }
-                volatile assert(((cast(size_t)p)&1)==1,"no val when expected one");
+                assert(((cast(size_t)p)&1)==1,"no val when expected one");
                 static if (is(typeof(this.value))) memoryBarrier!(true,false,false,false)();
             }
         }
@@ -89,15 +89,15 @@ struct WaitListPtr{
         }
     }
     
-    bool addTask(TaskI t){
-        return ifNoVal(delegate void(WaitList w){
+    bool addTask(shared TaskI t){
+        return ifNoVal(delegate void(shared WaitList w){
             w.waiting~=t;
         });
     }
     
     void maybeSetValShort(ref WaitListPtr newVal){
         while(true){
-            volatile size_t nV=newVal.data.data;
+            size_t nV=newVal.data.data;
             switch (nV&3){
             case 0:
                 return;
@@ -116,7 +116,7 @@ struct WaitListPtr{
     void setValShort(size_t newVal){
         assert((newVal&3)==1,"newVal binary rep has to end with 01");
         while(true){
-            volatile void* oldV=data.ptr;
+            shared void* oldV=data.ptr;
             switch((cast(size_t)oldV)&3){
             case 0:
                 if (atomicCASB(data.data,newVal,cast(size_t)oldV)){
@@ -128,7 +128,7 @@ struct WaitListPtr{
                 break; // spin
             case 1:
                 if (data.data !is newVal){
-                    throw new Exception(collectAppender(delegate void(CharSink sink){
+                    throw new Exception(collectIAppender(delegate void(CharSink sink){
                         auto s=dumper(sink);
                         s("invalid change of value from ")(data.data)(" to ")(newVal);
                     }),__FILE__,__LINE__);
@@ -145,7 +145,7 @@ struct WaitListPtr{
 
     void setValLong(void delegate(bool) setOp){
         while(true){
-            volatile void* oldV=data.ptr;
+            shared void* oldV=data.ptr;
             switch((cast(size_t)oldV)&3){
             case 0:
                 size_t waitP=3;

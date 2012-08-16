@@ -348,7 +348,7 @@ class Pool(T,int _batchSize=16):PoolI!(T){
 /// a next style unbounded freelist, can be used when T has a next attribute that builds a single linked list
 /// *no* heap activity, minimal atomic ops
 class PoolNext(T):PoolI!(T){
-    T first=null;
+    shared T first=null;
     T delegate(PoolI!(T)) createNew;
     size_t activeUsers=1;
     bool cacheStopped=false;

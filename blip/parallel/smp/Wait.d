@@ -41,7 +41,7 @@ struct SmpSemaphore{
         int delayLevel;
     }
     ptrdiff_t counter; /// the number of waiting threads
-    Semaphore sem; // remove support for this? it is just for waiting non yieldable tasks or the main thread
+    shared Semaphore sem; // remove support for this? it is just for waiting non yieldable tasks or the main thread
     TaskISlist *waiting;
     
     /// constructor
@@ -90,11 +90,11 @@ struct SmpSemaphore{
                 });
             } else {
                 if (sem is null){
-                    auto newSem=new Semaphore();
+                    shared newSem=new Semaphore();
                     writeBarrier();
                     atomicCAS(sem,newSem,cast(Semaphore)null);
                 }
-                volatile auto mySem=sem;
+                shared mySem=sem;
                 assert(mySem!is null);
                 insertAt(waiting,tt);
                 mySem.wait();
@@ -190,8 +190,8 @@ class WaitConditionT(bool oneAtTime=true){
                         }
                     }
                 }
-                volatile {
-                    Semaphore mySem=sem;
+                {
+                    shared Semaphore mySem=sem;
                     auto myCnd=cnd;
                     while (!myCnd()){
                         mySem.wait();
@@ -283,13 +283,13 @@ class RLock:Object.Monitor{
     }
     /// to string
     string toString(){
-        return collectAppender(&desc);
+        return collectIAppender(&desc);
     }
     /// locks the recursive lock
     void lock(){
         auto newTask=taskAtt.val;
         if (newTask is null || cast(RootTask)newTask !is null){
-            throw new Exception(collectAppender(delegate void(CharSink s){
+            throw new Exception(collectIAppender(delegate void(CharSink s){
                 dumper(s)("warning dangerous locking in task ")(newTask);
             }),__FILE__,__LINE__); // allow aquiring a real lock??? can deadlock...
         }
@@ -470,7 +470,7 @@ class RRLock:Object.Monitor{
     }
     /// to string
     string toString(){
-        return collectAppender(&desc);
+        return collectIAppender(&desc);
     }
     /// locks the recursive lock
     void lock(){

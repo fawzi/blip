@@ -49,7 +49,7 @@ import blip.util.Grow:growLength;
 import blip.io.BasicIO;
 import blip.io.Console;
 import blip.stdc.stdlib:abort;
-import blip.container.GrowableArray:collectAppender;
+import blip.container.GrowableArray:collectIAppender;
 import blip.container.Cache;
 import blip.container.Pool;
 import blip.Comp;
@@ -129,9 +129,9 @@ struct NumaNode{
         return
             ((v==0)?(pos-n.pos):v);
     }
-    static ClassMetaInfo metaI;
-    static this(){
-        metaI=ClassMetaInfo.createForType!(typeof(*this))("NumaNode","identifies a numa node");
+    __gshared static ClassMetaInfo metaI;
+    shared static this(){
+        metaI=ClassMetaInfo.createForType!(typeof(this))("NumaNode","identifies a numa node");
         metaI.addFieldOfType!(int)("level","the level of this node");
         metaI.addFieldOfType!(int)("pos","position of this node within the level");
     }
@@ -416,8 +416,8 @@ class ExplicitTopology(NodeType): Topology!(NodeType){
             subNodes.length=size;
             superNodes.length=size;
         }
-        static ClassMetaInfo metaI;
-        static this(){
+        __gshared static ClassMetaInfo metaI;
+        shared static this(){
             metaI=ClassMetaInfo.createForType!(typeof(*this))("ExplicitTopology!("~NodeType.stringof~").NumaLevel",
                 "a level of a numa hierarcy");
             metaI.addFieldOfType!(NodeType[])("nodes","the nodes of this level");
@@ -500,8 +500,8 @@ class ExplicitTopology(NodeType): Topology!(NodeType){
         return new ArrayIterator!(NodeType)(levels[node.level].subNodes[node.pos],start);
     }
     
-    static ClassMetaInfo metaI;
-    static this(){
+    __gshared static ClassMetaInfo metaI;
+    shared static this(){
         metaI=ClassMetaInfo.createForType!(typeof(this))("ExplicitTopology!("~NodeType.stringof~")",
             "an explicit topology structure (stored in memory)");
         metaI.addFieldOfType!(NumaLevel[])("levels","the levels of this topology");
@@ -537,8 +537,8 @@ class ExplicitNumaTopology: ExplicitTopology!(NumaNode), NumaTopology {
     SocketInfo nextSocket(NumaNode){ SocketInfo res; return res; }
     bool bindToNode(NumaNode n,bool singlify=false){ return false; }
     
-    static ClassMetaInfo metaI;
-    static this(){
+    __gshared static ClassMetaInfo metaI;
+    shared static this(){
         metaI=ClassMetaInfo.createForType!(typeof(this))("ExplicitNumaTopology",
             "an explicit numa topology");
     }
@@ -682,7 +682,7 @@ version(noHwloc){} else {
             int level; /// the maximum level of the childrens
             int depth2,maxDepth;
             PoolI!(RandomChildernIterator) pool;
-            static PoolI!(RandomChildernIterator) gPool;
+            __gshared static PoolI!(RandomChildernIterator) gPool;
         
             bool descend(){
                 if (left[lastStack]==0) return false;
@@ -749,7 +749,7 @@ version(noHwloc){} else {
                 res.reset(topo,childrens,start,level);
                 return res;
             }
-            static this(){
+            shared static this(){
                 gPool=cachedPool(function RandomChildernIterator(PoolI!(RandomChildernIterator)p){
                     return new RandomChildernIterator(p);
                 });
@@ -949,7 +949,7 @@ version(noHwloc){} else {
             assert(node.level+1<levelMapping.length,"no super node for node at top level"); // return itself?
             auto obj=hwlocObjForNumaNode(node);
             if (obj is null){
-                throw new Exception(collectAppender(delegate void(CharSink s){
+                throw new Exception(collectIAppender(delegate void(CharSink s){
                     s("no object for node "); writeOut(s,node);  s("\n");
                 }),__FILE__,__LINE__);
             }
@@ -974,7 +974,7 @@ version(noHwloc){} else {
                     obj=obj.parent;
                 }
             }
-            throw new Exception(collectAppender(delegate void(CharSink s){
+            throw new Exception(collectIAppender(delegate void(CharSink s){
                 s("no superNode for node "); writeOut(s,node);  s("\n");
             }),__FILE__,__LINE__);
         }
@@ -983,7 +983,7 @@ version(noHwloc){} else {
             assert(node.level!=0,"no subnode of the last level"); // return an empty iterator?
             auto obj=hwlocObjForNumaNode(node);
             if (obj is null){
-                throw new Exception(collectAppender(delegate void(CharSink s){
+                throw new Exception(collectIAppender(delegate void(CharSink s){
                     s("no hwlocObjForNumaNode for node "); writeOut(s,node);  s("\n");
                 }),__FILE__,__LINE__);
             }
@@ -992,7 +992,7 @@ version(noHwloc){} else {
                 obj=obj.first_child;
             }
             if (obj is null){
-                throw new Exception(collectAppender(delegate void(CharSink s){
+                throw new Exception(collectIAppender(delegate void(CharSink s){
                     s("no subnodes for node "); writeOut(s,node);  s("\n");
                 }),__FILE__,__LINE__); // return an empty iterator?
             }
@@ -1027,8 +1027,8 @@ version(noHwloc){} else {
             return RandomChildernIterator(this,childrens,start,node.level-1);
         }
     
-    /+    static ClassMetaInfo metaI;
-        static this(){
+    /+    __gshared static ClassMetaInfo metaI;
+        shared static this(){
             metaI=ClassMetaInfo.createForType!(typeof(this))("HwlocTopology","numa topology derivad from hwloc");
             metaI.addFieldOfType!(NumaLevel[])("levels","the levels of this topology");
         }
@@ -1188,9 +1188,9 @@ version(noHwloc){} else {
     }
 }
 
-NumaTopology defaultTopology;
+__gshared NumaTopology defaultTopology;
 
-static this(){
+shared static this(){
     version(noHwloc){
         defaultTopology=uniformTopology([mainCpu.coresPerCPU(),
             mainCpu.threadsPerCPU()/mainCpu.coresPerCPU()]);

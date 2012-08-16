@@ -89,7 +89,7 @@ struct BasicSocket{
         int oldMode;
         if ((oldMode = fcntl(res.sock, F_GETFL, 0)) == -1 ||
             fcntl(res.sock, F_SETFL, oldMode | O_NONBLOCK)==-1){
-            throw new BIOException(collectAppender(delegate void(CharSink s){
+            throw new BIOException(collectIAppender(delegate void(CharSink s){
                         dumper(s)("could not set non blocking mode for socket ")(s);
                     }),__FILE__,__LINE__);
         }
@@ -196,7 +196,7 @@ struct BasicSocket{
     void noDelay(bool val){
         int i=(val?1:0);
         if (setsockopt(sock,SOL_TCP,TCP_NODELAY,&i,4)!=0){
-            throw new Exception(collectAppender(delegate void(CharSink s){
+            throw new Exception(collectIAppender(delegate void(CharSink s){
                 dumper(s)("setsockopt SOL_TCP,TCP_NODELAY failed on socket ")(sock);
                 char[256] buf;
                 s(strerror_d(errno(),buf));
@@ -208,7 +208,7 @@ struct BasicSocket{
         int i;
         socklen_t len=4;
         if (getsockopt(sock,SOL_TCP,TCP_NODELAY,&i,&len)){
-            throw new Exception(collectAppender(delegate void(CharSink s){
+            throw new Exception(collectIAppender(delegate void(CharSink s){
                 dumper(s)("getsockopt SOL_TCP,TCP_NODELAY failed on socket ")(sock);
                 char[256] buf;
                 s(strerror_d(errno(),buf));
@@ -221,7 +221,7 @@ struct BasicSocket{
     void keepalive(bool k){
         int i=cast(int)k;
         if (setsockopt(sock,SOL_SOCKET,SO_KEEPALIVE,&i,4)!=0){
-            throw new Exception(collectAppender(delegate void(CharSink s){
+            throw new Exception(collectIAppender(delegate void(CharSink s){
                 dumper(s)("setsockopt SOL_SOCKET,SO_KEEPALIVE failed on socket ")(sock);
                 char[256] buf;
                 s(strerror_d(errno(),buf));
@@ -232,7 +232,7 @@ struct BasicSocket{
         int i;
         socklen_t len=4;
         if (getsockopt(sock,SOL_SOCKET,SO_KEEPALIVE,&i,&len)){
-            throw new Exception(collectAppender(delegate void(CharSink s){
+            throw new Exception(collectIAppender(delegate void(CharSink s){
                 dumper(s)("getsockopt SOL_SOCKET,SO_KEEPALIVE failed on socket ")(sock);
                 char[256] buf;
                 if (strerror_d(errno(),buf)){
@@ -455,13 +455,13 @@ class SocketServer{
         PoolI!(Handler*) pool;
 
         void doAction(){
-            server.handler(*this);
+            server.handler(this);
             if (atomicAdd(server.pendingTasks,-1)==0)
                 throw new Exception("error in pending tasks",__FILE__,__LINE__);
         }
         void giveBack(){
             if (pool!is null){
-                pool.giveBack(this);
+                pool.giveBack(&this);
             } else {
                 //tryDeleteT(this);
             }
@@ -487,8 +487,8 @@ class SocketServer{
             res.port=Idup(res.port);
             return res;
         }
-        static PoolI!(Handler*)gPool;
-        static this(){
+        __gshared static PoolI!(Handler*)gPool;
+        shared static this(){
             gPool=cachedPool(function Handler*(PoolI!(Handler*)p){
                 auto res=new Handler;
                 res.pool=p;

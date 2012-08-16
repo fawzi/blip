@@ -131,12 +131,12 @@ struct BulkArray(T){
         None=0,
         Dummy,
     }
-    static size_t defaultOptimalBlockSize=100*1024/T.sizeof;
-    static const BulkArrayCallocSize=100*1024;
+    __gshared static size_t defaultOptimalBlockSize=100*1024/T.sizeof;
+    static immutable BulkArrayCallocSize=100*1024;
     T* ptr, ptrEnd;
     ChunkGuard guard;
     Flags flags=Flags.Dummy;
-    static const BulkArray dummy={null,null,null,Flags.Dummy};
+    static immutable BulkArray dummy={null,null,null,Flags.Dummy};
     alias T dtype;
     static if(is(T.flt)){
         static if((T.sizeof%T.flt.sizeof==0)){
@@ -149,8 +149,8 @@ struct BulkArray(T){
     }
     
     // ---- Serialization ---
-    static ClassMetaInfo metaI;
-    static this(){
+    __gshared static ClassMetaInfo metaI;
+    shared static this(){
         synchronized{
             if (metaI is null){
                 metaI=ClassMetaInfo.createForType!(BulkArray)
@@ -264,7 +264,7 @@ struct BulkArray(T){
     T* ptrI(size_t i)
     in{
         if (this.ptr+i>=this.ptrEnd){
-            assert(0,collectAppender(delegate void(CharSink sink){
+            assert(0,collectIAppender(delegate void(CharSink sink){
                 dumper(sink)("index of BulkArray out of bounds:")(i)(" for array of size ")(this.ptrEnd-this.ptr);
             }));
         }
@@ -329,7 +329,7 @@ struct BulkArray(T){
                 *aPtr0=cast(T)(*bPtr0);
             } else {
                 *aPtr0=convertTo!(typeof(*aPtr0))(*bPtr0);
-            }`,T,V)(*this,b);
+            }`,T,V)(this,b);
         }
     }
     void opSliceAssign(BulkArray b){
@@ -352,7 +352,7 @@ struct BulkArray(T){
                 *aPtr0=cast(T)(*bPtr0);
             } else {
                 *aPtr0=convertTo!(typeof(*aPtr0))(*bPtr0);
-            }`,V,T)(n,*this);
+            }`,V,T)(n,this);
         }
         return n;
     }
@@ -364,9 +364,9 @@ struct BulkArray(T){
     BulkArray deepdup(){
         BulkArray n=BulkArray(length);
         static if (is(typeof(T.init.deepdup))){
-            baBinaryOpStr!(`*bPtr0=aPtr0.deepdup;`,T,T)(*this,n);
+            baBinaryOpStr!(`*bPtr0=aPtr0.deepdup;`,T,T)(this,n);
         } else static if (is(typeof(T.init.dup()))) {
-            baBinaryOpStr!("*bPtr0=aPtr0.dup;",T,T)(*this,n);
+            baBinaryOpStr!("*bPtr0=aPtr0.dup;",T,T)(this,n);
         } else {
             memcpy(n.data.ptr,data.ptr,length*T.sizeof);
         }
@@ -593,11 +593,11 @@ struct BulkArray(T){
     }
     /// return what is needed for a sequential foreach loop on the array
     BulkArray sLoop(){
-        return *this;
+        return this;
     }
     /// return what is needed for a parallel foreach loop on the array
     PLoop pLoop(size_t optimalBlockSize=defaultOptimalBlockSize){
-        return PLoop(*this,optimalBlockSize);
+        return PLoop(this,optimalBlockSize);
     }
     template LoopReturnType(int loopType){
         static if ((loopType&1)!=0){
@@ -608,9 +608,9 @@ struct BulkArray(T){
     }
     LoopReturnType!(loopType) loop(int loopType)(size_t blockSize=defaultOptimalBlockSize){
         static if ((loopType&1)!=0){
-            return PLoop(*this,blockSize);
+            return PLoop(this,blockSize);
         } else {
-            return *this;
+            return this;
         }
     }
     void opSliceAssign(T val){

@@ -50,12 +50,12 @@ string loopCtxMixin(string ctxName,string ctxExtra,string startLoop, string task
         `~ctxName~` *next;
         PoolI!(`~ctxName~`*) pool;
         `~ctxExtra~`
-        static size_t nGPools;
-        static Mutex gLock;
-        static this(){
+        __gshared static size_t nGPools;
+        __gshared static Mutex gLock;
+        shared static this(){
             gLock=new Mutex();
         }
-        static CachedPool!(`~ctxName~`*) gPool;
+        __gshared static CachedPool!(`~ctxName~`*) gPool;
         static void addGPool(){
             synchronized(gLock){
                 if (nGPools==0){
@@ -83,7 +83,7 @@ string loopCtxMixin(string ctxName,string ctxExtra,string startLoop, string task
             assert(gPool!is null,"invalid gPool (forgot addGPool call?)");
             auto res=gPool.getObj();
             auto p=res.pool;
-            *res=*this;
+            *res=this;
             res.pool=p;
             return res;
         }
@@ -445,12 +445,12 @@ class PLoopIter(T){
         PoolI!(LoopEl*) pool;
         size_t idx; // do a separate structure without idx?
         T el;
-        static size_t nGPools=0;
-        static Mutex gLock;
-        static this(){
+        __gshared static size_t nGPools=0;
+        __gshared static Mutex gLock;
+        shared static this(){
             gLock=new Mutex();
         }
-        static CachedPool!(LoopEl*) gPool;
+        __gshared static CachedPool!(LoopEl*) gPool;
         static void addGPool(){
             synchronized(gLock){
                 if (nGPools==0){

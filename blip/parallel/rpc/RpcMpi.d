@@ -31,7 +31,7 @@ import blip.Comp;
 
 /// handles vending (and possibly also receiving the results if using one channel for both)
 class MpiProtocolHandler: ProtocolHandler{
-    static MpiProtocolHandler[string ] mpiProtocolHandlers;
+    __gshared static MpiProtocolHandler[string ] mpiProtocolHandlers;
     
     /// those that can actually handle the given protocol
     static ProtocolHandler findHandlerForUrl(ParsedUrl url){
@@ -51,7 +51,7 @@ class MpiProtocolHandler: ProtocolHandler{
         return pH;
     }
     /// registers the mpi-sbin protocol
-    static this(){
+    shared static this(){
         registerProtocolHandler("mpi-sbin",&findHandlerForUrl);
     }
     /// registers a mpi communicator handler

@@ -111,20 +111,20 @@ enum :size_t{Eof=size_t.max}
 /// a character sink
 alias void delegate(cstring) CharSink;
 /// a binary sink
-alias void delegate(void[]) BinSink;
+alias void delegate(const(void)[]) BinSink;
 /// a delegate that will write out to a character sink
 alias void delegate(void delegate(cstring))  OutWriter;
 /// a delegate that will write out to a binary sink
-alias void delegate(void delegate(void[]))  BinWriter;
+alias void delegate(void delegate(const(void)[]))  BinWriter;
 
 /// a basic character reader (can be used to build more advanced objects that can handle CharReader, see blip.io.BufferIn)
 alias size_t delegate(cstring) CharRead;
 /// a basic binary reader (can be used to build more advanced objects that can handle CharReader and BinReader)
-alias size_t delegate(void[]) BinRead;
+alias size_t delegate(const(void)[]) BinRead;
 /// a delegate that reads in from a character source
 alias size_t delegate(cstring, SliceExtent slice,out bool iterate) CharReader;
 /// a delegate that reads in from a binary source
-alias size_t delegate(void[], SliceExtent slice,out bool iterate) BinReader;
+alias size_t delegate(const(void)[], SliceExtent slice,out bool iterate) BinReader;
 /// a handler of CharReader, returns true if something was read
 alias bool delegate(CharReader)CharReaderHandler;
 /// a handler of BinReader, returns true if something was read
@@ -151,7 +151,7 @@ interface OutStreamI{
     void rawWriteStrC(cstring);
     void rawWriteStrW(cstringw);
     void rawWriteStrD(cstringd);
-    void rawWrite(void[]);
+    void rawWrite(const(void)[]);
     CharSink charSink();
     BinSink  binSink();
     void flush();
@@ -245,15 +245,16 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
         assert(!(sink1 is null),"null sink in writeOut");
     }
     static if (is(typeof(sink1(" "c)))){
-        alias Const!(char) Char;
+        alias const(char) Char;
     } else static if (is(typeof(sink1(" "w)))){
-        alias Const!(wchar) Char;
+        alias const(wchar) Char;
     } else static if (is(typeof(sink1(" "d)))){
-        alias Const!(dchar) Char;
+        alias const(dchar) Char;
     } else {
         static assert(0,"invalid sink in writeOut");
     }
-    static if(is(S[0]==Char[])){
+    alias Unqual!(Char) UChar;
+    static if(is(Unqual!(S[0])==UChar[])){
         int width=0;
         void delegate(Char[]) sink;
         static if(is(V==typeof(sink))){
@@ -285,8 +286,9 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
             void delegate(Char[]) sinkDlg=delegate void(Char[]s){ sink1(s); };
         }
     }
+    alias Unqual!(T) TT;
     static if (is(T U:U[])){
-        static if(is(U==Char)){
+        static if(is(Unqual!(U)==UChar)){
             sink(v);
         } else static if(is(U==char)||is(U==wchar)||is(U==dchar)){
             if (v.length<128){
@@ -301,7 +303,7 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
             auto digits=[cast(Char)'0',cast(Char)'1',cast(Char)'2',cast(Char)'3',cast(Char)'4',
             cast(Char)'5',cast(Char)'6',cast(Char)'7',cast(Char)'8',cast(Char)'9',
             cast(Char)'a',cast(Char)'b',cast(Char)'c',cast(Char)'d',cast(Char)'e',cast(Char)'f'];
-            Char[32] buf;
+            UChar[32] buf;
             size_t ii=0;
             auto p=cast(ubyte*)v.ptr;
             for(int i=0;i<v.length;++i){
@@ -325,7 +327,7 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
             }
             sink("]");
         }
-    } else static if (isAssocArrayType!(T)){
+    } else static if (isAssocArrayType!(TT)){
         sink("[");
         int notFirst=false;
         foreach (k,t;v){
@@ -336,22 +338,22 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
             writeOut(sink,t);
         }
         sink("]");
-    } else static if (is(T==char)){
+	} else static if (is(TT==char)){
         sink((&v)[0..1]);
-    } else static if(is(T==wchar)||is(T==dchar)){
+    } else static if(is(TT==wchar)||is(TT==dchar)){
         sink(cast(cstring)[v]);
-    } else static if (is(T==byte)||is(T==ubyte)||is(T==short)||is(T==ushort)||
-        is(T==int)||is(T==uint)||is(T==long)||is(T==ulong))
+    } else static if (is(TT==byte)||is(TT==ubyte)||is(TT==short)||is(TT==ushort)||
+        is(TT==int)||is(TT==uint)||is(TT==long)||is(TT==ulong))
     {
         bool sign=true;
-        static if (is(S[0]:Char[])){
+        static if (is(Unqual!(S[0]):UChar[])){
             if (args[0].length>0){
                 switch (args[0][0]){
                 case 'x':
                     const digits=[cast(Char)'0',cast(Char)'1',cast(Char)'2',cast(Char)'3',cast(Char)'4',
                     cast(Char)'5',cast(Char)'6',cast(Char)'7',cast(Char)'8',cast(Char)'9',
                     cast(Char)'a',cast(Char)'b',cast(Char)'c',cast(Char)'d',cast(Char)'e',cast(Char)'f'];
-                    Char[T.sizeof*2] str;
+                    UChar[T.sizeof*2] str;
                     auto val=v;
                     for(int i=1;i<=cast(int)T.sizeof*2;++i){
                         auto d=cast(int)(0xF & val);
@@ -364,7 +366,7 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
                     const digitsU=[cast(Char)'0',cast(Char)'1',cast(Char)'2',cast(Char)'3',cast(Char)'4',
                     cast(Char)'5',cast(Char)'6',cast(Char)'7',cast(Char)'8',cast(Char)'9',
                     cast(Char)'A',cast(Char)'B',cast(Char)'C',cast(Char)'D',cast(Char)'E',cast(Char)'F'];
-                    Char[T.sizeof*2] strU;
+                    UChar[T.sizeof*2] strU;
                     auto valU=v;
                     for(int i=1;i<=T.sizeof*2;++i){
                         auto dU=cast(int)(0xF & valU);
@@ -402,7 +404,7 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
             }
         }
         if (v<0){
-            char[22] res;
+            UChar[22] res;
             int pos=res.length-1;
             while(v<0){
                 auto r=v%10;
@@ -419,7 +421,7 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
         } else if (v==0){
             sink("0");
         } else {
-            Char[22] res;
+            UChar[22] res;
             int pos=res.length-1;
             while(v>0){
                 auto r=v%10;
@@ -429,35 +431,35 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
             }
             sink(res[pos+1..$]);
         }
-    } else static if (is(T==bool)){
+    } else static if (is(TT==bool)){
         if (v){
             sink([cast(Char)'1']);
         } else {
             sink([cast(Char)'0']);
         }
-    } else static if (is(T==float)||is(T==double)||is(T==real)){
+    } else static if (is(TT==float)||is(TT==double)||is(TT==real)){
         char[40] buf;
         int prec=6;
-        static if (is(S[0]==Char[])){
+        static if (is(Unqual!(S[0])==UChar[])){
             if (args[0].length>1){
                 parseInt(args[0][1..$],prec);
             }
         }
         sink(formatFloat(buf,v,prec));
-    } else static if (is(T==ifloat)||is(T==idouble)||is(T==ireal)){
+    } else static if (is(TT==ifloat)||is(TT==idouble)||is(TT==ireal)){
         char[40] buf;
         int prec=6;
-        static if (is(S[0]==Char[])){
+        static if (is(Unqual!(S[0])==UChar[])){
             if (args[0].length>1){
                 parseInt(args[0][1..$],prec);
             }
         }
         sink(formatFloat(buf,v.im,prec));
         sink("*1i");
-    } else static if (is(T==cfloat)||is(T==cdouble)||is(T==creal)){
+    } else static if (is(TT==cfloat)||is(TT==cdouble)||is(TT==creal)){
         char[40] buf;
         int prec=6;
-        static if (is(S[0]==Char[])){
+        static if (is(Unqual!(S[0])==UChar[])){
             if (args[0].length>1){
                 parseInt(args[0][1..$],prec);
             }
@@ -473,13 +475,13 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
             sink(res);
             sink("*1i");
         }
-    } else static if (is(T==void*)){
+    } else static if (is(TT==void*)){
         static if (nArgs!(S)==0){
             writeOut(sink,cast(size_t)v,"x");
         } else {
             writeOut(sink,cast(size_t)v,args);
         }
-    } else static if (is(T:int)){
+    } else static if (is(TT:int)){
         writeOut(sink,cast(int)v);
     } else {
         static if (is(typeof(v is null))){
@@ -524,7 +526,7 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
             sink(v.toString());
         } else static if (is(typeof(writeOut(sink,v.toString())))){
             writeOut(sink,v.toString());
-        } else static if (is(T U==typedef)){
+        } else static if (is(TT U==typedef)){
             writeOut(sink1,cast(U)v,args);
         } else static if (is(T == function)){
             sink(convertToString!(Char)("function@"));
@@ -558,7 +560,7 @@ struct Dumper(T){
         } else {
             static assert(0,"Dumper!("~T.stringof~") cannot handle "~U.stringof);
         }
-        return *this;
+        return this;
     }
 }
 

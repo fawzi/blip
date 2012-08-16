@@ -179,12 +179,12 @@ string rpcProxyMixin(string name,string extName,string extraInterfaces,string []
                     delete this;
                 }
             }
-            static PoolI!(OnewayClosure*) gPool;
-            static Mutex gLock;
-            static this(){
+            __gshared static PoolI!(OnewayClosure*) gPool;
+            __gshared static Mutex gLock;
+            shared static this(){
                 gLock=new Mutex();
             }
-            static size_t gPoolLevel;
+            __gshared static size_t gPoolLevel;
             static void addGPool(){
                 synchronized(gLock){
                     if (gPoolLevel==0){
@@ -273,7 +273,7 @@ string rpcProxyMixin(string name,string extName,string extraInterfaces,string []
         res~=`
         override bool proxyIsLocal(){ return true; }
     }
-    static this(){
+    shared static this(){
         ProtocolHandler.registerProxy(`~extNameProxy~`,
             function Proxy(string name,string url){ return new `~name~`Proxy(name,url); },
             function Proxy(string name,string url){ return new `~name~`ProxyLocal(name,url); });
@@ -281,7 +281,7 @@ string rpcProxyMixin(string name,string extName,string extraInterfaces,string []
     } else {
         res~=`
         }
-        static this(){
+        shared static this(){
             ProtocolHandler.registerProxy(`~extNameProxy~`,
                 function Proxy(string name,string url){ return new `~name~`Proxy(name,url); });
         }
@@ -412,12 +412,12 @@ string rpcVendorMixin(string name,string extName_, string [] functionsComments){
                     delete this;
                 }
             }
-            static PoolI!(Closure*) gPool;
-            static Mutex gLock;
-            static this(){
+            __gshared static PoolI!(Closure*) gPool;
+            __gshared static Mutex gLock;
+            shared static this(){
                 gLock=new Mutex();
             }
-            static size_t gPoolLevel;
+            __gshared static size_t gPoolLevel;
             static void addGPool(){
                 synchronized(gLock){
                     if (gPoolLevel==0){

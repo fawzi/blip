@@ -223,7 +223,7 @@ else {
         enum :int{ dim=rank };
         alias ArrayFlags Flags;
         // default optimal chunk size for parallel looping
-        static index_type defaultOptimalChunkSize=defaultSimpleLoopSize/cast(index_type)V.sizeof;
+        __gshared static index_type defaultOptimalChunkSize=defaultSimpleLoopSize/cast(index_type)V.sizeof;
         /// pointer to the element 0,...0 (not necessarily the start of the slice)
         V* startPtrArray;
         /// strides multiplied by V.sizeof (can be negative)
@@ -1579,7 +1579,7 @@ else {
         }
         
         string toString(){
-            return collectAppender(delegate void(CharSink s){ this.printData(s); });
+            return collectIAppender(delegate void(CharSink s){ this.printData(s); });
         }
 
         /// description of the NArray wrapper, not of the contents, for debugging purposes...
@@ -1835,10 +1835,10 @@ else {
         }
         // ---- Serialization ---
         /// meta information for serialization
-        static ClassMetaInfo metaI;
+        __gshared static ClassMetaInfo metaI;
         /// registers this type into the serialization facilities
         //static void registerSerialization(){
-        static this(){
+        shared static this(){
             synchronized{
                 if (metaI is null){
                     metaI=ClassMetaInfo.createForType!(NArray)
@@ -2444,7 +2444,7 @@ template randomNArray(T){
 NArray!(T,rank) randNArray(T,int rank)(Rand r, NArray!(T,rank) a){
     static if (is(T==float)|| is(T==double)||is(T==real)){
         auto source=r.normalD(cast(T)3.0);
-    }else static if (is(T==ubyte)||is(T==uint)||is(T==ulong)) {
+    } else static if (is(T==ubyte)||is(T==uint)||is(T==ulong)) {
         auto source=r.expD(10.0);
     } else {
         auto source=r.normalD(30.0);

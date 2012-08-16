@@ -19,7 +19,7 @@ import blip.serialization.JsonSerialization;
 import blip.serialization.SerializationBase;
 import blip.io.Console;
 
-Serializer Sout;
-static this(){
+__gshared Serializer Sout;
+shared static this(){
     Sout=new JsonSerializer!()("sout",sout);
 }

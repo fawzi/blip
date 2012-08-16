@@ -29,6 +29,8 @@ if [ -n "$1" -o -n "$DC" ]; then
     fi
     if [ -n "$return_path" ]; then
         which "$comp"
+    elif ( "$comp" -v 2>&1 | grep ldc2 >& /dev/null ) ; then
+        echo ldc2
     elif ( "$comp" -v 2>&1 | grep ldc >& /dev/null ) ; then
         echo ldc
     elif ( "$comp" -v 2>&1 | grep gdc >& /dev/null ) ; then
@@ -37,6 +39,12 @@ if [ -n "$1" -o -n "$DC" ]; then
         echo dmd
     else
         echo `basename $comp`
+    fi
+elif (which ldc2 >& /dev/null); then
+    if [ -n "$return_path" ]; then
+        which ldc2
+    else
+        echo ldc2
     fi
 elif (which ldc >& /dev/null); then
     if [ -n "$return_path" ]; then

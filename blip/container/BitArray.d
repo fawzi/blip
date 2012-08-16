@@ -208,15 +208,15 @@ struct BitArray
         assert(length == bits.length);
         foreach( i, b; bits )
         {
-            (*this)[i] = b;
+            this[i] = b;
         }
     }
     /// sets the bits of this slice
     BitArray opSliceAssign(BitArray rhs){
         assert(rhs.len == len);
         mixin(loopOpMixin(`ptr[iBlock]=(ptr[iBlock]&(~mask))|(valAtt&mask);`,
-            `ptr[iBlock]=valAtt;`,`(*this)[ibit]=rhs[ibit];`));
-        return *this;
+            `ptr[iBlock]=valAtt;`,`this[ibit]=rhs[ibit];`));
+        return this;
     }
     /// loops on the slice
     int opApply( int delegate(ref bool) dg ){
@@ -248,19 +248,19 @@ struct BitArray
         return result;
     }
     /// compares the contents of two slices
-    int opEquals( BitArray rhs ){
+    equals_t opEquals( BitArray rhs ){
         if( this.length != rhs.length )
-            return 0; // not equal
-        mixin(loopOpMixin(`if ((ptr[iBlock]&mask)!=(valAtt&mask)) return 0;`,
-            `if (ptr[iBlock]!=valAtt) return 0;`,`if ((*this)[ibit]!=rhs[ibit]) return 0;`));
-        return 1;
+            return false; // not equal
+        mixin(loopOpMixin(`if ((ptr[iBlock]&mask)!=(valAtt&mask)) return false;`,
+            `if (ptr[iBlock]!=valAtt) return false;`,`if (this[ibit]!=rhs[ibit]) return false;`));
+        return true;
     }
 
     /// Performs a lexicographical comparison of this array to the supplied
     /// array.
     int opCmp( BitArray rhs ){
         mixin(loopOpMixin(`if ((ptr[iBlock]&mask)!=(valAtt&mask)) return (((ptr[iBlock]&mask)<(valAtt&mask))?-1:1);`,
-            `if (ptr[iBlock]!=valAtt) return ((ptr[iBlock]<valAtt)?-1:1);`,`if ((*this)[ibit]!=rhs[ibit]) return (((*this)[ibit])?1:-1);`));
+            `if (ptr[iBlock]!=valAtt) return ((ptr[iBlock]<valAtt)?-1:1);`,`if (this[ibit]!=rhs[ibit]) return ((this[ibit])?1:-1);`));
         return 0;
     }
     /// bit at index i
@@ -327,7 +327,7 @@ struct BitArray
                     }
                 }
                 return bitPosUp+ibit0;
-            }`,`if (!((*this)[ibit]||rhs[ibit])) return ibit;`));
+            }`,`if (!(this[ibit]||rhs[ibit])) return ibit;`));
         return len;
     }
 }

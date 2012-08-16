@@ -45,18 +45,18 @@ struct hwloc_bitmap_t{
     }
 
     void free(){
-        hwloc_bitmap_free(*this);
+        hwloc_bitmap_free(this);
     }
 
     /** \brief Duplicate CPU set \p set by allocating a new CPU set and copying its contents */
     hwloc_bitmap_t dup(){
-        return hwloc_bitmap_dup(*this);
+        return hwloc_bitmap_dup(this);
     }
 
     /** \brief Copy the contents of CPU set \p src into the already allocated CPU set \p dst */
     hwloc_bitmap_t opSliceAssign(hwloc_bitmap_t src){
-        hwloc_bitmap_copy(*this,src);
-        return *this;
+        hwloc_bitmap_copy(this,src);
+        return this;
     }
 
 
@@ -72,12 +72,12 @@ struct hwloc_bitmap_t{
      * or that would have been written  (not including the ending \\0).
      */
     int snprintf(char[] s){
-        return hwloc_bitmap_snprintf(cast(char*)s.ptr,cast(size_t)s.length, *this);
+        return hwloc_bitmap_snprintf(cast(char*)s.ptr,cast(size_t)s.length, this);
     }
     
     string toString(){
         char *res;
-        auto len=hwloc_bitmap_asprintf(&res, *this);
+        auto len=hwloc_bitmap_asprintf(&res, this);
         auto s=res[0..len].dup;
 	stdlib.free(res);
 	return s;
@@ -88,7 +88,7 @@ struct hwloc_bitmap_t{
      * Must start and end with a digit.
      */
     int fromString(cstring s){
-      int nRead=hwloc_bitmap_sscanf(*this,toStringz(s));
+      int nRead=hwloc_bitmap_sscanf(this,toStringz(s));
       return nRead;
     }
 
@@ -106,14 +106,14 @@ struct hwloc_bitmap_t{
     * or that would have been written (not including the ending \\0).
     */
     int listSprintf(char[] s){
-    	return hwloc_bitmap_list_snprintf(s.ptr, s.length, *this);
+    	return hwloc_bitmap_list_snprintf(s.ptr, s.length, this);
     }
 
     /** \brief Stringify a bitmap into a newly allocated list string.
      */
     string listString(){
         char *res;
-        auto len = hwloc_bitmap_list_asprintf(&res, *this);
+        auto len = hwloc_bitmap_list_asprintf(&res, this);
 	auto s=res[0..len].dup;
 	free(res);
 	return s;
@@ -122,7 +122,7 @@ struct hwloc_bitmap_t{
     /** \brief Parse a list string and stores it in bitmap \p bitmap.
      */
     int fromListString(cstring s){
-	return hwloc_bitmap_list_sscanf(*this, toStringz(s));
+	return hwloc_bitmap_list_sscanf(this, toStringz(s));
     }
 
     /** \brief
@@ -131,37 +131,37 @@ struct hwloc_bitmap_t{
 
     /** \brief Empty CPU set \p set */
     hwloc_bitmap_t zero(){
-        hwloc_bitmap_zero(*this);
-        return *this;
+        hwloc_bitmap_zero(this);
+        return this;
     }
 
     /** \brief Fill CPU set \p set */
     hwloc_bitmap_t fill(){
-        hwloc_bitmap_fill(*this);
-        return *this;
+        hwloc_bitmap_fill(this);
+        return this;
     }
 
     /** \brief Setup CPU set \p set from c_ulong \p mask */
     void bitmap_from_ulong(c_ulong mask){
-        hwloc_bitmap_from_ulong(*this,mask);
+        hwloc_bitmap_from_ulong(this,mask);
     }
 
     /** \brief Setup CPU set \p set from c_ulong \p mask used as \p i -th subset */
     void set_ith_ulong(int i,c_ulong mask){
-        hwloc_bitmap_from_ith_ulong(*this,i,mask);
+        hwloc_bitmap_from_ith_ulong(this,i,mask);
     }
 
     /** \brief Convert the \p i -th subset of CPU set \p set into c_ulong mask */
     c_ulong get_ith_ulong(int i){
-        return hwloc_bitmap_to_ith_ulong(*this,i);
+        return hwloc_bitmap_to_ith_ulong(this,i);
     }
 
     /** \brief sets the cpu i */
     void opIndexAssign(bool value,uint i){
         if (value){
-            hwloc_bitmap_set(*this, i);
+            hwloc_bitmap_set(this, i);
         } else {
-            hwloc_bitmap_clr(*this,i);
+            hwloc_bitmap_clr(this,i);
         }
     }
     
@@ -169,12 +169,12 @@ struct hwloc_bitmap_t{
     /// warning unlike the hwloc_bitmap_set_range the range excludes j
     void opIndexAssign(bool value,uint i,uint j){
         if (value){
-            hwloc_bitmap_set_range(*this,i,j-1);
+            hwloc_bitmap_set_range(this,i,j-1);
         } else {
             if (i<j){
                 auto newC=alloc();
                 hwloc_bitmap_set_range(newC,i,j-1);
-                hwloc_bitmap_andnot(*this,*this,newC);
+                hwloc_bitmap_andnot(this,this,newC);
                 newC.free();
             }
         }
@@ -182,56 +182,56 @@ struct hwloc_bitmap_t{
 
     /** \brief Test whether CPU \p cpu is part of set \p set */
     bool opIndex(uint i){
-        return hwloc_bitmap_isset(*this,i)!=0;
+        return hwloc_bitmap_isset(this,i)!=0;
     }
     
     /** \brief Test whether set \p set1 is equal to set \p set2 */
     equals_t opEqual(hwloc_bitmap_t s2){
-        return hwloc_bitmap_isequal(*this,s2);
+        return hwloc_bitmap_isequal(this,s2);
     }
 
     /** \brief Test whether sets \p set1 and \p set2 intersects */
     bool intersect(hwloc_bitmap_t s2){
-        return hwloc_bitmap_intersects(*this,s2)!=0;
+        return hwloc_bitmap_intersects(this,s2)!=0;
     }
 
     /** \brief Test whether set \p sub_set is part of set \p super_set */
     bool isincluded(hwloc_bitmap_t s2){
-        return hwloc_bitmap_isincluded(*this,s2)!=0;
+        return hwloc_bitmap_isincluded(this,s2)!=0;
     }
 
     /** \brief Or set \p modifier_set into set \p set */
     hwloc_bitmap_t opOrAssign(hwloc_bitmap_t s2){
-        hwloc_bitmap_or(*this,*this,s2);
-        return *this;
+        hwloc_bitmap_or(this,this,s2);
+        return this;
     }
 
     /** \brief And set \p modifier_set into set \p set */
     hwloc_bitmap_t opAndAssign(hwloc_bitmap_t s2){
-        hwloc_bitmap_and(*this,*this,s2);
-        return *this;
+        hwloc_bitmap_and(this,this,s2);
+        return this;
     }
 
     /** \brief Clear set \p modifier_set out of set \p set */
     hwloc_bitmap_t andNot(hwloc_bitmap_t s2){
-        hwloc_bitmap_andnot(*this,*this,s2);
-        return *this;
+        hwloc_bitmap_andnot(this,this,s2);
+        return this;
     }
 
     /** \brief Xor set \p set with set \p modifier_set */
     hwloc_bitmap_t opXorAssign(hwloc_bitmap_t s2){
-        hwloc_bitmap_xor(*this,*this,s2);
-        return *this;
+        hwloc_bitmap_xor(this,this,s2);
+        return this;
     }
 
     /** \brief Compute the first CPU (least significant bit) in CPU set \p set */
     int first(){
-        return hwloc_bitmap_first(*this);
+        return hwloc_bitmap_first(this);
     }
 
     /** \brief Compute the last CPU (most significant bit) in CPU set \p set */
     int last(){
-        return hwloc_bitmap_last(*this);
+        return hwloc_bitmap_last(this);
     }
 
     /** \brief Keep a single CPU among those set in CPU set \p set
@@ -243,8 +243,8 @@ struct hwloc_bitmap_t{
      * MODIFIES the current object!
      */
     hwloc_bitmap_t singlify(){
-        hwloc_bitmap_singlify(*this);
-        return *this;
+        hwloc_bitmap_singlify(this);
+        return this;
     }
 
     /** \brief Compar CPU sets \p set1 and \p set2 using their first set bit.
@@ -253,7 +253,7 @@ struct hwloc_bitmap_t{
      * The empty CPU set is considered higher than anything.
      */
     int compare_first(hwloc_bitmap_t s2){
-        return hwloc_bitmap_compare_first(*this,s2);
+        return hwloc_bitmap_compare_first(this,s2);
     }
 
     /** \brief Compar CPU sets \p set1 and \p set2 using their last bits.
@@ -262,12 +262,12 @@ struct hwloc_bitmap_t{
      * The empty CPU set is considered lower than anything.
      */
     int opCmp(hwloc_bitmap_t s2){
-        return hwloc_bitmap_compare(*this,s2);
+        return hwloc_bitmap_compare(this,s2);
     }
 
     /** \brief Compute the weight of CPU set \p set */
     int weight(){
-        return hwloc_bitmap_weight(*this);
+        return hwloc_bitmap_weight(this);
     }
     
 }

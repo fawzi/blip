@@ -142,7 +142,7 @@ class WeakList(T){
     }
     alias EntryCacheT!() EntryCache;
     
-    static Cached!(EntryCache) eCache;
+    __gshared static Cached!(EntryCache) eCache;
     
     Deque!(JournalEntry) journal;
     long journalFirstId;
@@ -243,7 +243,7 @@ class WeakList(T){
     void mergeWith(string sourceId){
         
     }
-    static this(){
+    shared static this(){
         eCache=new Cached!(EntryCache)(cast(EntryCache)null,"Cluster","WeakList!("~T.mangleof~")",
             Cache.EntryFlags.Purge,
             delegate EntryCache(){ return new EntryCache(); });
@@ -263,7 +263,7 @@ class Cluster{
         auto w=new Worker;
         string fullId;
         synchronized(workersList){
-            fullId=collectAppender(delegate void(CharSink s){
+            fullId=collectIAppender(delegate void(CharSink s){
                 writeOut(s,workersList.lastEntryId+1,":d6");
                 s("_");
                 s(partialSId);

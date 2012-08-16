@@ -18,6 +18,7 @@ module blip.text.UtfUtils;
 import Utf=tango.text.convert.Utf;
 import tango.io.model.IConduit;
 public import tango.text.convert.Utf: cropRight, cropLeft;
+import std.traits: Unqual;
 
 /// returns the number of code points in the string str, raise if str contains invalid or 
 /// partial characters (but does not explicitly validate)
@@ -134,18 +135,19 @@ size_t nCodePoints(T)(T[] str){
     }
 }
 
-template convertToString(T=char){
-    T[]convertToString(S)(S[]src,T[]dest=null){
-        static if(is(T==S)){
-            return src;
+template convertToString(TT=const(char)){
+    TT[]convertToString(S)(S[]src,TT[]dest=null){
+	alias Unqual!(TT) T;
+        static if(is(T==Unqual!(S))){
+            return cast(T[])src;
         } else static if(is(T==char)){
             return Utf.toString(src,dest);
-        } else static if(is(T==wchar)){
+	} else static if(is(T==wchar)){
             return Utf.toString16(src,dest);
-        } else static if(is(T==dchar)){
+	} else static if(is(T==dchar)){
             return Utf.toString32(src,dest);
         } else {
-            static assert(0,"unexpected char type "~T.stringof);
+            static assert(0,"unexpected char type "~TT.stringof);
         }
     }
 }

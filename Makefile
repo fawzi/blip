@@ -55,7 +55,7 @@ ARCHDIR=$(BLIP_HOME)/build/arch
 EXCLUDEPAT_ALL=$(EXCLUDEPAT_OS) *objs-*
 ARCHFILE=$(ARCHDIR)/$(IDENT).mak
 MAKEFILE=$(BLIP_HOME)/Makefile
-DFLAGS_MAIN=-I$(BLIP_HOME)
+DFLAGS_MAIN=-I$(BLIP_HOME) -I$(BLIP_HOME)/../Tango-D2
 WHAT=_lib
 
 LIB=libblip.$(LIB_EXT)
@@ -75,7 +75,7 @@ vpath %di $(SRCDIR)
 
 MODULES=$(MOD_BLIP)
 
-EXCLUDE_DEP_ALL=$(EXCLUDE_DEP_COMP) object.di ^tango.*
+EXCLUDE_DEP_ALL=$(EXCLUDE_DEP_COMP) object.di ^tango.* ^core.* ^std.*
 
 OBJS=$(MODULES:%=%.$(OBJ_EXT))
 

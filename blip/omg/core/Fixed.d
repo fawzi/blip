@@ -47,8 +47,8 @@ struct fixed32T(int fracBits_) {
     static assert (((minInt << fracBits) >> fracBits) == minInt);
     static assert ((((minInt-1) << fracBits) >> fracBits) != minInt-1);
     
-    static ClassMetaInfo metaI;
-    static this(){
+    __gshared static ClassMetaInfo metaI;
+    shared static this(){
         metaI=ClassMetaInfo.createForType!(typeof(this))("fixed32T!("~ctfe_i2a(fracBits)~")","a fractional number with a fixed precision");
         metaI.addFieldOfType!(int)("int","integer part");
         metaI.addFieldOfType!(int)("frac","fractional part");
@@ -129,35 +129,35 @@ struct fixed32T(int fracBits_) {
     
     
     fixed32T opAdd(fixed32T rhs) {
-        fixed32T res = *this;
+        fixed32T res = this;
         res += rhs;
         return res;
     }
 
 
     fixed32T opSub(fixed32T rhs) {
-        fixed32T res = *this;
+        fixed32T res = this;
         res -= rhs;
         return res;
     }
 
 
     fixed32T opMul(fixed32T rhs) {
-        fixed32T res = *this;
+        fixed32T res = this;
         res *= rhs;
         return res;
     }
 
 
     fixed32T opMul(real rhs) {
-        fixed32T res = *this;
+        fixed32T res = this;
         res *= rhs;
         return res;
     }
 
 
     fixed32T opDiv(fixed32T rhs) {
-        fixed32T res = *this;
+        fixed32T res = this;
         res /= rhs;
         return res;
     }
@@ -181,7 +181,7 @@ struct fixed32T(int fracBits_) {
 
 
     string toString() {
-        return convTo!(string )(cast(real)*this);
+        return convTo!(string )(cast(real)this);
     }
     
     

@@ -69,7 +69,7 @@ StreamStrWriter!(T) outfileStrWriterT(T)(string path,WriteMode wMode){
                     auto f=new DataFileOutput(newPath,wStyle);
                     return new StreamStrWriter!(T)(f);
                 } catch (Exception e) { // should catch only creation failures...
-                    newPath=collectAppender(delegate void(CharSink s){
+                    newPath=collectIAppender(delegate void(CharSink s){
                         uint uniqueId;
                         rand(uniqueId);
                         dumper(s)(path0)("-")(uniqueId)(ext);
@@ -138,7 +138,7 @@ StreamWriter outfileBinWriter(string path,WriteMode wMode){
                         auto f=new DataFileOutput(newPath,wStyle);
                         return new StreamWriter(f);
                     } catch (Exception e) { // should catch only creation failures...
-                        newPath=collectAppender(delegate void(CharSink s){
+                        newPath=collectIAppender(delegate void(CharSink s){
                             uint uniqueId;
                             rand(uniqueId);
                             dumper(s)(path0)("-")(uniqueId)(ext);

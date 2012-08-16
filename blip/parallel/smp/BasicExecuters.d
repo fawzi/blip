@@ -67,7 +67,7 @@ class ImmediateExecuter:ExecuterI,TaskSchedulerI,SchedGroupI{
         return _name;
     }
     Cache nnCache(){
-        auto tAtt=taskAtt.val;
+        auto tAtt=taskAtt;
         if (tAtt!is null && tAtt.superTask !is null && tAtt.superTask.scheduler !is this){
             return tAtt.superTask.scheduler.nnCache();
         } else {
@@ -98,7 +98,7 @@ class ImmediateExecuter:ExecuterI,TaskSchedulerI,SchedGroupI{
     /// description (for debugging)
     /// non threadsafe
     string toString(){
-        return collectAppender(cast(OutWriter)&desc);
+        return collectIAppender(cast(OutWriter)&desc);
     }
     /// description (for debugging)
     void desc(void delegate(cstring) s){ desc(s,false); }
@@ -298,7 +298,7 @@ class PExecuter:ExecuterI,SchedGroupI{
     /// description (for debugging)
     /// non threadsafe
     string toString(){
-        return collectAppender(cast(OutWriter)&desc);
+        return collectIAppender(cast(OutWriter)&desc);
     }
     /// description (for debugging)
     void desc(CharSink s){ desc(s,false); }

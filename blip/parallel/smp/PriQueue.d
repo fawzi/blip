@@ -18,13 +18,13 @@ import blip.io.BasicIO;
 import blip.core.sync.Mutex;
 import blip.core.sync.Semaphore;
 import blip.math.Math;
-import blip.container.GrowableArray:collectAppender;
+import blip.container.GrowableArray:collectIAppender;
 import blip.BasicModels;
 import blip.util.Grow:growLength;
 import blip.container.Deque;
 import blip.container.AtomicSLink;
 import blip.Comp;
-
+import blip.io.Console; // pippo
 /// a simple priority queue optimized for adding high priority tasks
 /// (otherwise a heap implementation would be better)
 /// the public interface consists of
@@ -47,7 +47,7 @@ class PriQueue(T){
         }
         /// description (for debugging)
         string toString(){
-            return collectAppender(cast(OutWriter)&desc);
+            return collectIAppender(cast(OutWriter)&desc);
         }
         /// description (for debugging)
         void desc(void delegate(cstring) s){
@@ -79,7 +79,7 @@ class PriQueue(T){
         }
         /// description (for debugging)
         string toString(){
-            return collectAppender(cast(OutWriter)&desc);
+            return collectIAppender(cast(OutWriter)&desc);
         }
         /// description (for debugging)
         void desc(void delegate(cstring) s){
@@ -190,7 +190,7 @@ class PriQueue(T){
                     assert(queue !is null);
                     T res;
                     if(!queue.entries.popFront(res)){
-                        throw new Exception(collectAppender(delegate void(CharSink s){
+                        throw new Exception(collectIAppender(delegate void(CharSink s){
                             s("Error: expected queue to have entries, queue is:");
                             desc(s);
                         }),__FILE__,__LINE__);
@@ -271,7 +271,7 @@ class PriQueue(T){
     /// description (for debugging)
     /// non threadsafe
     string toString(){
-        return collectAppender(cast(OutWriter)&desc);
+        return collectIAppender(cast(OutWriter)&desc);
     }
     /// description (for debugging)
     /// (might not be a snapshot if other thread modify it while printing)
@@ -318,3 +318,7 @@ class PriQueue(T){
     }
 }
 
+void pippo(){
+    PriQueue!(int) q;
+    writeOut(sout,q);
+}

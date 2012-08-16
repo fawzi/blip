@@ -137,7 +137,7 @@ string startMixin(){
         case Kind.none:
         break;
         default:
-        throw new Exception(collectAppender(delegate void(CharSink s){
+        throw new Exception(collectIAppender(delegate void(CharSink s){
             dumper(s)("cannot start kind ")(kind);
         }),__FILE__,__LINE__);
     }`;
@@ -160,7 +160,7 @@ string stopMixin(){
         if ((kind&Kind.io)!=0){
             ev_io_stop(loop,ptr!(ev_io)());
         } else {
-            throw new Exception(collectAppender(delegate void(CharSink s){
+            throw new Exception(collectIAppender(delegate void(CharSink s){
                 dumper(s)("cannot stop kind ")(kind);
             }),__FILE__,__LINE__);
         }
@@ -169,7 +169,7 @@ string stopMixin(){
 }
 
 string mixinInitAndCreate(string kind,string extraArgsDecls, string extraArgs){
-    string upcaseKind=kind.dup;
+    char[] upcaseKind=kind.dup;
     upcaseKind[0]+='A'-'a';
     string commaExtraArgs=((extraArgs.length>0)?",":" ")~extraArgs;
     string extraArgsDeclsComma=extraArgsDecls~((extraArgsDecls.length>0)?",":" ");
@@ -199,7 +199,7 @@ GenericWatcher `~kind~`Init(T=watcherCbF)(`~extraArgsDeclsComma~` T callback=nul
     } else {
         static assert(0,"could not create a valid `~kind~` callback with "~TT.stringof);
     }
-    return *this;
+    return this;
 }
 /// create a `~kind~` watcher, the callback can be either directly given, or created by passing
 /// valid arguments for EventHandler opCall
@@ -248,7 +248,7 @@ struct GenericWatcher{
     
     void giveBack(){
         if (pool!is null && ptr_!is null){
-            pool.giveBack(*this);
+            pool.giveBack(this);
         }
         ptr_=null;
         kind=Kind.none;
@@ -284,7 +284,7 @@ struct GenericWatcher{
             });
         }
         synchronized(activeWatchers()){
-            activeWatchers().add(*this); // slow and ugly!!!
+            activeWatchers().add(this); // slow and ugly!!!
         }
         mixin(startMixin());
     }
@@ -298,7 +298,7 @@ struct GenericWatcher{
             });
         }
         synchronized(activeWatchers()){
-            activeWatchers().remove(*this); // slow and ugly!!!
+            activeWatchers().remove(this); // slow and ugly!!!
         }
         mixin(stopMixin());
     }
@@ -423,7 +423,7 @@ struct GenericWatcher{
                 ev_timer_again(loop,ptr!(ev_timer)());
                 break;
             default:
-                throw new Exception(collectAppender(delegate void(CharSink s){
+                throw new Exception(collectIAppender(delegate void(CharSink s){
                     dumper(s)("the kind ")(kind)(" does not support *again");
                 }),__FILE__,__LINE__);
         }
@@ -470,20 +470,20 @@ struct GenericWatcher{
     }
     /// returns the content as a pointer to type T
     T* ptr(T=void*)(){
-        assert(canCastTo!(T)(kind),collectAppender(delegate void(CharSink s){
+        assert(canCastTo!(T)(kind),collectIAppender(delegate void(CharSink s){
             dumper(s)("invalid cast of kind ")(kind)(" to ")(T.stringof);
         }));
         return cast(T*)ptr_;
     }
     TP ptrP(TP)(){
-        assert(canCastTo!(typeof(*TP.init))(kind),collectAppender(delegate void(CharSink s){
+        assert(canCastTo!(typeof(*TP.init))(kind),collectIAppender(delegate void(CharSink s){
             dumper(s)("invalid cast of kind ")(kind)(" to ")(TP.stringof);
         }));
         return cast(TP)ptr_;
     }
     // global pool - static methods
-    static PoolI!(GenericWatcher) gPool;
-    static this(){
+    __gshared static PoolI!(GenericWatcher) gPool;
+    shared static this(){
         gPool=cachedPool( function GenericWatcher(PoolI!(GenericWatcher)p){
             GenericWatcher res;
             res.ptr_=new ev_any_watcher;

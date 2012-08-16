@@ -393,12 +393,12 @@ ClassMetaInfo getSerializationInfoForVar(T)(T t){
 }
 
 // various metaInfo (for completeness, not really needed)
-ClassMetaInfo arrayMetaInfo;
-ClassMetaInfo stringMetaInfo;
-ClassMetaInfo aaMetaInfo;
-ClassMetaInfo dictMetaInfo;
-ClassMetaInfo voidPtrMetaInfo;
-static this(){
+__gshared ClassMetaInfo arrayMetaInfo;
+__gshared ClassMetaInfo stringMetaInfo;
+__gshared ClassMetaInfo aaMetaInfo;
+__gshared ClassMetaInfo dictMetaInfo;
+__gshared ClassMetaInfo voidPtrMetaInfo;
+shared static this(){
     arrayMetaInfo=new ClassMetaInfo("array","an array",null,null,null,TypeKind.ArrayK,
         cast(void* function(ClassMetaInfo))null); // use a different type for each array type?
     stringMetaInfo=new ClassMetaInfo("string","a string",null,null,null,TypeKind.ArrayK,
@@ -419,9 +419,9 @@ static this(){
 string coreTypesMetaInfoMixStr(){
     string res="";
     foreach(T;CoreTypes){
-        res~="ClassMetaInfo "~strForCoreType!(T)~"MetaInfo;\n";
+        res~="__gshared ClassMetaInfo "~strForCoreType!(T)~"MetaInfo;\n";
     }
-    res~="static this(){\n";
+    res~="shared static this(){\n";
     foreach(T;CoreTypes){
         res~=strForCoreType!(T)~"MetaInfo=new ClassMetaInfo(\""~T.stringof~"\",\"\",null,typeid("~T.stringof~"),null,TypeKind.PrimitiveK,cast(void *function (ClassMetaInfo c))null);\n";
         res~="SerializationRegistry().register!("~T.stringof~")("~strForCoreType!(T)~"MetaInfo);\n";
@@ -481,7 +481,7 @@ class SerializationRegistry {
     void register(T)(ClassMetaInfo metaInfo) {
         assert(metaInfo!is null,"attempt to register null metaInfo");
         version(STrace) {
-            sout(collectAppender(delegate(CharSink s){
+            sout(collectIAppender(delegate(CharSink s){
                 s("Registering "); s(metaInfo.className);
                 s(" in the serialization factory "~keyOf!(T).toString~" ("~T.stringof~")");
             }));
@@ -494,7 +494,7 @@ class SerializationRegistry {
 		// exception in static constructors might be tricky...
 		// so we also print out
 		sout("Registering duplicated name:"~metaInfo.className~"\n");
-		throw new Exception(collectAppender(delegate void(CharSink s){
+		throw new Exception(collectIAppender(delegate void(CharSink s){
 			    dumper(s)("Registering duplicated name in SerializationRegistry@")(cast(void*)this)(":")(metaInfo.className)
 				(", oldVal:")(*oldInfo)(" newVal:")(metaInfo)("\n");
 			}),__FILE__,__LINE__);
@@ -521,7 +521,7 @@ class SerializationRegistry {
     }
     
     static typeof(this) opCall() {
-        static typeof(this) instance;
+        __gshared static typeof(this) instance;
         if (instance is null) instance = new typeof(this);
         return instance;
     }
@@ -555,8 +555,8 @@ template isBasicType(T) {
 /// serializer
 /// some methods have no classinfo for performance reasons, if you really need it file a ticket explaining why 
 class Serializer {
-    typedef size_t classId;
-    typedef size_t objectId;
+    alias size_t classId;
+    alias size_t objectId;
     WriteHandlers handlers;
     void delegate(Serializer) rootObjStartCallback;
     void delegate(Serializer) rootObjEndCallback;
@@ -668,11 +668,11 @@ class Serializer {
     /// writes out a custom field
     final void customField(FieldMetaInfo *fieldMeta, void delegate() realWrite){
         version(SerializationTrace) {
-            sout(collectAppender(delegate(CharSink s){
+            sout(collectIAppender(delegate(CharSink s){
                 s("X customField("); s(fieldMeta is null?"*NULL*":fieldMeta.name); s(") starting\n");
             }));
             scope(exit) {
-                sout(collectAppender(delegate(CharSink s){
+                sout(collectIAppender(delegate(CharSink s){
                     s("X customField("); s(fieldMeta is null?"*NULL*":fieldMeta.name); s(") finished\n");
                 }));
             }
@@ -683,13 +683,13 @@ class Serializer {
     /// writes out a field of type t
     void field(T)(FieldMetaInfo *fieldMeta, ref T t) {
         version(SerializationTrace) {
-            sout(collectAppender(delegate void(CharSink s){
+            sout(collectIAppender(delegate void(CharSink s){
                 s("X field!("~T.stringof~")(");
                 s(fieldMeta is null?"*NULL*":fieldMeta.name);
                 s(","); writeOut(s,cast(void*)&t); s(") starting\n");
             }));
             scope(exit) {
-                sout(collectAppender(delegate void(CharSink s){
+                sout(collectIAppender(delegate void(CharSink s){
                     s("X field!("~T.stringof~")(");
                     s(fieldMeta is null?"*NULL*":fieldMeta.name);
                     s(","); writeOut(s,cast(void*)&t); s(") finished\n");
@@ -756,12 +756,12 @@ class Serializer {
                     metaInfo=sObj.getSerializationMetaInfo();
                     if (metaInfo.ci != t.classinfo){
                         version(SerializationTrace) {
-                            sout(collectAppender(delegate void(CharSink s){
+                            sout(collectIAppender(delegate void(CharSink s){
                                 s("X metaInfo:");
                                 writeOut(s,metaInfo);
                                 s("\n");
                             }));
-                            sout(collectAppender(delegate void(CharSink s){
+                            sout(collectIAppender(delegate void(CharSink s){
                                 s("t.classinfo:"); s(t.classinfo.name); s("@");
                                 writeOut(s,cast(void*)t.classinfo);
                                 s("\n");
@@ -1101,8 +1101,8 @@ class Serializer {
 /// unserializer
 /// some methods have no classinfo for performance reasons, if you really need it file a ticket explaining why 
 class Unserializer {
-    typedef size_t classId;
-    typedef size_t objectId;
+    alias size_t classId;
+    alias size_t objectId;
     ReadHandlers handlers;
 
     void*[objectId]             objectIdToPtr;
@@ -1220,11 +1220,11 @@ class Unserializer {
     /// reads a custom field
     final void customField(FieldMetaInfo *fieldMeta, void delegate() readOp){
         version(SerializationTrace) {
-            sout(collectAppender(delegate void(CharSink s){
+            sout(collectIAppender(delegate void(CharSink s){
                 s("Y customField("); s(fieldMeta is null?"*NULL*"[]:fieldMeta.name); s(") starting\n");
             }));
             scope(exit) {
-                sout(collectAppender(delegate void(CharSink s){
+                sout(collectIAppender(delegate void(CharSink s){
                     s("> customField("); s(fieldMeta is null?"*NULL*":fieldMeta.name); s(") finished\n");
                 }));
             }
@@ -1255,12 +1255,12 @@ class Unserializer {
     /// this method cannot be overridden, but call all other methods that can be
     void field(T)(FieldMetaInfo *fieldMeta, ref T t) {
         version(UnserializationTrace) {
-            sout(collectAppender(delegate void(CharSink s){
+            sout(collectIAppender(delegate void(CharSink s){
                 s("Y field!("~T.stringof~")("); s(fieldMeta is null ? "*NULL*"[] : fieldMeta.name);
                 s(","); writeOut(s,cast(void*)&t); s(") starting unserialization\n");
             }));
             scope(exit) {
-                sout(collectAppender(delegate void(CharSink s){
+                sout(collectIAppender(delegate void(CharSink s){
                     s("Y field!("~T.stringof~")("); s(fieldMeta is null ? "*NULL*"[] : fieldMeta.name);
                     s(","); writeOut(s,cast(void*)&t); s(") finished unserialization\n");
                 }));
@@ -1288,7 +1288,7 @@ class Unserializer {
         static if (isCoreType!(T)){
             readCoreType(fieldMeta, { handlers.handle(t); });
             version(UnserializationTrace) {
-                sout(collectAppender(delegate void(CharSink s){
+                sout(collectIAppender(delegate void(CharSink s){
                     s("Y readValue:"); writeOut(s,t); s("\n");
                 }));
             }
@@ -1345,7 +1345,7 @@ class Unserializer {
                     } else {
                         t=cast(T)readAndInstantiateClass(fieldMeta,metaInfo,oid,cast(Object)t);
                         version(UnserializationTrace) {
-                            sout(collectAppender(delegate void(CharSink s){
+                            sout(collectIAppender(delegate void(CharSink s){
                                 s("Y instantiated object of class "); s(metaInfo.className);
                                 s(" ("~T.stringof~") at "); writeOut(s,cast(void*)t); s("\n");
                             }));
@@ -1367,7 +1367,7 @@ class Unserializer {
                         doPost();
                         voidPop(handle);
                         version(UnserializationTrace) {
-                            sout(collectAppender(delegate void(CharSink s){
+                            sout(collectIAppender(delegate void(CharSink s){
                                 s("Y did read object now at ");
                                 writeOut(s,cast(void*)t); s("\n");
                             }));
@@ -1547,7 +1547,7 @@ class Unserializer {
                 }
             } else static if (isArrayType!(T)) {
                 version(UnserializationTrace) {
-                    sout(collectAppender(delegate void(CharSink s){
+                    sout(collectIAppender(delegate void(CharSink s){
                         s("Y unserializing array: "); s(fieldMeta?fieldMeta.name:"*NULL*");
                         writeOut(s,typeid(T)); s("\n");
                     }));
@@ -1777,6 +1777,6 @@ class Unserializer {
     /// override this to give more info on parser position,...
     /// this method *has* to throw
     void serializationError(string msg,string filename,long line,Exception next=null){
-        throw new SerializationException(msg,collectAppender(&handlers.parserPos),filename,line,next);
+        throw new SerializationException(msg,collectIAppender(&handlers.parserPos),filename,line,next);
     }
 }

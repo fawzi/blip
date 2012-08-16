@@ -2,13 +2,8 @@
 ///
 /// mainly wrapping of a tango module
 module blip.stdc.socket;
-version(Tango) {
 import tango.core.Version;
-static if(Tango.Major>0||Tango.Minor>999){
-    public import tango.sys.consts.socket;
-} else {
-    public import tango.stdc.constants.socket;
-}
+public import tango.sys.consts.socket;
 
 static if (!is(typeof(SOL_TCP))){
     alias IPPROTO_TCP SOL_TCP;
@@ -22,7 +17,7 @@ version (Win32) {
     
     // sys/socket.hostname
     public import tango.stdc.posix.sys.socket: sockaddr,sockaddr_storage,socklen_t;
-    private typedef int socket_t = -1;
+    private alias int socket_t; // = -1;
     extern(C){
         socket_t     accept(socket_t, sockaddr *restrict, socklen_t *restrict);
         int     bind(socket_t, sockaddr *, socklen_t);
@@ -109,7 +104,7 @@ version (Win32) {
 
 }
 
-} else { // !version(Tango)
+/+ // !version(Tango)
 
 version (Win32) {
         pragma (lib, "ws2_32.lib");
@@ -123,7 +118,7 @@ version (Win32) {
     
     // sys/socket.hostname
     public import core.stdc.sys.posix.sys.socket: sockaddr,sockaddr_storage,socklen_t;
-    private typedef int socket_t = -1;
+    private alias int socket_t; //= -1;
 /+    extern(C){
         socket_t     accept(socket_t, sockaddr *restrict, socklen_t *restrict);
         int     bind(socket_t, sockaddr *, socklen_t);
@@ -157,4 +152,4 @@ version (Win32) {
 
 }
 
-} // !version(Tango)
++/

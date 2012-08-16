@@ -156,8 +156,8 @@ version(Posix){
                 }
             }
         }
-        static TraceAll tracer;
-        static this(){
+        __gshared static TraceAll tracer;
+        shared static this(){
             tracer=new TraceAll();
             static if (Tango.Major==1) {} else {
                 setthread_abortHandler(function void(int i){ tracer.abort(); });

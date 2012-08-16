@@ -51,7 +51,7 @@ class RpcException:Exception{
         super(msg,file,line);
     }
     this(void delegate(void delegate(cstring))msg,string file,long line){
-        super(collectAppender(msg),file,line);
+        super(collectIAppender(msg),file,line);
     }
 }
 
@@ -139,14 +139,14 @@ struct ParsedUrl{
             sink(anchor);
         }
     }
-    char[] url(char[]buf=null){
-        return collectAppender(&this.urlWriter,buf);
+    string url(char[]buf=null){
+        return collectIAppender(&this.urlWriter,buf);
     }
-    char[] fullPath(char[]buf=null){
-        return collectAppender(&this.fullPathWriter,buf);
+    string fullPath(char[]buf=null){
+        return collectIAppender(&this.fullPathWriter,buf);
     }
-    char[] pathAndRest(char[]buf=null){
-        return collectAppender(&this.pathAndRestWriter,buf);
+    string pathAndRest(char[]buf=null){
+        return collectIAppender(&this.pathAndRestWriter,buf);
     }
     void clearPath(){
         pathBuf[]=null;
@@ -189,7 +189,7 @@ struct ParsedUrl{
         ParsedUrl res;
         auto len=res.parseUrlInternal(url);
         if (len!=url.length){
-            throw new RpcException(collectAppender(delegate void(CharSink s){
+            throw new RpcException(collectIAppender(delegate void(CharSink s){
                 dumper(s)("url parsing failed:")(len)("vs")(url.length)(", '")(&res.urlWriter)("' vs '")(url)("'");
             }),__FILE__,__LINE__);
         }
@@ -350,7 +350,7 @@ class BasicVendor:ObjVendorI{
         s("string proxyDesc()\nstring proxyName()\nstring proxyObjUrl()\n");
     }
     string proxyDesc(){
-        return collectAppender(&proxyDescDumper);
+        return collectIAppender(&proxyDescDumper);
     }
     string proxyName(){
         return _proxyName;
@@ -413,7 +413,7 @@ class BasicVendor:ObjVendorI{
         size_t reqIdLen;
         T res;
         PoolI!(SimpleReplyClosure*) pool;
-        static PoolI!(SimpleReplyClosure*) gPool;
+        __gshared static PoolI!(SimpleReplyClosure*) gPool;
         ubyte[] reqId(){
             if (reqIdPtr is null){
                 return reqIdBuf[0..reqIdLen];
@@ -431,7 +431,7 @@ class BasicVendor:ObjVendorI{
                 reqIdLen=nV.length;
             }
         }
-        static this(){
+        shared static this(){
             gPool=cachedPool(function SimpleReplyClosure*(PoolI!(SimpleReplyClosure*)p){
                 auto res=new SimpleReplyClosure;
                 res.pool=p;
@@ -701,8 +701,8 @@ class BasicProxy: Proxy {
         proxyObjUrl=url;
         _proxyName=name;
     }
-    static ClassMetaInfo metaI;
-    static this(){
+    __gshared static ClassMetaInfo metaI;
+    shared static this(){
         metaI=ClassMetaInfo.createForType!(typeof(this))("blip.parallel.rpc.BasicProxy","a proxy base class");
         metaI.addFieldOfType!(string )("proxyObjUrl","url identifying the proxied object");
         metaI.addFieldOfType!(string )("proxyName","name identifying the class of the proxy object");
@@ -775,7 +775,7 @@ class Publisher{
         return po.obj;
     }
     string proxyObjUrl(string objName){
-        return collectAppender(delegate void(CharSink s){
+        return collectIAppender(delegate void(CharSink s){
             dumper(s)(protocol.handlerUrl())("/")(namespace)("/")(objName);
         });
     }
@@ -945,13 +945,13 @@ class FailureManager{
 class ProtocolHandler{
     /// the default protocol handler (to vend objects)
     /// this defaults to StcpProtocol handler if included
-    static ProtocolHandler defaultProtocol;
+    __gshared static ProtocolHandler defaultProtocol;
     CharSink log;
     // static part (move to a singleton?)
     
     alias ProtocolHandler function(ParsedUrl url) ProtocolGetter;
     /// those that can actually handle the given protocol
-    static ProtocolGetter[string ] protocolHandlers;
+    __gshared static ProtocolGetter[string ] protocolHandlers;
     /// registers a handler for a given protocol
     static void registerProtocolHandler(string protocol,ProtocolGetter pH){
         assert((protocol in protocolHandlers)is null,"duplicate handler for protocol "~protocol);
@@ -973,11 +973,11 @@ class ProtocolHandler{
         Proxy function(string name,string url) proxyCreator;
         Proxy function(string name,string url) localProxyCreator;
     }
-    static ProxyCreators[string ] proxyCreators;
-    static Mutex proxyCreatorsLock;
+    __gshared static ProxyCreators[string ] proxyCreators;
+    __gshared static Mutex proxyCreatorsLock;
     FailureManager failureManager;
     
-    static this(){
+    shared static this(){
         proxyCreatorsLock=new Mutex();
         ProtocolHandler.registerProxy("blip.BasicProxy",function Proxy(string name,string url){ return new BasicProxy(name,url); });
     }

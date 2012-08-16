@@ -142,7 +142,7 @@ class PriQTaskScheduler:TaskSchedulerI {
     /// description (for debugging)
     /// non threadsafe
     string toString(){
-        return cast(string)collectAppender(cast(OutWriter)&desc);
+        return cast(string)collectIAppender(cast(OutWriter)&desc);
     }
     /// locks the scheduler (to perform task reorganization)
     /// if you call this then toString is threadsafe

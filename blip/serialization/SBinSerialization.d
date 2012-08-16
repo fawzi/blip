@@ -218,7 +218,7 @@ class SBinUnserializer: Unserializer {
         uint l;
         reader.handle(l);
         if (l!=0xdeadbeef){
-            serializationError(collectAppender(delegate void(CharSink s){
+            serializationError(collectIAppender(delegate void(CharSink s){
                     dumper(s)("readEndRoot found ")(l)(" instead of 0xdeadbeef, binary stream is likely to be garbled");
                 }),__FILE__,__LINE__);
         }
@@ -280,7 +280,7 @@ class SBinUnserializer: Unserializer {
         FieldMetaInfo *mismatchedField;
         string actualField;
         this(FieldMetaInfo *mismatchedField,string actualField,string desc,string filename,long line){
-            super(collectAppender(delegate void(CharSink s){ s(desc); s(" at "); reader.parserPos(s); }),filename,line);
+            super(collectIAppender(delegate void(CharSink s){ s(desc); s(" at "); reader.parserPos(s); }),filename,line);
             this.actualField=actualField;
             this.mismatchedField=mismatchedField;
         }
@@ -433,7 +433,7 @@ class SBinUnserializer: Unserializer {
     /// override this to give more info on parser position,...
     /// this method *has* to throw
     override void serializationError(string msg,string filename,long line,Exception e=null){
-        throw new SerializationException(msg,collectAppender(&reader.parserPos),filename,line,e);
+        throw new SerializationException(msg,collectIAppender(&reader.parserPos),filename,line,e);
     }
     /// returns true if this is the SBIN protocol, otherwise throws
     override bool readProtocolVersion(){

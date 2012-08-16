@@ -57,7 +57,7 @@ bool ctfe_hasToken(string token,string code){
         do {
             outOfTokens=(!ctfe_isTokenChar(code[i]));
             ++i;
-        } while((!outOfTokens) && i<code.length)
+        } while((!outOfTokens) && i<code.length);
     }
     return false;
 }
@@ -84,7 +84,7 @@ string ctfe_replaceToken(string token,string repl,string code){
         do {
             outOfTokens=(!ctfe_isTokenChar(code[i]));
             ++i;
-        } while((!outOfTokens) && i<code.length)
+        } while((!outOfTokens) && i<code.length);
         res~=code[i0..i];
     }
     return res;

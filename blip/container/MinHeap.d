@@ -229,9 +229,9 @@ char[] heapMixinStr(char[]extraAttribs,char[] compareMixin,char[]moveMixin=""){
         }
 
         /** Return a shallow copy of this heap. */
-        typeof(*this) clone ()
+        typeof(this) clone ()
         {
-                typeof(*this) other;
+                typeof(this) other;
                 other.heap = this.heap.dup;
                 other.next = this.next;
                 return other;

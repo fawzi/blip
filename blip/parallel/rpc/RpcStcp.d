@@ -62,8 +62,8 @@ struct StcpRequest{
     TaskI toResume;
     char[22] reqBuf;
     PoolI!(StcpRequest*) pool;
-    static PoolI!(StcpRequest*) gPool;
-    static this(){
+    __gshared static PoolI!(StcpRequest*) gPool;
+    shared static this(){
         gPool=cachedPool(function StcpRequest*(PoolI!(StcpRequest*)p){
             auto res=new StcpRequest;
             res.pool=p;
@@ -140,7 +140,7 @@ struct StcpRequest{
             serArgs(connection.serializer);
             connection.outStream.flush();
         } catch(Exception o){
-            exception=new Exception(collectAppender(delegate void(CharSink s){
+            exception=new Exception(collectIAppender(delegate void(CharSink s){
                 dumper(s)("exception in sending request for url")(&url.urlWriter);
             }),__FILE__,__LINE__,o);
         }
@@ -470,7 +470,7 @@ class StcpConnection{
 
 /// handles vending (and possibly also receiving the results if using one channel for both)
 class StcpProtocolHandler: ProtocolHandler{
-    static string [] selfHostnames;
+    __gshared static string [] selfHostnames;
     CharSink log;
     RandomSync rand;
     LoopHandlerI loop;
@@ -861,7 +861,7 @@ class StcpProtocolHandler: ProtocolHandler{
     mixin(rpcMixin("","",`handlerUrl|listObjects`));
 }
 
-static this(){
+shared static this(){
     char[512] buf;
     if (gethostname(buf.ptr,buf.length)!=0){
         serr("Warning could not establish the hostname\n");
