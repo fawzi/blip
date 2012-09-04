@@ -19,7 +19,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 module blip.container.Pool;
-import blip.core.Traits:ctfe_i2a,tryDeleteT,isNullT;
+import blip.core.Traits:ctfe_i2s,tryDeleteT,isNullT;
 import blip.math.Math: max;
 import blip.container.AtomicSLink;
 import blip.sync.Atomic;
@@ -78,7 +78,7 @@ T allocT(T,A...)(A args) {
 class Pool(T,int _batchSize=16):PoolI!(T){
     enum :int{ batchSize=_batchSize }
     alias T ElType;
-    static assert((batchSize & (batchSize-1))==0,"batchSize should be a power of 2 "~ctfe_i2a(batchSize));
+    static assert((batchSize & (batchSize-1))==0,"batchSize should be a power of 2 "~ctfe_i2s(batchSize));
     struct S{
         T[batchSize]array;
         S*next;
@@ -89,7 +89,7 @@ class Pool(T,int _batchSize=16):PoolI!(T){
     size_t maxEl;
     size_t bufferSpace;
     S* pool;
-    size_t activeUsers=1;
+    shared size_t activeUsers=1;
     T delegate(PoolI!(T)) customAllocator;
     
     this(T delegate(PoolI!(T)) customAllocator,size_t bufferSpace=8*batchSize, size_t maxEl=16*batchSize){
@@ -134,7 +134,7 @@ class Pool(T,int _batchSize=16):PoolI!(T){
     /// allocates a new object of type T
     T allocateNew(){
         debug(TrackPools){
-            sinkTogether(sout,delegate void(CharSink s){
+            sinkTogether(sout,delegate void(scope CharSink s){
                 dumper(s)("pool @")(cast(void*)this)(" will create new ")(T.stringof)("\n");
             });
         }
@@ -166,7 +166,7 @@ class Pool(T,int _batchSize=16):PoolI!(T){
     /// returns an object to the pool
     void giveBack(T obj){
         debug(TrackPools){
-            sinkTogether(sout,delegate void(CharSink s){
+            sinkTogether(sout,delegate void(scope CharSink s){
                 dumper(s)("pool @")(cast(void*)this)(" given back ")(T.stringof)("@")(cast(void*)obj)("=")(obj)("\n");
             });
         }
@@ -201,7 +201,7 @@ class Pool(T,int _batchSize=16):PoolI!(T){
                 ++nEl;
             }
             debug(TrackPools){
-                if (!deleteO) sinkTogether(sout,delegate void(CharSink s){
+                if (!deleteO) sinkTogether(sout,delegate void(scope CharSink s){
                     dumper(s)("pool @")(cast(void*)this)(" added ")(T.stringof)("@")(cast(void*)obj)(" to pool, nEl=")(nEl)(" nCapacity=")(nCapacity)("\n");
                 });
             }
@@ -233,7 +233,7 @@ class Pool(T,int _batchSize=16):PoolI!(T){
                         tryDeleteT(toRm);
                     }
                     debug(TrackPools){
-                        sinkTogether(sout,delegate void(CharSink s){
+                        sinkTogether(sout,delegate void(scope CharSink s){
                             dumper(s)("pool @")(cast(void*)this)(" got object from pool ")(T.stringof)("@")(cast(void*)obj)(", nEl=")(nEl)(" nCapacity=")(nCapacity)("\n");
                         });
                     }
@@ -286,7 +286,7 @@ class Pool(T,int _batchSize=16):PoolI!(T){
     /// get rid of all cached values
     void flush(){
         debug(TrackPools){
-            sinkTogether(sout,delegate void(CharSink s){
+            sinkTogether(sout,delegate void(scope CharSink s){
                 dumper(s)("pool @")(cast(void*)this)(" deleting cached objects nEl=")(nEl)(" nCapacity=")(nCapacity)("\n");
             });
         }
@@ -297,7 +297,7 @@ class Pool(T,int _batchSize=16):PoolI!(T){
                     --nEl;
                     size_t pos=nEl&(batchSize-1);
                     debug(TrackPools){
-                        sinkTogether(sout,delegate void(CharSink s){
+                        sinkTogether(sout,delegate void(scope CharSink s){
                             dumper(s)("pool @")(cast(void*)this)(" deleting obj ")(T.stringof)("@")(cast(void*)(p.array[pos]))("\n");
                         });
                     }
@@ -350,7 +350,7 @@ class Pool(T,int _batchSize=16):PoolI!(T){
 class PoolNext(T):PoolI!(T){
     shared T first=null;
     T delegate(PoolI!(T)) createNew;
-    size_t activeUsers=1;
+    shared size_t activeUsers=1;
     bool cacheStopped=false;
     
     /// constructor
@@ -391,10 +391,10 @@ class PoolNext(T):PoolI!(T){
     
     /// returns a new object if possible from the cached ones
     T getObj(){
-        T res=popFrom(first);
+        T res=cast(T)popFrom(first);
         if (res is null) {
             debug(TrackPools){
-                sinkTogether(sout,delegate void(CharSink s){
+                sinkTogether(sout,delegate void(scope CharSink s){
                     dumper(s)("PoolNext!(")(T.stringof)(")@")(cast(void*)this)(" allocating new object\n");
                 });
             }
@@ -402,7 +402,7 @@ class PoolNext(T):PoolI!(T){
             else throw new Exception("no allocator",__FILE__,__LINE__);
         } else {
             debug(TrackPools){
-                sinkTogether(sout,delegate void(CharSink s){
+                sinkTogether(sout,delegate void(scope CharSink s){
                     dumper(s)("PoolNext!(")(T.stringof)(")@")(cast(void*)this)(" reusing pool object\n");
                 });
             }
@@ -413,7 +413,7 @@ class PoolNext(T):PoolI!(T){
     static if (is(T U:U[])){
         /// gets a new instance of dimension dim (if applicable)
         U[] getObj(size_t dim){
-            T res=popFrom(first);
+            T res=cast(T)popFrom(first);
             if (res.length==dim){
                 return res;
             }
@@ -425,16 +425,16 @@ class PoolNext(T):PoolI!(T){
     /// removes the cached objects
     void flush(){
         debug(TrackPools){
-            sinkTogether(sout,delegate void(CharSink s){
+            sinkTogether(sout,delegate void(scope CharSink s){
                 dumper(s)("PoolNext!(")(T.stringof)(")@")(cast(void*)this)(" removing cached objects\n");
             });
         }
-        T elAtt=popFrom(first);
+        T elAtt=cast(T)popFrom(first);
         while(elAtt!is null){
             T oldV=elAtt;
-            elAtt=popFrom(first);
+            elAtt=cast(T)popFrom(first);
             debug(TrackPools){
-                sinkTogether(sout,delegate void(CharSink s){
+                sinkTogether(sout,delegate void(scope CharSink s){
                     dumper(s)("PoolNext!(")(T.stringof)(")@")(cast(void*)this)(" deallocating object@")(cast(void*)oldV)("\n");
                 });
             }
@@ -470,14 +470,14 @@ class PoolNext(T):PoolI!(T){
         if (el!is null){
             if (!cacheStopped){
                 debug(TrackPools){
-                    sinkTogether(sout,delegate void(CharSink s){
+                    sinkTogether(sout,delegate void(scope CharSink s){
                         dumper(s)("PoolNext!(")(T.stringof)(")@")(cast(void*)this)(" adding object@")(cast(void*)el)(" to the cache\n");
                     });
                 }
                 insertAt(first,el);
             } else {
                 debug(TrackPools){
-                    sinkTogether(sout,delegate void(CharSink s){
+                    sinkTogether(sout,delegate void(scope CharSink s){
                         dumper(s)("PoolNext!(")(T.stringof)(")@")(cast(void*)this)(" deleting non reusable object@")(cast(void*)el)("\n");
                     });
                 }

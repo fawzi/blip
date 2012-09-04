@@ -10,11 +10,11 @@ static if (Tango.Major==1) {
 }
 import blip.Comp;
 
-void printTrace(void delegate(cstring) sink,cstring msg){
+void printTrace(scope void delegate(in cstring) sink,in cstring msg){
     auto tInfo=basicTracer();
     sink("=======\n");
     sink(msg);
     sink("\n");
-    tInfo.writeOut(sink);
+    sink(tInfo.toString());
     sink("=======\n");
 }

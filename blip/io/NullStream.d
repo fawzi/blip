@@ -20,7 +20,7 @@ class NullConduit: Conduit{
 
     size_t read (void[] dst) { return Eof; }
 
-    size_t write (void[] src) { return src.length; }
+    size_t write (const(void)[] src) { return src.length; }
 
     void detach () { }
     

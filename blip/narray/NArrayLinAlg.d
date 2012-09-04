@@ -463,7 +463,7 @@ in {
 }
 body {
     alias typeof(T.init*U.init) S;
-    const int rank3=rank1+rank2-2;
+    immutable int rank3=rank1+rank2-2;
     index_type[rank3] newshape;
     int ii=0;
     if (axis1<0) axis1+=rank1;
@@ -535,18 +535,18 @@ body {
     index_type optimalChunkSize_j=NArray!(S,rank2).defaultOptimalChunkSize;
     if (scaleC==0){
         if (scaleRes==1){
-            const istring innerLoop=pLoopPtr(rank2,["b","t2"],
+            istring innerLoop=pLoopPtr(rank2,["b","t2"],
                     "*t2Ptr0 = (*aPtr0)*(*bPtr0);","j");
             mixin(pLoopPtr(rank1,["a","t1"],
                     "t2.startPtrArray=t1Ptr0;\n"~innerLoop,"i"));
         } else {
-            const istring innerLoop=pLoopPtr(rank2,["b","t2"],
+            istring innerLoop=pLoopPtr(rank2,["b","t2"],
                     "*t2Ptr0 = scaleRes*(*aPtr0)*(*bPtr0);","j");
             mixin(pLoopPtr(rank1,["a","t1"],
                     "t2.startPtrArray=t1Ptr0;\n"~innerLoop,"i"));
         }
     } else {
-        const istring innerLoop=pLoopPtr(rank2,["b","t2"],
+        istring innerLoop=pLoopPtr(rank2,["b","t2"],
                 "*t2Ptr0 = scaleC*(*t2Ptr0)+scaleRes*(*aPtr0)*(*bPtr0);","j");
         mixin(pLoopPtr(rank1,["a","t1"],
                 "t2.startPtrArray=t1Ptr0;\n"~innerLoop,"i"));
@@ -577,7 +577,7 @@ NArray!(typeof(T.init*U.init),rank1+rank2)outerNA(T,int rank1,U,int rank2)
     (NArray!(T,rank1)a,NArray!(U,rank2)b)
 body {
     alias typeof(T.init*U.init) S;
-    const int rank3=rank1+rank2;
+    immutable int rank3=rank1+rank2;
     index_type[rank3] newshape;
     newshape[0..rank1]=a.shape;
     newshape[rank1..rank1+rank2]=b.shape;

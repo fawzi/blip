@@ -33,7 +33,7 @@ struct Callback{
         ReceiveWhenInProcess=2, /// receive when a notification happens while processing the first one (callback has to be threadsafe)
         ReceiveAll=7, /// receive all notification (even if you are still waiting for the first to start executing, the callback should be threadsafe)
     }
-    void delegate(cstring,Callback*,Variant) callback;
+    void delegate(string,Callback*,Variant) callback;
     Callback *next;
     Flags flags;
     
@@ -42,7 +42,7 @@ struct Callback{
     }
     
     __gshared static Callback *freeList;
-    static Callback *newCallback(void delegate(cstring,Callback*,Variant) callback,
+    static Callback *newCallback(void delegate(string,Callback*,Variant) callback,
         Flags flags=Flags.None)
     {
         auto newC=popFrom(freeList);
@@ -85,7 +85,7 @@ class NotificationCenter{
         }
         return false;
     }
-    Callback * registerCallback(string name,void delegate(cstring,Callback*,Variant) callback,
+    Callback * registerCallback(string name,void delegate(string,Callback*,Variant) callback,
         Callback.Flags flags=Callback.Flags.None){
         auto res=Callback.newCallback(callback,flags);
         if (registerCallback(name,res)){

@@ -39,7 +39,7 @@ string convolveBase(string indent,bool istream_m=true, bool istream_z=true, bool
         bool shouldAdd=false;
         for (int j=jmin;j<jmax;++j){
             if (shouldAdd) res~="+";
-            res~="c0"~ctfe_i2a(2-j)~"*a1"~ctfe_i2a((j+jshift)%3);
+            res~="c0"~ctfe_i2s(2-j)~"*a1"~ctfe_i2s((j+jshift)%3);
             shouldAdd=true;
         }
         res~=";\n";
@@ -52,7 +52,7 @@ string convolveBase(string indent,bool istream_m=true, bool istream_z=true, bool
         for (int i=imin;i<imax;++i){
             for (int j=jmin;j<jmax;++j){
                 if (shouldAdd) res~="+";
-                res~="c"~ctfe_i2a(2-i)~ctfe_i2a(2-j)~"*a"~ctfe_i2a(i)~ctfe_i2a((j+jshift)%3);
+                res~="c"~ctfe_i2s(2-i)~ctfe_i2s(2-j)~"*a"~ctfe_i2s(i)~ctfe_i2s((j+jshift)%3);
                 shouldAdd=true;
             }
         }
@@ -66,14 +66,14 @@ string convolveBase(string indent,bool istream_m=true, bool istream_z=true, bool
         if (imin<=1 && 1<imax){
             for (int j=jmin;j<jmax;++j){
                 if (shouldAdd) res~="+";
-                res~="c2"~ctfe_i2a(2-j)~"*a1"~ctfe_i2a((j+jshift)%3);
+                res~="c2"~ctfe_i2s(2-j)~"*a1"~ctfe_i2s((j+jshift)%3);
                 shouldAdd=true;
             }
         }
         if (imin<=2 && 2<imax){
             for (int j=jmin;j<jmax;++j){
                 if (shouldAdd) res~="+";
-                res~="c1"~ctfe_i2a(2-j)~"*a2"~ctfe_i2a((j+jshift)%3);
+                res~="c1"~ctfe_i2s(2-j)~"*a2"~ctfe_i2s((j+jshift)%3);
                 shouldAdd=true;
             }
         }
@@ -99,7 +99,7 @@ string incrementA(string indent,int imin,int imax,int jshift){
         if (i==1) aPtrName="aPtr0";
         if (i==2) aPtrName="aPtrPiuI";
         debug (ConvolveCheckAccess) res~="safeIn("~aPtrName~",__LINE__);";
-        res~=indent~"a"~ctfe_i2a(i)~ctfe_i2a(jshift)~"= *"~aPtrName~";\n";
+        res~=indent~"a"~ctfe_i2s(i)~ctfe_i2s(jshift)~"= *"~aPtrName~";\n";
         res~=indent~aPtrName~"=cast(T*)(cast(size_t)"~aPtrName~"+aStrideJ);\n";
     }
     return res;
@@ -150,25 +150,25 @@ string convolveJLoop(string indent0,int jrest=0,bool istream_m=true, bool istrea
                 }
                 if (iStart>=iEnd || jInStart>=jInEnd) continue;
                 debug (ConvolveCheckAccess) {
-                    res~="safeOut(cast(T*)(cast(size_t)resPtr0+("~ctfe_i2a(istream)~")*resStrideI+("
-                        ~ctfe_i2a(j)~")*resStrideJ),__LINE__);\n";
+                    res~="safeOut(cast(T*)(cast(size_t)resPtr0+("~ctfe_i2s(istream)~")*resStrideI+("
+                        ~ctfe_i2s(j)~")*resStrideJ),__LINE__);\n";
                     for (int i=iStart;i<iEnd;++i){
                         for (int diff=-1;diff<2;++diff){
                             if (jInStart<=j+diff && j+diff<jInEnd){
-                                res~="safeIn(cast(T*)(cast(size_t)aPtr0+"~ctfe_i2a(i-1)~"*aStrideI+"~ctfe_i2a(j+diff)~"*aStrideJ),__LINE__);\n";
+                                res~="safeIn(cast(T*)(cast(size_t)aPtr0+"~ctfe_i2s(i-1)~"*aStrideI+"~ctfe_i2s(j+diff)~"*aStrideJ),__LINE__);\n";
                             }
                         }
                     }
                 }
-                res~=indent~"*cast(T*)(cast(size_t)resPtr0+("~ctfe_i2a(istream)~")*resStrideI+("
-                    ~ctfe_i2a(j)~")*resStrideJ)+=";
+                res~=indent~"*cast(T*)(cast(size_t)resPtr0+("~ctfe_i2s(istream)~")*resStrideI+("
+                    ~ctfe_i2s(j)~")*resStrideJ)+=";
                 bool shouldAdd=false;
                 for (int i=iStart;i<iEnd;++i){
                     for (int diff=-1;diff<2;++diff){
                         if (jInStart<=j+diff && j+diff<jInEnd){
                             if (shouldAdd) res~="+";
-                            res~="c"~ctfe_i2a(2-i+istream)~ctfe_i2a(1-diff)~
-                                "*(*cast(T*)(cast(size_t)aPtr0+"~ctfe_i2a(i-1)~"*aStrideI+"~ctfe_i2a(j+diff)~"*aStrideJ))";
+                            res~="c"~ctfe_i2s(2-i+istream)~ctfe_i2s(1-diff)~
+                                "*(*cast(T*)(cast(size_t)aPtr0+"~ctfe_i2s(i-1)~"*aStrideI+"~ctfe_i2s(j+diff)~"*aStrideJ))";
                             shouldAdd=true;
                         }
                     }
@@ -188,7 +188,7 @@ string convolveJLoop(string indent0,int jrest=0,bool istream_m=true, bool istrea
             for (int j=0;j<3;++j){
                 if (j!=0)
                     res~=", ";
-                res~="a"~ctfe_i2a(i)~ctfe_i2a(j);
+                res~="a"~ctfe_i2s(i)~ctfe_i2s(j);
             }
             res~=";\n";
         }
@@ -348,7 +348,7 @@ string preConvolveIJSetup(string indent,string inAName,string outAName,Border bo
         res~=indent~"T[] outBaseSlice="~outAName~".data;\n";
         res~=indent~"void safeOut(T* ptr,long lineNr){\n";
         res~=indent~"    if (ptr<outBaseSlice.ptr || ptr>=(outBaseSlice.ptr+outBaseSlice.length)){\n";
-        res~=indent~"        string msg=collectIAppender(void delegate(CharSink sink){\n";
+        res~=indent~"        string msg=collectIAppender(void delegate(scope CharSink sink){\n";
         res~=indent~"            sink(\"ERROR convolve kernel invalid write\\n\");\n";
         res~=indent~"            dumper(sink)(\" invalid access of out array in convolution kernel, T=\")\n";
         res~=indent~"            (T.stringof)(\",rank=\")(rank)(\",switchTag=\")(switchTag)(\", line=\")\n";
@@ -358,7 +358,7 @@ string preConvolveIJSetup(string indent,string inAName,string outAName,Border bo
         res~=indent~"}\n";
         res~=indent~"void safeIn(T* ptr,long lineNr){\n";
         res~=indent~"    if (ptr<inBaseSlice.ptr || ptr>=(inBaseSlice.ptr+inBaseSlice.length)){\n";
-        res~=indent~"        string msg=collectIAppender(void delegate(CharSink sink){\n";
+        res~=indent~"        string msg=collectIAppender(void delegate(scope CharSink sink){\n";
         res~=indent~"            dumper(s)(\"ERROR convolve kernel invalid read\\n\")\n";
         res~=indent~"            (\" invalid access of in array in convolution kernel, T=\")\n";
         res~=indent~"            (T.stringof)(\",rank=\")(rank)(\",switchTag=\")(switchTag)(\", line=\")\n";
@@ -382,7 +382,7 @@ string convolveIJ(string indent,Border border){
     string indent2=indent~"    ";
     foreach (ires;[-1,0]){
         foreach (jres;[-4,-3,-2,-1,0,1,2]){
-            res~=indent~"case "~ctfe_i2a(10*ires+jres)~":\n";
+            res~=indent~"case "~ctfe_i2s(10*ires+jres)~":\n";
             res~=indent~"  {\n";
             res~=convolveILoop(indent2,jres,ires,border);
             res~=indent~"  }\n";
@@ -390,7 +390,7 @@ string convolveIJ(string indent,Border border){
         }
     }
     res~=indent~"case -1000: break;\n";
-    res~=indent2~"default: assert(0,\"invalid switchTag \"~ctfe_i2a(switchTag));\n";
+    res~=indent2~"default: assert(0,\"invalid switchTag \"~ctfe_i2s(switchTag));\n";
     res~=indent~"}\n";
     return res;
 }
@@ -407,14 +407,14 @@ string convolveJOnly(string indent,Border border){
     res~=indent~"switch (switchTag){\n";
     string indent2=indent~"    ";
     foreach (jres;[-4,-3,-2,-1,0,1,2]){
-        res~=indent~"case "~ctfe_i2a(jres)~":\n";
+        res~=indent~"case "~ctfe_i2s(jres)~":\n";
         res~=indent~"  {\n";
         res~=convolveJLoop(indent2,jres,false,true,false,1,2,border);
         res~=indent~"  }\n";
         res~=indent~"break;\n";
     }
     res~=indent~"case -1000: break;\n";
-    res~=indent2~"default: assert(0,\"invalid switchTag \"~ctfe_i2a(switchTag));\n";
+    res~=indent2~"default: assert(0,\"invalid switchTag \"~ctfe_i2s(switchTag));\n";
     res~=indent~"}\n";
     return res;
 }
@@ -520,7 +520,7 @@ in {
     }
 }
 body{
-    //pragma(msg,"convolveNN, rank="~ctfe_i2a(rank)~", border="~ctfe_i2a(cast(int)border));
+    //pragma(msg,"convolveNN, rank="~ctfe_i2s(rank)~", border="~ctfe_i2s(cast(int)border));
     if (inA.flags & ArrayFlags.Zero) return outA;
     if (isNullNArray!(T,rank,true)(outA)){
         index_type[rank] outShape=inA.shape;
@@ -536,23 +536,23 @@ body{
     if (outA.flags & ArrayFlags.Zero) return outA;
     static if(rank==1){
         static if (border==Border.Increase){
-            const istring startPStr
+            istring startPStr
             ="    T* pOutAPtr0=cast(T*)(cast(size_t)outA.startPtrArray+outA.bStrides[0]);\n"
             ~"    T* pInAPtr0=inA.startPtrArray;\n";
         } else static if (border==Border.Same){
-            const istring startPStr="    T* pOutAPtr0=outA.startPtrArray,pInAPtr0=inA.startPtrArray;\n";
+            istring startPStr="    T* pOutAPtr0=outA.startPtrArray,pInAPtr0=inA.startPtrArray;\n";
         } else {
-            const istring startPStr
+            istring startPStr
             ="    T* pOutAPtr0=outA.startPtrArray;\n"
             ~"    T* pInAPtr0=cast(T*)(cast(size_t)inA.startPtrArray+inA.bStrides[0]);\n";
         }
-        const istring loopStr
+        istring loopStr
             ="    T c10=kernel[0],c11=kernel[1],c12=kernel[2];\n"
             ~"    T c00,c01,c02,c20,c21,c22;\n"
             ~preConvolveIJSetup("    ","inA","outA",border,true)
             ~startPStr
             ~convolveJOnly("    ",border);
-//        pragma(msg,"convolveNN("~T.stringof~","~ctfe_i2a(rank)~","~ctfe_i2a(cast(int)border)~")");
+//        pragma(msg,"convolveNN("~T.stringof~","~ctfe_i2s(rank)~","~ctfe_i2s(cast(int)border)~")");
 //        pragma(msg,loopStr);
         mixin(loopStr);
 //        pragma(msg,"----");
@@ -561,21 +561,21 @@ body{
         T c10=kernel[1,0],c11=kernel[1,1],c12=kernel[1,2];
         T c20=kernel[2,0],c21=kernel[2,1],c22=kernel[2,2];
         static if (border==Border.Increase){
-            const istring startPStr
+            istring startPStr
             ="    T* pOutAPtr0=cast(T*)(cast(size_t)outA.startPtrArray+outA.bStrides[0]+outA.bStrides[1]);\n"
             ~"    T* pInAPtr0=inA.startPtrArray;\n";
         } else static if (border==Border.Same){
-            const istring startPStr="    T* pOutAPtr0=outA.startPtrArray,pInAPtr0=inA.startPtrArray;\n";
+            istring startPStr="    T* pOutAPtr0=outA.startPtrArray,pInAPtr0=inA.startPtrArray;\n";
         } else {
-            const istring startPStr
+            istring startPStr
             ="    T* pOutAPtr0=outA.startPtrArray;\n"
             ~"    T* pInAPtr0=cast(T*)(cast(size_t)inA.startPtrArray+inA.bStrides[0]+inA.bStrides[1]);\n";
         }
-        const istring loopStr
+        istring loopStr
         =startPStr
         ~preConvolveIJSetup("    ","inA","outA",border)
         ~convolveIJ("    ",border);
-        //pragma(msg,"convolveNN("~T.stringof~","~ctfe_i2a(rank)~","~ctfe_i2a(cast(int)border)~")");
+        //pragma(msg,"convolveNN("~T.stringof~","~ctfe_i2s(rank)~","~ctfe_i2s(cast(int)border)~")");
         //pragma(msg,loopStr);
         mixin(loopStr);
         //pragma(msg,"--------");
@@ -590,9 +590,9 @@ body{
             cast(T*)(cast(size_t)outA.startPtrArray
                 +((outA.shape[0]-partialShape)/2)*(outA.bStrides[0]+outA.bStrides[1]+outA.bStrides[2])),
             outA.newFlags, outA.newBase);
-        const istring intConvolveStr=convolveIJ("    ",border);
+        istring intConvolveStr=convolveIJ("    ",border);
         static if (border==Border.Increase){
-            const loopBody=`
+            immutable loopBody=`
             for (index_type kDiff=-1;kDiff<2;++kDiff){
                 T* pOutAPtr0=cast(T*)(cast(size_t)partialOutAPtr0+kDiff*partialOutAStride0);
                 T* pInAPtr0=partialInAPtr0;
@@ -602,7 +602,7 @@ body{
             `~intConvolveStr~`
             }`;
         } else static if (border==Border.Decrease){
-            const loopBody=`
+            immutable loopBody=`
             for (index_type kDiff=-1;kDiff<2;++kDiff){
                 T* pOutAPtr0=partialOutAPtr0;
                 T* pInAPtr0=cast(T*)(cast(size_t)partialInAPtr0-kDiff*partialInAStride0);
@@ -613,7 +613,7 @@ body{
             }`;
         } else static if (border==Border.Same){
             index_type maxK=partialShape-1;
-            const loopBody=`/+ line 0_new +/ convolveStartLine=__LINE__; /+ line 0_new +/
+            immutable loopBody=`/+ line 0_new +/ convolveStartLine=__LINE__; /+ line 0_new +/
             for (index_type kDiff=-1;kDiff<2;++kDiff){
                 if (ii_0_==0 && kDiff==-1 || ii_0_==maxK && kDiff==1) continue;
                 T* pOutAPtr0=cast(T*)(cast(size_t)partialOutAPtr0+kDiff*partialOutAStride0);
@@ -624,7 +624,7 @@ body{
             `~intConvolveStr~`
             }`;
         }
-        //pragma(msg,"convolveNN("~T.stringof~","~ctfe_i2a(rank)~","~ctfe_i2a(cast(int)border)~")");
+        //pragma(msg,"convolveNN("~T.stringof~","~ctfe_i2s(rank)~","~ctfe_i2s(cast(int)border)~")");
         //pragma(msg,loopBody);
         //pragma(msg,"------");
         index_type optimalChunkSize_ii=NArray!(T,rank).defaultOptimalChunkSize;

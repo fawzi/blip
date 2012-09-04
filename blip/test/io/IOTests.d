@@ -43,8 +43,8 @@ class LocalPipeTester{
         try{
             uint pos=0;
             foreach(s;slicesOut){
-                uint posNext=pos+(s%data.length);
-                if (posNext>data.length) posNext=data.length;
+                uint posNext=pos+cast(uint)(s%data.length);
+                if (posNext>data.length) posNext=cast(uint)data.length;
                 pipe.rawWrite(data[pos..posNext]);
                 noToutWatcher.sleepTask(rand.uniformR2(0.0,1.0)*0.001);
                 pos=posNext;
@@ -62,8 +62,8 @@ class LocalPipeTester{
             ubyte[] readData=new ubyte[](data.length);
             uint pos=0;
             foreach(s;slicesIn){
-                uint posNext=pos+(s%data.length);
-                if (posNext>data.length) posNext=data.length;
+                uint posNext=pos+cast(uint)(s%data.length);
+                if (posNext>data.length) posNext=cast(uint)data.length;
                 pipe.rawReadExact(readData[pos..posNext]);
                 noToutWatcher.sleepTask(rand.uniformR2(0.0,1.0)*0.001);
                 pos=posNext;

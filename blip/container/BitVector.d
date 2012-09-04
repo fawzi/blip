@@ -23,23 +23,21 @@ import blip.Comp;
 struct BitVector(size_t len){
     internal_t[(len+internal_t.sizeof*8-1)/(internal_t.sizeof*8)] data;
     
-    static BitVector opCall(bool[] vals){
+    /+static BitVector opCall(bool[] vals){
         assert(vals.length==len);
         BitVector res;
         for (size_t i=0;i<len;++i){
             res[i]=vals[i];
         }
         return res;
-    }
-
-/+    static BitVector opCall(int[] vals){
-        assert(vals.length==len);
-        BitVector res;
-        for (size_t i=0;i<len;++i){
-            res[i]=(vals[i]!=0);
-        }
-        return res;
     }+/
+
+    this(bool[] vals){
+        assert(vals.length==len);
+        for (size_t i=0;i<len;++i){
+            this[i]=vals[i];
+        }
+    }
 
 /+    void opAssign( int[] bits )
     {
@@ -49,6 +47,13 @@ struct BitVector(size_t len){
         }
     }+/
     
+    void opAssign( BitVector bits )
+    {
+        assert(bits.length==len);
+        for (size_t i=0;i<len;++i){
+            this[i]=bits[i];
+        }
+    }
     void opAssign( bool[] bits )
     {
         assert(bits.length==len);
@@ -80,7 +85,7 @@ struct BitVector(size_t len){
      * Params:
      *  dg = The supplied code as a delegate.
      */
-    int opApply( int delegate(ref bool) dg )
+    int opApply( scope int delegate(ref bool) dg )
     {
         int result;
 
@@ -97,7 +102,7 @@ struct BitVector(size_t len){
 
 
     /** ditto */
-    int opApply( int delegate(ref size_t, ref bool) dg )
+    int opApply( scope int delegate(ref size_t, ref bool) dg )
     {
         int result;
 
@@ -114,7 +119,7 @@ struct BitVector(size_t len){
     struct LoopTrue{
         BitVector *v;
         /// loop on indexes of set bits
-        int opApply( int delegate(ref size_t) dg )
+        int opApply( scope int delegate(ref size_t) dg )
         {
             auto dim = v.dim();
             auto p=v.ptr;
@@ -134,7 +139,7 @@ struct BitVector(size_t len){
             }
             return 0;
         }
-        int opApply( int delegate(ref size_t,ref size_t) dg )
+        int opApply( scope int delegate(ref size_t,ref size_t) dg )
         {
             auto dim = v.dim();
             auto p=v.ptr;
@@ -158,7 +163,7 @@ struct BitVector(size_t len){
     }
     LoopTrue loopTrue(){
         LoopTrue res;
-        res.v=this;
+        res.v=&this;
         return res;
     }
     /**

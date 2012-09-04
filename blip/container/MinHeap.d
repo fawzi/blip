@@ -51,8 +51,8 @@ bool maxHeapCompare(T)(T a, T b) {return a >= b;}
   *               probably want to keep this function small; it's called O(log N) 
   *               times per insertion or removal.
 */
-char[] heapMixinStr(char[]extraAttribs,char[] compareMixin,char[]moveMixin=""){
-    char[] res=`
+string heapMixinStr(string extraAttribs,string compareMixin,string moveMixin=""){
+    string res=`
         alias pop       remove;
         alias push      opCatAssign;
         static if (is(typeof(*this))){

@@ -174,9 +174,9 @@ string rpcProxyMixin(string name,string extName,string extraInterfaces,string []
             Cl closure;
             void giveBack(){
                 if (pool!is null){
-                    pool.giveBack(this);
+                    pool.giveBack(&this);
                 } else {
-                    delete this;
+                    // delete this;
                 }
             }
             __gshared static PoolI!(OnewayClosure*) gPool;
@@ -354,7 +354,7 @@ string rpcVendorMixin(string name,string extName_, string [] functionsComments){
                                 try{
                                     context.obj.`~functionName~`(args);
                                 } catch (Exception e){ /+ communicate back?? +/
-                                    sinkTogether(context.publisher.log,delegate void(CharSink s){
+                                    sinkTogether(context.publisher.log,delegate void(scope CharSink s){
                                         dumper(s)("exception in oneway method ")(`~extName~`)(".`~functionName~`:")(e);
                                     });
                                 }`;
@@ -380,7 +380,7 @@ string rpcVendorMixin(string name,string extName_, string [] functionsComments){
                                         context.simpleReply(sendRes,reqId,res);`;
             version(TrackRpc){
                 res~=`
-                                        sinkTogether(context.publisher.log,delegate void(CharSink s){
+                                        sinkTogether(context.publisher.log,delegate void(scope CharSink s){
                                             dumper(s)("sending back result in rpc call "~`~extName~`~".`~functionName~`, resVal:")(res)("\n");
                                         });`;
             }
@@ -407,9 +407,9 @@ string rpcVendorMixin(string name,string extName_, string [] functionsComments){
             Cl closure;
             void giveBack(){
                 if (pool!is null){
-                    pool.giveBack(this);
+                    pool.giveBack(&this);
                 } else {
-                    delete this;
+                    // delete this;
                 }
             }
             __gshared static PoolI!(Closure*) gPool;
@@ -459,7 +459,7 @@ string rpcVendorMixin(string name,string extName_, string [] functionsComments){
             // Closure.rmGPool();
         }
         
-        override void proxyDescDumper(void delegate(cstring)s){
+        override void proxyDescDumper(scope void delegate(in cstring)s){
             super.proxyDescDumper(s);`;
     for (int ifield=0;ifield<functionsComments.length/2;++ifield){
         auto functionName=functionsComments[2*ifield];
@@ -523,8 +523,8 @@ string rpcVendorMixin(string name,string extName_, string [] functionsComments){
             try{
                 Task("rpcCall`~functionName~`",cl0.callClosureDelegate)
                     .appendOnFinish(&cl0.giveBack).autorelease.submit(objTask);
-            } catch (Object o){
-                sinkTogether(publisher.log,delegate void(CharSink s){
+            } catch (Throwable o){
+                sinkTogether(publisher.log,delegate void(scope CharSink s){
                     dumper(s)("internal exception in method ")(`~extName~`)(".`~functionName~`:")(o);
                 });
             }

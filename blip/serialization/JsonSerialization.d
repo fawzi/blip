@@ -34,23 +34,23 @@ class JsonSerializer(T=char) : Serializer {
     long writeCount,lineCount;
     bool atStart;
     bool compact; // skips class, id when possible
-    const T[1] nline=[cast(T)'\n'];
-    Dumper!(void delegate(cstring)) s; // quick dump of strings
+    immutable T[1] nline=[cast(T)'\n'];
+    Dumper!(void delegate(in cstring)) s; // quick dump of strings
     /// writes a newline
     void newline(){
         handlers.rawWriteStr(nline);
     }
 
     /// constructor using a wispered sink delegate
-    this(string dsc,Dumper!(void delegate(T[])) sink){
+    this(string dsc,Dumper!(void delegate(in T[])) sink){
         this(dsc,sink.call);
     }
     /// constructor using a sink delegate
-    this(string dsc,void delegate(T[])sink){
+    this(string dsc,void delegate(in T[])sink){
         this(new FormattedWriteHandlers!(T)(dsc,sink));
     }
     /// constructor using a sink delegate
-    this(OutWriter dsc,void delegate(T[])sink){
+    this(OutWriter dsc,void delegate(in T[])sink){
         this(new FormattedWriteHandlers!(T)(dsc,sink));
     }
     /// constructor using an OutStreamI (or a WriteHandlers)
@@ -91,7 +91,7 @@ class JsonSerializer(T=char) : Serializer {
         }
     }
     /// writes something that has a custom write operation
-    override void writeCustomField(FieldMetaInfo *field, void delegate()writeOp){
+    override void writeCustomField(FieldMetaInfo *field, scope void delegate()writeOp){
         writeField(field);
         writeOp();
     }
@@ -118,7 +118,7 @@ class JsonSerializer(T=char) : Serializer {
         return PosCounter(size);
     }
     /// writes a separator of the array
-    override void writeArrayEl(ref PosCounter ac, void delegate() writeEl) {
+    override void writeArrayEl(ref PosCounter ac, scope void delegate() writeEl) {
         if (ac.pos==0){
             ac.data=Variant(writeCount+10*lineCount);
         } else if (ac.pos==1){
@@ -165,7 +165,7 @@ class JsonSerializer(T=char) : Serializer {
         return res;
     }
     /// writes an entry of the dictionary
-    override void writeEntry(ref PosCounter ac, void delegate() writeKey,void delegate() writeVal) {
+    override void writeEntry(ref PosCounter ac, scope void delegate() writeKey,scope void delegate() writeVal) {
         if (!atStart) handlers.rawWriteStr([cast(T)',']);
         newline;
         ac.next();
@@ -200,7 +200,7 @@ class JsonSerializer(T=char) : Serializer {
     }
     /// writes an Object
     override void writeObject(FieldMetaInfo *field, ClassMetaInfo metaInfo, objectId objId,
-        bool isSubclass,void delegate() realWrite, Object o)
+        bool isSubclass,scope void delegate() realWrite, Object o)
     {
         writeField(field);
         assert(metaInfo!is null);
@@ -232,7 +232,7 @@ class JsonSerializer(T=char) : Serializer {
     }
     /// write Struct
     override void writeStruct(FieldMetaInfo *field, ClassMetaInfo metaInfo, objectId objId,
-        void delegate() realWrite,void *t){
+        scope void delegate() realWrite,const(void) *t){
         writeField(field);
         assert(metaInfo!is null);
         if (compact) {
@@ -256,7 +256,7 @@ class JsonSerializer(T=char) : Serializer {
         s("}");
     }
     /// writes a core type
-    override void writeCoreType(FieldMetaInfo *field, void delegate() realWrite,void *t){
+    override void writeCoreType(FieldMetaInfo *field, scope void delegate() realWrite,void *t){
         writeField(field);
         realWrite();
     }
@@ -315,7 +315,7 @@ class JsonUnserializer(T=char) : Unserializer {
                     if (fieldReadName.length>0)
                         this.reader.skipString(cast(S)":");
                     throw new FieldMismatchException(field,fieldReadName,
-                        collectIAppender(delegate void(CharSink s){
+                        collectIAppender(delegate void(scope CharSink s){
                             dumper(s)("unexpected field '")(fieldReadName)("' at "); this.reader.parserPos(s);
                         }),__FILE__,__LINE__);
                 }
@@ -325,7 +325,7 @@ class JsonUnserializer(T=char) : Unserializer {
     }
     
     /// reads something that has a custom write operation
-    override void readCustomField(FieldMetaInfo *field, void delegate()readOp){
+    override void readCustomField(FieldMetaInfo *field, scope void delegate()readOp){
         readField(field);
         readOp();
     }
@@ -343,7 +343,7 @@ class JsonUnserializer(T=char) : Unserializer {
     }
     /// reads an element of the array (or its end)
     /// returns true if an element was read
-    override bool readArrayEl(ref PosCounter ac, void delegate() readEl) {
+    override bool readArrayEl(ref PosCounter ac, scope void delegate() readEl) {
         if (ac.length==ac.pos) return false;
         if (sloppyCommas){
             reader.skipString(cast(S)",",false);
@@ -390,7 +390,7 @@ class JsonUnserializer(T=char) : Unserializer {
         return res;
     }
     /// reads an entry of the dictionary
-    override bool readEntry(ref PosCounter ac, void delegate() readKey,void delegate() readVal) {
+    override bool readEntry(ref PosCounter ac, scope void delegate() readKey,scope void delegate() readVal) {
         if (ac.length==ac.pos) {
             ac.end;
             return false;
@@ -420,7 +420,7 @@ class JsonUnserializer(T=char) : Unserializer {
         return true;
     }
     /// scans for the id string
-    size_t scanId(T[]data,SliceExtent se){
+    size_t scanId(in T[]data,SliceExtent se){
         size_t i=0;
         size_t l=data.length;
         for(;i!=l;++i){
@@ -504,10 +504,10 @@ class JsonUnserializer(T=char) : Unserializer {
         return instantiateClass(metaI);
     }
     /// reads an object (called after readAndInstantiateClass)
-    override void readObject(FieldMetaInfo *field, ClassMetaInfo metaInfo,void delegate() unserializeF,Object o){
+    override void readObject(FieldMetaInfo *field, ClassMetaInfo metaInfo,scope void delegate() unserializeF,Object o){
         readStruct(field,metaInfo,unserializeF,cast(void*)o);
     }
-    override void readStruct(FieldMetaInfo *field, ClassMetaInfo metaInfo,void delegate() unserializeF,void *t){
+    override void readStruct(FieldMetaInfo *field, ClassMetaInfo metaInfo,scope void delegate() unserializeF,void *t){
         try{
             unserializeF();
             reader.skipString(cast(S)"}");
@@ -531,7 +531,7 @@ class JsonUnserializer(T=char) : Unserializer {
             }
             while(1){
                 if(!stackTop.missingLabels.remove(stackTop.labelToRead)){
-                    serializationError(collectIAppender(delegate void(CharSink sink){ auto s=dumper(sink);
+                    serializationError(collectIAppender(delegate void(scope CharSink sink){ auto s=dumper(sink);
                         s("unexpected extra object field '")(stackTop.labelToRead)("'");
                         if (field !is null){
                             if (field.name.length!=0)
@@ -572,14 +572,14 @@ class JsonUnserializer(T=char) : Unserializer {
                     case "}":
                         return;
                     default:
-                        serializationError("unexpected separator in object unserialization '"~sep~"'",
+                        serializationError("unexpected separator in object unserialization '"~sep.idup~"'",
                             __FILE__,__LINE__);
                 }
             }
         }
     }
     /// reads a core type
-    void readCoreType(FieldMetaInfo *field,void delegate() realRead){
+    void readCoreType(FieldMetaInfo *field,scope void delegate() realRead){
         readField(field);
         realRead();
     }

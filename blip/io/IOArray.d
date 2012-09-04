@@ -26,7 +26,7 @@ import blip.Comp;
 
 extern (C)
 {
-        protected void * memcpy (void *dst, void *src, size_t);
+    protected void * memcpy (void *dst, const(void) *src, size_t);
 }
 
 /*******************************************************************************
@@ -440,7 +440,7 @@ class IOArray : Conduit, InputBuffer, OutputBuffer, Conduit.Seek
 
         ***********************************************************************/
 
-        final IOArray append (void[] src)
+        final IOArray append (const(void)[] src)
         {
                 if (write(src) is Eof)
                     error (overflow);
@@ -468,7 +468,7 @@ class IOArray : Conduit, InputBuffer, OutputBuffer, Conduit.Seek
 
         ***********************************************************************/
 
-        final bool next (size_t delegate (void[]) scan)
+        final bool next (scope size_t delegate (const(void)[]) scan)
         {
                 return reader (scan) != IConduit.Eof;
         }
@@ -610,7 +610,7 @@ class IOArray : Conduit, InputBuffer, OutputBuffer, Conduit.Seek
 
         ***********************************************************************/
 
-        final size_t writer (size_t delegate (void[]) dg)
+        final size_t writer (scope size_t delegate (void[]) dg)
         {
                 auto count = dg (data [extent..dimension]);
 
@@ -630,7 +630,7 @@ class IOArray : Conduit, InputBuffer, OutputBuffer, Conduit.Seek
                 dg = callback to provide buffer access to
 
                 Returns:
-                Returns whatever the delegate returns.
+                Returns whatever The delegate returns.
 
                 Remarks:
                 Exposes the raw data buffer at the current _read position. The
@@ -643,7 +643,7 @@ class IOArray : Conduit, InputBuffer, OutputBuffer, Conduit.Seek
 
         ***********************************************************************/
 
-        final size_t reader (size_t delegate (void[]) dg)
+        final size_t reader (scope size_t delegate (const(void)[]) dg)
         {
                 auto count = dg (data [index..extent]);
 

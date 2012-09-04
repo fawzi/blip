@@ -24,33 +24,27 @@ import blip.Comp;
 // wrapper to write out an array
 struct LazyArray(T) {
     ulong size; /// output size
-    int delegate(int delegate(ref T)) loopOp; /// output loop
+    int delegate(scope int delegate(ref T)) loopOp; /// output loop
     void delegate(T) addOp; /// add one element
     void delegate(ulong l) setLen; /// set the length (before addition with a guess, after with real size)
     
     /// if you just want to write out this is all that is needed
-    static LazyArray opCall(int delegate(int delegate(ref T)) loopOp,ulong size=ulong.max){
-        LazyArray res;
-        res.size=size;
-        res.loopOp=loopOp;
-        return res;
+    this(int delegate(scope int delegate(ref T)) loopOp,ulong size=ulong.max){
+        this.size=size;
+        this.loopOp=loopOp;
     }
     /// if you just want to readin this is all that is needed
-    static LazyArray opCall(void delegate(T) addOp,void delegate(ulong l) setLen=null){
-        LazyArray res;
-        res.addOp=addOp;
-        res.setLen=setLen;
-        return res;
+    this(void delegate(T) addOp,void delegate(ulong l) setLen=null){
+        this.addOp=addOp;
+        this.setLen=setLen;
     }
     /// initialize a complete (input/output) wrapper
-    static LazyArray opCall(int delegate(int delegate(ref T)) loopOp,void delegate(T) addOp,
+    this(int delegate(scope int delegate(ref T)) loopOp,void delegate(T) addOp,
         ulong size=ulong.max,void delegate(ulong l) setLen=null){
-        LazyArray res;
-        res.size=size;
-        res.loopOp=loopOp;
-        res.addOp=addOp;
-        res.setLen=setLen;
-        return res;
+        this.size=size;
+        this.loopOp=loopOp;
+        this.addOp=addOp;
+        this.setLen=setLen;
     }
     __gshared static ClassMetaInfo metaI;
     shared static this(){
@@ -81,8 +75,10 @@ struct LazyArray(T) {
     }
     void unserialize(Unserializer s){
         if (addOp is null) s.serializationError("LazyArray missing addOp",__FILE__,__LINE__);
-        FieldMetaInfo elMetaInfo=FieldMetaInfo("el","",
-            getSerializationInfoForType!(T)());
+	auto typeInfo=getSerializationInfoForType!(T)();
+	typeInfo=null;
+	assert(0,"pippo dmd 2.060 bug to do");
+        FieldMetaInfo elMetaInfo=FieldMetaInfo("el","",typeInfo);
         elMetaInfo.pseudo=true;
         auto ac=s.readArrayStart(null);
         if (setLen !is null) {
@@ -105,14 +101,14 @@ struct LazyArray(T) {
 struct LazyAA(K,V) {
     alias K KeyType;
     alias V ValueType;
-    alias Unqual!(K) K2;
+    alias UnqualAll!(K) K2;
     ulong size; /// output size
-    int delegate(int delegate(ref K,ref V)) loopOp; /// output loop
+    int delegate(scope int delegate(ref K,ref V)) loopOp; /// output loop
     void delegate(K,V) addOp; /// add one element
     void delegate(ulong l) setLen; /// set the length (before addition with a guess, after with real size)
     
     /// if you just want to write out this is all that is needed
-    static LazyAA opCall(int delegate(int delegate(ref K,ref V)) loopOp,ulong size=ulong.max){
+    static LazyAA opCall(int delegate(scope int delegate(ref K,ref V)) loopOp,ulong size=ulong.max){
         LazyAA res;
         res.size=size;
         res.loopOp=loopOp;
@@ -126,7 +122,7 @@ struct LazyAA(K,V) {
         return res;
     }
     /// initialize a complete (input/output) wrapper
-    static LazyAA opCall(int delegate(int delegate(ref K,ref V)) loopOp,void delegate(K,V) addOp,
+    static LazyAA opCall(int delegate(scope int delegate(ref K,ref V)) loopOp,void delegate(K,V) addOp,
         ulong size=ulong.max,void delegate(ulong l) setLen=null){
         LazyAA res;
         res.size=size;

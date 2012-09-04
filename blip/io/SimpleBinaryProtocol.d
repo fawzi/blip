@@ -75,7 +75,7 @@ void sbpSendHeader(BinSink sink, int kind, ulong len){
     }
     sink((cast(byte*)buf.ptr)[4..16]);
     version(TrackSBP){
-        sinkTogether(sout,delegate void(CharSink s){
+        sinkTogether(sout,delegate void(scope CharSink s){
             dumper(s)("sbpSendHeader kind:")(kind)(" len:")(len)("\n");
         });
     }
@@ -202,7 +202,7 @@ void sbpReadHeader(ReadExact rIn, ref uint kind, ref ulong len){
         len=*(cast(ulong*)bufPos);
     }
     version(TrackSBP){
-        sinkTogether(sout,delegate void(CharSink s){
+        sinkTogether(sout,delegate void(scope CharSink s){
             dumper(s)("sbpReadHeader kind:")(kind)(" len:")(len)("\n");
         });
     }
@@ -323,7 +323,7 @@ DynamicArrayType!(T) sbpRead(T)(ReadExact rIn,T arr,bool strict=true){
     static if (is(T U:U[])){
         if (strict){
             if (arr.length*U.sizeof != rcvLen){
-                throw new Exception(collectIAppender(delegate void(CharSink s){
+                throw new Exception(collectIAppender(delegate void(scope CharSink s){
                     dumper(s)("unexpected byte size, ")(arr.length)("*")(U.sizeof)("vs")(rcvLen)("\n");
                 }));
             }

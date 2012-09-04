@@ -24,7 +24,6 @@ import blip.math.Math;
 import blip.util.TangoLog;
 import blip.io.BasicIO;
 import blip.container.GrowableArray;
-import blip.util.TemplateFu:ctfe_i2a;
 import blip.parallel.smp.PriQueue;
 import blip.parallel.smp.SmpModels;
 import blip.parallel.smp.BasicTasks;
@@ -67,7 +66,7 @@ class PriQTaskScheduler:TaskSchedulerI {
         return _nnCache;
     }
     /// logs a message
-    void logMsg(cstring m){
+    void logMsg(in cstring m){
         log.info(m);
     }
     /// returns the root task
@@ -88,7 +87,7 @@ class PriQTaskScheduler:TaskSchedulerI {
         assert(t.status==TaskStatus.NonStarted ||
             t.status==TaskStatus.Started,"initial");
         debug(TrackQueues){
-            sinkTogether(&logMsg,delegate void(CharSink s){
+            sinkTogether(&logMsg,delegate void(scope CharSink s){
                 dumper(s)("task ")(t)(" will be added to queue ")(this);
             });
         }
@@ -206,11 +205,11 @@ class PriQTaskScheduler:TaskSchedulerI {
         return _executer;
     }
     /// description (for debugging)
-    void desc(void delegate(cstring) s){ return desc(s,false); }
+    void desc(scope void delegate(in cstring) s){ return desc(s,false); }
     /// description (for debugging)
     /// (might not be a snapshot if other threads modify it while printing)
     /// non threadsafe
-    void desc(void delegate(cstring) sink,bool shortVersion){
+    void desc(scope void delegate(in cstring) sink,bool shortVersion){
         auto s=dumper(sink);
         s("<PriQTaskScheduler@"); writeOut(sink,cast(void*)this);
         if (shortVersion) {

@@ -54,7 +54,7 @@ class Dottable(T,int rank1,S,int rank2,bool scanAxis=false, bool randomLayout=fa
     }
     /// returns a random array (here with randNArray & co due to bug 2246)
     static Dottable randomGenerate(Rand r,int idx,ref int nEl,ref bool acceptable){
-        const index_type maxSize=1_000_000;
+        immutable index_type maxSize=1_000_000;
         float mean=10.0f;
         index_type[rank1+rank2-1] dims;
         index_type totSize;
@@ -73,7 +73,7 @@ class Dottable(T,int rank1,S,int rank2,bool scanAxis=false, bool randomLayout=fa
             foreach (el;dims)
                 totSize*=el;
             mean*=(cast(float)maxSize)/(cast(float)totSize);
-        } while (totSize>maxSize)
+        } while (totSize>maxSize);
         static if(scanAxis){
             int axis1=-rank1+(idx % (2*rank1));
             int axis2=-rank2+((idx / (2*rank1))%(2*rank2));
@@ -103,7 +103,7 @@ class Dottable(T,int rank1,S,int rank2,bool scanAxis=false, bool randomLayout=fa
         }
         return new Dottable(a,b,axis1,axis2);
     }
-    void desc(void delegate(cstring) sink,string formatEl=",10", index_type elPerLine=10,
+    void desc(scope void delegate(in cstring) sink,string formatEl=",10", index_type elPerLine=10,
         string indent=""){
         auto s=dumper(sink);
         s(indent)("Dottable{\n");
@@ -123,7 +123,7 @@ class Dottable(T,int rank1,S,int rank2,bool scanAxis=false, bool randomLayout=fa
         s(indent)("}\n");
     }
     string toString(){
-        return collectIAppender(delegate void(void delegate(cstring)s){ this.desc(s); });
+        return collectIAppender(delegate void(scope void delegate(in cstring)s){ this.desc(s); });
     }
 }
 
@@ -139,7 +139,7 @@ class SizedRandomNArray(T,int i){
         randNArray(r,res.arr);
         return res;
     }
-    void desc(void delegate(cstring) sink,string formatEl=",10", index_type elPerLine=10,
+    void desc(scope void delegate(in cstring) sink,string formatEl=",10", index_type elPerLine=10,
         string indent=""){
         if (arr is null) {
             sink("*null*");
@@ -148,7 +148,7 @@ class SizedRandomNArray(T,int i){
         arr.printData(sink,formatEl,elPerLine,indent);
     }
     string toString(){
-        return collectIAppender(delegate void(void delegate(cstring)s){ this.desc(s); });
+        return collectIAppender(delegate void(scope void delegate(in cstring)s){ this.desc(s); });
     }
 }
 /// a random 2D NArray type T and dimension i,j (in the arr attribute)
@@ -163,7 +163,7 @@ class SizedRandomNArray(T,int i,int j){
         randNArray(r,res.arr);
         return res;
     }
-    void desc(void delegate(cstring) sink,string formatEl=",10", index_type elPerLine=10,
+    void desc(scope void delegate(in cstring) sink,string formatEl=",10", index_type elPerLine=10,
         string indent=""){
         if (arr is null) {
             sink("*null*");
@@ -172,7 +172,7 @@ class SizedRandomNArray(T,int i,int j){
         arr.printData(sink,formatEl,elPerLine,indent);
     }
     string toString(){
-        return collectIAppender(delegate void(void delegate(cstring)s){ this.desc(s); });
+        return collectIAppender(delegate void(scope void delegate(in cstring)s){ this.desc(s); });
     }
 }
 /// a random 3D NArray type T and dimension i,j,k (in the arr attribute)
@@ -187,7 +187,7 @@ class SizedRandomNArray(T,int i,int j,int k){
         randNArray(r,res.arr);
         return res;
     }
-    void desc(void delegate(cstring) sink,string formatEl=",10", index_type elPerLine=10,
+    void desc(scope void delegate(in cstring) sink,string formatEl=",10", index_type elPerLine=10,
         string indent=""){
         if (arr is null) {
             sink("*null*");
@@ -196,6 +196,6 @@ class SizedRandomNArray(T,int i,int j,int k){
         arr.printData(sink,formatEl,elPerLine,indent);
     }
     string toString(){
-        return collectIAppender(delegate void(void delegate(cstring)s){ this.desc(s); });
+        return collectIAppender(delegate void(scope void delegate(in cstring)s){ this.desc(s); });
     }
 }

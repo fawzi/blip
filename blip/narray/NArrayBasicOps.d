@@ -197,7 +197,7 @@ body {
 
 /// function to create free standing empty,zeros,ones
 string freeFunMixin(string opName){
-    string res="".dup;
+    string res="";
     res~="template "~opName~"(V){\n";
     res~="    template "~opName~"(T){\n";
     res~="        NArray!(V,rkOfShape!(T))"~opName~"(T shape, bool fortran=false){\n";
@@ -251,7 +251,7 @@ NArray!(T,1) arange(T)(T from, T to, T step=cast(T)1){
     }
     NArray!(T,1) res=NArray!(T,1).empty([n]);
     T x=from;
-    const istring loopBody=`
+    istring loopBody=`
     *resPtr0=x;
     x+=step;`;
     mixin(sLoopPtr(1,["res"],loopBody,"i"));
@@ -284,11 +284,11 @@ template a2NAof(V){
             checkShape!(T,rankOfArray!(T))(arr,shape);
         }
         body{
-            const Immutable!(int) rank=rankOfArray!(T);
+            immutable int rank=rankOfArray!(T);
             index_type[rank] shape;
             calcShapeArray!(T,rankOfArray!(T))(arr,shape);
             auto res=NArray!(V,cast(int)rankOfArray!(T)).empty(shape,fortran);
-            const istring loop_body="*resPtr0=cast(V)"~arrayInLoop("arr",rank,"i")~";";
+            istring loop_body="*resPtr0=cast(V)"~arrayInLoop("arr",rank,"i")~";";
             index_type optimalChunkSize_i=NArray!(V,cast(int)rankOfArray!(T)).defaultOptimalChunkSize;
             mixin(pLoopIdx(rank,["res"],loop_body,"i"));
             return res;
@@ -393,7 +393,7 @@ string arrayInLoop(string arrName,int rank,string ivarStr){
     string res="".dup;
     res~=arrName;
     for (int i=0;i<rank;++i)
-        res~="["~ivarStr~"_"~ctfe_i2a(i)~"_]";
+        res~="["~ivarStr~"_"~ctfe_i2s(i)~"_]";
     return res;
 }
 
@@ -417,7 +417,7 @@ S reduceAllGen(alias foldOp,alias mergeOp, alias dupInitial,T,int rank,S=T)(NArr
 
 /// collects data on the whole array using the given folding operation
 /// if not given mergeOp is built from foldOp 
-S reduceAll(T,int rank,S=T)(S delegate(S,T)foldOp,NArray!(T,rank)a,S x0,S delegate(S,S)mergeOp=null){
+S reduceAll(T,int rank,S=T)(scope S delegate(S,T)foldOp,NArray!(T,rank)a,S x0,scope S delegate(S,S)mergeOp=null){
     if (mergeOp is null){
         mergeOp=(S x,S y){ x=foldOp(x,cast(T)y); };
     }
@@ -502,7 +502,7 @@ body  {
 
 /// applies a reduction operation along the given axis
 NArray!(S,rank-1) reduceAxis(int rank, T, S=T)
-    (S delegate(S,T) foldOp,NArray!(T,rank)a, S x0, int axis=-1, NArray!(S,rank-1) res=nullNArray!(S,rank-1),S delegate(S,S)mergeOp=null)
+    (scope S delegate(S,T) foldOp,NArray!(T,rank)a, S x0, int axis=-1, NArray!(S,rank-1) res=nullNArray!(S,rank-1),scope S delegate(S,S)mergeOp=null)
 {
     if (mergeOp is null){
         mergeOp=(S x,S y){ x=foldOp(x,cast(T)y); };
@@ -593,7 +593,7 @@ in {
             myFuse(&c,a.startPtrArray,a.bStrides[0],b.startPtrArray,
                 b.bStrides[0],a.shape[0]);
         } else {
-            const istring innerLoop=`myFuse(c1Ptr0,tmp1Ptr0,a.bStrides[axis1],b.startPtrArray,
+            istring innerLoop=`myFuse(c1Ptr0,tmp1Ptr0,a.bStrides[axis1],b.startPtrArray,
                 b.bStrides[0],b.shape[0]);`;
         }
     } else {
@@ -612,7 +612,7 @@ in {
         scope NArray!(S,rank2-1) tmp2=NArray!(S,rank2-1)(newstrides2,newshape2,b.startPtrArray,
             b.newFlags,b.newBase);
         scope NArray!(U,rank2-1) c2=NArray!(U,rank2-1)(newstrides2c,newshape2,null,c.newFlags);
-        const istring innerLoop=pLoopPtr(rank2-1,["tmp2","c2"],
+        istring innerLoop=pLoopPtr(rank2-1,["tmp2","c2"],
                 "myFuse(cast(U*)(cast(size_t)c2Ptr0+cast(size_t)c1Ptr0),tmp1Ptr0,a.bStrides[axis1],tmp2Ptr0,\n"~
                 "            b.bStrides[axis2],a.shape[axis1]);\n","j");
     }
@@ -694,7 +694,7 @@ body {
     
     index_type ii=0;
     
-    const istring loopInstr=`
+    istring loopInstr=`
     if (*maskPtr0){
         if (resP==resEnd)
         {
@@ -752,7 +752,7 @@ body {
     }
     T* elAtt=a.startPtrArray;
     index_type myStride=a.bStrides[0];
-    const istring loopInstr=`
+    istring loopInstr=`
     if (*maskPtr0){
         *resPtr0=*elAtt;
         elAtt=cast(T*)(cast(size_t)elAtt+myStride);
@@ -764,18 +764,18 @@ body {
 /// returns the reduction of the rank done by the arguments in the tuple
 /// allow also static arrays?
 template reductionFactorFilt(){
-    const Immutable!(int) reductionFactorFilt=0;
+    immutable int reductionFactorFilt=0;
 }
 /// ditto
 template reductionFactorFilt(T,S...){
     static if (is(T==int) || is(T==long)||is(T==uint)||is(T==ulong)){
-        const Immutable!(int) reductionFactorFilt=1+reductionFactorFilt!(S);
+        immutable int reductionFactorFilt=1+reductionFactorFilt!(S);
     } else static if (is(T==Range)){
-        const Immutable!(int) reductionFactorFilt=reductionFactorFilt!(S);
+        immutable int reductionFactorFilt=reductionFactorFilt!(S);
     } else static if (is(T:int[])||is(T:long[])||is(T:uint[])||is(T:ulong[])){
-        const Immutable!(int) reductionFactorFilt=reductionFactorFilt!(S);
+        immutable int reductionFactorFilt=reductionFactorFilt!(S);
     } else static if (is(T:NArray!(long,1))||is(T:NArray!(int,1))||is(T:NArray!(uint,1))||is(T:NArray!(ulong,1))){
-        const Immutable!(int) reductionFactorFilt=reductionFactorFilt!(S);
+        immutable int reductionFactorFilt=reductionFactorFilt!(S);
     } else {
         static assert(0,"ERROR: unexpected type <"~T.stringof~"> in reductionFactorFilt, this will fail");
     }
@@ -784,7 +784,7 @@ template reductionFactorFilt(T,S...){
 // creates an empty array of the requested shape for axis filtering (support function)
 NArray!(T,rank-reductionFactorFilt!(S)) arrayAxisFilter(T,int rank,S...)(NArray!(T,rank) a,S idx_tup)
 {
-    const Immutable!(int) rank2=rank-reductionFactorFilt!(S);
+    immutable int rank2=rank-reductionFactorFilt!(S);
     index_type from,to,step;
     index_type[rank2] newshape;
     int ii=0;
@@ -798,13 +798,13 @@ NArray!(T,rank-reductionFactorFilt!(S)) arrayAxisFilter(T,int rank,S...)(NArray!
             if (to<0) to+=a.shape[i]+1;
             if (from<to && step>=0 || from>to && step<0){
                 assert(0<=from && from<a.shape[i],
-                    "invalid lower range for dimension "~ctfe_i2a(i));
+                    "invalid lower range for dimension "~ctfe_i2s(i));
                 if (step==0)
                     to=a.shape[i]-1;
                 else
                     to=to-(to-from)%step;
                 assert(to>=0 && to<=a.shape[i],
-                    "invalid upper range for dimension "~ctfe_i2a(i));
+                    "invalid upper range for dimension "~ctfe_i2s(i));
             }
             newshape[ii]=(to-from)/inc;
             ++ii;
@@ -831,21 +831,21 @@ string axisFilterLoop(T,int rank,V,S...)(string loopBody)
     string indent;
     indent~="    ";
     static immutable int rank2=rank-reductionFactorFilt!(S);
-    res~=indent~"const int rank2=rank-reductionFactorFilt!(S);";
+    res~=indent~"immutable int rank2=rank-reductionFactorFilt!(S);";
     res~=indent~"index_type from,to,step;\n";
-    res~=indent~"T* aPtr"~ctfe_i2a(rank)~"=a.startPtrArray;\n";
-    res~=indent~"T* bPtr"~ctfe_i2a(rank2)~"=b.startPtrArray;\n";
+    res~=indent~"T* aPtr"~ctfe_i2s(rank)~"=a.startPtrArray;\n";
+    res~=indent~"T* bPtr"~ctfe_i2s(rank2)~"=b.startPtrArray;\n";
     for (int i=0;i<rank;++i){
-        res~=indent~"index_type aStride"~ctfe_i2a(i)~"=a.bStrides["~ctfe_i2a(i)~"];\n";
-        res~=indent~"index_type aShape"~ctfe_i2a(i)~"=a.shape["~ctfe_i2a(i)~"];\n";
+        res~=indent~"index_type aStride"~ctfe_i2s(i)~"=a.bStrides["~ctfe_i2s(i)~"];\n";
+        res~=indent~"index_type aShape"~ctfe_i2s(i)~"=a.shape["~ctfe_i2s(i)~"];\n";
     }
     for (int i=0;i<rank2;++i){
-        res~=indent~"index_type bStride"~ctfe_i2a(i)~"=b.bStrides["~ctfe_i2a(i)~"];\n";
+        res~=indent~"index_type bStride"~ctfe_i2s(i)~"=b.bStrides["~ctfe_i2s(i)~"];\n";
     }
     foreach(i,U;S){
         static if (is(U==int) || is(U==long)||is(U==uint)||is(U==ulong)){
-            res~=indent~"aPtr"~ctfe_i2a(rank)~"=cast(T*)(cast(size_t)aPtr"~ctfe_i2a(rank)
-                ~"+idx_tup["~ctfe_i2a(i)~"]*a.bStrides["~ctfe_i2a(i)~"]);\n";
+            res~=indent~"aPtr"~ctfe_i2s(rank)~"=cast(T*)(cast(size_t)aPtr"~ctfe_i2s(rank)
+                ~"+idx_tup["~ctfe_i2s(i)~"]*a.bStrides["~ctfe_i2s(i)~"]);\n";
         } else static if (is(U==Range)){
             res~=`
             from=idx_tup[i].from;
@@ -855,24 +855,24 @@ string axisFilterLoop(T,int rank,V,S...)(string loopBody)
             if (to<0) to+=a.shape[i]+1;
             if (from<to && step>=0 || from>to && step<0){
                 assert(0<=from && from<a.shape[i],
-                    "invalid lower range for dimension "~ctfe_i2a(i));
+                    "invalid lower range for dimension "~ctfe_i2s(i));
                 if (step==0)
                     to=a.shape[i]-1;
                 else
                     to=to-(to-from)%step;
                 assert(to>=0 && to<=a.shape[i],
-                    "invalid upper range for dimension "~ctfe_i2a(i));
+                    "invalid upper range for dimension "~ctfe_i2s(i));
             }
             `;
-            res~=indent~"aPtr"~ctfe_i2a(rank)~"=cast(T*)(cast(size_t)aPtr"~ctfe_i2a(rank)
-                ~"+from*a.bStrides["~ctfe_i2a(i)~"]);\n";
-            res~=indent~"index_type j"~ctfe_i2a(i)~"_1=(to-from)/inc;\n";
-            res~=indent~"aStride"~ctfe_i2a(i)~"*=inc;\n";
+            res~=indent~"aPtr"~ctfe_i2s(rank)~"=cast(T*)(cast(size_t)aPtr"~ctfe_i2s(rank)
+                ~"+from*a.bStrides["~ctfe_i2s(i)~"]);\n";
+            res~=indent~"index_type j"~ctfe_i2s(i)~"_1=(to-from)/inc;\n";
+            res~=indent~"aStride"~ctfe_i2s(i)~"*=inc;\n";
         } else static if (is(U:int[])||is(U:long[])||is(U:uint[])||is(U:ulong[])){
-            res~=indent~"index_type j"~ctfe_i2a(i)~"_1=idx_tup["~ctfe_i2a(i)~"].length;\n";
+            res~=indent~"index_type j"~ctfe_i2s(i)~"_1=idx_tup["~ctfe_i2s(i)~"].length;\n";
         } else static if (is(U:NArray!(long,1))||is(U:NArray!(int,1))||is(U:NArray!(uint,1))||is(U:NArray!(ulong,1))){
-            res~=indent~"index_type j"~ctfe_i2a(i)~"_1=idx_tup["~ctfe_i2a(i)~"].shape[0];\n";
-            res~=indent~"index_type j"~ctfe_i2a(i)~"_2=idx_tup["~ctfe_i2a(i)~"].bStrides[0];\n";
+            res~=indent~"index_type j"~ctfe_i2s(i)~"_1=idx_tup["~ctfe_i2s(i)~"].shape[0];\n";
+            res~=indent~"index_type j"~ctfe_i2s(i)~"_2=idx_tup["~ctfe_i2s(i)~"].bStrides[0];\n";
         } else {
             static assert(0,"ERROR: unexpected type <"~U.stringof~"> in reductionFactorFilt, this will fail");
         }
@@ -882,18 +882,18 @@ string axisFilterLoop(T,int rank,V,S...)(string loopBody)
         string indent2=indent~"    ";
         static if (is(U==int) || is(U==long)||is(U==uint)||is(U==ulong)){
             res~=indent~"{\n";
-            res~=indent2~"T* aPtr"~ctfe_i2a(rank-i-1)~"=aPtr"~ctfe_i2a(rank-i)~";\n";
+            res~=indent2~"T* aPtr"~ctfe_i2s(rank-i-1)~"=aPtr"~ctfe_i2s(rank-i)~";\n";
         } else static if (is(U==Range)){
-            res~=indent~"T* aPtr"~ctfe_i2a(rank-i-1)~"=aPtr"~ctfe_i2a(rank-i)~";\n";
-            res~=indent~"T* bPtr"~ctfe_i2a(rank2-ii-1)~"=bPtr"~ctfe_i2a(rank2-ii)~";\n";
-            res~=indent~"for(index_type i"~ctfe_i2a(i)~"=j"~ctfe_i2a(i)~"_1;i"~ctfe_i2a(i)~"!=0;--i"~ctfe_i2a(i)~"){\n";
+            res~=indent~"T* aPtr"~ctfe_i2s(rank-i-1)~"=aPtr"~ctfe_i2s(rank-i)~";\n";
+            res~=indent~"T* bPtr"~ctfe_i2s(rank2-ii-1)~"=bPtr"~ctfe_i2s(rank2-ii)~";\n";
+            res~=indent~"for(index_type i"~ctfe_i2s(i)~"=j"~ctfe_i2s(i)~"_1;i"~ctfe_i2s(i)~"!=0;--i"~ctfe_i2s(i)~"){\n";
             ++ii;
         } else static if (is(U:int[])||is(U:long[])||is(U:uint[])||is(U:ulong[])){
-            res~=indent~BaseTypeOfArrays!(U).stringof~"* idx"~ctfe_i2a(i)~"=idx_tup["~ctfe_i2a(i)~"].ptr;\n";
-            res~=indent~"T* bPtr"~ctfe_i2a(rank2-ii-1)~"=bPtr"~ctfe_i2a(rank2-ii)~";\n";
-            res~=indent~"for(index_type i"~ctfe_i2a(i)~"=0;i"~ctfe_i2a(i)~"!=j"~ctfe_i2a(i)~"_1;++i"~ctfe_i2a(i)~"){\n";
-            res~=indent2~"T* aPtr"~ctfe_i2a(rank-i-1)~"=cast(T*)(cast(size_t)aPtr"~ctfe_i2a(rank-i)~
-                "+cast(index_type)(*idx"~ctfe_i2a(i)~")*aStride"~ctfe_i2a(i)~");\n";
+            res~=indent~BaseTypeOfArrays!(U).stringof~"* idx"~ctfe_i2s(i)~"=idx_tup["~ctfe_i2s(i)~"].ptr;\n";
+            res~=indent~"T* bPtr"~ctfe_i2s(rank2-ii-1)~"=bPtr"~ctfe_i2s(rank2-ii)~";\n";
+            res~=indent~"for(index_type i"~ctfe_i2s(i)~"=0;i"~ctfe_i2s(i)~"!=j"~ctfe_i2s(i)~"_1;++i"~ctfe_i2s(i)~"){\n";
+            res~=indent2~"T* aPtr"~ctfe_i2s(rank-i-1)~"=cast(T*)(cast(size_t)aPtr"~ctfe_i2s(rank-i)~
+                "+cast(index_type)(*idx"~ctfe_i2s(i)~")*aStride"~ctfe_i2s(i)~");\n";
             ++ii;
         } else static if (is(U:NArray!(long,1))||is(U:NArray!(int,1))||is(U:NArray!(uint,1))||is(U:NArray!(ulong,1))){
             res~=indent;
@@ -901,12 +901,12 @@ string axisFilterLoop(T,int rank,V,S...)(string loopBody)
             static if (is(U:NArray!(  int,1))) res~="int";
             static if (is(U:NArray!(ulong,1))) res~="ulong";
             static if (is(U:NArray!( uint,1))) res~="uint";
-            res~="* idx"~ctfe_i2a(i)~
-                "=idx_tup["~ctfe_i2a(i)~"].startPtrArray;\n";
-            res~=indent~"T* bPtr"~ctfe_i2a(rank2-ii-1)~"=bPtr"~ctfe_i2a(rank2-ii)~";\n";
-            res~=indent~"for(index_type i"~ctfe_i2a(i)~"=0;i"~ctfe_i2a(i)~"!=j"~ctfe_i2a(i)~"_1;++i"~ctfe_i2a(i)~"){\n";
-            res~=indent2~"T* aPtr"~ctfe_i2a(rank-i-1)~"=cast(T*)(cast(size_t)aPtr"~ctfe_i2a(rank-i)~
-                "+cast(index_type)(*idx"~ctfe_i2a(i)~")*aStride"~ctfe_i2a(i)~");\n";
+            res~="* idx"~ctfe_i2s(i)~
+                "=idx_tup["~ctfe_i2s(i)~"].startPtrArray;\n";
+            res~=indent~"T* bPtr"~ctfe_i2s(rank2-ii-1)~"=bPtr"~ctfe_i2s(rank2-ii)~";\n";
+            res~=indent~"for(index_type i"~ctfe_i2s(i)~"=0;i"~ctfe_i2s(i)~"!=j"~ctfe_i2s(i)~"_1;++i"~ctfe_i2s(i)~"){\n";
+            res~=indent2~"T* aPtr"~ctfe_i2s(rank-i-1)~"=cast(T*)(cast(size_t)aPtr"~ctfe_i2s(rank-i)~
+                "+cast(index_type)(*idx"~ctfe_i2s(i)~")*aStride"~ctfe_i2s(i)~");\n";
             ++ii;
         } else {
             static assert(0,"ERROR: unexpected type <"~U.stringof~"> in axisFilterLoop, this will fail");
@@ -915,19 +915,19 @@ string axisFilterLoop(T,int rank,V,S...)(string loopBody)
     }
     for (int i=rank2-ii;i>0;--i){
         string indent2=indent~"    ";
-        res~=indent~"T* aPtr"~ctfe_i2a(i-1)~"=aPtr"~ctfe_i2a(i)~";\n";
-        res~=indent~"T* bPtr"~ctfe_i2a(i-1)~"=bPtr"~ctfe_i2a(i)~";\n";
-        res~=indent~"for (index_type iIn"~ctfe_i2a(i-1)~"=aShape"~ctfe_i2a(rank-i)~";iIn"~ctfe_i2a(i-1)~"!=0;--iIn"~ctfe_i2a(i-1)~"){\n";
+        res~=indent~"T* aPtr"~ctfe_i2s(i-1)~"=aPtr"~ctfe_i2s(i)~";\n";
+        res~=indent~"T* bPtr"~ctfe_i2s(i-1)~"=bPtr"~ctfe_i2s(i)~";\n";
+        res~=indent~"for (index_type iIn"~ctfe_i2s(i-1)~"=aShape"~ctfe_i2s(rank-i)~";iIn"~ctfe_i2s(i-1)~"!=0;--iIn"~ctfe_i2s(i-1)~"){\n";
         indent=indent2;
     }
     res~=indent~loopBody~"\n";
     for (int i=0;i<rank2-ii;++i){
         assert(indent.length>=4);
         string indent2=indent[0..(indent.length-4)];
-        res~=indent~"aPtr"~ctfe_i2a(i)~"=cast(T*)(cast(size_t)aPtr"~ctfe_i2a(i)
-            ~"+aStride"~ctfe_i2a(rank-1-i)~");\n";
-        res~=indent~"bPtr"~ctfe_i2a(i)~"=cast(T*)(cast(size_t)bPtr"~ctfe_i2a(i)
-            ~"+bStride"~ctfe_i2a(rank-1-i)~");\n";
+        res~=indent~"aPtr"~ctfe_i2s(i)~"=cast(T*)(cast(size_t)aPtr"~ctfe_i2s(i)
+            ~"+aStride"~ctfe_i2s(rank-1-i)~");\n";
+        res~=indent~"bPtr"~ctfe_i2s(i)~"=cast(T*)(cast(size_t)bPtr"~ctfe_i2s(i)
+            ~"+bStride"~ctfe_i2s(rank-1-i)~");\n";
         res~=indent2~"}\n";
         indent=indent2;
     }
@@ -938,23 +938,23 @@ string axisFilterLoop(T,int rank,V,S...)(string loopBody)
             res~=indent2~"}\n";
         } else static if (is(U==Range)){
             --ii;
-            res~=indent~"aPtr"~ctfe_i2a(rank-i-1)~"=cast(T*)(cast(size_t)aPtr"~ctfe_i2a(rank-i-1)
-                ~"+aStride"~ctfe_i2a(i)~");\n";
-            res~=indent~"bPtr"~ctfe_i2a(rank2-ii-1)~"=cast(T*)(cast(size_t)bPtr"~ctfe_i2a(rank2-ii-1)
-                ~"+bStride"~ctfe_i2a(ii)~");\n";
+            res~=indent~"aPtr"~ctfe_i2s(rank-i-1)~"=cast(T*)(cast(size_t)aPtr"~ctfe_i2s(rank-i-1)
+                ~"+aStride"~ctfe_i2s(i)~");\n";
+            res~=indent~"bPtr"~ctfe_i2s(rank2-ii-1)~"=cast(T*)(cast(size_t)bPtr"~ctfe_i2s(rank2-ii-1)
+                ~"+bStride"~ctfe_i2s(ii)~");\n";
             res~=indent2~"}\n";
         } else static if (is(U:int[])||is(U:long[])||is(U:uint[])||is(U:ulong[])){
             --ii;
-            res~=indent~"++idx"~ctfe_i2a(i)~";\n";
-            res~=indent~"bPtr"~ctfe_i2a(rank2-ii-1)~"=cast(T*)(cast(size_t)bPtr"~ctfe_i2a(rank2-ii-1)
-                ~"+bStride"~ctfe_i2a(ii)~");\n";
+            res~=indent~"++idx"~ctfe_i2s(i)~";\n";
+            res~=indent~"bPtr"~ctfe_i2s(rank2-ii-1)~"=cast(T*)(cast(size_t)bPtr"~ctfe_i2s(rank2-ii-1)
+                ~"+bStride"~ctfe_i2s(ii)~");\n";
             res~=indent2~"}\n";
         } else static if (is(U:NArray!(long,1))||is(U:NArray!(int,1))||is(U:NArray!(uint,1))||is(U:NArray!(ulong,1))){
             --ii;
-            res~=indent~"idx"~ctfe_i2a(i)~"=cast(typeof(idx"~ctfe_i2a(i)~"))"
-                ~"(cast(size_t)idx"~ctfe_i2a(i)~"+j"~ctfe_i2a(i)~"_2);\n";
-            res~=indent~"bPtr"~ctfe_i2a(rank2-ii-1)~"=cast(T*)"
-                ~"(cast(size_t)bPtr"~ctfe_i2a(rank2-ii-1)~"+bStride"~ctfe_i2a(ii)~");\n";
+            res~=indent~"idx"~ctfe_i2s(i)~"=cast(typeof(idx"~ctfe_i2s(i)~"))"
+                ~"(cast(size_t)idx"~ctfe_i2s(i)~"+j"~ctfe_i2s(i)~"_2);\n";
+            res~=indent~"bPtr"~ctfe_i2s(rank2-ii-1)~"=cast(T*)"
+                ~"(cast(size_t)bPtr"~ctfe_i2s(rank2-ii-1)~"+bStride"~ctfe_i2s(ii)~");\n";
             res~=indent2~"}\n";
         } else {
             static assert(0,"ERROR: unexpected type <"~U.stringof~"> in axisFilterLoop, this will fail");
@@ -986,7 +986,7 @@ NArray!(T,rank) axisUnfilter1(T,int rank,V,int rank2,S...)
     (NArray!(T,rank) a,NArray!(V,rank2) b,S idx_tup)
 {
     static assert(rank2==rank-reductionFactorFilt!(S),"b has incorrect rank, expected "~
-        ctfe_i2a(rank-reductionFactorFilt!(S))~" got "~ctfe_i2a(rank2));
+        ctfe_i2s(rank-reductionFactorFilt!(S))~" got "~ctfe_i2s(rank2));
     static assert(nArgs!(S)<=rank,"too many indexing arguments");
     mixin(axisFilterLoop!(T,rank,V,S)("*aPtr0=*bPtr0;"));
     return a;

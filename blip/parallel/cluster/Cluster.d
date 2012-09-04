@@ -263,7 +263,7 @@ class Cluster{
         auto w=new Worker;
         string fullId;
         synchronized(workersList){
-            fullId=collectIAppender(delegate void(CharSink s){
+            fullId=collectIAppender(delegate void(scope CharSink s){
                 writeOut(s,workersList.lastEntryId+1,":d6");
                 s("_");
                 s(partialSId);

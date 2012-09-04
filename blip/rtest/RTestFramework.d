@@ -16,8 +16,8 @@
 // limitations under the License.
 module blip.rtest.RTestFramework;
 import blip.math.random.Random: Random;
-public import blip.util.TemplateFu: nArgs,ctfe_i2a,ctfe_hasToken, ctfe_replaceToken;
-public import blip.core.Traits:isStaticArrayType, ctfe_i2a;
+public import blip.util.TemplateFu: nArgs,ctfe_hasToken, ctfe_replaceToken;
+public import blip.core.Traits:isStaticArrayType, ctfe_i2s;
 import blip.io.BasicIO;
 public import blip.io.Console;
 public import blip.core.Variant:Variant;
@@ -40,9 +40,9 @@ alias Random Rand;
 string replaceArgI(S...)(string manualInit){
     string manualInit2=manualInit;
     foreach (i,T;S){
-        string argName="arg"~ctfe_i2a(i);
+        string argName="arg"~ctfe_i2s(i);
         if (ctfe_hasToken(argName,manualInit)){
-            string argRepl="arg["~ctfe_i2a(i)~"]";
+            string argRepl="arg["~ctfe_i2s(i)~"]";
             manualInit2=ctfe_replaceToken(argName,argRepl,manualInit2);
         }
     }
@@ -57,33 +57,33 @@ string completeInitStr(S...)(string checks,string manualInit,string indent="    
     string indent1=indent~"    ";
     res~=indent1~"Rand r=test.r;\n";
     foreach (i,T;S){
-        res~=indent1~"int arg"~ctfe_i2a(i)~"_nEl=-1;\n";
-        res~=indent1~"int arg"~ctfe_i2a(i)~"_i=test.counter["~ctfe_i2a(i)~"];\n";
+        res~=indent1~"int arg"~ctfe_i2s(i)~"_nEl=-1;\n";
+        res~=indent1~"int arg"~ctfe_i2s(i)~"_i=test.counter["~ctfe_i2s(i)~"];\n";
     }
     res~=indent1~"bool acceptable=true,acceptableAll=true;\n";
     res~=indent1;
     res~=replaceArgI!(S)(manualInit);
     res~="\n";
     foreach (i,T;S){
-        string argName="arg"~ctfe_i2a(i);
+        string argName="arg"~ctfe_i2s(i);
         if (!ctfe_hasToken(argName,manualInit)){
-            res~=indent1~"static if(isStaticArrayType!(S["~ctfe_i2a(i)~"])){\n";
-            res~=indent1~"static if(is(typeof(genRandom!(S["~ctfe_i2a(i)~"])(new Rand(),arg0_i,arg0_nEl,acceptable)))){\n";
-            res~=indent1~"    genRandom!(S["~ctfe_i2a(i)~"])(r,arg"~
-                ctfe_i2a(i)~"_i,arg"~ctfe_i2a(i)~"_nEl,acceptable);\n";
-            res~=indent1~"} else static if (is(typeof(generateRandom!(S["~ctfe_i2a(i)~"])(new Rand(),arg0_i,arg0_nEl,acceptable)))) {\n";
-            res~=indent1~"    generateRandom!(S["~ctfe_i2a(i)~"])(r,arg"~
-                ctfe_i2a(i)~"_i,arg"~ctfe_i2a(i)~"_nEl,acceptable);\n";
+            res~=indent1~"static if(isStaticArrayType!(S["~ctfe_i2s(i)~"])){\n";
+            res~=indent1~"static if(is(typeof(genRandom!(S["~ctfe_i2s(i)~"])(new Rand(),arg0_i,arg0_nEl,acceptable)))){\n";
+            res~=indent1~"    genRandom!(S["~ctfe_i2s(i)~"])(r,arg"~
+                ctfe_i2s(i)~"_i,arg"~ctfe_i2s(i)~"_nEl,acceptable);\n";
+            res~=indent1~"} else static if (is(typeof(generateRandom!(S["~ctfe_i2s(i)~"])(new Rand(),arg0_i,arg0_nEl,acceptable)))) {\n";
+            res~=indent1~"    generateRandom!(S["~ctfe_i2s(i)~"])(r,arg"~
+                ctfe_i2s(i)~"_i,arg"~ctfe_i2s(i)~"_nEl,acceptable);\n";
             res~=indent1~"} else {\n";
             res~=indent1~"    static assert(0,\""~T.stringof~" cannot be automatically generated, missing one of the randomGenerate static methods or a T generateRandom(T:"~T.stringof~")(Rand r,int idx,ref int nEl, ref bool acceptable) specialization (note that specialization defined in external modules might not be picked up), see blip.rtest.BasicGenerators.\");\n";
             res~=indent1~"}\n";
             res~=indent1~"}else{\n";
-            res~=indent1~"static if(is(typeof(genRandom!(S["~ctfe_i2a(i)~"])(new Rand(),arg0_i,arg0_nEl,acceptable)))){\n";
-            res~=indent1~"    arg["~ctfe_i2a(i)~"]"~"=genRandom!(S["~ctfe_i2a(i)~"])(r,arg"~
-                ctfe_i2a(i)~"_i,arg"~ctfe_i2a(i)~"_nEl,acceptable);\n";
-            res~=indent1~"} else static if (is(typeof(generateRandom!(S["~ctfe_i2a(i)~"])(new Rand(),arg0_i,arg0_nEl,acceptable)))) {\n";
-            res~=indent1~"    arg["~ctfe_i2a(i)~"]"~"=generateRandom!(S["~ctfe_i2a(i)~"])(r,arg"~
-                ctfe_i2a(i)~"_i,arg"~ctfe_i2a(i)~"_nEl,acceptable);\n";
+            res~=indent1~"static if(is(typeof(genRandom!(S["~ctfe_i2s(i)~"])(new Rand(),arg0_i,arg0_nEl,acceptable)))){\n";
+            res~=indent1~"    arg["~ctfe_i2s(i)~"]"~"=genRandom!(S["~ctfe_i2s(i)~"])(r,arg"~
+                ctfe_i2s(i)~"_i,arg"~ctfe_i2s(i)~"_nEl,acceptable);\n";
+            res~=indent1~"} else static if (is(typeof(generateRandom!(S["~ctfe_i2s(i)~"])(new Rand(),arg0_i,arg0_nEl,acceptable)))) {\n";
+            res~=indent1~"    arg["~ctfe_i2s(i)~"]"~"=generateRandom!(S["~ctfe_i2s(i)~"])(r,arg"~
+                ctfe_i2s(i)~"_i,arg"~ctfe_i2s(i)~"_nEl,acceptable);\n";
             res~=indent1~"} else {\n";
             res~=indent1~"    static assert(0,\""~T.stringof~" cannot be automatically generated, missing one of the randomGenerate static methods or a T generateRandom(T:"~T.stringof~")(Rand r,int idx,ref int nEl, ref bool acceptable) specialization (note that specialization defined in external modules might not be picked up), see blip.rtest.BasicGenerators.\");\n";
             res~=indent1~"}\n";
@@ -94,12 +94,12 @@ string completeInitStr(S...)(string checks,string manualInit,string indent="    
     // updateCounter
     res~=indent1~"int increase=1;\n";
     foreach (i,T;S){
-        string argNEl="arg"~ctfe_i2a(i)~"_nEl";
+        string argNEl="arg"~ctfe_i2s(i)~"_nEl";
         res~=indent1~"if ("~argNEl~"<0) test.hasRandom=true;\n";
         res~=indent1~"if (increase) {\n";
-        res~=indent1~"    test.newCounter["~ctfe_i2a(i)~"]=test.counter["~ctfe_i2a(i)~"]+1;\n";
-        res~=indent1~"    if (test.newCounter["~ctfe_i2a(i)~"]>=("~argNEl~">0?"~argNEl~":-"~argNEl~")){\n";
-        res~=indent1~"        test.newCounter["~ctfe_i2a(i)~"]=0;\n";
+        res~=indent1~"    test.newCounter["~ctfe_i2s(i)~"]=test.counter["~ctfe_i2s(i)~"]+1;\n";
+        res~=indent1~"    if (test.newCounter["~ctfe_i2s(i)~"]>=("~argNEl~">0?"~argNEl~":-"~argNEl~")){\n";
+        res~=indent1~"        test.newCounter["~ctfe_i2s(i)~"]=0;\n";
         res~=indent1~"        if ("~argNEl~"==0){\n"; // skip all, change behaviour, make it equivalent to -1?
         res~=indent1~"            test.didCombinations=true;\n";
         res~=indent1~"            test.hasRandom=false;\n";
@@ -109,7 +109,7 @@ string completeInitStr(S...)(string checks,string manualInit,string indent="    
         res~=indent1~"        increase=0;\n";
         res~=indent1~"    }\n";
         res~=indent1~"} else {\n";
-        res~=indent1~"    test.newCounter["~ctfe_i2a(i)~"]=test.counter["~ctfe_i2a(i)~"];\n";
+        res~=indent1~"    test.newCounter["~ctfe_i2s(i)~"]=test.counter["~ctfe_i2s(i)~"];\n";
         res~=indent1~"}\n";
     }
     res~=indent1~"test.didCombinations=increase;\n";
@@ -140,14 +140,14 @@ string printArgs(int nargs,string printC="sout.call",string indent="    "){
     string res="";
     res~=indent~"try{\n";
     for (int i=0;i<nargs;++i){
-        res~=indent~"    static if(is(typeof(writeOut("~printC~",arg["~ctfe_i2a(i)~"])))){\n";
-        res~=indent~"        "~printC~"(\"arg"~ctfe_i2a(i)~": \"); writeOut("~printC~",arg["~ctfe_i2a(i)~"]); "~printC~"(\"\\n\");\n";
+        res~=indent~"    static if(is(typeof(writeOut("~printC~",arg["~ctfe_i2s(i)~"])))){\n";
+        res~=indent~"        "~printC~"(\"arg"~ctfe_i2s(i)~": \"); writeOut("~printC~",arg["~ctfe_i2s(i)~"]); "~printC~"(\"\\n\");\n";
         res~=indent~"    } else {\n";
-        res~=indent~"        "~printC~"(\"non printable argument of type \"~(typeof(arg["~ctfe_i2a(i)~"]).stringof)~\" as writeOut cannot handle it.\\n\");\n";
+        res~=indent~"        "~printC~"(\"non printable argument of type \"~(typeof(arg["~ctfe_i2s(i)~"]).stringof)~\" as writeOut cannot handle it.\\n\");\n";
         res~=indent~"    }\n";
     }
     res~=indent~"}catch (Exception e) {\n";
-    res~=indent~"    sout.call(collectIAppender(delegate void(void delegate(cstring)s){ s(\"\\nError: could not print arguments due to exception \"); writeOut(s,e); s(\"\\n\");}));\n";
+    res~=indent~"    sout.call(collectIAppender(delegate void(scope void delegate(in cstring)s){ s(\"\\nError: could not print arguments due to exception \"); writeOut(s,e); s(\"\\n\");}));\n";
     res~=indent~"}\n";
     return res;
 }
@@ -257,7 +257,7 @@ class TextController: TestControllerI{
         if (shouldPrint) {
             synchronized(_writeLock){
                 if (printLevel!=PrintLevel.AllVerbose || test.stat.failedTests>0){
-                    progressLog(collectIAppender(delegate void(CharSink s){
+                    progressLog(collectIAppender(delegate void(scope CharSink s){
                         s("test`");
                         s(test.testName);
                         s("`");
@@ -287,7 +287,7 @@ class TextController: TestControllerI{
     bool willRunTest(SingleRTest test) {
         if (printLevel==PrintLevel.AllVerbose) {
             synchronized(_writeLock) {
-                progressLog(collectIAppender(delegate void(CharSink s){
+                progressLog(collectIAppender(delegate void(scope CharSink s){
                     s("test`"); s(test.testName); s("`"); s(" STARTED\n"); }));
             }
         }
@@ -297,7 +297,7 @@ class TextController: TestControllerI{
     bool testSkipped(SingleRTest test) {
         if (printLevel==PrintLevel.AllVerbose) {
             synchronized(_writeLock) {
-                progressLog(collectIAppender(delegate void(CharSink s){
+                progressLog(collectIAppender(delegate void(scope CharSink s){
                     s("test`"); s(test.testName); s("`"); s(" SKIPPED\n"); }));
             }
         }
@@ -307,7 +307,7 @@ class TextController: TestControllerI{
     bool testPassed(SingleRTest test) {
         if (printLevel==PrintLevel.AllVerbose) {
             synchronized(_writeLock) {
-                progressLog(collectIAppender(delegate void(CharSink s){
+                progressLog(collectIAppender(delegate void(scope CharSink s){
                     s("test`"); s(test.testName); s("`"); s(" SUCCESS\n"); }));
             }
         }
@@ -486,7 +486,7 @@ class SingleRTest{
     /// (valid only after at least one test attempt)
     bool hasRandom;
     int didCombinations; /// 0: in combinatorial sequence, 1: completed combinatorial sequence
-    CharSink failureLog; /// place to log failure description (if available)
+    scope CharSink failureLog; /// place to log failure description (if available)
     float budgetLeft; /// budget left
     
     /// structure keeping statistic info
@@ -748,7 +748,7 @@ class TestCollection: SingleRTest, TestControllerI {
     /// test has failed one test, should return werether the testing should continue
     bool testFailed(SingleRTest test){
         synchronized(testController.writeLock()){
-            test.failureLog(collectIAppender(delegate void(CharSink s){
+            test.failureLog(collectIAppender(delegate void(scope CharSink s){
                 dumper(s)("test failed in collection`")(testName)("` created at `");
                 dumper(s)(sourceFile)(":")(sourceLine)("`\n");
             }));
@@ -764,7 +764,7 @@ class TestCollection: SingleRTest, TestControllerI {
 /// template that checks that the initialization arguments of testInit (checkInit and manualInit)
 /// are compatible with the arguments of the test, and if not gives a nice error message
 template checkTestInitArgs(S...){
-    const validArgs=is(typeof(function(){S arg;mixin(completeInitStr!(S)(checkInit,manualInit));}));
+    immutable validArgs=is(typeof(function(){S arg;mixin(completeInitStr!(S)(checkInit,manualInit));}));
     static if(!validArgs){
         pragma(msg,"invalid arguments to template testInit for the current context.");
         pragma(msg,"context (arguments to generate randomly for the test):"~S.stringof);
@@ -823,10 +823,10 @@ template testInit(string checkInit="", string manualInit=""){
                 return TestResult.Skip;
             } catch (Exception e){
                 synchronized(test.testController.writeLock()){
-                    test.failureLog(collectIAppender(delegate void(void delegate(cstring) s){
+                    test.failureLog(collectIAppender(delegate void(scope void delegate(in cstring) s){
                             dumper(s)("test`")(test.testName)("` failed with exception\n"); }));
                     //test.failureLog.flush();
-                    e.writeOut(test.failureLog);
+                    writeOut(test.failureLog,e);
                     //test.failureLog.flush();
                     mixin(printArgs(nArgs!(S),"test.failureLog"));
                 }

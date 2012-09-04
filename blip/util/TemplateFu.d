@@ -21,11 +21,11 @@ import blip.Comp;
 
 /// returns the number of arguments in the tuple (its length)
 template nArgs(){
-    const int nArgs=0;
+    immutable int nArgs=0;
 }
 /// returns the number of arguments in the tuple (its length)
 template nArgs(T,S...){
-    const int nArgs=1+nArgs!(S);
+    immutable int nArgs=1+nArgs!(S);
 }
 
 /// identity function

@@ -248,7 +248,7 @@ version(mpi)
             return MpiUnserializer(SerializedMessage(status.MPI_TAG,buf));
         }
         template sendT(T){
-            void send(Const!(T) valOut,int tag=0){
+            void send(in T valOut,int tag=0){
                 static if(is(T U:U[])){
                     int count=valOut.length;
                     void * buf=valOut.ptr;
@@ -299,7 +299,7 @@ version(mpi)
         alias r2.recv recv;
         alias r3.recv recv;
         
-        void sendStr(cstring s, int tag=0){
+        void sendStr(in cstring s, int tag=0){
             sendT!(cstring ).send(s,tag);
         }
         int recvStr(ref char[] s,int tag=0){
@@ -317,7 +317,7 @@ version(mpi)
         void close(){ }
     
         template sendrecvT(T){
-            int sendrecv(Const!(T) sendV,ref T recvV,Channel recvChannel,int sendTag=0,int recvTag=0){
+            int sendrecv(in T sendV,ref T recvV,Channel recvChannel,int sendTag=0,int recvTag=0){
                 if (recvChannel is this){
                     static if(is(T U:U[])){
                         recvV[]=sendV;
@@ -339,7 +339,7 @@ version(mpi)
         alias sr2.sendrecv sendrecv;
         alias sr3.sendrecv sendrecv;
         
-        void desc(void delegate(cstring) sink){
+        void desc(scope void delegate(in cstring) sink){
             auto s=dumper(sink);
             s("{<MpiChannel@")(cast(void*)this)(">\n");
             s("  otherRank:")(this.otherRank)(",\n");
@@ -441,7 +441,7 @@ version(mpi)
                         handler(comm[status.MPI_SOURCE],status.MPI_TAG);
                     }
                 } catch (Exception e){
-                    serr(collectIAppender(delegate void(CharSink s){
+                    serr(collectIAppender(delegate void(scope CharSink s){
                         dumper(s)("Error in mpi handler for comm ")(comm.name)(" tag:")(tag)("\n");
                         e.writeOut(serr.call);
                     }));
@@ -789,7 +789,7 @@ version(mpi)
         void registerHandler(ChannelHandler handler,int tag){
             auto serv=new HandlerServer(this,handler,tag);
             if ((tag in handlers)is null){
-                throw new MpiException(collectIAppender(delegate void(CharSink s){
+                throw new MpiException(collectIAppender(delegate void(scope CharSink s){
                     s("handler already present for tag "); writeOut(s,tag); }),
                     __FILE__,__LINE__);
             }
@@ -799,10 +799,10 @@ version(mpi)
             t.start();
         }
     
-        void desc(void delegate(cstring) sink){
+        void desc(scope void delegate(in cstring) sink){
             desc(sink,true);
         }
-        void desc(void delegate(cstring) sink,bool shortDesc){
+        void desc(scope void delegate(in cstring) sink,bool shortDesc){
             auto s=dumper(sink);
             s("{<MpiLinearComm@")(cast(void*)this)(">\n");
             s("  name:")(this.name)(",\n");

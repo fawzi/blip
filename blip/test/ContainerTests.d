@@ -123,7 +123,7 @@ void testDeque(uint startPos,int[] arr1,int[] arr2){
         while (ii<arr1.length){
             if ((cast(uint)arr1[ii])%2==0) {
                 auto el=d.popBack();
-                if (el!=arr1[ii]) throw new Exception(collectIAppender(delegate void(CharSink s){
+                if (el!=arr1[ii]) throw new Exception(collectIAppender(delegate void(scope CharSink s){
                     dumper(s)(el)(" vs ")(arr1[ii])("\n");
                 }),__FILE__,__LINE__);
             }
@@ -184,10 +184,10 @@ void testPool(){
     for (int i=0;i<iPool.maxEl+1;++i){
         iPool.giveBack(base+i);
     }
-    for (int i=iPool.maxEl;i!=0;--i){
+    for (int i=cast(int)iPool.maxEl;i!=0;--i){
         auto el=iPool.getObj();
         if (el!=base+(i-1)){
-            throw new Exception(collectIAppender(delegate void(CharSink s){
+            throw new Exception(collectIAppender(delegate void(scope CharSink s){
                 dumper(s)("unexpected value in pool 1:")(el-base)(" vs ")(i);
             }),__FILE__,__LINE__);
         }
@@ -195,30 +195,30 @@ void testPool(){
     {
         auto el=iPool.getObj();
         if (el!=base-2){
-            throw new Exception(collectIAppender(delegate void(CharSink s){
+            throw new Exception(collectIAppender(delegate void(scope CharSink s){
                 dumper(s)("unexpected value in pool 2:")(el-base)(" vs ")(-2);
             }),__FILE__,__LINE__);
         }
     }
-    for (int i=0;i<iPool.maxEl+1;++i){
+    for (int i=0;i<cast(int)iPool.maxEl+1;++i){
         iPool.giveBack(base+i);
     }
-    for (int i=iPool.maxEl;i!=iPool.maxEl/2;--i){
+    for (int i=cast(int)iPool.maxEl;i!=iPool.maxEl/2;--i){
         auto el=iPool.getObj();
         if (el!=base+i-1){
             throw new Exception("unexpected value in pool 3",__FILE__,__LINE__);
         }
     }
-    for (int i=0;i<iPool.maxEl+1;++i){
+    for (int i=0;i<cast(int)iPool.maxEl+1;++i){
         iPool.giveBack(base+i);
     }
-    for (int i=(iPool.maxEl+1)/2;i!=0;--i){
+    for (int i=(cast(int)iPool.maxEl+1)/2;i!=0;--i){
         auto el=iPool.getObj();
         if (el!=base+i-1){
             throw new Exception("unexpected value in pool 4",__FILE__,__LINE__);
         }
     }
-    for (int i=iPool.maxEl/2;i!=0;--i){
+    for (int i=cast(int)iPool.maxEl/2;i!=0;--i){
         auto el=iPool.getObj();
         if (el!=base+i-1){
             throw new Exception("unexpected value in pool 5",__FILE__,__LINE__);
@@ -227,7 +227,7 @@ void testPool(){
     {
         auto el=iPool.getObj();
         if (el!=base-2){
-            throw new Exception(collectIAppender(delegate void(CharSink s){
+            throw new Exception(collectIAppender(delegate void(scope CharSink s){
                 dumper(s)("unexpected value in pool 6:")(el-base)(" vs ")(-2);
             }),__FILE__,__LINE__);
         }
@@ -253,7 +253,7 @@ void testPoolNext(){
     for (int i=maxEl;i!=0;--i){
         auto el=iPool.getObj();
         if (el.i!=i-1){
-            throw new Exception(collectIAppender(delegate void(CharSink s){
+            throw new Exception(collectIAppender(delegate void(scope CharSink s){
                 dumper(s)("unexpected value in pool 1:")(el.i)(" vs ")(i);
             }),__FILE__,__LINE__);
         } else if (i==1|| i==2){
@@ -261,7 +261,7 @@ void testPoolNext(){
             iPool.giveBack(el2);
             auto el3=iPool.getObj();
             if (el3!is el){
-                throw new Exception(collectIAppender(delegate void(CharSink s){
+                throw new Exception(collectIAppender(delegate void(scope CharSink s){
                     dumper(s)("unexpected value when adding and getting back:")(el2.i)(" vs ")(el3.i);
                 }),__FILE__,__LINE__);
             }
@@ -271,7 +271,7 @@ void testPoolNext(){
     {
         auto el=iPool.getObj();
         if (el.i!=-2){
-            throw new Exception(collectIAppender(delegate void(CharSink s){
+            throw new Exception(collectIAppender(delegate void(scope CharSink s){
                 dumper(s)("unexpected value in pool 2:")(el.i)(" vs ")(-2);
             }),__FILE__,__LINE__);
         }
@@ -295,7 +295,7 @@ void testBatchedGrowableArray(T=int,int bSize=2)(T[] arr,T[] arr2){
     nEl=0;
     foreach(i,el;bArr.view){
         if (arr[i%arr.length]!=el) {
-            throw new Exception(collectIAppender(delegate void(CharSink s){
+            throw new Exception(collectIAppender(delegate void(scope CharSink s){
                 dumper(s)("error4  bArr[")(i)("]=")(el)("vs")(arr[i%arr.length]);
             }),__FILE__,__LINE__);
         }

@@ -39,7 +39,7 @@ final class ReinterpretReader(U,T):Reader!(T){
     }
     
     ///  reader handler
-    bool handleReader(size_t delegate(T[], SliceExtent slice,out bool iterate) r){
+    bool handleReader(scope size_t delegate(T[], SliceExtent slice,out bool iterate) r){
         return this.buf.handleReaderT!(T)(r);
     }
     
@@ -47,7 +47,7 @@ final class ReinterpretReader(U,T):Reader!(T){
         this.buf.shutdownInput();
     }
     
-    void desc(CharSink s){
+    void desc(scope CharSink s){
         s("ReinterpretReader!(");s(U.stringof); s(","); s(T.stringof); s(")(");
         writeOut(s,buf); s(")");
     }
@@ -67,16 +67,16 @@ final class BufferIn(TInt):Reader!(TInt){
     size_t encodingOverhead;
     void delegate() _shutdownInput;
     string dsc;
-    void delegate(CharSink) dscWriter;
+    void delegate(scope CharSink) dscWriter;
     
-    void _writeDesc(CharSink s){
+    void _writeDesc(scope CharSink s){
         s(dsc);
     }
     
-    this(void delegate(CharSink) dscW,size_t delegate(TInt[]) basicReader,TBuf[] buf,size_t encodingOverhead=ulong.sizeof/TInt.sizeof,void delegate() shutdown=null,size_t bufLen=0,size_t bufPos=0){
+    this(void delegate(scope CharSink) dscW,size_t delegate(TInt[]) basicReader,TBuf[] buf,size_t encodingOverhead=ulong.sizeof/TInt.sizeof,void delegate() shutdown=null,size_t bufLen=0,size_t bufPos=0){
         this("",basicReader,buf,encodingOverhead,shutdown,bufLen,bufPos,dscW);
     }
-    this(string dsc,size_t delegate(TInt[]) basicReader,TBuf[] buf,size_t encodingOverhead=ulong.sizeof/TInt.sizeof,void delegate() shutdown=null,size_t bufLen=0,size_t bufPos=0,void delegate(CharSink) dscW=null){
+    this(string dsc,size_t delegate(TInt[]) basicReader,TBuf[] buf,size_t encodingOverhead=ulong.sizeof/TInt.sizeof,void delegate() shutdown=null,size_t bufLen=0,size_t bufPos=0,void delegate(scope CharSink) dscW=null){
         assert(buf.length>encodingOverhead,"buf too small");
         this.buf=buf;
         this.bufPos=bufPos;
@@ -111,12 +111,12 @@ final class BufferIn(TInt):Reader!(TInt){
     
     void loadMore(bool insist=true){
         version(TrackBInReadSome){
-            sinkTogether(sout,delegate void(CharSink s){
+            sinkTogether(sout,delegate void(scope CharSink s){
                 dumper(s)("BufferIn@")(cast(void*)this)(",pre loadMore,")
                     ("buffer contents:\n'")(buf[bufPos..bufPos+bufLen])("'\n");
             });
             scope(exit){
-                sinkTogether(sout,delegate void(CharSink s){
+                sinkTogether(sout,delegate void(scope CharSink s){
                     dumper(s)("BufferIn@")(cast(void*)this)(",post loadMore,")
                         ("buffer contents:\n'")(buf[bufPos..bufPos+bufLen])("'\n");
                 });
@@ -190,7 +190,7 @@ final class BufferIn(TInt):Reader!(TInt){
 
     size_t readSomeT(TOut)(TOut[]outBuf){
         version(TrackBInReadSome){
-            sinkTogether(sout,delegate void(CharSink s){
+            sinkTogether(sout,delegate void(scope CharSink s){
                 dumper(s)("readSome started need to read ")(outBuf.length)(" ")(TOut.stringof)(",")
                     ("buffer contents:\n'")(buf[bufPos..bufPos+bufLen])("'\n");
             });
@@ -254,7 +254,7 @@ final class BufferIn(TInt):Reader!(TInt){
             }
         }
         version(TrackBInReadSome){
-            sinkTogether(sout,delegate void(CharSink s){
+            sinkTogether(sout,delegate void(scope CharSink s){
                 dumper(s)("readSome after realRead the buffer contents are:\n'")(buf[bufPos..bufPos+bufLen])("'\n");
             });
         }
@@ -273,7 +273,7 @@ final class BufferIn(TInt):Reader!(TInt){
         return readTot/OutToIn; // as rest/OutToIn==0
     }
     
-    bool handleReaderT(TOut)(size_t delegate(TOut[], SliceExtent slice,out bool iterate) r){
+    bool handleReaderT(TOut)(scope size_t delegate(TOut[], SliceExtent slice,out bool iterate) r){
         static assert(TInt.sizeof<=TOut.sizeof,"internal size needs to be smaller than external");
         static assert(TOut.sizeof%TInt.sizeof==0,"external size needs to be a multiple of internal size");
         enum :size_t{OutToIn=TOut.sizeof/TInt.sizeof}
@@ -332,7 +332,7 @@ final class BufferIn(TInt):Reader!(TInt){
     size_t readSome(TInt[] a){
         return readSomeT!(TInt)(a);
     }
-    bool handleReader(size_t delegate(TInt[], SliceExtent slice,out bool iterate) r){
+    bool handleReader(scope size_t delegate(TInt[], SliceExtent slice,out bool iterate) r){
         return handleReaderT!(TInt)(r);
     }
     
@@ -341,7 +341,7 @@ final class BufferIn(TInt):Reader!(TInt){
         return new ReinterpretReader!(TInt,T)(this);
     }
     
-    void desc(CharSink s){
+    void desc(scope CharSink s){
         dscWriter(s);
     }
 }
@@ -374,7 +374,7 @@ final class MixedSource: MultiReader {
     this(string dsc,size_t delegate(void[]) basicReader){
         this(new BufferIn!(void)(dsc,basicReader));
     }
-    this(void delegate(CharSink) dscW,size_t delegate(void[]) basicReader){
+    this(void delegate(scope CharSink) dscW,size_t delegate(void[]) basicReader){
         this(new BufferIn!(void)(dscW,basicReader));
     }
     uint modes(){
@@ -405,7 +405,7 @@ final class MixedSource: MultiReader {
         else if (_readerDchar !is null ) _readerDchar.shutdownInput();
         else if (_readerBin !is null ) _readerBin.shutdownInput();
     }
-    void desc(CharSink s){
+    void desc(scope CharSink s){
         dumper(s)("MultiReader(")(_readerChar)(",")(_readerWchar)(",")(_readerDchar)(",")(_readerBin)(")");
     }
 }
@@ -437,7 +437,7 @@ final class StringReader(T): MultiReader{
     this(OutWriter dscW,size_t delegate(T[])r){
         this(new BufferIn!(T)(dscW,r));
     }
-    this(bool delegate(size_t delegate(T[], SliceExtent slice,out bool iterate)) reader){
+    this(bool delegate(scope size_t delegate(T[], SliceExtent slice,out bool iterate)) reader){
         this(r(basicReader));
     }
     this(Reader!(T) r){
@@ -478,7 +478,7 @@ final class StringReader(T): MultiReader{
         else if (_readerDchar !is null ) _readerDchar.shutdownInput();
         else if (_readerBin !is null ) _readerBin.shutdownInput();
     }
-    void desc(CharSink s){
+    void desc(scope CharSink s){
         dumper(s)("StringReader!(")(T.stringof)(")(")(_readerChar)(",")(_readerWchar)(",")
             (_readerDchar)(",")(_readerBin)(")");
     }

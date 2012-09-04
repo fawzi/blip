@@ -39,7 +39,7 @@ class Citation{
             throw new Exception("comparing Citation to an incompatible class: "~o.classinfo.name);
         }
     }
-    void desc(void delegate(cstring) sink){
+    void desc(scope void delegate(in cstring) sink){
         auto s=dumper(sink);
         s("[")(key)("] ")(citation);
         if (refs.length>0){
@@ -106,7 +106,7 @@ class CitationDB{
         }
     }
     /// prints the references that have been cited
-    void printCited(void delegate(cstring) sink){
+    void printCited(scope void delegate(in cstring) sink){
         auto cits=toPrint.toArray();
         cits.sort;
         foreach(c;cits){

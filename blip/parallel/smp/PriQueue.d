@@ -50,7 +50,7 @@ class PriQueue(T){
             return collectIAppender(cast(OutWriter)&desc);
         }
         /// description (for debugging)
-        void desc(void delegate(cstring) s){
+        void desc(scope void delegate(in cstring) s){
             s("<PriQLevel@"); writeOut(s,cast(void*)this); s(" level=");
             writeOut(s,level); s(" entries=");
             writeOut(s,entries);
@@ -59,7 +59,7 @@ class PriQueue(T){
     }
     /// pool to recycle PriQLevels
     static class PriQPool{
-        PriQLevel lastE;
+        shared PriQLevel lastE;
         /// returns a PriQLevel to the pool for recycling
         void giveBack(PriQLevel l){ assert(l!is null); insertAt(lastE,l); }
         /// creates a PriQLevel, if possible recycling an old one.
@@ -82,12 +82,12 @@ class PriQueue(T){
             return collectIAppender(cast(OutWriter)&desc);
         }
         /// description (for debugging)
-        void desc(void delegate(cstring) s){
+        void desc(scope void delegate(in cstring) s){
             if (this is null){
                 s("<PriQPool *NULL*>");
             } else {
                 s("<PriQPool@"); writeOut(s,cast(void*)this); s(" entries=[");
-                PriQLevel el=lastE;
+                shared PriQLevel el=lastE;
                 while(el !is null){
                     if (el !is lastE) s(", ");
                     s("<PriQLevel@"); writeOut(s,cast(void *)el);
@@ -190,7 +190,7 @@ class PriQueue(T){
                     assert(queue !is null);
                     T res;
                     if(!queue.entries.popFront(res)){
-                        throw new Exception(collectIAppender(delegate void(CharSink s){
+                        throw new Exception(collectIAppender(delegate void(scope CharSink s){
                             s("Error: expected queue to have entries, queue is:");
                             desc(s);
                         }),__FILE__,__LINE__);
@@ -221,7 +221,7 @@ class PriQueue(T){
         }
     }
     /// returns the first element from the back that satifies the given filter function
-    bool popBack(ref T el,bool delegate(T) filter){
+    bool popBack(ref T el,scope bool delegate(T) filter){
         PriQLevel[128] levels;
         size_t ilevel=0;
         synchronized(queueLock){
@@ -276,7 +276,7 @@ class PriQueue(T){
     /// description (for debugging)
     /// (might not be a snapshot if other thread modify it while printing)
     /// non threadsafe
-    void desc(void delegate(cstring) s){
+    void desc(scope void delegate(in cstring) s){
         if (this is null){
             s("<PriQueue *NULL*>\n");
         } else {
@@ -319,6 +319,6 @@ class PriQueue(T){
 }
 
 void pippo(){
-    PriQueue!(int) q;
+    PriQueue!(int*) q;
     writeOut(sout,q);
 }

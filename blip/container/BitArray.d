@@ -219,7 +219,7 @@ struct BitArray
         return this;
     }
     /// loops on the slice
-    int opApply( int delegate(ref bool) dg ){
+    int opApply( scope int delegate(ref bool) dg ){
         // to do: optimize with loopOpMixin
         int result;
 
@@ -234,7 +234,7 @@ struct BitArray
         return result;
     }
     /// ditto
-    int opApply( int delegate(ref size_t, ref bool) dg ){
+    int opApply( scope int delegate(ref size_t, ref bool) dg ){
         int result;
 
         for( size_t i = 0; i < len; ++i )

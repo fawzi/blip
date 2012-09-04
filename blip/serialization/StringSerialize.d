@@ -34,7 +34,14 @@ U[] serializeToArray(T,U=char)(T t,U[] buf=cast(U[])null){
     return arr.takeData();
 }
 
-void serializeToSink(U,T)(void delegate(T[]) sink,U t){
+/// utility method to serialize just one object to an array of the given type
+immutable(U)[] serializeToIArray(T,U=char)(T t,U[] buf=cast(U[])null){
+    auto res=serializeToArray(t,buf);
+    return res.idup; // use cast???
+}
+
+void serializeToSink(U,TT)(void delegate(in TT[]) sink,U t){
+    alias UnqualAll!(TT) T;
     static if (is(T==char)||is(T==wchar)||is(T==dchar)){
         auto s=new JsonSerializer!(T)("serializeToSink",sink);
         s(t);
@@ -58,7 +65,7 @@ template printOut(){
             return cast(string)serializeToArray(this);
     }
     
-    void desc(void delegate(cstring) sink){
+    void desc(scope void delegate(in cstring) sink){
         static if (is(typeof(*T.init)==struct))
             serializeToSink(sink,*this);
         else

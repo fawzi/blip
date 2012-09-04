@@ -27,7 +27,6 @@ import blip.time.Time;
 import blip.time.Clock;
 import blip.io.BasicIO;
 import blip.container.GrowableArray;
-import blip.util.TemplateFu:ctfe_i2a;
 import blip.parallel.smp.PriQueue;
 import blip.parallel.smp.SmpModels;
 import blip.parallel.smp.BasicTasks;
@@ -116,7 +115,7 @@ class PriQScheduler:TaskSchedulerI {
     /// constructor for the pool
     this(PoolI!(PriQScheduler)p,string loggerPath="blip.parallel.smp.queue"){
         version(TrackCollections){
-            sinkTogether(sout,delegate void(CharSink s){
+            sinkTogether(sout,delegate void(scope CharSink s){
                 dumper(s)("creating PriQScheduler@")(cast(void*)this)("\n");
             });
         }
@@ -135,7 +134,7 @@ class PriQScheduler:TaskSchedulerI {
     /// creates a new PriQScheduler
     this(string name,MultiSched superScheduler,string loggerPath="blip.parallel.smp.queue"){
         version(TrackCollections){
-            sinkTogether(sout,delegate void(CharSink s){
+            sinkTogether(sout,delegate void(scope CharSink s){
                 dumper(s)("creating PriQScheduler@")(cast(void*)this)("\n");
             });
         }
@@ -215,21 +214,21 @@ class PriQScheduler:TaskSchedulerI {
         }
     }
     /// logs a message
-    void logMsg(cstring m){
+    void logMsg(in cstring m){
         log.info(m);
     }
     void release0(){
         if (pool!is null){
             refCount=1;
             debug(TrackQueues){
-                sinkTogether(&logMsg,delegate void(CharSink s){
+                sinkTogether(&logMsg,delegate void(scope CharSink s){
                     dumper(s)("giving back ")(this,false)(" to pool");
                 });
             }
             pool.giveBack(this);
         } else {
             debug(TrackQueues){
-                sinkTogether(&logMsg,delegate void(CharSink s){
+                sinkTogether(&logMsg,delegate void(scope CharSink s){
                     dumper(s)("deleting ")(this,false);
                 });
             }
@@ -242,7 +241,7 @@ class PriQScheduler:TaskSchedulerI {
     }
     version(TrackCollections){
         ~this(){
-            sinkTogether(sout,delegate void(CharSink s){
+            sinkTogether(sout,delegate void(scope CharSink s){
                 dumper(s)("destructor of PriQScheduler@")(cast(void*)this)(" refCount:")(refCount)("\n");
             });
         }
@@ -251,11 +250,11 @@ class PriQScheduler:TaskSchedulerI {
         assert(t.status==TaskStatus.NonStarted ||
             t.status==TaskStatus.Started,"initial");
         debug(TrackQueues){
-            sinkTogether(&logMsg,delegate void(CharSink s){
+            sinkTogether(&logMsg,delegate void(scope CharSink s){
                 dumper(s)("will PriQScheduler ")(this,true)(".addTask0(")(t)(",with superTask:")(t.superTask)(" in task ")(taskAtt.val)("):");writeStatus(s,4);
             });
             scope(exit){
-                sinkTogether(&logMsg,delegate void(CharSink s){
+                sinkTogether(&logMsg,delegate void(scope CharSink s){
                     dumper(s)("did PriQScheduler@")(cast(void*)this)(".addTask0");
                 });
             }
@@ -281,7 +280,7 @@ class PriQScheduler:TaskSchedulerI {
                 }
             }
             if (runLevel==SchedulerRunLevel.Stopped){
-                throw new Exception(collectIAppender(delegate void(CharSink s){
+                throw new Exception(collectIAppender(delegate void(scope CharSink s){
                         dumper(s)("addTask0 to stopped PriQScheduler@")(cast(void*)this);
                     }));
             }
@@ -292,7 +291,7 @@ class PriQScheduler:TaskSchedulerI {
     void addTask(TaskI t){
         assert(t.status==TaskStatus.NonStarted ||
             t.status==TaskStatus.Started,"initial");
-        debug(TrackQueues) log.info(collectIAppender(delegate void(CharSink s){
+        debug(TrackQueues) log.info(collectIAppender(delegate void(scope CharSink s){
             dumper(s)("task ")(t)(" might be added to queue ")(this,true);
         }));
         if (shouldAddTask(t)){
@@ -386,7 +385,7 @@ class PriQScheduler:TaskSchedulerI {
             return false;
         }
         debug(TrackQueues){
-            sinkTogether(&logMsg,delegate void(CharSink sink){
+            sinkTogether(&logMsg,delegate void(scope CharSink sink){
                 dumper(sink)("stealing task ")(t)(" from scheduler ")(this,true)
                     (" for scheduler ")(targetScheduler,true);
             });
@@ -409,7 +408,7 @@ class PriQScheduler:TaskSchedulerI {
             }
             t2.scheduler=scheduler2;
             debug(TrackQueues){
-            sinkTogether(&logMsg,delegate void(CharSink sink){
+            sinkTogether(&logMsg,delegate void(scope CharSink sink){
                     sink("stealing other task "); writeOut(sink,t2,true); sink(" from ");
                     writeOut(sink,this,true); sink(" to "); writeOut(sink,scheduler2,true); sink("\n");
                 }));
@@ -494,11 +493,11 @@ class PriQScheduler:TaskSchedulerI {
         return _executer;
     }
     /// description (for debugging)
-    void desc(void delegate(cstring) s){ return desc(s,false); }
+    void desc(scope void delegate(in cstring) s){ return desc(s,false); }
     /// description (for debugging)
     /// (might not be a snapshot if other threads modify it while printing)
     /// non threadsafe
-    void desc(void delegate(cstring) sink,bool shortVersion){
+    void desc(scope void delegate(in cstring) sink,bool shortVersion){
         auto s=dumper(sink);
         s("<PriQScheduler@"); writeOut(sink,cast(void*)this);
         if (shortVersion) {
@@ -525,7 +524,7 @@ class PriQScheduler:TaskSchedulerI {
         s("\n >");
     }
     /// writes the status of the queue in a compact and 
-    void writeStatus(CharSink s,int intentL){
+    void writeStatus(scope CharSink s,int intentL){
         synchronized(queue.queueLock){
             s("{ \"sched@\":"); writeOut(s,cast(void*)this); s(", rl:"); writeOut(s,runLevel); s(", q:[");
             auto lAtt=queue.queue;
@@ -566,7 +565,7 @@ class PriQScheduler:TaskSchedulerI {
     /// called when the queue stops
     void reuse(){
         debug(TrackQueues){
-            sinkTogether(&logMsg,delegate void(CharSink s){
+            sinkTogether(&logMsg,delegate void(scope CharSink s){
                 dumper(s)("PriQScheduler@")(cast(void*)this)(" reused");
             });
         }
@@ -585,7 +584,7 @@ class PriQScheduler:TaskSchedulerI {
         gPool=cachedPoolNext(function PriQScheduler(PoolI!(PriQScheduler)p){
             auto res=new PriQScheduler(p);
             debug(TrackQueues){
-                sinkTogether(sout,delegate void(CharSink s){
+                sinkTogether(sout,delegate void(scope CharSink s){
                     dumper(s)("new PriQScheduler@")(cast(void*)res)("\n");
                 });
             }
@@ -638,7 +637,7 @@ class MultiSched:TaskSchedulerI {
         StarvationManager starvationManager,
         string loggerPath="blip.parallel.smp.queue")
     {
-        this.name=collectIAppender(delegate void(CharSink s){
+        this.name=collectIAppender(delegate void(scope CharSink s){
             s(name); s("_"); writeOut(s,numaNode.level); s("_"); writeOut(s,numaNode.pos);
         });
         this.starvationManager=starvationManager;
@@ -656,7 +655,7 @@ class MultiSched:TaskSchedulerI {
         zeroSem=new Semaphore();
     }
     /// logs a message
-    void logMsg(cstring m){
+    void logMsg(in cstring m){
         log.info(m);
     }
     /// adds a task to be executed without checking for starvation of other schedulers
@@ -668,11 +667,11 @@ class MultiSched:TaskSchedulerI {
         assert(t.status==TaskStatus.NonStarted ||
             t.status==TaskStatus.Started,"initial");
         debug(TrackQueues){
-            sinkTogether(&logMsg,delegate void(CharSink s){
+            sinkTogether(&logMsg,delegate void(scope CharSink s){
                 dumper(s)("pre MultiSched ")(this,true)(".addTask0(")(t)("):");writeStatus(s,4);
             });
             scope(exit){
-                sinkTogether(&logMsg,delegate void(CharSink s){
+                sinkTogether(&logMsg,delegate void(scope CharSink s){
                     dumper(s)("post MultiSched ")(this,true)(".addTask0:");writeStatus(s,4);
                 });
             }
@@ -771,7 +770,7 @@ class MultiSched:TaskSchedulerI {
         synchronized(queue){
             if (queue.appendL(sched)==0){
                 debug(TrackQueues) {
-                    sinkTogether(&logMsg,delegate void(CharSink s){
+                    sinkTogether(&logMsg,delegate void(scope CharSink s){
                         s("MultiSched "); writeOut(s,this,true); s(" added sched@"); writeOut(s,cast(void*)sched);
                     });
                 }
@@ -868,11 +867,11 @@ class MultiSched:TaskSchedulerI {
         return _executer;
     }
     /// description (for debugging)
-    void desc(void delegate(cstring) s){ return desc(s,false); }
+    void desc(scope void delegate(in cstring) s){ return desc(s,false); }
     /// description (for debugging)
     /// (might not be a snapshot if other threads modify it while printing)
     /// non threadsafe
-    void desc(void delegate(cstring) sink,bool shortVersion){
+    void desc(scope void delegate(in cstring) sink,bool shortVersion){
         auto s=dumper(sink);
         s("<MultiSched@"); writeOut(sink,cast(void*)this);
         if (shortVersion) {
@@ -918,7 +917,7 @@ class MultiSched:TaskSchedulerI {
     /// actions executed on stop (tells the starvationManager)
     void onStop(){
         debug(TrackQueues){
-            sinkTogether(&logMsg,delegate void(CharSink s){
+            sinkTogether(&logMsg,delegate void(scope CharSink s){
                 s("MultiSched "); writeOut(s,this,true); s(" stopped");
             });
         }
@@ -931,7 +930,7 @@ class MultiSched:TaskSchedulerI {
     /// number of simple tasks wanted
     int nSimpleTasksWanted(){ return 4; }
     /// writes just the scheduling status in a way that looks good
-    void writeStatus(CharSink sink,int indentL){
+    void writeStatus(scope CharSink sink,int indentL){
         auto s=dumper(sink);
         synchronized(queue){
             s("{ class:MultiSched, name:\"")(name)("\", scheds:\n");
@@ -979,7 +978,7 @@ class StarvationManager: TaskSchedulerI, ExecuterI, SchedGroupI {
     /// returns a random source for scheduling
     final RandomSync rand(){ return _rand; }
     
-    void writeStatus(CharSink sink,int indentL){
+    void writeStatus(scope CharSink sink,int indentL){
         void ind(int l){
             writeSpace(sink,indentL+l);
         }
@@ -1035,7 +1034,7 @@ class StarvationManager: TaskSchedulerI, ExecuterI, SchedGroupI {
         addStarvingSched(NumaNode(schedLevel,0));
     }
     /// logs a message
-    void logMsg(cstring m){
+    void logMsg(in cstring m){
         log.info(m);
     }
     
@@ -1136,11 +1135,11 @@ class StarvationManager: TaskSchedulerI, ExecuterI, SchedGroupI {
     TaskI trySteal(MultiSched el,int stealLevel){
         TaskI t;
         debug(TrackQueues){
-            sinkTogether(&logMsg,delegate void(CharSink s){
+            sinkTogether(&logMsg,delegate void(scope CharSink s){
                 s("pre trySteal for "); writeOut(s,el,true); s(" in "); writeOut(s,this,true); s(":");writeStatus(s,4);
             });
             scope(exit){
-                sinkTogether(&logMsg,delegate void(CharSink s){
+                sinkTogether(&logMsg,delegate void(scope CharSink s){
                     dumper(s)("trySteal for ")(el.name)(" in ")(this,true)(" returns ")(t)(", status:");
                     writeStatus(s,4);
                 });
@@ -1337,11 +1336,11 @@ class StarvationManager: TaskSchedulerI, ExecuterI, SchedGroupI {
         return _executer;
     }
     /// description (for debugging)
-    void desc(void delegate(cstring) s){ return desc(s,false); }
+    void desc(scope void delegate(in cstring) s){ return desc(s,false); }
     /// description (for debugging)
     /// (might not be a snapshot if other threads modify it while printing)
     /// non threadsafe
-    void desc(void delegate(cstring) sink,bool shortVersion){
+    void desc(scope void delegate(in cstring) sink,bool shortVersion){
         auto s=dumper(sink);
         s("<StarvationManager@"); writeOut(sink,cast(void*)this);
         if (shortVersion) {
@@ -1456,22 +1455,22 @@ class MExecuter:ExecuterI{
         log=_scheduler.starvationManager.execLogger;
         worker=new Thread(&(this.workThreadJob),16*8192);
         worker.isDaemon=true;
-        worker.name=collectIAppender(delegate void(CharSink s){
+        worker.name=collectIAppender(delegate void(scope CharSink s){
             s(name); s("_"); writeOut(s,exeNode.level); s("_"); writeOut(s,exeNode.pos);
         });
         worker.start();
     }
     /// logs a message
-    void logMsg(cstring m){
+    void logMsg(in cstring m){
         log.info(m);
     }
     /// the job of the worker threads
     void workThreadJob(){
-        sinkTogether(&logMsg,delegate void(CharSink s){
+        sinkTogether(&logMsg,delegate void(scope CharSink s){
             dumper(s)("Work thread ")(Thread.getThis().name)(" started");
         });
         scope(exit){
-            sinkTogether(&logMsg,delegate void(CharSink s){
+            sinkTogether(&logMsg,delegate void(scope CharSink s){
                 dumper(s)("Work thread ")(Thread.getThis().name)(" stopped");
             });
         }
@@ -1479,19 +1478,21 @@ class MExecuter:ExecuterI{
             setDefaultCache(_scheduler.nnCache());
         } catch(Exception e){
             log.error("setDefaultCache failed, continuing...");
-            log.error(collectIAppender(&e.writeOut));
+            //log.error(collectIAppender(&e.writeOut));
+            log.error(e.toString());
         }
         try{
             pin(_scheduler.starvationManager.pinLevel);
         } catch(Exception e){
             log.error("pinning failed, continuing...");
-            log.error(collectIAppender(&e.writeOut));
+            //log.error(collectIAppender(&e.writeOut));
+            log.error(e.toString());
         }
         while(1){
             try{
                 TaskI t=scheduler.nextTask();
                 version(DetailedLog){
-                    sinkTogether(&logMsg,delegate void(CharSink s){
+                    sinkTogether(&logMsg,delegate void(scope CharSink s){
                         dumper(s)("Work thread ")(Thread.getThis().name)(" starting task ")(t);
                     });
                 }
@@ -1502,14 +1503,15 @@ class MExecuter:ExecuterI{
                 auto tName=t.taskName;
                 schedAtt.subtaskDeactivated(t);
                 version(DetailedLog){
-                    sinkTogether(&logMsg,delegate void(CharSink s){
+                    sinkTogether(&logMsg,delegate void(scope CharSink s){
                         dumper(s)("Work thread ")(Thread.getThis().name)(" finished task ")(tName)("@")(tPos);
                     });
                 }
             }
             catch(Exception e) {
                 log.error("exception in working thread ");
-                log.error(collectIAppender(&e.writeOut));
+                //log.error(collectIAppender(&e.writeOut));
+		log.error(e.toString);
                 soutStream.flush();
                 scheduler.raiseRunlevel(SchedulerRunLevel.Stopped);
                 abort();
@@ -1522,11 +1524,11 @@ class MExecuter:ExecuterI{
         return collectIAppender(cast(OutWriter)&desc);
     }
     /// description (for debugging)
-    void desc(CharSink s){ desc(s,false); }
+    void desc(scope CharSink s){ desc(s,false); }
     /// description (for debugging)
     /// (might not be a snapshot if other threads modify it while printing)
     /// non threadsafe
-    void desc(CharSink s,bool shortVersion){
+    void desc(scope CharSink s,bool shortVersion){
         s("<MExecuter@");writeOut(s,cast(void*)this);
         if (shortVersion) {
             s("  name:\""); writeOut(s,name); s("\"");
@@ -1553,7 +1555,7 @@ class MExecuter:ExecuterI{
                 n=topo.superNode(n);
             }
             auto res=topo.bindToNode(n);
-            sinkTogether(&logMsg,delegate void(CharSink s){
+            sinkTogether(&logMsg,delegate void(scope CharSink s){
                 dumper(s)("Work thread ")(Thread.getThis().name);
                 if (res){
                     s(" pinned to ");
@@ -1651,11 +1653,11 @@ class OnStarvingScheduler:TaskSchedulerI{
         return _rootTask;
     }
     /// description
-    void desc(void delegate(cstring) s){
+    void desc(scope void delegate(in cstring) s){
         desc(s,false);
     }
     /// possibly short description
-    void desc(void delegate(cstring) s,bool shortVersion){
+    void desc(scope void delegate(in cstring) s,bool shortVersion){
         s("<OnStarvingScheduler@");writeOut(s,cast(void*)this);
         if (shortVersion) {
             s(" >");

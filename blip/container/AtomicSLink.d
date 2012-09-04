@@ -22,22 +22,23 @@
 module blip.container.AtomicSLink;
 import blip.sync.Atomic: atomicOp,memoryBarrier;
 import blip.io.BasicIO;
+import blip.Comp;
 
 /// inserts newHead before head, and returns the value at head when the insertion took place
-T insertAt(T)(ref shared T head,T newHead){
+T insertAt(T,U=T)(ref shared T head,U newHead) if(is(UnqualAll!(T)==UnqualAll!(U))){
     static if(is(typeof(newHead is null))){
         assert(!(newHead is null),"cannot add a null head");
     }
-    memoryBarrier!(false,false,false,true)();
-    return atomicOp(head,delegate T(T val){
-        newHead.next=val;
-        return newHead;
+    return atomicOp!(T,T,T)(head,delegate T(T val){
+	newHead.next=cast(typeof(newHead.next))val;
+	memoryBarrier!(false,false,false,true)();
+        return cast(T)newHead;
     });
 }
 
 /// removes one element from the top of list
 T popFrom(T)(ref shared T list){
-    return atomicOp(list,delegate T(T val){
+    return atomicOp!(T,T,T)(list,delegate T(T val){
 	    if (val is null) {
 		return null;
 	    } else {
@@ -58,7 +59,7 @@ struct SLinkT(T){
         res.next=next;
         return res;
     }
-    void desc(void delegate(const(char)[])sink){
+    void desc(scope void delegate(in char[])sink){
         sink("SLinkT@");
         writeOut(sink,cast(void*)this);
         sink("{");

@@ -22,19 +22,19 @@ import blip.io.StreamConverters;
 import blip.Comp;
 
 /// a threadsafe sink to Stdout
-__gshared Dumper!(void delegate(cstring)) sout;
+__gshared Dumper!(void delegate(in cstring)) sout;
 /// non threadsafe sink to Stdout
-__gshared Dumper!(void delegate(cstring)) soutUnsafe;
+__gshared Dumper!(void delegate(in cstring)) soutUnsafe;
 /// sink to Stderr
-__gshared Dumper!(void delegate(cstring)) serr;
+__gshared Dumper!(void delegate(in cstring)) serr;
 /// stdout stream
 __gshared OutStreamI soutStream;
 /// stderr stream
 __gshared OutStreamI serrStream;
 /// in a parallel setting this is a log local to the current process
-__gshared Dumper!(void delegate(cstring)) localLog;
+__gshared Dumper!(void delegate(in cstring)) localLog;
 /// in a parallel setting this log is active only in the master process
-__gshared Dumper!(void delegate(cstring)) globalLog;
+__gshared Dumper!(void delegate(in cstring)) globalLog;
 /// true is the global log is active
 __gshared bool hasGlobalLog;
 

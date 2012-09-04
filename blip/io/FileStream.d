@@ -43,7 +43,7 @@ enum StreamOptions{
     BaseMask=3,
     Sync=1<<3,
 }
-private const File.Style WriteUnique = {File.Access.Write, File.Open.New, File.Share.Read};
+private immutable File.Style WriteUnique = {File.Access.Write, File.Open.New, File.Share.Read};
 
 /// general StreamStrWriter for the given file (normally you want strFile and binFile)
 StreamStrWriter!(T) outfileStrWriterT(T)(string path,WriteMode wMode){
@@ -66,10 +66,10 @@ StreamStrWriter!(T) outfileStrWriterT(T)(string path,WriteMode wMode){
             string newPath=path;
             for (size_t i=0;i<20;++i){
                 try{
-                    auto f=new DataFileOutput(newPath,wStyle);
+                    auto f=new DataFileOutput(cast(char[])newPath,wStyle);
                     return new StreamStrWriter!(T)(f);
                 } catch (Exception e) { // should catch only creation failures...
-                    newPath=collectIAppender(delegate void(CharSink s){
+                    newPath=collectIAppender(delegate void(scope CharSink s){
                         uint uniqueId;
                         rand(uniqueId);
                         dumper(s)(path0)("-")(uniqueId)(ext);
@@ -90,7 +90,7 @@ StreamStrWriter!(T) outfileStrWriterT(T)(string path,WriteMode wMode){
     default:
         assert(0);
     }
-    auto f=new DataFileOutput(path,wStyle);
+    auto f=new DataFileOutput(cast(char[])path,wStyle);
     return new StreamStrWriter!(T)(f);
 }
 /// ditto
@@ -135,10 +135,10 @@ StreamWriter outfileBinWriter(string path,WriteMode wMode){
                 string newPath=path;
                 for (size_t i=0;i<20;++i){
                     try{
-                        auto f=new DataFileOutput(newPath,wStyle);
+                        auto f=new DataFileOutput(cast(char[])newPath,wStyle);
                         return new StreamWriter(f);
                     } catch (Exception e) { // should catch only creation failures...
-                        newPath=collectIAppender(delegate void(CharSink s){
+                        newPath=collectIAppender(delegate void(scope CharSink s){
                             uint uniqueId;
                             rand(uniqueId);
                             dumper(s)(path0)("-")(uniqueId)(ext);
@@ -159,7 +159,7 @@ StreamWriter outfileBinWriter(string path,WriteMode wMode){
     default:
         assert(0);
     }
-    auto f=new DataFileOutput(path,wStyle);
+    auto f=new DataFileOutput(cast(char[])path,wStyle);
     return new StreamWriter(f);
 }
 
@@ -200,12 +200,12 @@ OutStreamI outfile(string path,WriteMode wMode,StreamOptions sOpt){
 }
 /// input file using string
 Reader!(T) infileStrT(T)(string path){
-    return toReaderT!(char)(new DataFileInput(path));
+    return toReaderT!(char)(new DataFileInput(cast(char[])path));
 }
 alias infileStrT!(char) infileStr;
 Reader!(void) infileBin(string path){
-    return toReaderT!(void)(new DataFileInput(path));
+    return toReaderT!(void)(new DataFileInput(cast(char[])path));
 }
 MultiInput infile(string path){
-    return new MultiInput(new DataFileInput(path));
+    return new MultiInput(new DataFileInput(cast(char[])path));
 }

@@ -39,7 +39,7 @@ class ChunkGuard{
     void *dataPtr; /// start of the chunk
     size_t dataLen; /// not really needed, just informative
     PoolI!(ChunkGuard) pool; /// pool of equally sized chunks
-    uint refCount; /// reference count
+    shared uint refCount; /// reference count
     enum Flags:uint{
         None,
         Scan // added to the GC as block contains pointers
@@ -119,7 +119,7 @@ class ChunkGuard{
     // maybe it would be better not to implement serialization for this, as it cannot be unserialized...
     mixin(serializeSome("blip.ChunkGuard","an object to 'guard' a chunk of memory, and dispose it",
         `dataPtr|dataLen|refCount|flags`));
-    void desc(CharSink s){
+    void desc(scope CharSink s){
         dumper(s)("{ class:blip.ChunkGuard, at:")(cast(void*)this)(", dataPtr:")(cast(void*)dataPtr)
             (", dataLen:")(dataLen)(", refCount:")(refCount)(", flags:")(flags)(" }");
     }
@@ -264,7 +264,7 @@ struct BulkArray(T){
     T* ptrI(size_t i)
     in{
         if (this.ptr+i>=this.ptrEnd){
-            assert(0,collectIAppender(delegate void(CharSink sink){
+            assert(0,collectIAppender(delegate void(scope CharSink sink){
                 dumper(sink)("index of BulkArray out of bounds:")(i)(" for array of size ")(this.ptrEnd-this.ptr);
             }));
         }
@@ -381,14 +381,14 @@ struct BulkArray(T){
         el=++ptr;
         return true;
     }
-    int opApply(int delegate(ref DynamicArrayType!(T) v) loopBody){
+    int opApply(scope int delegate(ref DynamicArrayType!(T) v) loopBody){
         for (T*aPtr=ptr;aPtr!=ptrEnd;++aPtr){
             int ret=loopBody(*aPtr);
             if (ret) return ret;
         }
         return 0;
     }
-    int opApply(int delegate(ref size_t i,ref DynamicArrayType!(T) v) loopBody){
+    int opApply(scope int delegate(ref size_t i,ref DynamicArrayType!(T) v) loopBody){
         T*aPtr=ptr;
         assert(ptrEnd>=aPtr,"invalid ptrEnd");
         size_t nEl=ptrEnd-aPtr;
@@ -409,8 +409,8 @@ struct BulkArray(T){
         T* start;
         T* end;
         size_t index;
-        Slice1 *freeList1;
-        Slice2 *freeList2;
+        shared Slice1 *freeList1;
+        shared Slice2 *freeList2;
         size_t optimalBlockSize;
         struct Slice1{
             PLoop *context;
@@ -422,13 +422,13 @@ struct BulkArray(T){
                 try{
                     if (context.res!=0) return;
                     if(start+context.optimalBlockSize*3/2<end){
-                        auto newChunk=popFrom(context.freeList1);
+                        auto newChunk=cast(Slice1*)popFrom(context.freeList1);
                         if (newChunk is null){
                             newChunk=new Slice1;
                             newChunk.loopBody=loopBody;
                             newChunk.context=context;
                         }
-                        auto newChunk2=popFrom(context.freeList1);
+                        auto newChunk2=cast(Slice1*)popFrom(context.freeList1);
                         if (newChunk2 is null){
                             newChunk2=new Slice1;
                             newChunk2.loopBody=loopBody;
@@ -460,7 +460,7 @@ struct BulkArray(T){
             }
             void giveBack(){
                 this.next=null;
-                insertAt(context.freeList1,this);
+                insertAt(context.freeList1,&this);
             }
         }
         struct Slice2{
@@ -474,13 +474,13 @@ struct BulkArray(T){
                 try{
                     if (context.res!=0) return;
                     if (end-start>context.optimalBlockSize*3/2){
-                        auto newChunk=popFrom(context.freeList2);
+                        auto newChunk=cast(Slice2*)popFrom(context.freeList2);
                         if (newChunk is null){
                             newChunk=new Slice2;
                             newChunk.loopBody=loopBody;
                             newChunk.context=context;
                         }
-                        auto newChunk2=popFrom(context.freeList2);
+                        auto newChunk2=cast(Slice2*)popFrom(context.freeList2);
                         if (newChunk2 is null){
                             newChunk2=new Slice2;
                             newChunk2.loopBody=loopBody;
@@ -517,7 +517,7 @@ struct BulkArray(T){
             }
             void giveBack(){
                 this.next=null;
-                insertAt(context.freeList2,this);
+                insertAt(context.freeList2,&this);
             }
         }
         static PLoop opCall(BulkArray array,size_t optimalBlockSize){
@@ -531,11 +531,11 @@ struct BulkArray(T){
             it.e=null;
             return it;
         }
-        int opApply(int delegate(ref DynamicArrayType!(T) v) loopBody){
+        int opApply(scope int delegate(ref DynamicArrayType!(T) v) loopBody){
             if (end-start>optimalBlockSize*2){
                 Slice1 newChunk;
                 newChunk.loopBody=loopBody;
-                newChunk.context=this;
+                newChunk.context=&this;
                 newChunk.start=start;
                 newChunk.end=end;
                 Task("BulkArrayPLoop0",&newChunk.exec).autorelease.executeNow();
@@ -559,11 +559,11 @@ struct BulkArray(T){
             }
             return 0;
         }
-        int opApply(int delegate(ref size_t i,ref DynamicArrayType!(T) v) loopBody){
+        int opApply(scope int delegate(ref size_t i,ref DynamicArrayType!(T) v) loopBody){
             if (end-start>optimalBlockSize*2){
                 Slice2 newChunk;
                 newChunk.loopBody=loopBody;
-                newChunk.context=this;
+                newChunk.context=&this;
                 newChunk.start=start;
                 newChunk.end=end;
                 newChunk.index=index;
@@ -630,14 +630,14 @@ struct BulkArray(T){
         bool next(ref DynamicArrayType!(T)* el){
             return it.next(el);
         }
-        int opApply(int delegate(ref DynamicArrayType!(T) v) loopBody){
+        int opApply(scope int delegate(ref DynamicArrayType!(T) v) loopBody){
             if (parallel){
                 return it.pLoop(optimalChunkSize).opApply(loopBody);
             } else {
                 return it.sLoop().opApply(loopBody);
             }
         }
-        int opApply(int delegate(ref size_t i,ref DynamicArrayType!(T) v) loopBody){
+        int opApply(scope int delegate(ref size_t i,ref DynamicArrayType!(T) v) loopBody){
             if (parallel){
                 return it.pLoop(optimalChunkSize).opApply(loopBody);
             } else {
@@ -662,8 +662,8 @@ BulkArray!(T) bulkArray(T)(T[]arr,ChunkGuard g=null){
 }
 
 /// tests if b is a dummy array
-static bool BulkArrayIsDummy(T)(BulkArray!(T) b){
-    return (b.flags & BulkArray!(T).Flags.Dummy)!=0;
+static bool BulkArrayIsDummy(T)(T b){
+    return (b.flags & T.Flags.Dummy)!=0;
 }
 
 void baUnaryOpStr(string opStr,T)(ref BulkArray!(T) a){

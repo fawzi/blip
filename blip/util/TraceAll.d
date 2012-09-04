@@ -41,7 +41,7 @@ version(Posix){
         }
         
         void abort(){
-            bool waitFor(bool delegate() check){
+            bool waitFor(scope bool delegate() check){
                 for(int i=0;i<500;++i){
                     for(int j=0;i<100;++i){
                         volatile auto tLevel=traceLevel;

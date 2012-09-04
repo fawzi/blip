@@ -105,7 +105,7 @@ class BatchedGrowableArray(T,int batchSize1=((2048/T.sizeof>128)?2048/T.sizeof:1
                 return false;
             }
             /// loops on the batches
-            int opApply(int delegate(ref T[]el) loopBody){
+            int opApply(scope int delegate(ref T[]el) loopBody){
                 if (this.view.start==this.view.end) return 0;
                 assert(this.view.start<this.view.end);
                 auto ii=0;
@@ -139,7 +139,7 @@ class BatchedGrowableArray(T,int batchSize1=((2048/T.sizeof>128)?2048/T.sizeof:1
                 return 0;
             }
             /// loop on the batches, the index is the index of the first element of the batch
-            int opApply(int delegate(ref size_t,ref T[]) loopBody){
+            int opApply(scope int delegate(ref size_t,ref T[]) loopBody){
                 if (this.view.start==this.view.end) return 0;
                 assert(this.view.start<this.view.end);
                 size_t ii=0;
@@ -257,7 +257,7 @@ class BatchedGrowableArray(T,int batchSize1=((2048/T.sizeof>128)?2048/T.sizeof:1
             }
             
             /// loops on the batches
-            int opApply(int delegate(ref T[]el) loopBody){
+            int opApply(scope int delegate(ref T[]el) loopBody){
                 if (this.view.start==this.view.end) return 0;
                 assert(this.view.start<this.view.end);
                 this.loopBody.noIndex=loopBody;
@@ -305,7 +305,7 @@ class BatchedGrowableArray(T,int batchSize1=((2048/T.sizeof>128)?2048/T.sizeof:1
                 return this.res;
             }
             /// loop on the batches, the index is the index of the first element of the batch
-            int opApply(int delegate(ref size_t,ref T[]) loopBody){
+            int opApply(scope int delegate(ref size_t,ref T[]) loopBody){
                 if (this.view.start==this.view.end) return 0;
                 assert(this.view.start<this.view.end);
                 this.loopBody.indexed=loopBody;
@@ -391,11 +391,11 @@ class BatchedGrowableArray(T,int batchSize1=((2048/T.sizeof>128)?2048/T.sizeof:1
             res.loopEl=l;
             return &res.loopBody;
         }
-        int opApply(int delegate(ref T)loop){
+        int opApply(scope int delegate(ref T)loop){
             auto loopB=this.toBatch(loop);
             return this.sBatchLoop.opApply(loopB);
         }
-        int opApply(int delegate(ref size_t,ref T)loop){
+        int opApply(scope int delegate(ref size_t,ref T)loop){
             auto loopB=this.toBatch(loop);
             return this.sBatchLoop.opApply(loopB);
         }
@@ -543,11 +543,11 @@ class BatchedGrowableArray(T,int batchSize1=((2048/T.sizeof>128)?2048/T.sizeof:1
     //alias appendArr opCatAssign;
     void opCatAssign(T[] t){ this.appendArr(t); }
     /// appends what the appender delegate sends
-    void opCatAssign(void delegate(void delegate(T)) appender){
+    void opCatAssign(scope void delegate(scope void delegate(T)) appender){
         appender(&this.appendEl);
     }
     /// appends what the appender delegate sends
-    void opCatAssign(void delegate(void delegate(T[])) appender){
+    void opCatAssign(scope void delegate(scope void delegate(T[])) appender){
         appender(&this.appendArr);
     }
     /// deallocates data
@@ -598,7 +598,7 @@ class BatchedGrowableArray(T,int batchSize1=((2048/T.sizeof>128)?2048/T.sizeof:1
         void preSerialize(Serializer s){ }
         void postSerialize(Serializer s){ }
         void serialize(Serializer s){
-            LazyArray!(T) la=LazyArray!(T).opCall(delegate int(int delegate(ref T)loopBody){
+            LazyArray!(T) la=LazyArray!(T).opCall(delegate int(scope int delegate(ref T)loopBody){
                 int res=0;
                 foreach (b;this.view.sBatchLoop){
                     for (size_t i=0;i<b.length;++i){
@@ -622,7 +622,7 @@ class BatchedGrowableArray(T,int batchSize1=((2048/T.sizeof>128)?2048/T.sizeof:1
         mixin printOut!();
     } else {
         /// description of the object
-        void desc(void delegate(cstring)sink){
+        void desc(scope void delegate(in cstring)sink){
             // this is the only dependency on BasicIO...
             auto s=dumper(sink);
             s("<BatchedGrowableArray@")(cast(void*)this)(" len:")(this.data.length);

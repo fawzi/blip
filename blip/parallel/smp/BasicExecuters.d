@@ -19,14 +19,13 @@
 // limitations under the License.
 module blip.parallel.smp.BasicExecuters;
 import blip.core.Thread;
-import blip.core.Traits: ctfe_i2a;
+import blip.core.Traits: ctfe_i2s;
 import blip.math.Math;
 import blip.math.random.Random;
 import blip.io.Console;
 import blip.util.TangoLog;
 import blip.io.BasicIO;
 import blip.container.GrowableArray;
-import blip.util.TemplateFu:ctfe_i2a;
 import blip.parallel.smp.SmpModels;
 import blip.parallel.smp.BasicSchedulers;
 import blip.parallel.smp.BasicTasks;
@@ -101,11 +100,11 @@ class ImmediateExecuter:ExecuterI,TaskSchedulerI,SchedGroupI{
         return collectIAppender(cast(OutWriter)&desc);
     }
     /// description (for debugging)
-    void desc(void delegate(cstring) s){ desc(s,false); }
+    void desc(scope void delegate(in cstring) s){ desc(s,false); }
     /// description (for debugging)
     /// (might not be a snapshot if other threads modify it while printing)
     /// non threadsafe
-    void desc(void delegate(cstring) s,bool shortVersion){
+    void desc(scope void delegate(in cstring) s,bool shortVersion){
         s("<ImmediateExecuter@");
         writeOut(s,cast(void*)this);
         s(" ");
@@ -124,7 +123,7 @@ class ImmediateExecuter:ExecuterI,TaskSchedulerI,SchedGroupI{
         runLevel=level;
     }
     /// logging a message
-    void logMsg(cstring m){
+    void logMsg(in cstring m){
         log.info(m);
     }
     /// adds a task to the scheduler queue
@@ -132,7 +131,7 @@ class ImmediateExecuter:ExecuterI,TaskSchedulerI,SchedGroupI{
         if (runLevel!=SchedulerRunLevel.Stopped){
             try{
                 version(DetailedLog){
-                    sinkTogether(&logMsg,delegate void(CharSink s){
+                    sinkTogether(&logMsg,delegate void(scope CharSink s){
                         dumper(s)("Executer ")(name)(", thread ")(Thread.getThis().name)(" starting task ")(t); });
                 }
                 if (t is null) {
@@ -143,13 +142,13 @@ class ImmediateExecuter:ExecuterI,TaskSchedulerI,SchedGroupI{
                 t.execute(true);
                 scheduler.subtaskDeactivated(t); // rm?
                 version(DetailedLog){
-                    sinkTogether(&logMsg,delegate void(CharSink s){ // task retain release is ok???
+                    sinkTogether(&logMsg,delegate void(scope CharSink s){ // task retain release is ok???
                         dumper(s)("Thread ")(Thread.getThis().name)(" finished task ")(t); });
                 }
             }
             catch(Exception e) {
                 log.error("exception in main thread ");
-                e.writeOut(sout.call);
+                sout(e);
                 soutStream.flush();
                 runLevel=SchedulerRunLevel.Stopped;
             }
@@ -233,7 +232,7 @@ class PExecuter:ExecuterI,SchedGroupI{
         return _name;
     }
     /// logs a message
-    void logMsg(cstring m){
+    void logMsg(in cstring m){
         log.info(m);
     }
     TaskSchedulerI scheduler(){ return _scheduler[0]; }
@@ -256,17 +255,17 @@ class PExecuter:ExecuterI,SchedGroupI{
         for(int i=0;i<this.nproc;++i){
             workers[i]=new Thread(&(this.workThreadJob),16*8192);
             workers[i].isDaemon=true;
-            workers[i].name=name~"-worker-"~ctfe_i2a(i);
+            workers[i].name(name~"-worker-"~ctfe_i2s(i));
             workers[i].start();
         }
     }
     /// the job of the worker threads
     void workThreadJob(){
-        sinkTogether(&logMsg,delegate void(CharSink s){
+        sinkTogether(&logMsg,delegate void(scope CharSink s){
             dumper(s)("Work thread ")(Thread.getThis().name)(" started");
         });
         scope(exit){
-            sinkTogether(&logMsg,delegate void(CharSink s){
+            sinkTogether(&logMsg,delegate void(scope CharSink s){
                 dumper(s)("Work thread ")(Thread.getThis().name)(" stopped");
             });
         }
@@ -274,7 +273,7 @@ class PExecuter:ExecuterI,SchedGroupI{
             try{
                 TaskI t=scheduler.nextTask();
                 version(DetailedLog){
-                    sinkTogether(&logMsg,delegate void(CharSink s){
+                    sinkTogether(&logMsg,delegate void(scope CharSink s){
                         dumper(s)("Work thread ")(Thread.getThis().name)(" starting task ")(t);
                     });
                 }
@@ -282,14 +281,14 @@ class PExecuter:ExecuterI,SchedGroupI{
                 t.execute(false);
                 scheduler.subtaskDeactivated(t);
                 version(DetailedLog){
-                    sinkTogether(&logMsg,delegate void(CharSink s){
+                    sinkTogether(&logMsg,delegate void(scope CharSink s){
                         dumper(s)("Work thread ")(Thread.getThis().name)(" finished task ")(t.taskName);
                     });
                 }
             }
             catch(Exception e) {
                 log.error("exception in working thread ");
-                e.writeOut(sout.call);
+                sout(e);
                 soutStream.flush();
                 scheduler.raiseRunlevel(SchedulerRunLevel.Stopped);
             }
@@ -301,11 +300,11 @@ class PExecuter:ExecuterI,SchedGroupI{
         return collectIAppender(cast(OutWriter)&desc);
     }
     /// description (for debugging)
-    void desc(CharSink s){ desc(s,false); }
+    void desc(scope CharSink s){ desc(s,false); }
     /// description (for debugging)
     /// (might not be a snapshot if other threads modify it while printing)
     /// non threadsafe
-    void desc(CharSink s,bool shortVersion){
+    void desc(scope CharSink s,bool shortVersion){
         s("<PExecuter@");writeOut(s,cast(void*)this);
         if (shortVersion) {
             s(" >");

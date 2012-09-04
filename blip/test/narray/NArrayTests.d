@@ -41,7 +41,7 @@ string NArrayInLoop(string arrName,int rank,string ivarStr){
     string res="";
     res~=arrName~"[";
     for (int i=0;i<rank;++i) {
-        res~=ivarStr~"_"~ctfe_i2a(i)~"_";
+        res~=ivarStr~"_"~ctfe_i2s(i)~"_";
         if (i!=rank-1)
             res~=", ";
     }
@@ -60,7 +60,7 @@ void checkLoop1(T,int rank)(NArray!(T,rank) a){
         "if (*aPtr0!="~NArrayInLoop("a",rank,"i")~") throw new Exception(\"sLoopGenIdx looping1 failed\",__FILE__,__LINE__);","i"));
     }
     index_type[rank] iPos;
-    const istring loopBody1=`
+    istring loopBody1=`
     if (did_wrap) throw new Exception("counter wrapped",__FILE__,__LINE__);
     if (a.arrayIndex(iPos)!=*aPtr0) throw new Exception("sLoopPtr failed",__FILE__,__LINE__);
     did_wrap=a.incrementArrayIdx(iPos);
@@ -71,7 +71,7 @@ void checkLoop1(T,int rank)(NArray!(T,rank) a){
         mixin(sLoopPtr(rank,["a"],loopBody1,"i"));
         if (!did_wrap) throw new Exception("incomplete loop",__FILE__,__LINE__);
     }
-    const istring loopBody2=`
+    istring loopBody2=`
     if (did_wrap) throw new Exception("counter wrapped",__FILE__,__LINE__);
     if (a.arrayIndex(iPos)!=*aPtr0) throw new Exception("sLoopIdx looping failed",__FILE__,__LINE__);
     did_wrap=a.incrementArrayIdx(iPos);
@@ -183,7 +183,7 @@ bool checkResDot(U,int rank3)(NArray!(U,rank3)refVal,NArray!(U,rank3)v,int tol=8
         auto err=minFeqrel2(refVal,v);
         res=(err>=2*U.mant_dig/3-tol);
         if (!res) {
-            sout(collectIAppender(delegate void(CharSink s){
+            sout(collectIAppender(delegate void(scope CharSink s){
                 s("error:"); writeOut(s,err); s("/"); writeOut(s,U.mant_dig); s("\n");
             }));
         }
@@ -191,7 +191,7 @@ bool checkResDot(U,int rank3)(NArray!(U,rank3)refVal,NArray!(U,rank3)v,int tol=8
         res=(refVal==v);
     }
     if (!res){
-        sout(collectIAppender(delegate void(CharSink s){
+        sout(collectIAppender(delegate void(scope CharSink s){
             s("v="); writeOut(s,v); s("\n");
             s("refVal="); writeOut(s,refVal); s("\n");
         }));
@@ -223,7 +223,7 @@ void testSumAll(T,int rank)(NArray!(T,rank) a){
     }
     int err=feqrel2(refVal,dVal);
     if (err<2*real.mant_dig/3-6){
-        sout(collectIAppender(delegate void(CharSink s){
+        sout(collectIAppender(delegate void(scope CharSink s){
             s("refVal:"); writeOut(s,refVal); s("\n");
             s("dVal:"); writeOut(s,dVal); s("\n");
         }));
@@ -247,7 +247,7 @@ void testSumAxis(T,int rank)(NArray!(T,rank) a, Rand r){
     static if (rank==1){
         int err=feqrel2(refVal,dVal);
         if (err<2*real.mant_dig/3-6){
-            sout(collectIAppender(delegate void(CharSink s){
+            sout(collectIAppender(delegate void(scope CharSink s){
                 s("refVal:"); writeOut(s,refVal); s("\n");
                 s("dVal:"); writeOut(s,dVal); s("\n");
             }));
@@ -268,7 +268,7 @@ void testMultAll(T,int rank)(NArray!(T,rank) a){
     }
     int err=feqrel2(refVal,dVal);
     if (err<2*real.mant_dig/3-6){
-        sout(collectIAppender(delegate void(CharSink s){
+        sout(collectIAppender(delegate void(scope CharSink s){
             s("refVal:"); writeOut(s,refVal); s("\n");
             s("dVal:"); writeOut(s,dVal); s("\n");
         }));
@@ -292,7 +292,7 @@ void testMultAxis(T,int rank)(NArray!(T,rank) a, Rand r){
     static if (rank==1){
         int err=feqrel2(refVal,dVal);
         if (err<2*real.mant_dig/3-6){
-            sout(collectIAppender(delegate void(CharSink s){
+            sout(collectIAppender(delegate void(scope CharSink s){
                 s("refVal:"); writeOut(s,refVal); s("\n");
                 s("dVal:"); writeOut(s,dVal); s("\n");
             }));
@@ -499,13 +499,13 @@ else {
             ev2.printData(sout.call,"F8,10"); sout("\n");
             sout("leftEVect:");  leftEVect.printData(sout.call,"F8,10"); sout("\n");
             sout("rightEVect:"); rightEVect.printData(sout.call,"F8,10"); sout("\n");
-            sout(collectIAppender(delegate void(CharSink s){
+            sout(collectIAppender(delegate void(scope CharSink s){
                 s("error"); writeOut(s,err1); s("/"); writeOut(s,T.mant_dig); s("\n");
             }));
             throw new Exception("rightEVect error too large",__FILE__,__LINE__);
         }
         if (err2<T.mant_dig*2/3-tol){
-            sout(collectIAppender(delegate void(CharSink s){
+            sout(collectIAppender(delegate void(scope CharSink s){
                 s("error"); writeOut(s,err2); s("/"); writeOut(s,T.mant_dig); s("\n");
             }));
             throw new Exception("leftEVect error too large",__FILE__,__LINE__);
@@ -514,7 +514,7 @@ else {
         auto diff3=norm2NA!(ComplexTypeOf!(T),1,real)(ev2-ev3)/sqrt(cast(real)n);
         auto err3=feqrel(diff3+1.0L,1.0L);
         if (err3<T.mant_dig*2/3-tol){
-            sout(collectIAppender(delegate void(CharSink s){
+            sout(collectIAppender(delegate void(scope CharSink s){
                 s("error"); writeOut(s,err3); s("/"); writeOut(s,T.mant_dig); s("\n");
             }));
             throw new Exception("eigenvalues changed too much (from eval+evect)",__FILE__,__LINE__);
@@ -552,19 +552,19 @@ else {
             u.printData(sout("u:").call,"F8"); sout("\n");
             s.printData(sout("s:").call,"F8"); sout("\n");
             vt.printData(sout("vt:").call,"F8"); sout("\n");
-            sout(collectIAppender(delegate void(CharSink s){
+            sout(collectIAppender(delegate void(scope CharSink s){
                 s("error1"); writeOut(s,err1); s("/"); writeOut(s,T.mant_dig); s("\n");
             }));
             throw new Exception("svd does not recover a",__FILE__,__LINE__);
         }
         if (err2<T.mant_dig*2/3-tol){
-            sout(collectIAppender(delegate void(CharSink s){
+            sout(collectIAppender(delegate void(scope CharSink s){
                 s("error2"); writeOut(s,err2); s("/"); writeOut(s,T.mant_dig); s("\n");
             }));
             throw new Exception("u non orthogonal",__FILE__,__LINE__);
         }
         if (err3<T.mant_dig*2/3-tol){
-            sout(collectIAppender(delegate void(CharSink s){
+            sout(collectIAppender(delegate void(scope CharSink s){
                 s("error3"); writeOut(s,err3); s("/"); writeOut(s,T.mant_dig); s("\n");
             }));
             throw new Exception("vt non orthogonal",__FILE__,__LINE__);
@@ -573,7 +573,7 @@ else {
         auto diff4=norm2NA!(RealTypeOf!(T),1,real)(s2-s3)/sqrt(cast(real)n);
         auto err4=feqrel(diff4+1.0L,1.0L);
         if (err3<T.mant_dig*2/3-tol){
-            sout(collectIAppender(delegate void(CharSink s){
+            sout(collectIAppender(delegate void(scope CharSink s){
                 s("error4"); writeOut(s,err4); s("/"); writeOut(s,T.mant_dig); s("\n");
             }));
             throw new Exception("singular values changed too much (from svd(u,s,vt))",__FILE__,__LINE__);
@@ -602,13 +602,13 @@ else {
             d.a.printData(sout("a:").call,"F8"); sout("\n");
             ev.printData(sout("ev:").call,"F8"); sout("\n");
             eVect.printData(sout("eVect:").call,"F8"); sout("\n");
-            sout(collectIAppender(delegate void(CharSink s){
+            sout(collectIAppender(delegate void(scope CharSink s){
                 s("error1"); writeOut(s,err1); s("/"); writeOut(s,T.mant_dig); s("\n");
             }));
             throw new Exception("diagonalization error too large",__FILE__,__LINE__);
         }
         if (err2<T.mant_dig*2/3-tol){
-            sout(collectIAppender(delegate void(CharSink s){
+            sout(collectIAppender(delegate void(scope CharSink s){
                 s("error2"); writeOut(s,err2); s("/"); writeOut(s,T.mant_dig); s("\n");
             }));
             throw new Exception("non orto eVect error too large",__FILE__,__LINE__);
@@ -617,7 +617,7 @@ else {
         auto diff3=norm2NA!(RealTypeOf!(T),1,real)(ev2-ev3)/sqrt(cast(real)n);
         auto err3=feqrel(diff3+1.0L,1.0L);
         if (err3<T.mant_dig*2/3-tol){
-            sout(collectIAppender(delegate void(CharSink s){
+            sout(collectIAppender(delegate void(scope CharSink s){
                 s("error"); writeOut(s,err3); s("/"); writeOut(s,T.mant_dig); s("\n");
             }));
             throw new Exception("hermitian eigenvalues changed too much (from eval+evect)",__FILE__,__LINE__);
@@ -652,7 +652,7 @@ void testSerial(T,int rank)(NArray!(T,rank)a){
 // private mixin testInit!() autoInitTst;
 
 TestCollection narrayRTst1(T,int rank)(TestCollection superColl){
-    TestCollection coll=new TestCollection("NArray!("~T.stringof~","~ctfe_i2a(rank)~")",
+    TestCollection coll=new TestCollection("NArray!("~T.stringof~","~ctfe_i2s(rank)~")",
         __LINE__,__FILE__,superColl);
     autoInitTst.testNoFail("loopCheck1",(NArray!(T,rank) x){checkLoop1!(T,rank)(x);},
         __LINE__,__FILE__,coll);
@@ -748,7 +748,7 @@ void doNArrayFixTests(){
     checkeq(a3[1],[1,0,2,0,3,0]);
     checkeq(a3[2],[0,0,0,0,0,0]);
     checkeq(a4[0,Range(1,3),Range(1,4,2)],[5,7,9,11]);
-    if (collectIAppender(delegate void(CharSink s){ s("a4:"); a4.printData(s,",6",10,"   "); s("\n");})!=
+    if (collectIAppender(delegate void(scope CharSink s){ s("a4:"); a4.printData(s,",6",10,"   "); s("\n");})!=
 `a4:[[[0     ,1     ,2     ,3     ],
      [4     ,5     ,6     ,7     ],
      [8     ,9     ,10    ,11    ]],
@@ -797,7 +797,7 @@ TestCollection narrayTests()(TestCollection superColl=null){
     TestCollection coll=new TestCollection("NArray",__LINE__,__FILE__,superColl);
     autoInitTst.testNoFailF("fixTests",&doNArrayFixTests,__LINE__,__FILE__,coll);
     version(Windows){
-        pragma(msg,"WARNING on windows due to limitations on the number of symbols per module only a subset of the tests is performed "~__FILE__~":"~ctfe_i2a(__LINE__));
+        pragma(msg,"WARNING on windows due to limitations on the number of symbols per module only a subset of the tests is performed "~__FILE__~":"~ctfe_i2s(__LINE__));
         sout("WARNING\non windows due to limitations on the number of symbols per module only a subset of the tests is performed ")(__FILE__)(":")(__LINE__)("\n");
         narrayRTst1!(float,1)(coll);
         narrayRTst1!(float,2)(coll);

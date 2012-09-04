@@ -23,13 +23,13 @@ int cmp(T,U)(T t,U u){
 /// combines two hashes
 extern(C) hash_t rt_hash_combine( hash_t val1, hash_t val2 );
 /// hashes length bytes
-extern(C) hash_t rt_hash_str(void *bStart,size_t length, hash_t seed=0);
+extern(C) hash_t rt_hash_str(const(void) *bStart,size_t length, hash_t seed=0);
 /// hashes the size_t aligned block bStart[0..length]
-extern(C) hash_t rt_hash_block(size_t *bStart,size_t length, hash_t seed=0);
+extern(C) hash_t rt_hash_block(const(size_t) *bStart,size_t length, hash_t seed=0);
 
 /// returns a valid hash for the given value, this might be different than the default D hash!
-int getHash(U)(U t){
-    alias Unqual!(U) T;
+hash_t getHash(U)(U t){
+    alias UnqualAll!(U) T;
     static if (is(typeof(t.toHash())==hash_t)){
         return t.toHash();
     } else static if (is(T==char[])||is(T==byte[])||is(T==ubyte[])||is(T==void[])){
@@ -46,7 +46,7 @@ int getHash(U)(U t){
 }
 /// returns a valid hash for the given value, and combines it with a previous hash
 /// this might be different than the default D hash!
-int getHash(T,U)(T t,U hash){
+hash_t getHash(T,U)(T t,U hash){
     static assert(is(U==hash_t));
     static if (is(typeof(t.toHash(hash))==hash_t)){
         return t.toHash(hash);
@@ -171,7 +171,7 @@ bool isNullT(T)(ref T obj){
 
 /// the non array core types
 template isBasicCoreType(T){
-    const bool isBasicCoreType=is(T==bool)||is(T==byte)||is(T==ubyte)||is(T==short)
+    immutable bool isBasicCoreType=is(T==bool)||is(T==byte)||is(T==ubyte)||is(T==short)
      ||is(T==ushort)||is(T==int)||is(T==uint)||is(T==float)
      ||is(T==long)||is(T==ulong)||is(T==double)||is(T==real)
      ||is(T==ifloat)||is(T==idouble)||is(T==ireal)||is(T==cfloat)
@@ -179,7 +179,7 @@ template isBasicCoreType(T){
 }
 /// the basic types, out of these more complex types are built
 template isCoreType(T){
-    const bool isCoreType=is(T==bool)||is(T==byte)||is(T==ubyte)||is(T==short)
+    immutable bool isCoreType=is(T==bool)||is(T==byte)||is(T==ubyte)||is(T==short)
      ||is(T==ushort)||is(T==int)||is(T==uint)||is(T==float)
      ||is(T==long)||is(T==ulong)||is(T==double)||is(T==real)
      ||is(T==ifloat)||is(T==idouble)||is(T==ireal)||is(T==cfloat)
@@ -196,14 +196,85 @@ alias Tuple!(char[],wchar[],dchar[]) CoreStringTypes;
 template strForCoreType(T){
     static if (is(T S:S[])){
         static if (is(T==ubyte[])){
-            const istring strForCoreType="binaryBlob";
+            istring strForCoreType="binaryBlob";
         } else static if (is(T==void[])){
-            const istring strForCoreType="binaryBlob2";
+            istring strForCoreType="binaryBlob2";
         } else {
-            const istring strForCoreType=S.stringof~"Str";
+            istring strForCoreType=S.stringof~"Str";
         }
     } else{
-        const istring strForCoreType=T.stringof;
+        istring strForCoreType=T.stringof;
     }
 }
 
+
+/// compile time integer to string
+string ctfe_i2s(int i){
+    string digit="0123456789";
+    string res="";
+    if (i==0){
+        return "0";
+    }
+    bool neg=false;
+    if (i<0){
+        neg=true;
+        i=-i;
+    }
+    while (i>0) {
+        res=digit[i%10]~res;
+        i/=10;
+    }
+    if (neg)
+        return '-'~res;
+    else
+        return res;
+}
+/// ditto
+string ctfe_i2s(long i){
+    string digit="0123456789";
+    string res="";
+    if (i==0){
+        return "0";
+    }
+    bool neg=false;
+    if (i<0){
+        neg=true;
+        i=-i;
+    }
+    while (i>0) {
+        res=digit[cast(size_t)(i%10)]~res;
+        i/=10;
+    }
+    if (neg)
+        return '-'~res;
+    else
+        return res;
+}
+/// ditto
+string ctfe_i2s(uint i){
+    string digit="0123456789";
+    string res;
+    if (i==0){
+        return "0";
+    }
+    bool neg=false;
+    while (i>0) {
+        res=digit[i%10]~res;
+        i/=10;
+    }
+    return res;
+}
+/// ditto
+string ctfe_i2s(ulong i){
+    string digit="0123456789";
+    string res;
+    if (i==0){
+        return "0";
+    }
+    bool neg=false;
+    while (i>0) {
+        res=digit[cast(size_t)(i%10)]~res;
+        i/=10;
+    }
+    return res;
+}

@@ -55,7 +55,7 @@ struct WaitLoopOp{
         }
     }
     void waitLoopOp(void delegate() op,void delegate(void delegate())submitter){
-        auto tAtt=taskAtt.val;
+        auto tAtt=taskAtt;
         this.op=op;
         if (tAtt !is null && tAtt.mightYield){
             task=tAtt;
@@ -142,7 +142,7 @@ class EventWatcher:LoopHandlerI{
 
     void addWatcher(GenericWatcher w,void delegate(bool)inlineOp=null){
         version(TrackEvents){
-            sinkTogether(sout,delegate void(CharSink s){
+            sinkTogether(sout,delegate void(scope CharSink s){
                 dumper(s)("queuing event@")(w.ptr_)(" for addition\n");
             });
         }
@@ -165,9 +165,9 @@ class EventWatcher:LoopHandlerI{
                 flags |=Flags.LoopRunning;
             }
         
-            if (taskAtt.val is null || taskAtt.val is noTask){
+            if (taskAtt is null || taskAtt is noTask){
                 // allow spawn from this task into the default work manager
-                taskAtt.val=defaultTask;
+                taskAtt=defaultTask;
             }
             // start async communicator (for multithread communication)
             asyncWatcher.start(loop);
@@ -179,7 +179,7 @@ class EventWatcher:LoopHandlerI{
                 flags = flags & (~Flags.LoopRunning);
             }
         } catch (Exception e){
-            sinkTogether(serr,delegate void(CharSink s){
+            sinkTogether(serr,delegate void(scope CharSink s){
                 dumper(s)("EventWatcher thread crashed with Exception:")(e)("\n");
             });
         }
@@ -206,7 +206,7 @@ class EventWatcher:LoopHandlerI{
             }
         }
         Semaphore sem;
-        auto tAtt=taskAtt.val;
+        auto tAtt=taskAtt;
         void stopOldLoop(){
             ev_break(loop,EV_BREAK.ALL);
             if (sem){
@@ -240,19 +240,19 @@ class EventWatcher:LoopHandlerI{
     }
     /// sleeps a task for at least the requested amount of seconds
     static void sleepTask(double time){
-        auto tAtt=taskAtt.val;
+        auto tAtt=taskAtt;
         if (tAtt!is null && tAtt.mightYield()){
             auto w=GenericWatcher.timerCreate(time,0.0,EventHandler(tAtt,tAtt.delayLevel));
             tAtt.delay(delegate void(){
                 noToutWatcher.addWatcher(w);
             });
         } else {
-            Thread.sleep(time);
+            Thread.sleep(tsecs(time));
         }
     }
     
     bool waitForEvent(GenericWatcher w,void delegate(bool)action=null){
-        auto tAtt=taskAtt.val;
+        auto tAtt=taskAtt;
         assert(w.cb() is null,"callback should not be set, as it will be overridden");
         assert(w.data() is null,"data should not be set, as it will be overridden");
         if (tAtt!is null && tAtt.mightYield()){
@@ -300,13 +300,13 @@ class TimeoutManager:LoopHandlerI{
         int status=Status.NotStarted;
 
         equals_t opEquals(ref TimedEvent t2){
-            return &t2 is this;
+            return &t2 is &this;
         }
         int opCmp(ref TimedEvent t2){
             if (endTime<t2.endTime){
                 return -1;
             } else if (endTime==t2.endTime){
-                return ((&t2 is this)?0:((this < &t2)?-1:1)); 
+                return ((&t2 is &this)?0:((&this < &t2)?-1:1)); 
             } else {
                 return 1;
             }
@@ -318,15 +318,15 @@ class TimeoutManager:LoopHandlerI{
             }
             Val v;
             v.t=endTime;
-            v.ptr=this;
+            v.ptr=&this;
             return rt_hash_str(&v,v.sizeof);
         }
         void release0(){
             if (pool !is null){
                 refCount=1;
-                pool.giveBack(this);
+                pool.giveBack(&this);
             } else {
-                delete this;
+                //delete this; // not possible anymore
             }
         }
         mixin RefCountMixin!();
@@ -338,8 +338,8 @@ class TimeoutManager:LoopHandlerI{
                 event.start(timeoutManager.loop);
                 next=timeoutManager.list.next;
                 prev=&timeoutManager.list;
-                timeoutManager.list.next=this;
-                next.prev=this;
+                timeoutManager.list.next=&this;
+                next.prev=&this;
                 if (next is prev) { // the list was empty
                     timeoutManager.maybeSetTimer();
                 }
@@ -372,8 +372,8 @@ class TimeoutManager:LoopHandlerI{
             }
             prev.next=next;
             next.prev=prev;
-            next=this;
-            prev=this;
+            next=&this;
+            prev=&this;
             if (eventOp) eventOp(false);
             if (task!is null){
                 if (task.status>=TaskStatus.Started){
@@ -397,8 +397,8 @@ class TimeoutManager:LoopHandlerI{
             }
             prev.next=next;
             next.prev=prev;
-            next=this;
-            prev=this;
+            next=&this;
+            prev=&this;
             if (eventOp) eventOp(true);
             if (task!is null){
                 if (task.status>=TaskStatus.Started){
@@ -420,14 +420,14 @@ class TimeoutManager:LoopHandlerI{
             retain();
             status=Status.Submitted;
             assert(event.cb() is null || event.cb() is &cCallback,"callback should not be set as it will be overridden");
-            assert(event.data() is null || event.data!(typeof(this))() is this,"data should not be set as it will be overridden");
-            event.cb(this);
+            assert(event.data() is null || event.data!(typeof(&this))() is &this,"data should not be set as it will be overridden");
+            event.cb(&this);
             timeoutManager.watcher.addAction(&this.startEvent);
         }
         /// starts the event and wait for its execution or timeout
         /// returns true if no timeout did happen
         bool startAndWait(){
-            auto tAtt=taskAtt.val;
+            auto tAtt=taskAtt;
             retain();
             scope(exit) {
                 release();
@@ -480,8 +480,8 @@ class TimeoutManager:LoopHandlerI{
             if (event.ptr() is null) event.giveBack();
             eventOp=null;
             timeoutManager=null;
-            prev=this;
-            next=this;
+            prev=&this;
+            next=&this;
             endTime=0;
             task=null;
             delayLevel=0;

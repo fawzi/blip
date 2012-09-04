@@ -137,7 +137,7 @@ string startMixin(){
         case Kind.none:
         break;
         default:
-        throw new Exception(collectIAppender(delegate void(CharSink s){
+        throw new Exception(collectIAppender(delegate void(scope CharSink s){
             dumper(s)("cannot start kind ")(kind);
         }),__FILE__,__LINE__);
     }`;
@@ -160,7 +160,7 @@ string stopMixin(){
         if ((kind&Kind.io)!=0){
             ev_io_stop(loop,ptr!(ev_io)());
         } else {
-            throw new Exception(collectIAppender(delegate void(CharSink s){
+            throw new Exception(collectIAppender(delegate void(scope CharSink s){
                 dumper(s)("cannot stop kind ")(kind);
             }),__FILE__,__LINE__);
         }
@@ -242,7 +242,7 @@ struct GenericWatcher{
     int kind;
     PoolI!(GenericWatcher) pool; // should be set only if it is based on any_watcher
     
-    void desc(void delegate(string)s){
+    void desc(scope void delegate(in cstring)s){
         dumper(s)("<GenericWatcher@")(ptr_)(" kind:")(kind)(">");
     }
     
@@ -279,7 +279,7 @@ struct GenericWatcher{
     /// Starts (activates) the given watcher. Only active watchers will receive events. If the watcher is already active nothing will happen.
     void start(ev_loop_t* loop){
         version(TrackEvents){
-            sinkTogether(sout,delegate void(CharSink s){
+            sinkTogether(sout,delegate void(scope CharSink s){
                 dumper(s)("starting event@")(cast(void*)ptr_)(" on loop@")(cast(void*)loop)("\n");
             });
         }
@@ -293,7 +293,7 @@ struct GenericWatcher{
     /// It is possible that stopped watchers are pending - for example, non-repeating timers are being stopped when they become pending - but calling ev_TYPE_stop ensures that the watcher is neither active nor pending. If you want to free or reuse the memory used by the watcher it is therefore a good idea to always call its stop function.
     void stop(ev_loop_t* loop){
         version(TrackEvents){
-            sinkTogether(sout,delegate void(CharSink s){
+            sinkTogether(sout,delegate void(scope CharSink s){
                 dumper(s)("stopping event@")(cast(void*)ptr_)(" on loop@")(cast(void*)loop)("\n");
             });
         }
@@ -423,7 +423,7 @@ struct GenericWatcher{
                 ev_timer_again(loop,ptr!(ev_timer)());
                 break;
             default:
-                throw new Exception(collectIAppender(delegate void(CharSink s){
+                throw new Exception(collectIAppender(delegate void(scope CharSink s){
                     dumper(s)("the kind ")(kind)(" does not support *again");
                 }),__FILE__,__LINE__);
         }
@@ -470,13 +470,13 @@ struct GenericWatcher{
     }
     /// returns the content as a pointer to type T
     T* ptr(T=void*)(){
-        assert(canCastTo!(T)(kind),collectIAppender(delegate void(CharSink s){
+        assert(canCastTo!(T)(kind),collectIAppender(delegate void(scope CharSink s){
             dumper(s)("invalid cast of kind ")(kind)(" to ")(T.stringof);
         }));
         return cast(T*)ptr_;
     }
     TP ptrP(TP)(){
-        assert(canCastTo!(typeof(*TP.init))(kind),collectIAppender(delegate void(CharSink s){
+        assert(canCastTo!(typeof(*TP.init))(kind),collectIAppender(delegate void(scope CharSink s){
             dumper(s)("invalid cast of kind ")(kind)(" to ")(TP.stringof);
         }));
         return cast(TP)ptr_;

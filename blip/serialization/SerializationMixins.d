@@ -18,7 +18,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 module blip.serialization.SerializationMixins;
-public import blip.core.Traits: ctfe_i2a,isStaticArrayType,DynamicArrayType;
+public import blip.core.Traits: ctfe_i2s,isStaticArrayType,DynamicArrayType;
 import blip.Comp;
 
 string [] extractFieldsAndDocs(string fieldsDoc){
@@ -89,18 +89,18 @@ string serializeSome(string typeName1,string doc,string fieldsDoc){
             static if (is(typeof(this.`~field~`()))){
                 alias typeof(this.`~field~`()) FieldType;
                     FieldType thisField=this.`~field~`;
-                    s.field(metaI[`~ctfe_i2a(ifield)~`],thisField);
+                    s.field(metaI[`~ctfe_i2s(ifield)~`],thisField);
                     this.`~field~`=thisField;
             } else {
                 alias typeof(this.`~field~`) FieldType;
                 static if(isStaticArrayType!(FieldType)){
                     auto thisField=this.`~field~`[];
-                    s.field(metaI[`~ctfe_i2a(ifield)~`],thisField);
+                    s.field(metaI[`~ctfe_i2s(ifield)~`],thisField);
                     assert(this.`~field~`.length==thisField.length);
                     if (this.`~field~`.ptr !is thisField.ptr)
                         this.`~field~`[]=thisField;
                 } else {
-                    s.field(metaI[`~ctfe_i2a(ifield)~`],this.`~field~`);
+                    s.field(metaI[`~ctfe_i2s(ifield)~`],this.`~field~`);
                 }
             }
         }`;
@@ -207,18 +207,18 @@ string createView(string viewName,string doc,string fieldsDoc,string baseType=""
                 static if (is(typeof(el.`~field~`()))){
                     alias typeof(el.`~field~`()) FieldType;
                         FieldType thisField=el.`~field~`;
-                        s.field(metaI[`~ctfe_i2a(ifield)~`],thisField);
+                        s.field(metaI[`~ctfe_i2s(ifield)~`],thisField);
                         el.`~field~`=thisField;
                 } else {
                     alias typeof(el.`~field~`) FieldType;
                     static if(isStaticArrayType!(FieldType)){
                         auto thisField=el.`~field~`[];
-                        s.field(metaI[`~ctfe_i2a(ifield)~`],thisField);
+                        s.field(metaI[`~ctfe_i2s(ifield)~`],thisField);
                         assert(el.`~field~`.length==thisField.length);
                         if (el.`~field~`.ptr !is thisField.ptr)
                             el.`~field~`[]=thisField;
                     } else {
-                        s.field(metaI[`~ctfe_i2a(ifield)~`],el.`~field~`);
+                        s.field(metaI[`~ctfe_i2s(ifield)~`],el.`~field~`);
                     }
                 }
             }`;
@@ -257,25 +257,28 @@ string createView(string viewName,string doc,string fieldsDoc,string baseType=""
     return res;
 }
 
-string descSome(string typeName1,string fieldsDoc){
-    string typeName;
+string descSome(string typeName,string fieldsDoc){
     string res=`
-    void desc(void delegate(cstring) sink){
+    void desc(scope void delegate(in cstring) sink){
         dumper(sink)("{ class:")`;
     if (typeName.length==0) {
-        res~="(typeof(this).mangleof)";
+        res~="(typeof(this).mangleof);";
     } else {
-        res~="`("~typeName~")`";
+        res~="(`"~typeName~"`);";
     }
-    res~=`("@")(cast(void*)this)`;
+    res~=`
+	static if (is(typeof(this)==class))
+	    dumper(sink)("@")(cast(void*)this);
+	else
+	    dumper(sink)("@")(cast(void*)&this);
+        dumper(sink)`;
     auto fieldsDocArray=extractFieldsAndDocs(fieldsDoc);
     for (int ifield=0;ifield<fieldsDocArray.length/2;++ifield){
         auto field=fieldsDocArray[2*ifield];
         auto doc=fieldsDocArray[2*ifield+1];
-        res~=`
-            (",`~field~`:")(`~field~`)`;
+        res~=`(",`~field~`:")(`~field~`)`;
     }
-    res~=`;
+    res~=`("}");
     }`;
     return res;
 }

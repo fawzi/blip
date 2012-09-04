@@ -61,7 +61,7 @@ static if (LockVersion){
                 _val+=v;
             }
         }
-        void desc(CharSink s){
+        void desc(scope CharSink s){
             T mVal;
             synchronized(m){
                 mVal=_val;
@@ -72,7 +72,7 @@ static if (LockVersion){
 } else {
     /// fast unique number (that handles well the absence of atomic ops)
     struct UniqueNumber(T){
-        T _val;
+        shared T _val;
         /// creates a unique number object with the given initial value
         static UniqueNumber opCall(T firstVal=cast(T)0){
             UniqueNumber res;
@@ -92,7 +92,7 @@ static if (LockVersion){
         void opAddAssign(T val){
             atomicAdd(_val,val);
         }
-        void desc(CharSink s){
+        void desc(scope CharSink s){
             auto mVal=_val;
             dumper(s)("<UniqueNumber@")(cast(void*)&_val)(" nextValue:")(mVal)(">");
         }

@@ -41,11 +41,11 @@ class FiberPoolT(int batchSize=16):Pool!(Fiber,batchSize){
     
     override Fiber clear(Fiber f){
         if (f !is null){
-            if (f.stackSize==stackSize){
+            //if (f.stackSize==stackSize){
                 f.clear();
                 return f;
-            }
-            delete f;
+		//}
+		//delete f;
         }
         return null;
     }
@@ -55,9 +55,9 @@ class FiberPoolT(int batchSize=16):Pool!(Fiber,batchSize){
     }
     
     override Fiber allocateNew(){
-        auto el=new Fiber(stackSize);
+        auto el=new Fiber(function void() {},stackSize);
         debug(TrackFibers){
-            sinkTogether(sout,delegate void(CharSink s){
+            sinkTogether(sout,delegate void(scope CharSink s){
                 auto ctx=el.m_ctxt;
                 writeOut!(CharSink,uint,char[1])(sout.call,34u,"x");
                 dumper(s)("FiberPool @")(cast(void*)this)(" created new Fiber@")(cast(void*)el)(" m_ctxt.bstack:")(((ctx is null)?cast(size_t)0:cast(size_t)ctx.bstack),"x")(" m_ctxt.tstack:")(((ctx is null)?cast(size_t)0:cast(size_t)ctx.tstack),"x")(" m_size:")(el.m_size)("\n");
@@ -81,7 +81,7 @@ class FiberPoolT(int batchSize=16):Pool!(Fiber,batchSize){
     override Fiber getObj(){
         auto el=super.getObj();
         debug(TrackFibers){
-            sinkTogether(sout,delegate void(CharSink s){
+            sinkTogether(sout,delegate void(scope CharSink s){
                 auto ctx=el.m_ctxt;
                 dumper(s)("FiberPool @")(cast(void*)this)(" getObj will return Fiber@")(cast(void*)el)("\n");
             });
@@ -90,7 +90,7 @@ class FiberPoolT(int batchSize=16):Pool!(Fiber,batchSize){
     }
     override void giveBack(Fiber obj){
         debug(TrackFibers){
-            sinkTogether(sout,delegate void(CharSink s){
+            sinkTogether(sout,delegate void(scope CharSink s){
                 dumper(s)("pool @")(cast(void*)this)(" got back Fiber@")(cast(void*)obj)("\n");
             });
         }

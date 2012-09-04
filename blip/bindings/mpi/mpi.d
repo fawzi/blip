@@ -120,17 +120,17 @@ enum{
 /*
  * More constants
  */
-const void *MPI_BOTTOM=null;
-const void *MPI_IN_PLACE=cast(void *) 1;
+immutable void *MPI_BOTTOM=null;
+immutable void *MPI_IN_PLACE=cast(void *) 1;
 
 enum{
  MPI_BSEND_OVERHEAD=128,
  MPI_MAX_INFO_KEY=36,
  MPI_MAX_INFO_VAL=256,
 }
-const char**  MPI_ARGV_NULL      =null;
-const char*** MPI_ARGVS_NULL     =null;
-const int*    MPI_ERRCODES_IGNORE=null;
+immutable char**  MPI_ARGV_NULL      =null;
+immutable char*** MPI_ARGVS_NULL     =null;
+immutable int*    MPI_ERRCODES_IGNORE=null;
 enum {
  MPI_MAX_PORT_NAME=1024,
  MPI_MAX_NAME_LEN=MPI_MAX_PORT_NAME,
@@ -344,8 +344,8 @@ shared static this(){
     MPI_FILE_NULL = cast(MPI_File)&ompi_mpi_file_null;
 }
 
-const MPI_Status* MPI_STATUS_IGNORE=cast(MPI_Status *)null;
-const MPI_Status* MPI_STATUSES_IGNORE=cast(MPI_Status *)null;
+immutable MPI_Status* MPI_STATUS_IGNORE=cast(MPI_Status *)null;
+immutable MPI_Status* MPI_STATUSES_IGNORE=cast(MPI_Status *)null;
 
 /* MPI-2 specifies that the name "MPI_TYPE_NULL_DELETE_FN" (and all
    related friends) must be accessible in C, C++, and Fortran. This is

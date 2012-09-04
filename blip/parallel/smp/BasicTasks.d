@@ -27,7 +27,6 @@ import blip.stdc.string;
 import blip.io.BasicIO;
 import blip.container.GrowableArray;
 import blip.core.sync.Semaphore;
-import blip.util.TemplateFu:ctfe_i2a;
 import blip.BasicModels;
 import blip.container.Pool;
 import blip.sync.Atomic;
@@ -119,7 +118,7 @@ class TaskPoolT(int batchSize=16):Pool!(Task,batchSize){
     
     override void giveBack(Task obj){
         if (obj.status!=TaskStatus.Finished && obj.status>=TaskStatus.Started){
-            throw new Exception(collectIAppender(delegate void(CharSink s){
+            throw new Exception(collectIAppender(delegate void(scope CharSink s){
                 dumper(s)("unexpected status ")(obj.status)(" in given back task ")(obj)("\n");
             }),__FILE__,__LINE__);
         }
@@ -194,7 +193,7 @@ struct YieldableCall{
 /// other tasks. Tasks with higher level are tasks (like communication) that
 /// should be done as soon as possible, even if overlap with other tasks is
 /// then needed
-const int SimpleTaskLevel=int.max/2;
+immutable int SimpleTaskLevel=int.max/2;
 
 /// no task is executing (just a way to get an error when spawning)
 __gshared TaskI noTask;
@@ -232,8 +231,8 @@ class Task:TaskI{
     TaskI[] holdedSubtasks; /// the subtasks on hold (debug, to remove)
     
     TaskFlags flags; /// various flags wrt. the task
-    int refCount; /// number of references to this task
-    int spawnTasks; /// number of spawn tasks executing at the moment
+    shared int refCount; /// number of references to this task
+    shared int spawnTasks; /// number of spawn tasks executing at the moment
     version(NoTaskLock){ } else {
         Mutex taskLock; /// lock to update task numbers and status (remove and use atomic ops)
     }
@@ -262,7 +261,7 @@ class Task:TaskI{
         auto tAtt=taskAtt;
         if (tAtt is null || !tAtt.mightYield()){
             if (tAtt !is null || cast(RootTask)tAtt !is null) return;
-            throw new Exception(collectIAppender(delegate void(CharSink s){
+            throw new Exception(collectIAppender(delegate void(scope CharSink s){
                 dumper(s)("asked to yield task ")(tAtt)(" which cannot be yielded");
             }),__FILE__,__LINE__);
         }
@@ -383,7 +382,7 @@ class Task:TaskI{
     /// empty constructor, task will need to be reset before using
     this(){
         version(TrackCollections){
-            sinkTogether(sout,delegate void(CharSink s){
+            sinkTogether(sout,delegate void(scope CharSink s){
                 dumper(s)("creating Task@")(cast(void*)this)("\n");
             });
         }
@@ -391,7 +390,7 @@ class Task:TaskI{
     /// constructor (with single delegate)
     this(string name, void delegate() taskOp,TaskFlags f=TaskFlags.None){
         version(TrackCollections){
-            sinkTogether(sout,delegate void(CharSink s){
+            sinkTogether(sout,delegate void(scope CharSink s){
                 dumper(s)("creating Task@")(cast(void*)this)("\n");
             });
         }
@@ -401,7 +400,7 @@ class Task:TaskI{
     /// constructor with a possibly yieldable call
     this(string name, YieldableCall c){
         version(TrackCollections){
-            sinkTogether(sout,delegate void(CharSink s){
+            sinkTogether(sout,delegate void(scope CharSink s){
                 dumper(s)("creating Task@")(cast(void*)this)("\n");
             });
         }
@@ -414,7 +413,7 @@ class Task:TaskI{
     /// constructor (with fiber)
     this(string name,Fiber fiber,TaskFlags f=TaskFlags.None){
         version(TrackCollections){
-            sinkTogether(sout,delegate void(CharSink s){
+            sinkTogether(sout,delegate void(scope CharSink s){
                 dumper(s)("creating Task@")(cast(void*)this)("\n");
             });
         }
@@ -424,7 +423,7 @@ class Task:TaskI{
     /// constructor (with generator)
     this(string name, bool delegate() generator,TaskFlags f=TaskFlags.None){
         version(TrackCollections){
-            sinkTogether(sout,delegate void(CharSink s){
+            sinkTogether(sout,delegate void(scope CharSink s){
                 dumper(s)("creating Task@")(cast(void*)this)("\n");
             });
         }
@@ -434,7 +433,7 @@ class Task:TaskI{
     /// constructor (with generator)
     this(string name, TaskI delegate() generator2,TaskFlags f=TaskFlags.None){
         version(TrackCollections){
-            sinkTogether(sout,delegate void(CharSink s){
+            sinkTogether(sout,delegate void(scope CharSink s){
                 dumper(s)("creating Task@")(cast(void*)this)("\n");
             });
         }
@@ -445,7 +444,7 @@ class Task:TaskI{
     this(string name, void delegate() taskOp,Fiber fiber,
         bool delegate() generator,TaskI delegate() generator2, TaskFlags f=TaskFlags.None, FiberPool fPool=null){
         version(TrackCollections){
-            sinkTogether(sout,delegate void(CharSink s){
+            sinkTogether(sout,delegate void(scope CharSink s){
                 dumper(s)("creating Task@")(cast(void*)this)("\n");
             });
         }
@@ -453,7 +452,7 @@ class Task:TaskI{
     }
     version(TrackCollections){
         ~this(){
-            sinkTogether(sout,delegate void(CharSink s){
+            sinkTogether(sout,delegate void(scope CharSink s){
                 dumper(s)("collecting Task@")(cast(void*)this)("\n");
             });
         }
@@ -503,7 +502,7 @@ class Task:TaskI{
                 auto endFlags=(delayFlags>>(delayLevel-2));
                 auto lastLevel=(endFlags&0x3);
                 debug(TrackDelayFlags){
-                    sinkTogether(sout,delegate void(CharSink s){
+                    sinkTogether(sout,delegate void(scope CharSink s){
                         dumper(s)("preExe, flags:")(delayFlags,"x")("\n");
                     });
                 }
@@ -529,7 +528,7 @@ class Task:TaskI{
                 fPool=defaultFiberPool(fPool);
                 fiber=fPool.getObj(taskOp);
                 debug(TrackFibers){
-                    sinkTogether(localLog,delegate void(CharSink s){
+                    sinkTogether(localLog,delegate void(scope CharSink s){
                         dumper(s)("task ")(this)(" is using Fiber@")(cast(void*)fiber)("\n");
                     });
                 }
@@ -561,7 +560,7 @@ class Task:TaskI{
                 if (delayLevel>0){
                     auto endFlags=(delayFlags>>(delayLevel-2));
                     debug(TrackDelayFlags){
-                        sinkTogether(sout,delegate void(CharSink s){
+                        sinkTogether(sout,delegate void(scope CharSink s){
                             dumper(s)("PostExe, flags:")(delayFlags,"x")("\n");
                         });
                     }
@@ -668,7 +667,7 @@ class Task:TaskI{
         if (oldRefC==1){
             giveBack();
         } else {
-            debug(TrackTasks) sinkTogether(localLog,delegate void(CharSink s){
+            debug(TrackTasks) sinkTogether(localLog,delegate void(scope CharSink s){
                 dumper(s)("could not yet reuse Task@")(cast(void*)this)(" in release as refCount was ")(oldRefC)("\n"); // do this because this could be released before printing...
             });
         }
@@ -676,7 +675,7 @@ class Task:TaskI{
     /// gives back the task (called automatically when you release the last time)
     void giveBack(){
         version(NoReuse){ } else {
-            debug(TrackTasks) sinkTogether(localLog,delegate void(CharSink s){
+            debug(TrackTasks) sinkTogether(localLog,delegate void(scope CharSink s){
                 dumper(s)("giving back task ")(this)("\n");
             });
             if (fiber !is null && fPool!is null){
@@ -687,12 +686,12 @@ class Task:TaskI{
                 tPool.giveBack(this.retain);
             } else {
                 if (fiber!is null){
-                    debug(TrackTasks) sinkTogether(localLog,delegate void(CharSink s){
+                    debug(TrackTasks) sinkTogether(localLog,delegate void(scope CharSink s){
                         dumper(s)("could not reuse fiber@")(cast(void*)fiber)(" of task ")(taskName)("@")(cast(void*)this)(", destroying\n");
                     });
                     delete fiber;
                 }
-                debug(TrackTasks) sinkTogether(localLog,delegate void(CharSink s){
+                debug(TrackTasks) sinkTogether(localLog,delegate void(scope CharSink s){
                     dumper(s)("could not reuse task ")(this)(", destroying\n");
                 });
                 delete this;
@@ -702,7 +701,7 @@ class Task:TaskI{
     /// the current delay level
     int delayLevel(){
         auto res=bsr(delayFlags);
-        assert((res&1)==0,collectIAppender(delegate void(CharSink s){
+        assert((res&1)==0,collectIAppender(delegate void(scope CharSink s){
             dumper(s)("unexpected delayFlags:")(delayFlags);
         }));
         return (res>>1);
@@ -757,13 +756,13 @@ class Task:TaskI{
             assert(false,"unimplemented");
         } else {
             int delayLevel=(delayLevel_<<1);
-            debug(TrackTasks) sinkTogether(localLog,delegate void(CharSink s){
+            debug(TrackTasks) sinkTogether(localLog,delegate void(scope CharSink s){
                 dumper(s)("will resubmit task ")(this)("\n");
             });
             bool resub=false;
             synchronized(taskLock){
                 debug(TrackDelayFlags){
-                    sinkTogether(sout,delegate void(CharSink s){
+                    sinkTogether(sout,delegate void(scope CharSink s){
                         dumper(s)("preResubmit")(delayLevel_)(", flags:")(delayFlags,"x")("\n");
                     });
                 }
@@ -790,7 +789,7 @@ class Task:TaskI{
 	    auto sched=scheduler;
             if (resub){
                 debug(TrackDelayFlags){
-                    sinkTogether(sout,delegate void(CharSink s){
+                    sinkTogether(sout,delegate void(scope CharSink s){
                         dumper(s)("preResubmit add task back ")(delayLevel_)(", flags:")(delayFlags,"x")("\n");
                     });
                 }
@@ -798,7 +797,7 @@ class Task:TaskI{
             }
             sched.subtaskDeactivated(this);
             debug(TrackDelayFlags){
-                sinkTogether(sout,delegate void(CharSink s){
+                sinkTogether(sout,delegate void(scope CharSink s){
                     dumper(s)("postResubmit ")(delayLevel_)(", flags:")(delayFlags,"x")("\n");
                 });
             }
@@ -813,7 +812,7 @@ class Task:TaskI{
     /// stopping the current execution. Use it to start the operation that will resume
     /// the task (so that it is not possible to resume before the delay is effective)
     /// a similar thing could be done using a "delay count" but I find this cleaner and safer
-    void delay(void delegate() opStart=null){
+    void delay(scope void delegate() opStart=null){
         int myDelayLevel;
         auto tAtt=taskAtt;
         if (tAtt !is this){
@@ -825,7 +824,7 @@ class Task:TaskI{
         } else {
             synchronized(taskLock){
                 debug(TrackDelayFlags){
-                    sinkTogether(sout,delegate void(CharSink s){
+                    sinkTogether(sout,delegate void(scope CharSink s){
                         dumper(s)("preDelay, flags:")(delayFlags,"x")("\n");
                     });
                 }
@@ -839,7 +838,7 @@ class Task:TaskI{
                 delayFlags|=(0x4<<myDelayLevel);
                 assert(lastDelayFlags(delayFlags)==DelayStat.WantSuspend);
                 debug(TrackDelayFlags){
-                    sinkTogether(sout,delegate void(CharSink s){
+                    sinkTogether(sout,delegate void(scope CharSink s){
                         dumper(s)("delay, preOp flags:")(delayFlags,"x")("\n");
                     });
                 }
@@ -852,7 +851,7 @@ class Task:TaskI{
             assert(opStart!is null);
             opStart();
             debug(TrackDelayFlags){
-                sinkTogether(sout,delegate void(CharSink s){
+                sinkTogether(sout,delegate void(scope CharSink s){
                     dumper(s)("delay postTask, flags:")(delayFlags,"x")("\n");
                 });
             }
@@ -861,7 +860,7 @@ class Task:TaskI{
             synchronized(taskLock){
                 auto levelAtt=bsr(delayFlags);
                 if (levelAtt!=myDelayLevel+2){
-                    throw new ParaException(collectIAppender(delegate void(CharSink s){
+                    throw new ParaException(collectIAppender(delegate void(scope CharSink s){
                         dumper(s)("unexpected 2*delay level at the end of delay of (")(taskName)("), ")
                             (levelAtt)(" vs ")(myDelayLevel);
                     }), __FILE__,__LINE__);
@@ -884,7 +883,7 @@ class Task:TaskI{
                 }
             }
             debug(TrackDelayFlags){
-                sinkTogether(sout,delegate void(CharSink s){
+                sinkTogether(sout,delegate void(scope CharSink s){
                     dumper(s)("delay preYield, flags:")(delayFlags,"x")("\n");
                 });
             }
@@ -894,7 +893,7 @@ class Task:TaskI{
             }
         }
         debug(TrackDelayFlags){
-            sinkTogether(sout,delegate void(CharSink s){
+            sinkTogether(sout,delegate void(scope CharSink s){
                 dumper(s)("postDelay, flags:")(delayFlags,"x")("\n");
             });
         }
@@ -1175,13 +1174,13 @@ class Task:TaskI{
         return collectIAppender(cast(OutWriter)&desc);
     }
     /// description (for debugging)
-    void desc(void delegate(cstring) s){
+    void desc(scope void delegate(in cstring) s){
         return desc(s,true);
     }
     /// description (for debugging)
     /// (might not be a snapshot if other threads modify it while printing)
     /// non threadsafe
-    void desc(void delegate(cstring) s,bool shortVersion){
+    void desc(scope void delegate(in cstring) s,bool shortVersion){
         if (this is null){
             s("<Task *NULL*>");
         } else {
@@ -1198,7 +1197,7 @@ class Task:TaskI{
         }
     }
     /// prints the fields (superclasses can override this an call it through super)
-    void fieldsDesc(void delegate(cstring) sink){
+    void fieldsDesc(scope void delegate(in cstring) sink){
         auto s=dumper(sink);
         s("  level=")(level)(",\n");
         s("  taskOp:");
@@ -1259,14 +1258,14 @@ class Task:TaskI{
     void wait()
     in{
         if (refCount<=0){
-            throw new Exception(collectIAppender(delegate void(CharSink s){
+            throw new Exception(collectIAppender(delegate void(scope CharSink s){
                 dumper(s)("waiting on released task ")(this)(" is dangerous (and you should have retained it before starting it)");
             }),__FILE__,__LINE__);
         }
     }
     out{
         if (refCount<=0){
-            throw new Exception(collectIAppender(delegate void(CharSink s){
+            throw new Exception(collectIAppender(delegate void(scope CharSink s){
                 dumper(s)("waiting on released task ")(this)(" (after wait) is dangerous (and you should have retained it before starting it)");
             }),__FILE__,__LINE__);
         }
@@ -1342,7 +1341,7 @@ class RootTask: Task{
         this.warnSpawn=warnSpawn;
     }
     override void internalExe(){
-        auto msg =collectIAppender(delegate void(CharSink s){
+        auto msg =collectIAppender(delegate void(scope CharSink s){
             dumper(s)("root task ")(this)(" should not be executed"); });
         log.error(msg);
         assert(0,msg);
@@ -1411,7 +1410,7 @@ class SequentialTask:RootTask{
             auto tNow=taskAtt;
             while (tNow!is null && tNow.superTask!is null && tNow.superTask!is tNow){
                 if (tNow.superTask is this){
-                    throw new ParaException(collectIAppender(delegate void(CharSink s){
+                    throw new ParaException(collectIAppender(delegate void(scope CharSink s){
                             dumper(s)(this)(".spawnTaskSync(")(task)(") called while executing ")
                                 (taskAtt)(" which is a subtask of ")(this)(" (wait between sequential tasks)");
                         }),__FILE__,__LINE__);
@@ -1472,7 +1471,7 @@ class SequentialTask:RootTask{
         }
     }
     
-    void desc(CharSink sink,bool shortDesc){
+    void desc(scope CharSink sink,bool shortDesc){
         auto s=dumper(sink);
         s(`{class:blip.SequentialTask@`)(cast(void*)this);
         if (!shortDesc){
@@ -1480,7 +1479,7 @@ class SequentialTask:RootTask{
         }
         s("}");
     }
-    void desc(CharSink sink){
+    void desc(scope CharSink sink){
         desc(sink,true);
     }
 }

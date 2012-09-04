@@ -31,7 +31,7 @@ final class StreamWriter{
     this(OutputStream s){
         writer=s;
     }
-    final void writeExact(void[] src){
+    final void writeExact(in void[] src){
         auto written=writer.write(src);
         if (written!=src.length){
             if (written==OutputStream.Eof){
@@ -56,7 +56,7 @@ final class StreamWriter{
         }
     }
 
-    final void writeExactSync(void[] src){
+    final void writeExactSync(in void[] src){
         synchronized(writer){
             writeExact(src);
         }
@@ -68,12 +68,12 @@ final class StreamWriter{
         writer.flush();
         writer.close();
     }
-    void desc(CharSink s){
+    void desc(scope CharSink s){
         s(writer.conduit.toString());
     }
 }
 
-void delegate(void[]) binaryDumper(OutputStream s){
+void delegate(in void[]) binaryDumper(OutputStream s){
     auto res=new StreamWriter(s);
     return &res.writeExact;
 }
@@ -95,7 +95,7 @@ class StreamStrWriter(T){
     this(OutputStream s){
         writer=s;
     }
-    final void writeStr(T[] src){
+    final void writeStr(in T[] src){
         auto written=writer.write(src);
         if (written!=src.length*T.sizeof){
             if (written==OutputStream.Eof){
@@ -119,24 +119,24 @@ class StreamStrWriter(T){
             }
         }
     }
-    final void writeStrFlushNl(T[] src){
+    final void writeStrFlushNl(in T[] src){
         writeStr(src);
         if (find(src,'\n')!=src.length) writer.flush();
     }
-    final void writeStrFlush(T[] src){
+    final void writeStrFlush(in T[] src){
         writeStr(src);
         writer.flush();
     }    
-    final void writeStrSync(T[] src){
+    final void writeStrSync(in T[] src){
         synchronized(writer){
             writeStr(src);
         }
     }
-    final void writeStrSyncFlushNl(T[] src){
+    final void writeStrSyncFlushNl(in T[] src){
         writeStrSync(src);
         if (find(src,'\n')!=src.length) writer.flush();
     }
-    final void writeStrSyncFlush(T[] src){
+    final void writeStrSyncFlush(in T[] src){
         writeStrSync(src);
         writer.flush();
     }
@@ -147,12 +147,12 @@ class StreamStrWriter(T){
         writer.flush();
         writer.close();
     }
-    void desc(CharSink s){
+    void desc(scope CharSink s){
         s(writer.conduit.toString());
     }
 }
 
-void delegate(T[]) strDumperT(T)(OutputStream s){
+void delegate(in T[]) strDumperT(T)(OutputStream s){
     auto res=new StreamStrWriter!(T)(s);
     return &res.writeStr;
 }
@@ -163,7 +163,7 @@ BasicStreams.BasicStrStream!(T) strStreamT(T)(OutputStream s){
     return res;
 }
 
-void delegate(T[]) strDumperSyncT(T)(OutputStream s){
+void delegate(in T[]) strDumperSyncT(T)(OutputStream s){
     auto res=new StreamStrWriter!(T)(s);
     return &res.writeStrSync;
 }
@@ -196,7 +196,7 @@ class ReadHandler(T):Reader!(T){
         this.maxTranscodingOverhead=maxTranscodingOverhead;
     }
     /// handles a reader
-    bool handleReader(size_t delegate (T[],SliceExtent,out bool iterate) scan)
+    bool handleReader(scope size_t delegate (T[],SliceExtent,out bool iterate) scan)
     {
         SliceExtent sliceE=SliceExtent.Partial;
         if (buf !is null){
@@ -210,7 +210,7 @@ class ReadHandler(T):Reader!(T){
         bool matchSuccess=false;
         bool iter=false;
         do {
-            while (buf.reader(delegate size_t(void[] rawData)
+            while (buf.reader(delegate size_t(const(void)[] rawData)
                     {
                         T[] data=cropRight((cast(T*)rawData.ptr)[0..rawData.length/T.sizeof]);
                         if (sliceE==SliceExtent.ToEnd && data.length!=rawData.length)
@@ -267,7 +267,7 @@ class ReadHandler(T):Reader!(T){
             arr.close();
         }
     }
-    void desc(CharSink s){
+    void desc(scope CharSink s){
         if (buf!is null){
             s(buf.toString());
         } else if (arr!is null){
@@ -284,7 +284,7 @@ Reader!(T) toReaderT(T)(InputStream i){
 
 alias toReaderT!(char) toReaderChar;
 
-bool delegate(size_t delegate(T[],SliceExtent,out bool)) readHandlerT(T)(InputStream i){
+bool delegate(scope size_t delegate(T[],SliceExtent,out bool)) readHandlerT(T)(InputStream i){
     auto h=new ReadHandler!(T)(i);
     return &h.handleReader;
 }
@@ -338,7 +338,7 @@ final class MultiInput: MultiReader{
         else if (_readerDchar !is null ) _readerDchar.shutdownInput();
         else if (_readerBin !is null ) _readerBin.shutdownInput();
     }
-    void desc(CharSink s){
+    void desc(scope CharSink s){
         dumper(s)("MultiInput(")(_readerBin)(",")(_readerChar)(",")(_readerWchar)(",")(_readerDchar)(")");
     }
 }
@@ -346,12 +346,12 @@ final class MultiInput: MultiReader{
 
 final class ConduitEmulator: IConduit
 {
-    void delegate(void[]) sink;
+    void delegate(in void[]) sink;
     void delegate() _flush;
     void delegate() _close;
     size_t delegate(void[]) basicReader;
     
-    this(void delegate(void[]) s,size_t delegate(void[]) r,
+    this(void delegate(in void[]) s,size_t delegate(void[]) r,
         void delegate() _flush=null,void delegate() _close=null){
         sink=s;
         basicReader=r;
@@ -417,13 +417,13 @@ final class ConduitEmulator: IConduit
 
     void detach (){ }
 
-    void error (cstring msg){
+    void error (in cstring msg){
         sink(msg);
     }
 
     interface Seek {}
 
-    size_t write (void[] src){
+    size_t write (const(void)[] src){
         sink(src);
         return src.length;
     }

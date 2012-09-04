@@ -31,7 +31,7 @@ version( LDC )
 {
     import ldc.intrinsics;
 }
-import std.traits:Unqual;
+import blip.Comp:Unqual;
 
 template Unshared(T){
     static if (is(T U==shared)){
@@ -48,7 +48,7 @@ private {
      */
     template isIntegerType( T )
     {
-        const bool isIntegerType = isSignedIntegerType!(T) ||
+        immutable bool isIntegerType = isSignedIntegerType!(T) ||
                                    isUnsignedIntegerType!(T);
     }
     /**
@@ -56,19 +56,19 @@ private {
      */
     template isPointerOrClass(T)
     {
-        const isPointerOrClass = is(T==class);
+        immutable isPointerOrClass = is(T==class);
     }
 
     template isPointerOrClass(T : T*)
     {
-            const isPointerOrClass = true;
+            immutable isPointerOrClass = true;
     }
     /**
      * Evaluates to true if T is a signed integer type.
      */
     template isSignedIntegerType( T )
     {
-        const bool isSignedIntegerType = is( T == byte )  ||
+        immutable bool isSignedIntegerType = is( T == byte )  ||
                                          is( T == short ) ||
                                          is( T == int )   ||
                                          is( T == long )/+||
@@ -79,7 +79,7 @@ private {
      */
     template isUnsignedIntegerType( T )
     {
-        const bool isUnsignedIntegerType = is( T == ubyte )  ||
+        immutable bool isUnsignedIntegerType = is( T == ubyte )  ||
                                            is( T == ushort ) ||
                                            is( T == uint )   ||
                                            is( T == ulong )/+||
@@ -367,10 +367,10 @@ private T aCasT(T,V)(ref shared(T) val, T newval, T equalTo){
     union UVConv{V v; T t;}
     union UVPtrConv{V *v; T *t;}
     UVConv vNew,vOld,vAtt;
-    UVPtrConv valPtr;
+    shared UVPtrConv valPtr;
     vNew.t=newval;
     vOld.t=equalTo;
-    valPtr.t=cast(T*)&val;
+    valPtr.t=cast(shared T*)&val;
     vAtt.v=atomicCAS(*valPtr.v,vNew.v,vOld.v);
     return vAtt.t;
 }
@@ -644,7 +644,7 @@ version(LDC){
             static assert( isIntegerType!(T), "invalid type "~T.stringof );
             return cast(TT)llvm_atomic_load_add!(T)(&val, cast(T)incV);
         } else {
-	    return cast(TT)atomicOp(val,delegate T(const(T) a){ return a+incV; });
+	    return cast(TT)atomicOp(val,delegate T(in T a){ return a+incV; });
         }
     }
 } else version (D_InlineAsm_X86){
@@ -684,13 +684,13 @@ version(LDC){
                     mov int ptr res[EBP],EDX;
                 }
             } else static if (T.sizeof==8){
-                return atomicOp(val,delegate (const T x){ return x+incV; });
+                return atomicOp(val,delegate (in T x){ return x+incV; });
             } else {
                 static assert(0,"Unsupported type size");
             }
             return cast(TT)res;
         } else {
-            return cast(TT)atomicOp(val,delegate T(const T a){ return a+incV_; });
+            return cast(TT)atomicOp(val,delegate T(in T a){ return a+incV_; });
         }
     }
 } else version (D_InlineAsm_X86_64){
@@ -743,7 +743,7 @@ version(LDC){
             }
             return cast(TT)res;
         } else {
-            return cast(TT)atomicOp(val,delegate T(const T a){ return a+incV_; });
+            return cast(TT)atomicOp(val,delegate T(in T a){ return a+incV_; });
         }
     }
 } else {
@@ -782,8 +782,7 @@ version(LDC){
  * and no "fair" share is applied between fast function (more likely to succeed) and
  * the others (i.e. do not use this in case of high contention).
 */
-T atomicOp(T,U,V)(ref shared(T) val, U delegate(const(V)) f)
-    if (is(Unqual!(T)==Unqual!(U)) && is(Unqual!(T)==Unqual!(V)))
+T atomicOp(T,U,V)(ref shared(T) val, scope U delegate(V) f)
 {
     T oldV,newV,nextV;
     int i=0;
@@ -826,7 +825,7 @@ T flagSet(T,U=T)(ref shared(T) flag,U newVal){
  * Performs an operation on a flag (ensuring that all pending writes are executed before this).
  * the original value is returned.
 */
-T flagOp(T,U=T,V=T)(ref shared(T) flag,U delegate(const(V)) op){
+T flagOp(T,U=T,V=T)(ref shared(T) flag,scope U delegate(in V) op){
     memoryBarrier!(false,strictFences,false,true)();
     return atomicOp!(T,U,V)(flag,op);
 }

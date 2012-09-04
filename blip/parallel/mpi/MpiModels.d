@@ -44,15 +44,15 @@ interface Channel{
     TaskI recvTask(); // remove???
     /// send might be sent while serializing or only when you send close, thus close should be sent...
     /// can be called from any task
-    Serializer sendTag(int tag=0,ubyte[] buf=null);
+    Serializer sendTag(int tag=0,in ubyte[] buf=null);
     /// should be called from the sendTask
-    void send(Const!(double[]),int tag=0);
+    void send(in double[],int tag=0);
     /// should be called from the sendTask
-    void send(Const!(int[]),int tag=0);
+    void send(in int[],int tag=0);
     /// should be called from the sendTask
-    void send(Const!(ubyte[]),int tag=0);
+    void send(in ubyte[],int tag=0);
     /// should be called from the sendTask
-    void sendStr(Const!(cstring),int tag=0);
+    void sendStr(in cstring,int tag=0);
     /// send close to the serializer to possibly reuse the unserializer
     /// can be called from any task
     Unserializer recvTag(ref int tag,ubyte[] buf=null);

@@ -21,7 +21,7 @@ T[] compress(T)(T[]a){
 
 /// compresses in place an array removing consecutive copies of the elements that
 /// return true with cmpOp
-T[] compress(T)(T[]a,bool delegate(T x,T y)cmpOp){
+T[] compress(T)(T[]a,scope bool delegate(T x,T y)cmpOp){
     if (a.length==0) return a;
     size_t i=0,j=1,len=a.length;
     while(j<len){
@@ -33,7 +33,7 @@ T[] compress(T)(T[]a,bool delegate(T x,T y)cmpOp){
     return a[0..i+1];
 }
 
-size_t findFirstPred(T)(T[]arr,bool delegate(T) pred){
+size_t findFirstPred(T)(T[]arr,scope bool delegate(T) pred){
     auto len=arr.length;
     for (size_t i=0;i<len;++i){
         if (pred(arr[i])) return i;

@@ -80,14 +80,14 @@ struct hwloc_bitmap_t{
         auto len=hwloc_bitmap_asprintf(&res, this);
         auto s=res[0..len].dup;
 	stdlib.free(res);
-	return s;
+	return s.idup;
     }
 
     /** \brief Parse a bitmap string.
      *
      * Must start and end with a digit.
      */
-    int fromString(cstring s){
+    int fromString(in cstring s){
       int nRead=hwloc_bitmap_sscanf(this,toStringz(s));
       return nRead;
     }
@@ -115,13 +115,13 @@ struct hwloc_bitmap_t{
         char *res;
         auto len = hwloc_bitmap_list_asprintf(&res, this);
 	auto s=res[0..len].dup;
-	free(res);
-	return s;
+	stdlib.free(res);
+	return s.idup;
     }
 
     /** \brief Parse a list string and stores it in bitmap \p bitmap.
      */
-    int fromListString(cstring s){
+    int fromListString(in cstring s){
 	return hwloc_bitmap_list_sscanf(this, toStringz(s));
     }
 
@@ -187,7 +187,7 @@ struct hwloc_bitmap_t{
     
     /** \brief Test whether set \p set1 is equal to set \p set2 */
     equals_t opEqual(hwloc_bitmap_t s2){
-        return hwloc_bitmap_isequal(this,s2);
+        return hwloc_bitmap_isequal(this,s2)!=0;
     }
 
     /** \brief Test whether sets \p set1 and \p set2 intersects */
@@ -317,7 +317,7 @@ int hwloc_bitmap_asprintf(char ** strp, hwloc_bitmap_t set);
  *
  * Must start and end with a digit.
  */
-int hwloc_bitmap_sscanf(hwloc_bitmap_t,char * string);
+int hwloc_bitmap_sscanf(hwloc_bitmap_t,const(char) * string);
 
 /** \brief Stringify a bitmap in the list format.
  *

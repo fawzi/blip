@@ -40,9 +40,9 @@ struct SmpSemaphore{
         TaskISlist * next;
         int delayLevel;
     }
-    ptrdiff_t counter; /// the number of waiting threads
+    shared ptrdiff_t counter; /// the number of waiting threads
     shared Semaphore sem; // remove support for this? it is just for waiting non yieldable tasks or the main thread
-    TaskISlist *waiting;
+    shared TaskISlist *waiting;
     
     /// constructor
     static SmpSemaphore opCall(ptrdiff_t initialValue=0){
@@ -50,6 +50,7 @@ struct SmpSemaphore{
         res.counter=initialValue;
         return res;
     }
+    
     /// notify howMany waiting threads (this is cached, i.e. you can notify before any thread is actually waiting)
     void notify(ptrdiff_t howMany=1){
         if (howMany==0) howMany=counter;
@@ -60,18 +61,23 @@ struct SmpSemaphore{
             for (ptrdiff_t i=toWake;i>0;--i){
                 TaskISlist *t=null;
                 while(true){
-                    t=popFrom(waiting);
+                    t=cast(typeof(t))popFrom(waiting);
                     if (t !is null) break;
                     Thread.yield();
                 }
                 if (t.el !is null){
                     t.el.resubmitDelayed(t.delayLevel);
                 } else {
-                    while (sem is null){
+                    for(int j=0;j<30 && sem is null;++j){
                         Thread.yield();
                     }
+		    if (sem is null){
+			shared newSem=new shared(Semaphore)();
+			writeBarrier();
+			atomicCAS(sem,newSem,cast(Semaphore)null);
+		    }
                     readBarrier();
-                    sem.notify();
+                    (cast(Semaphore)sem).notify();
                 }
             }
         }
@@ -80,24 +86,24 @@ struct SmpSemaphore{
     void wait(){
         auto oldV=atomicAdd!(ptrdiff_t)(counter,1);
         if (oldV>=0){
-            auto tAtt=taskAtt.val;
+            auto tAtt=taskAtt;
             auto tt=new TaskISlist;
             if (tAtt!is null && tAtt.mightYield()){
                 tt.el=tAtt;
                 tt.delayLevel=tAtt.delayLevel;
                 tAtt.delay(delegate void(){
-                    insertAt(waiting,tt);
+			insertAt!(TaskISlist*)(waiting,tt);
                 });
             } else {
                 if (sem is null){
-                    shared newSem=new Semaphore();
+                    shared newSem=new shared(Semaphore)();
                     writeBarrier();
                     atomicCAS(sem,newSem,cast(Semaphore)null);
                 }
                 shared mySem=sem;
                 assert(mySem!is null);
                 insertAt(waiting,tt);
-                mySem.wait();
+                (cast(Semaphore)mySem).wait();
             }
         }
     }
@@ -109,7 +115,7 @@ struct SmpSemaphore{
 /// execution)
 class WaitConditionT(bool oneAtTime=true){
     bool delegate() cnd;
-    Semaphore sem;
+    shared Semaphore sem;
     TaskI waiting0,waiting1;
     TaskI[]waiting; // using this rather than delegates because it is more self descriptive, 
     /// constructor
@@ -131,7 +137,7 @@ class WaitConditionT(bool oneAtTime=true){
                 t.resubmitDelayed(t.delayLevel-1);
             }
             waiting=null;
-            if (sem!is null) sem.notify();
+            if (sem!is null) (cast(Semaphore)sem).notify();
         }
     }
     /// notify one waiter at a time that the condition was met
@@ -148,7 +154,7 @@ class WaitConditionT(bool oneAtTime=true){
                 waiting0.resubmitDelayed(waiting0.delayLevel-1);
                 waiting0=null;
             }
-            if (sem!is null) sem.notify();
+            if (sem!is null) (cast(Semaphore)sem).notify();
         }
     }
     /// notifies that the condition was met
@@ -169,7 +175,7 @@ class WaitConditionT(bool oneAtTime=true){
     /// waits for the condition
     void wait(){
         if (!cnd()){
-            auto tAtt=taskAtt.val;
+            auto tAtt=taskAtt;
             if (tAtt!is null && tAtt.mightYield()){
                 tAtt.delay({
                     synchronized(this){
@@ -186,7 +192,7 @@ class WaitConditionT(bool oneAtTime=true){
                 if (sem is null){
                     synchronized(this){
                         if (sem is null) {
-                            sem=new Semaphore();
+                            sem=new shared(Semaphore)();
                         }
                     }
                 }
@@ -194,9 +200,9 @@ class WaitConditionT(bool oneAtTime=true){
                     shared Semaphore mySem=sem;
                     auto myCnd=cnd;
                     while (!myCnd()){
-                        mySem.wait();
+                        (cast(Semaphore)mySem).wait();
                     }
-                    mySem.notify();
+                    (cast(Semaphore)mySem).notify();
                 }
             }
         }
@@ -204,7 +210,7 @@ class WaitConditionT(bool oneAtTime=true){
     }
     /// checks periodically if the condition (up to at least maxT milliseconds)
     void poll(uint maxT=uint.max){
-        TaskI tAtt=taskAtt.val;
+        TaskI tAtt=taskAtt;
         for (uint i=0;i<maxT;++i){
             for (int j=0;j<10;++j){
                 if (cnd()) {
@@ -214,10 +220,10 @@ class WaitConditionT(bool oneAtTime=true){
                 if (tAtt.mightYield()){
                     tAtt.scheduler.yield();
                 } else {
-                    Thread.sleep(0.0001);
+                    Thread.sleep(tsecs(0.0001));
                 }
             }
-            Thread.sleep(0.001);
+            Thread.sleep(tsecs(0.001));
         }
     }
 }
@@ -242,7 +248,7 @@ class WaitLock(T){
             for (int j=0;j<20;++j){
                 bool lkd=lockObj.tryLock();
                 if (lkd) return;
-                TaskI tAtt=taskAtt.val;
+                TaskI tAtt=taskAtt;
                 if (tAtt.mightYield()){
                     tAtt.scheduler.yield();
                 } else {
@@ -254,7 +260,7 @@ class WaitLock(T){
                     }
                 }
             }
-            Thread.sleep(0.001);
+            Thread.sleep(tsecs(0.001));
         }
         if (alwaysLock){
             lockObj.lock();
@@ -277,7 +283,7 @@ class RLock:Object.Monitor{
     this(){}
     /// description of this lock (for debugging purposes)
     /// threadSafe only if locked...
-    void desc(CharSink s){
+    void desc(scope CharSink s){
         dumper(s)("<RLock@")(cast(void*)this)(", locking:")(locking)
             (", lockLevel:")(lockLevel)(", waiting:")(waiting)(">");
     }
@@ -287,9 +293,9 @@ class RLock:Object.Monitor{
     }
     /// locks the recursive lock
     void lock(){
-        auto newTask=taskAtt.val;
+        auto newTask=taskAtt;
         if (newTask is null || cast(RootTask)newTask !is null){
-            throw new Exception(collectIAppender(delegate void(CharSink s){
+            throw new Exception(collectIAppender(delegate void(scope CharSink s){
                 dumper(s)("warning dangerous locking in task ")(newTask);
             }),__FILE__,__LINE__); // allow aquiring a real lock??? can deadlock...
         }
@@ -402,7 +408,7 @@ class RLock:Object.Monitor{
     
     void unlock()
     in{
-        auto t=taskAtt.val;
+        auto t=taskAtt;
         synchronized(this){
             while (t!is null){
                 if (t is locking){
@@ -444,7 +450,7 @@ class RLock:Object.Monitor{
         toUnlock.deallocData();
     }
     /// perform the given action while holding the lock
-    void synchronizedDo(void delegate() op){
+    void synchronizedDo(scope void delegate() op){
         lock();
         scope(exit){ unlock(); }
         op();
@@ -464,7 +470,7 @@ class RRLock:Object.Monitor{
     }
     /// description of this lock (for debugging purposes)
     /// threadSafe only if locked...
-    void desc(CharSink s){
+    void desc(scope CharSink s){
         dumper(s)("<RRLock@")(cast(void*)this)(", lockingStack:")(lockingStack)
             (", lockLevelStack:")(lockLevelStack)(", waiting:")(waiting)(", lastStack:")(lastStack)(">");
     }

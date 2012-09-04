@@ -90,7 +90,7 @@ class Deque(T):CopiableObjectI{
         return true;
     }
     /// returns the first element that matches the given filter
-    bool popFront(ref T el,bool delegate(T) filter){
+    bool popFront(ref T el,scope bool delegate(T) filter){
         debug(SafeDeque){
             synchronized(this){
                 size_t i=0;
@@ -217,7 +217,7 @@ class Deque(T):CopiableObjectI{
         return true;
     }
     /// returns the last element that matches the given filter
-    bool popBack(ref T el,bool delegate(T) filter){
+    bool popBack(ref T el,scope bool delegate(T) filter){
         version(SafeDeque){
             synchronized(this){
                 bool res;
@@ -302,7 +302,7 @@ class Deque(T):CopiableObjectI{
         }
     }
     /// foreach looping
-    int opApplyNoIdx(int delegate(ref T) loopBody){
+    int opApplyNoIdx(scope int delegate(ref T) loopBody){
         synchronized(this){
             size_t to1=start+nEl;
             if (to1>baseArr.length){
@@ -324,7 +324,7 @@ class Deque(T):CopiableObjectI{
     }
     alias opApplyNoIdx opApply;
     /// foreach looping
-    int opApplyIdx(int delegate(ref size_t i,ref T) loopBody){
+    int opApplyIdx(scope int delegate(ref size_t i,ref T) loopBody){
         synchronized(this){
             size_t to1=start+nEl;
             size_t ii=0;
@@ -423,7 +423,7 @@ class Deque(T):CopiableObjectI{
         void preSerialize(Serializer s){ }
         void postSerialize(Serializer s){ }
         void serialize(Serializer s){
-            LazyArray!(T) la=LazyArray!(T).opCall(&this.opApplyNoIdx,cast(ulong)nEl);
+            LazyArray!(T) la=LazyArray!(T)(&this.opApplyNoIdx,cast(ulong)nEl);
             s.field(metaI[0],la);
         }
 
@@ -437,7 +437,7 @@ class Deque(T):CopiableObjectI{
     
         mixin printOut!();
     } else {
-        void desc(void delegate(cstring) s){
+        void desc(scope void delegate(in cstring) s){
             s("{<Deque!(");
             s(T.stringof);
             s(") nEl=");

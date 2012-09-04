@@ -134,21 +134,21 @@ struct Range{
 /// returns the reduction of the rank done by the arguments in the tuple
 /// allow also static arrays?
 template reductionFactor(){
-    const int reductionFactor=0;
+    immutable int reductionFactor=0;
 }
 /// ditto
 template reductionFactor(T,S...){
     static if (is(T==int) || is(T==long)||is(T==uint)||is(T==ulong))
-        const int reductionFactor=1+reductionFactor!(S);
+        immutable int reductionFactor=1+reductionFactor!(S);
     else static if (is(T==Range))
-        const int reductionFactor=reductionFactor!(S);
+        immutable int reductionFactor=reductionFactor!(S);
     else{
         static assert(0,"ERROR: unexpected type <"~T.stringof~"> in reductionFactor, this will fail");
     }
 }
 
 /// threshold for manual allocation
-const int manualAllocThreshold=200*1024;
+immutable int manualAllocThreshold=200*1024;
 
 /// guard object to deallocate large arrays that contain inner pointers
 ///
@@ -520,13 +520,13 @@ else {
             static if(rank==reductionFactor!(S)){
                 foreach (i,v;idx_tup){
                     if (0>v || v>=shape[i]){
-                        assert(false,"index "~ctfe_i2a(i)~" out of bounds");
+                        assert(false,"index "~ctfe_i2s(i)~" out of bounds");
                     }
                 }
             } else {
                 foreach(i,TT;S){
                     static if(is(TT==int)||is(TT==long)||is(TT==uint)||is(TT==ulong)){
-                        assert(0<=idx_tup[i] && idx_tup[i]<shape[i],"index "~ctfe_i2a(i)~" out of bounds");
+                        assert(0<=idx_tup[i] && idx_tup[i]<shape[i],"index "~ctfe_i2s(i)~" out of bounds");
                     } else static if(is(TT==Range)){
                         {
                             index_type from=idx_tup[i].from,to=idx_tup[i].to,step=idx_tup[i].inc;
@@ -534,7 +534,7 @@ else {
                             if (to<0) to+=shape[i]+1;
                             if (from<to && step>=0 || from>to && step<0){
                                 assert(0<=from && from<shape[i],
-                                    "invalid lower range for dimension "~ctfe_i2a(i));
+                                    "invalid lower range for dimension "~ctfe_i2s(i));
                                 if (step==0)
                                     to=shape[i];
                                 else if (step>0)
@@ -542,7 +542,7 @@ else {
                                 else
                                     to=from-(to-from+step+1)/step;
                                 assert(to>=0 && to<=shape[i],
-                                    "invalid upper range for dimension "~ctfe_i2a(i));
+                                    "invalid upper range for dimension "~ctfe_i2s(i));
                             }
                         }
                     } else static assert(0,"unexpected type <"~TT.stringof~"> in opIndex");
@@ -569,7 +569,7 @@ else {
                 }
                 return *pos;
             } else {
-                const int rank2=rank-reductionFactor!(S);
+                immutable int rank2=rank-reductionFactor!(S);
                 index_type[rank2] newstrides,newshape;
                 index_type newStartIdx=cast(index_type)0;
                 int idim=0;
@@ -625,7 +625,7 @@ else {
             static if (rank==reductionFactor!(S)){
                 foreach(i,TT;S){
                     static if(is(TT==int)||is(TT==long)||is(TT==uint)||is(TT==ulong)){
-                        assert(0<=idx_tup[i] && idx_tup[i]<shape[i],"index "~ctfe_i2a(i)~" out of bounds");                        
+                        assert(0<=idx_tup[i] && idx_tup[i]<shape[i],"index "~ctfe_i2s(i)~" out of bounds");                        
                     } else static assert(0,"unexpected type <"~TT.stringof~"> in opIndexAssign");
                 } // else check done in opIndex...
             }
@@ -656,7 +656,7 @@ else {
             static if (rank==reductionFactor!(S)){
                 foreach(i,TT;S){
                     static if(is(TT==int)||is(TT==long)||is(TT==uint)||is(TT==ulong)){
-                        assert(0<=idx_tup[i] && idx_tup[i]<shape[i],"index "~ctfe_i2a(i)~" out of bounds");                        
+                        assert(0<=idx_tup[i] && idx_tup[i]<shape[i],"index "~ctfe_i2s(i)~" out of bounds");                        
                     } else static assert(0,"unexpected type <"~TT.stringof~"> in opIndexAssign");
                 } // else check done in opIndex...
             }
@@ -680,7 +680,7 @@ else {
         NArray!(V,rank-cast(int)staticArraySize!(S))arrayIndex(S)(S index){
             static assert(is(S:int[])||is(S:long[])||is(S:uint[])||is(S:ulong[]),"only arrays of indexes supported");
             static assert(isStaticArrayType!(S),"arrayIndex needs *static* arrays as input");
-            const istring loopBody=("auto res=opIndex("~arrayToSeq("index",cast(int)staticArraySize!(S))~");");
+            immutable istring loopBody=("auto res=opIndex("~arrayToSeq("index",cast(int)staticArraySize!(S))~");");
             mixin(loopBody);
             return res;
         }
@@ -696,7 +696,7 @@ else {
         /// copies the array, undefined behaviour if there is overlap
         NArray opSliceAssign(S,int rank2)(NArray!(S,rank2) val)
         in { 
-            static assert(rank2==rank,"assign operation should have same rank "~ctfe_i2a(rank)~"vs"~ctfe_i2a(rank2));
+            static assert(rank2==rank,"assign operation should have same rank "~ctfe_i2s(rank)~"vs"~ctfe_i2s(rank2));
             assert(shape==val.shape,"assign arrays need to have the same shape");
             assert(!(flags&Flags.ReadOnly),"ReadOnly array cannot be assigned");
         }
@@ -779,7 +779,7 @@ else {
                     this.iPos=index;
                     return *cast(V*)(cast(size_t)this.baseArray.startPtrArray+this.iIdx);
                 }
-                int opApply( int delegate(ref V) loop_body ) {
+                int opApply( scope int delegate(ref V) loop_body ) {
                     if (this.iPos<this.iDim){
                         V* pos=cast(V*)(cast(size_t)this.baseArray.startPtrArray+this.iIdx);
                         for (index_type i=this.iPos;i!=this.iDim;++i){
@@ -789,7 +789,7 @@ else {
                     }
                     return 0;
                 }
-                int opApply( int delegate(ref index_type,ref V) loop_body ) {
+                int opApply( scope int delegate(ref index_type,ref V) loop_body ) {
                     if (this.iPos<this.iDim){
                         V* pos=cast(V*)(cast(size_t)this.baseArray.startPtrArray+this.iIdx);
                         for (index_type i=this.iPos;i!=this.iDim;i++){
@@ -874,26 +874,22 @@ else {
                     this.view.startPtrArray=cast(V*)(cast(size_t)this.baseArray.startPtrArray+this.idxAtt);
                     return this.view;
                 }
-                int opApply( int delegate(ref NArray!(V,rank-1)) loop_body ) {
+                int opApply( scope int delegate(ref NArray!(V,rank-1)) loop_body ) {
                     for (index_type i=this.iPos;i<this.iDim;i++){
                         if (auto r=loop_body(this.view)) return r;
                         this.view.startPtrArray=cast(V*)(cast(size_t)this.view.startPtrArray+this.stride);
                     }
                     return 0;
                 }
-                int opApply( int delegate(ref index_type,ref NArray!(V,rank-1)) loop_body ) {
+                int opApply( scope int delegate(ref index_type,ref NArray!(V,rank-1)) loop_body ) {
                     for (index_type i=this.iPos;i<this.iDim;i++){
                         if (auto r=loop_body(i,this.view)) return r;
                         this.view.startPtrArray=cast(V*)(cast(size_t)this.view.startPtrArray+this.stride);
                     }
                     return 0;
                 }
-                void desc(void delegate(cstring) s){
-                    if (this is null){
-                        s("<SubView *null*>");
-                        return;
-                    }
-                    s("<SubView!(");
+                void desc(scope void delegate(in cstring) s){
+		    s("<SubView!(");
                     s(V.stringof);
                     s(",");
                     writeOut(s,rank);
@@ -1019,7 +1015,7 @@ else {
             /// Return the array over which this iterator is iterating
             NArray array() { return this.baseArray; }
 
-            int opApply( int delegate(ref V) loop_body ) 
+            int opApply( scope int delegate(ref V) loop_body ) 
             {
                 if (this.p is null) return 0;
                 if (this.left!=this.baseArray.shape){
@@ -1029,7 +1025,7 @@ else {
                     }
                 } else {
                     auto bArray=this.baseArray;
-                    const istring loopBody=`
+                    istring loopBody=`
                     int ret=loop_body(*bArrayPtr0);
                     if (ret) return ret;
                     `;
@@ -1037,7 +1033,7 @@ else {
                 }
                 return 0;
             }
-            int opApply( int delegate(ref index_type,ref V) loop_body ) 
+            int opApply( scope int delegate(ref index_type,ref V) loop_body ) 
             {
                 if (this.p is null) return 0;
                 if (this.left==this.baseArray.shape) {
@@ -1047,7 +1043,7 @@ else {
                     }
                 } else {
                     auto bArray=this.baseArray;
-                    const istring loopBody=`
+                    istring loopBody=`
                     int ret=loop_body(iPos,*bArrayPtr0);
                     if (ret) return ret;
                     ++iPos;
@@ -1057,12 +1053,8 @@ else {
                 }
                 return 0;
             }
-            void desc(void delegate(cstring) sink){
+            void desc(scope void delegate(in cstring) sink){
                 auto s=dumper(sink);
-                if (this is null){
-                    s("<FlatIterator *null*>");
-                    return;
-                }
                 s("<FlatIterator rank:")(rank)(", p:")(cast(void*)this.p)(",\n");
                 s("left:")(this.left)(",\n");
                 s("adds:")(this.adds)(",\n");
@@ -1078,20 +1070,20 @@ else {
                 res.a=a;
                 return res;
             }
-            int opApply( int delegate(ref V) loop_body ) 
+            int opApply( scope int delegate(ref V) loop_body ) 
             {
                 auto aa=this.a;
-                const istring loopBody=`
+                istring loopBody=`
                 int ret=loop_body(*aaPtr0);
                 if (ret) return ret;
                 `;
                 mixin(sLoopPtr(rank,["aa"],loopBody,"i"));
                 return 0;
             }
-            int opApply( int delegate(ref index_type,ref V) loop_body ) 
+            int opApply( scope int delegate(ref index_type,ref V) loop_body ) 
             {
                 auto aa=this.a;
-                const istring loopBody=`
+                istring loopBody=`
                 int ret=loop_body(iPos,*aaPtr0);
                 if (ret) return ret;
                 ++iPos;
@@ -1114,10 +1106,10 @@ else {
                 res.optimalChunkSize=optimalChunkSize;
                 return res;
             }
-            int opApply( int delegate(ref V) loop_body ) 
+            int opApply( scope int delegate(ref V) loop_body ) 
             {
                 auto aa=this.a;
-                const istring loopBody=`
+                istring loopBody=`
                 int ret=loop_body(*aaPtr0);
                 if (ret) return ret;
                 `;
@@ -1125,10 +1117,10 @@ else {
                 mixin(pLoopPtr(rank,["aa"],loopBody,"i"));
                 return 0;
             }
-            int opApply( int delegate(ref index_type,ref V) loop_body ) 
+            int opApply( scope int delegate(ref index_type,ref V) loop_body ) 
             {
                 auto aa=this.a;
-                const istring loopBody=`
+                istring loopBody=`
                 int ret=loop_body(iPos,*aaPtr0);
                 if (ret) return ret;
                 ++iPos;
@@ -1145,20 +1137,20 @@ else {
         
         static if(rank==1){
             /// loops on the 0 axis
-            int opApply( int delegate(ref V) loop_body ) {
+            int opApply( scope int delegate(ref V) loop_body ) {
                 return SubView(this).opApply(loop_body);
             }
             /// loops on the 0 axis
-            int opApply( int delegate(ref index_type,ref V) loop_body ) {
+            int opApply( scope int delegate(ref index_type,ref V) loop_body ) {
                 return SubView(this).opApply(loop_body);
             }
         } else {
             /// loops on the 0 axis
-            int opApply( int delegate(ref NArray!(V,rank-1)) loop_body ) {
+            int opApply( scope int delegate(ref NArray!(V,rank-1)) loop_body ) {
                 return SubView(this).opApply(loop_body);
             }
             /// loops on the 0 axis
-            int opApply( int delegate(ref index_type,ref NArray!(V,rank-1)) loop_body ) {
+            int opApply( scope int delegate(ref index_type,ref NArray!(V,rank-1)) loop_body ) {
                 return SubView(this).opApply(loop_body);
             }
         }
@@ -1199,9 +1191,9 @@ else {
             bool next(ref V el){
                 return this.it.next(el);
             }
-            int opApply(int delegate(ref V x) loop_body){
+            int opApply(scope int delegate(ref V x) loop_body){
                 NArray a=this.it.baseArray;
-                const istring loopBody=`
+                istring loopBody=`
                 int ret=loop_body(*aPtr0);
                 if (ret) return ret;
                 `;
@@ -1214,11 +1206,11 @@ else {
                 }
                 return 0;
             }
-            int opApply(int delegate(ref size_t i,ref V x) loop_body){
+            int opApply(scope int delegate(ref size_t i,ref V x) loop_body){
                 NArray a=this.it.baseArray;
                 index_type optimalChunkSize_i=this.optimalChunkSize;
                 size_t iPos=0;
-                const istring loopBody=`
+                istring loopBody=`
                 int ret=loop_body(iPos,*aPtr0);
                 if (ret) return ret;
                 ++iPos;
@@ -1522,7 +1514,7 @@ else {
             assert(0, "Comparison of arrays not allowed");
         }
 
-        void printData(CharSink s,string formatEl=",10", index_type elPerLine=10,
+        void printData(scope CharSink s,string formatEl=",10", index_type elPerLine=10,
             string indent=""){
             s("[");
             static if(rank==1) {
@@ -1557,7 +1549,7 @@ else {
             string formatEl=",10";
             index_type elPerLine=10;
             string indent="";
-            void desc(CharSink s){
+            void desc(scope CharSink s){
                 if (arr is null){
                     s("*null*"); /// print an empty array instead???
                 } else {
@@ -1579,12 +1571,12 @@ else {
         }
         
         string toString(){
-            return collectIAppender(delegate void(CharSink s){ this.printData(s); });
+            return collectIAppender(delegate void(scope CharSink s){ this.printData(s); });
         }
 
         /// description of the NArray wrapper, not of the contents, for debugging purposes...
         /// see printData for the content
-        void desc(void delegate(cstring) sink){
+        void desc(scope void delegate(in cstring) sink){
             auto s=dumper(sink);
             if (this is null){
                 s("<NArray *null*>");
@@ -1817,7 +1809,7 @@ else {
         
         /// returns a random array
         static NArray randomGenerate(Rand r){
-            const index_type maxSize=1_000_000;
+            immutable index_type maxSize=1_000_000;
             float mean=10.0f;
             index_type[rank] dims;
             index_type totSize;
@@ -1829,7 +1821,7 @@ else {
                 foreach (el;dims)
                     totSize*=el;
                 mean*=(cast(float)maxSize)/(cast(float)totSize);
-            } while (totSize>maxSize)
+            } while (totSize>maxSize);
             NArray res=NArray.empty(dims);
             return randNArray(r,res);
         }
@@ -1842,7 +1834,7 @@ else {
             synchronized{
                 if (metaI is null){
                     metaI=ClassMetaInfo.createForType!(NArray)
-                        ("NArray!("~V.stringof~","~ctfe_i2a(rank)~")","a numerical multidimensional array (wrapper based, tries to avoid allocation)",
+                        ("NArray!("~V.stringof~","~ctfe_i2s(rank)~")","a numerical multidimensional array (wrapper based, tries to avoid allocation)",
                         function void *(ClassMetaInfo){
                             index_type[rank] strid=0;
                             index_type[rank] shap=0;
@@ -1892,7 +1884,7 @@ else {
                 }
                 auto ac=s.readArrayStart(null);
                 auto a=this;
-                mixin(sLoopPtr(rank,["a"],`if (!s.readArrayEl(ac,{ s.field(cast(FieldMetaInfo*)null, *aPtr0); } )) s.serializationError("unexpected number of elements",__FILE__,`~ctfe_i2a(__LINE__)~`);`,"i"));
+                mixin(sLoopPtr(rank,["a"],`if (!s.readArrayEl(ac,{ s.field(cast(FieldMetaInfo*)null, *aPtr0); } )) s.serializationError("unexpected number of elements",__FILE__,`~ctfe_i2s(__LINE__)~`);`,"i"));
                 V dummy;
                 if (s.readArrayEl(ac,{ s.field(cast(FieldMetaInfo*)null, dummy); } ))
                     s.serializationError("unexpected extra elements",__FILE__,__LINE__);
@@ -1919,9 +1911,9 @@ else {
 /// returns a "null" or dummy array (useful as default parameter)
 template nullNArray(T,int rank){
     static if (rank>0){
-        const NArray!(T,rank) nullNArray=null;
+        immutable NArray!(T,rank) nullNArray=null;
     } else {
-        const T nullNArray=T.init;
+        immutable T nullNArray=T.init;
     }
 }
 
@@ -2016,25 +2008,25 @@ string sLoopGenIdx(int rank,string [] arrayNames,string loop_body,string ivarStr
     string indent2=indent~indentInc;
 
     foreach(i,arrayName;arrayNames){
-        res~=indent~arrayNameDot(arrayName)~"dtype * "~arrayName~"Ptr"~ctfe_i2a(rank-1)~"="
+        res~=indent~arrayNameDot(arrayName)~"dtype * "~arrayName~"Ptr"~ctfe_i2s(rank-1)~"="
             ~arrayNameDot(arrayName)~"startPtrArray;\n";
         for (int idim=0;idim<rank;idim++){
-            res~=indent~"index_type "~arrayName~"Stride"~ctfe_i2a(idim)~"="
-                ~arrayNameDot(arrayName)~"bStrides["~ctfe_i2a(idim)~"];\n";
+            res~=indent~"index_type "~arrayName~"Stride"~ctfe_i2s(idim)~"="
+                ~arrayNameDot(arrayName)~"bStrides["~ctfe_i2s(idim)~"];\n";
         }
     }
     for (int idim=0;idim<rank;idim++){
-        res~=indent~"index_type "~ivarStr~"Shape"~ctfe_i2a(idim)~"="
-            ~arrayNameDot(arrayNames[0])~"shape["~ctfe_i2a(idim)~"];\n";
+        res~=indent~"index_type "~ivarStr~"Shape"~ctfe_i2s(idim)~"="
+            ~arrayNameDot(arrayNames[0])~"shape["~ctfe_i2s(idim)~"];\n";
     }
     for (int idim=0;idim<rank;idim++){
-        string ivar=ivarStr.dup~"_"~ctfe_i2a(idim)~"_";
+        string ivar=ivarStr~"_"~ctfe_i2s(idim)~"_";
         res~=indent~"for (index_type "~ivar~"=0;"
-            ~ivar~"<"~ivarStr~"Shape"~ctfe_i2a(idim)~";++"~ivar~"){\n";
+            ~ivar~"<"~ivarStr~"Shape"~ctfe_i2s(idim)~";++"~ivar~"){\n";
         if (idxPre.length>idim) res~=idxPre[idim];
         if (idim<rank-1) {
             foreach(arrayName;arrayNames){
-                res~=indent2~arrayNameDot(arrayName)~"dtype * "~arrayName~"Ptr"~ctfe_i2a(rank-2-idim)~"="~arrayName~"Ptr"~ctfe_i2a(rank-1-idim)~";\n";
+                res~=indent2~arrayNameDot(arrayName)~"dtype * "~arrayName~"Ptr"~ctfe_i2s(rank-2-idim)~"="~arrayName~"Ptr"~ctfe_i2s(rank-1-idim)~";\n";
             }
         }
         indent=indent2;
@@ -2045,9 +2037,9 @@ string sLoopGenIdx(int rank,string [] arrayNames,string loop_body,string ivarStr
         indent2=indent[0..indent.length-indentInc.length];
         if (idxPost.length>idim) res~=idxPost[idim]; // move after increment??
         foreach(arrayName;arrayNames){
-            res~=indent~arrayName~"Ptr"~ctfe_i2a(rank-1-idim)~" = "
-                ~"cast("~arrayNameDot(arrayName)~"dtype*)(cast(size_t)"~arrayName~"Ptr"~ctfe_i2a(rank-1-idim)
-                ~"+"~arrayName~"Stride"~ctfe_i2a(idim)~");\n";
+            res~=indent~arrayName~"Ptr"~ctfe_i2s(rank-1-idim)~" = "
+                ~"cast("~arrayNameDot(arrayName)~"dtype*)(cast(size_t)"~arrayName~"Ptr"~ctfe_i2s(rank-1-idim)
+                ~"+"~arrayName~"Stride"~ctfe_i2s(idim)~");\n";
         }
         res~=indent2~"}\n";
         indent=indent2;
@@ -2067,19 +2059,19 @@ string sLoopGenPtr(int rank,string [] arrayNames,
 
     foreach(i,arrayName;arrayNames){
         res~=indent;
-        res~=arrayNameDot(arrayName)~"dtype * "~arrayName~"Ptr"~ctfe_i2a(rank-1)~"="~arrayNameDot(arrayName)~"startPtrArray;\n";
+        res~=arrayNameDot(arrayName)~"dtype * "~arrayName~"Ptr"~ctfe_i2s(rank-1)~"="~arrayNameDot(arrayName)~"startPtrArray;\n";
         for (int idim=0;idim<rank;idim++){
             res~=indent;
-            res~="index_type "~arrayName~"Stride"~ctfe_i2a(idim)~"="~arrayNameDot(arrayName)~"bStrides["~ctfe_i2a(idim)~"];\n";
+            res~="index_type "~arrayName~"Stride"~ctfe_i2s(idim)~"="~arrayNameDot(arrayName)~"bStrides["~ctfe_i2s(idim)~"];\n";
         }
     }
     for (int idim=0;idim<rank;idim++){
-        string ivar=ivarStr.dup~"_"~ctfe_i2a(idim)~"_";
-        res~=indent~"for (index_type "~ivar~"="~arrayNameDot(arrayNames[0])~"shape["~ctfe_i2a(idim)~"];"
+        string ivar=ivarStr~"_"~ctfe_i2s(idim)~"_";
+        res~=indent~"for (index_type "~ivar~"="~arrayNameDot(arrayNames[0])~"shape["~ctfe_i2s(idim)~"];"
             ~ivar~"!=0;--"~ivar~"){\n";
         if (idim<rank-1) {
             foreach(arrayName;arrayNames){
-                res~=indent2~arrayNameDot(arrayName)~"dtype * "~arrayName~"Ptr"~ctfe_i2a(rank-2-idim)~"="~arrayName~"Ptr"~ctfe_i2a(rank-1-idim)~";\n";
+                res~=indent2~arrayNameDot(arrayName)~"dtype * "~arrayName~"Ptr"~ctfe_i2s(rank-2-idim)~"="~arrayName~"Ptr"~ctfe_i2s(rank-1-idim)~";\n";
             }
         }
         indent=indent2;
@@ -2089,9 +2081,9 @@ string sLoopGenPtr(int rank,string [] arrayNames,
     for (int idim=rank-1;idim>=0;idim--){
         indent2=indent[0..indent.length-indInc.length];
         foreach(arrayName;arrayNames){
-            res~=indent~arrayName~"Ptr"~ctfe_i2a(rank-1-idim)~" = "
-                ~"cast("~arrayNameDot(arrayName)~"dtype*)(cast(size_t)"~arrayName~"Ptr"~ctfe_i2a(rank-1-idim)
-                ~"+"~arrayName~"Stride"~ctfe_i2a(idim)~");\n";
+            res~=indent~arrayName~"Ptr"~ctfe_i2s(rank-1-idim)~" = "
+                ~"cast("~arrayNameDot(arrayName)~"dtype*)(cast(size_t)"~arrayName~"Ptr"~ctfe_i2s(rank-1-idim)
+                ~"+"~arrayName~"Stride"~ctfe_i2s(idim)~");\n";
         }
         res~=indent2~"}\n";
         indent=indent2;
@@ -2135,8 +2127,8 @@ string pLoopIdx(int rank,string [] arrayNames,
     }
     res~=";\n";
     res~=indent~"if ("~arrayNameDot(arrayNames[0])~"mData !is null &&\n";
-    res~=indent~"    (commonFlags"~ivarStr~"&(ArrayFlags.Contiguous|ArrayFlags.Fortran) ||\n";
-    res~=indent~"    commonFlags"~ivarStr~"&(ArrayFlags.Small | ArrayFlags.Compact)==ArrayFlags.Compact\n";
+    res~=indent~"    ((commonFlags"~ivarStr~"&(ArrayFlags.Contiguous|ArrayFlags.Fortran)) ||\n";
+    res~=indent~"    (commonFlags"~ivarStr~"&(ArrayFlags.Small | ArrayFlags.Compact))==ArrayFlags.Compact\n";
     res~=indent2;
     for (int i=1;i<arrayNames.length;i++)
         res~="&& "~arrayNameDot(arrayNames[0])~"bStrides=="~arrayNameDot(arrayNames[i])~"bStrides ";
@@ -2216,8 +2208,8 @@ string pLoopPtr(int rank,string [] arrayNames,
         if (i!=arrayNamesDot.length-1) res~=" & ";
     }
     res~=";\n";
-    res~=indent~"if (commonFlags"~ivarStr~"&(ArrayFlags.Contiguous|ArrayFlags.Fortran) ||\n";
-    res~=indent2~"commonFlags"~ivarStr~"&(ArrayFlags.Small | ArrayFlags.Compact1)==ArrayFlags.Compact1\n";
+    res~=indent~"if ((commonFlags"~ivarStr~"&(ArrayFlags.Contiguous|ArrayFlags.Fortran)) ||\n";
+    res~=indent2~"(commonFlags"~ivarStr~"&(ArrayFlags.Small | ArrayFlags.Compact1))==ArrayFlags.Compact1\n";
     res~=indent2;
     for (int i=1;i<arrayNamesDot.length;i++){
         res~="&& is("~arrayNamesDot[0]~"dtype=="~arrayNamesDot[i]~"dtype) ";
@@ -2301,7 +2293,7 @@ string sLoopPtr(int rank,string [] arrayNames, string loopBody,string ivarStr){
 string arrayToSeq(string arrayName,int dim){
     string res="";
     for (int i=0;i<dim;++i){
-        res~=arrayName~"["~ctfe_i2a(i)~"]";
+        res~=arrayName~"["~ctfe_i2s(i)~"]";
         if (i!=dim-1)
             res~=", ";
     }
@@ -2311,7 +2303,7 @@ string arrayToSeq(string arrayName,int dim){
 string opApplyIdxAll(int rank,string arrayName,bool sequential){
     string res="";
     string indent="    ";
-    res~="int opApply(int delegate(";
+    res~="int opApply(scope int delegate(";
     for (int i=0;i<rank;++i){
         res~="ref index_type, ";
     }
@@ -2320,7 +2312,7 @@ string opApplyIdxAll(int rank,string arrayName,bool sequential){
     string loopBody="";
     loopBody~=indent~"int ret=loop_body(";
     for (int i=0;i<rank;++i){
-        loopBody~="i_"~ctfe_i2a(i)~"_, ";
+        loopBody~="i_"~ctfe_i2s(i)~"_, ";
     }
     loopBody~="*aaPtr0);\n";
     loopBody~=indent~"if (ret) return ret;\n";
@@ -2370,7 +2362,7 @@ body {
         invert[i]=invert[i]>0;
     for (int i=0;i<rank;++i)
         perm[i]=[i];
-    const int maxR=(rank>3)?rank-4:0;
+    immutable int maxR=(rank>3)?rank-4:0;
     // use also the shape as criteria?
     for (int i=rank-1;i>=0;--i){
         for (int j=i-1;j>=0;--j){
@@ -2398,11 +2390,11 @@ template rkOfShape(T){
         static assert(is(BaseTypeOfArrays!(T)==int)||is(BaseTypeOfArrays!(T)==uint)||
             is(BaseTypeOfArrays!(T)==long)||is(BaseTypeOfArrays!(T)==ulong),
             "only integer types supported as shape dimensions");
-        const int rkOfShape = cast(int)staticArraySize!(T);
+        immutable int rkOfShape = cast(int)staticArraySize!(T);
     } else {
         static assert(is(T==int)||is(T==uint)||is(T==long)||is(T==ulong),
             "only integer types (and static arrays of them) supported as dimensions");
-        const int rkOfShape = 1;
+        immutable int rkOfShape = 1;
     }
 }
 
@@ -2412,7 +2404,7 @@ template rkOfShape(T){
 
 /// randomizes the content of the array
 NArray!(T,rank) randomizeNArray(RandG,T,int rank)(RandG r,NArray!(T,rank)a){
-    if (a.flags | ArrayFlags.Compact2){
+    if (a.flags & ArrayFlags.Compact2){
         T[] d=a.data;
         r.randomize(d);
     } else {

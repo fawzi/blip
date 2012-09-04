@@ -67,8 +67,8 @@ struct TargetHost{
     mixin printOut!();
     TargetHost dup(){
         TargetHost res;
-        res.host=host.dup;
-        res.port=port.dup;
+        res.host=host.idup;
+        res.port=port.idup;
         return res;
     }
     hash_t toHash(){
@@ -79,7 +79,7 @@ struct TargetHost{
 /// basically a wrapper around a socket just to group some functions...
 /// being a struct it is not possible to synchronize on this, but I realized that I did not need it
 struct BasicSocket{
-    socket_t sock=socket_t.init;
+    socket_t sock=socket_tInit;
     enum{ eagerTries=2 }
     
     static BasicSocket opCall(socket_t s){
@@ -89,7 +89,7 @@ struct BasicSocket{
         int oldMode;
         if ((oldMode = fcntl(res.sock, F_GETFL, 0)) == -1 ||
             fcntl(res.sock, F_SETFL, oldMode | O_NONBLOCK)==-1){
-            throw new BIOException(collectIAppender(delegate void(CharSink s){
+            throw new BIOException(collectIAppender(delegate void(scope CharSink s){
                         dumper(s)("could not set non blocking mode for socket ")(s);
                     }),__FILE__,__LINE__);
         }
@@ -129,7 +129,7 @@ struct BasicSocket{
 	    auto errA=lGrowableArray(errBuf,0);
 	    dumper(&errA.appendArr)("getaddrinfo error:")(errStr[0..strlen(errStr)])
 		(" with address:")(address)(" and service:")(service);
-            throw new BIOException(errA.takeData(),__FILE__,__LINE__);
+            throw new BIOException(errA.takeIData(),__FILE__,__LINE__);
         }
 
         socket_t s=-1;
@@ -137,7 +137,7 @@ struct BasicSocket{
             s = socket(addrAtt.ai_family, addrAtt.ai_socktype, addrAtt.ai_protocol);
             if (s<0) continue;
             version(TrackSocketServer){
-                sinkTogether(serr,delegate void(CharSink s){
+                sinkTogether(serr,delegate void(scope CharSink s){
                     dumper(s)("trying to connect to ");
                     char[256] buf;
                     auto res=inet_ntop(addrAtt.ai_family, addrAtt.ai_addr,
@@ -149,7 +149,7 @@ struct BasicSocket{
             }
             if (connect(s, addrAtt.ai_addr, addrAtt.ai_addrlen) != 0) {
                 version(TrackSocketServer){
-                    sinkTogether(serr,delegate void(CharSink s){
+                    sinkTogether(serr,delegate void(scope CharSink s){
                         dumper(s)("connection to ");
                         char[256] buf;
                         auto res=inet_ntop(addrAtt.ai_family, addrAtt.ai_addr,
@@ -164,7 +164,7 @@ struct BasicSocket{
                 continue;
             }
             version(TrackSocketServer){
-                sinkTogether(serr,delegate void(CharSink s){
+                sinkTogether(serr,delegate void(scope CharSink s){
                     dumper(s)("connection to ");
                     char[256] buf;
                     auto res=inet_ntop(addrAtt.ai_family, addrAtt.ai_addr,
@@ -196,7 +196,7 @@ struct BasicSocket{
     void noDelay(bool val){
         int i=(val?1:0);
         if (setsockopt(sock,SOL_TCP,TCP_NODELAY,&i,4)!=0){
-            throw new Exception(collectIAppender(delegate void(CharSink s){
+            throw new Exception(collectIAppender(delegate void(scope CharSink s){
                 dumper(s)("setsockopt SOL_TCP,TCP_NODELAY failed on socket ")(sock);
                 char[256] buf;
                 s(strerror_d(errno(),buf));
@@ -208,7 +208,7 @@ struct BasicSocket{
         int i;
         socklen_t len=4;
         if (getsockopt(sock,SOL_TCP,TCP_NODELAY,&i,&len)){
-            throw new Exception(collectIAppender(delegate void(CharSink s){
+            throw new Exception(collectIAppender(delegate void(scope CharSink s){
                 dumper(s)("getsockopt SOL_TCP,TCP_NODELAY failed on socket ")(sock);
                 char[256] buf;
                 s(strerror_d(errno(),buf));
@@ -221,7 +221,7 @@ struct BasicSocket{
     void keepalive(bool k){
         int i=cast(int)k;
         if (setsockopt(sock,SOL_SOCKET,SO_KEEPALIVE,&i,4)!=0){
-            throw new Exception(collectIAppender(delegate void(CharSink s){
+            throw new Exception(collectIAppender(delegate void(scope CharSink s){
                 dumper(s)("setsockopt SOL_SOCKET,SO_KEEPALIVE failed on socket ")(sock);
                 char[256] buf;
                 s(strerror_d(errno(),buf));
@@ -232,7 +232,7 @@ struct BasicSocket{
         int i;
         socklen_t len=4;
         if (getsockopt(sock,SOL_SOCKET,SO_KEEPALIVE,&i,&len)){
-            throw new Exception(collectIAppender(delegate void(CharSink s){
+            throw new Exception(collectIAppender(delegate void(scope CharSink s){
                 dumper(s)("getsockopt SOL_SOCKET,SO_KEEPALIVE failed on socket ")(sock);
                 char[256] buf;
                 if (strerror_d(errno(),buf)){
@@ -250,7 +250,7 @@ struct BasicSocket{
         return opCall(t.host,t.port);
     }
     /// writes at least one byte (unless src.length==0), but possibly less than src.length
-    final size_t writeSomeTout(void[] src,LoopHandlerI loop){
+    final size_t writeSomeTout(in void[] src,LoopHandlerI loop){
         while(true){
             ptrdiff_t wNow;
             for (int itry=0;itry<eagerTries;++itry){
@@ -264,13 +264,13 @@ struct BasicSocket{
                             auto a=lGrowableArray(buf,0);
                             a("IO error:");
                             writeOut(&a.appendArr,errno());
-                            throw new BIOException(a.takeData(),__FILE__,__LINE__);
+                            throw new BIOException(a.takeIData(),__FILE__,__LINE__);
                         }
                         throw new BIOException(buf[0..strlen(buf.ptr)],__FILE__,__LINE__);
                     }
                 } else if (wNow>0 || src.length==0){
                     version(SocketEcho){
-                        sinkTogether(sout,delegate void(CharSink s){
+                        sinkTogether(sout,delegate void(scope CharSink s){
                             dumper(s)("socket ")(sock)(" writing '")(src[0..wNow])("'\n");
                         });
                     }
@@ -290,11 +290,11 @@ struct BasicSocket{
         }
     }
     /// ditto
-    final size_t writeSome(void[] src){
+    final size_t writeSome(in void[] src){
         return writeSomeTout(src,noToutWatcher);
     }
     
-    final void writeExactTout(void[] src,LoopHandlerI loop){
+    final void writeExactTout(in void[] src,LoopHandlerI loop){
         size_t written=0;
         while(written<src.length){
             ptrdiff_t wNow;
@@ -309,7 +309,7 @@ struct BasicSocket{
                             auto a=lGrowableArray(buf,0);
                             a("IO error:");
                             writeOut(&a.appendArr,errno());
-                            throw new BIOException(a.takeData(),__FILE__,__LINE__);
+                            throw new BIOException(a.takeIData(),__FILE__,__LINE__);
                         }
                         throw new BIOException(buf[0..strlen(buf.ptr)],__FILE__,__LINE__);
                     }
@@ -328,14 +328,14 @@ struct BasicSocket{
                 wNow=0;
             }
             version(SocketEcho){
-                sinkTogether(sout,delegate void(CharSink s){
+                sinkTogether(sout,delegate void(scope CharSink s){
                     dumper(s)("socket ")(sock)(" writing '")(src[0..wNow])("'\n");
                 });
             }
             written+=wNow;
         }
     }
-    final void writeExact(void[] src){
+    final void writeExact(in void[] src){
         writeExactTout(src,noToutWatcher);
     }
     
@@ -358,13 +358,13 @@ struct BasicSocket{
                             auto a=lGrowableArray(buf,0);
                             a("IO error:");
                             writeOut(&a.appendArr,errno());
-                            throw new BIOException(a.takeData(),__FILE__,__LINE__);
+                            throw new BIOException(a.takeIData(),__FILE__,__LINE__);
                         }
                         throw new BIOException(errMsg,__FILE__,__LINE__);
                     }
                 } else {
                     version(SocketEcho){
-                        sinkTogether(sout,delegate void(CharSink s){
+                        sinkTogether(sout,delegate void(scope CharSink s){
                             dumper(s)("socket ")(sock)(" got '")(dst[0..res])("'\n");
                         });
                     }
@@ -377,7 +377,7 @@ struct BasicSocket{
                 auto watcher=GenericWatcher.ioCreate(cast(int)sock,EV_READ);
                 // implement blocking for non present or non yieldable tasks? it might be dangeroues (deadlocks)
                 version(LogReadWaits){
-                    sinkTogether(sout,delegate void(CharSink s){
+                    sinkTogether(sout,delegate void(scope CharSink s){
                         dumper(s)("socket ")(sock)(" start waiting in read with event@")(cast(void*)watcher.ptr_)("\n");
                     });
                 }
@@ -386,7 +386,7 @@ struct BasicSocket{
                 }
                 res=0;
                 version(LogReadWaits){
-                    sinkTogether(sout,delegate void(CharSink s){
+                    sinkTogether(sout,delegate void(scope CharSink s){
                         dumper(s)("socket ")(sock)(" did waiting in read\n");
                     });
                 }
@@ -406,7 +406,7 @@ struct BasicSocket{
     
     void shutdownInput(){
         version(SocketEcho){
-            sinkTogether(sout,delegate void(CharSink s){
+            sinkTogether(sout,delegate void(scope CharSink s){
                 dumper(s)("socket ")(sock)(" shutdownInput\n");
             });
         }
@@ -415,14 +415,14 @@ struct BasicSocket{
 
     void close(){
         version(SocketEcho){
-            sinkTogether(sout,delegate void(CharSink s){
+            sinkTogether(sout,delegate void(scope CharSink s){
                 dumper(s)("socket ")(sock)(" close\n");
             });
         }
         shutdown(sock,SHUT_WR);
     }
     
-    void desc(CharSink s){
+    void desc(scope CharSink s){
         dumper(s)("socket@")(sock);
     }
 }
@@ -444,7 +444,7 @@ class SocketServer{
     GenericWatcher[] watchers;
     size_t pendingTasks;
     size_t maxPendingTasks=size_t.max;
-    CharSink log;
+    scope CharSink log;
     bool requireFirst;
     
     static struct Handler{
@@ -498,7 +498,7 @@ class SocketServer{
     }
     void delegate (ref Handler) handler;
     
-    this(string serviceName,void delegate(ref Handler)handler,CharSink log){
+    this(string serviceName,void delegate(ref Handler)handler,scope CharSink log){
         this.serviceName=serviceName;
         this.handler=handler;
         this.log=log;
@@ -550,7 +550,7 @@ class SocketServer{
 			&& setsockopt (s, SOL_IPV6, IPV6_V6ONLY, cast(char *) &tmp,
 				       cast(socklen_t) tmp.sizeof) != 0)
 			{
-			    sinkTogether(log,delegate void(CharSink s){
+			    sinkTogether(log,delegate void(scope CharSink s){
 				    char[256] buf;
 				    dumper(s)(strerror_d(errno(), buf))
 					(", in setsockopt(s, SOL_IPV6, IPV6_V6ONLY,[1],4)\n");
@@ -559,7 +559,7 @@ class SocketServer{
 		}
 	    }
             version(TrackSocketServer){
-                sinkTogether(log,delegate void(CharSink s){
+                sinkTogether(log,delegate void(scope CharSink s){
                     dumper(s)("trying bind to ");
                     char[256] buf;
                     auto res=inet_ntop(res.ai_family, res.ai_addr,
@@ -569,7 +569,7 @@ class SocketServer{
                 });
             }
             if (bind(s,res.ai_addr,res.ai_addrlen)!=0){
-                sinkTogether(log,delegate void(CharSink s){
+                sinkTogether(log,delegate void(scope CharSink s){
                     dumper(s)("bind to ");
                     char[256] buf;
                     auto res=inet_ntop(res.ai_family, res.ai_addr,
@@ -582,7 +582,7 @@ class SocketServer{
                 continue;
             }
             version(TrackSocketServer){
-                sinkTogether(log,delegate void(CharSink s){
+                sinkTogether(log,delegate void(scope CharSink s){
                     dumper(s)("bind to ");
                     char[256] buf;
                     auto res=inet_ntop(res.ai_family, res.ai_addr,
@@ -620,7 +620,7 @@ class SocketServer{
         version(TrackSocketServer){
             // this is in a special version, because without it one can (in the normal case) accept a socket
             // without any logging
-            sinkTogether(log,delegate void(CharSink sink){
+            sinkTogether(log,delegate void(scope CharSink sink){
                 auto s=dumper(sink);
                 s("server ")(serviceName)(" received request\n");
             });
@@ -633,7 +633,7 @@ class SocketServer{
         if (newSock<=0){ // ignore lost connections? would be safer but in development it is probably better to crash...
             char[256] buf;
             auto errMsg=strerror_d(errno,buf);
-            sinkTogether(log,delegate void(CharSink sink){
+            sinkTogether(log,delegate void(scope CharSink sink){
                 auto s=dumper(sink);
                 s("error accepting socket in ")(serviceName)(":")(errMsg);
                 if (errMsg.length==0){
@@ -643,7 +643,7 @@ class SocketServer{
             });
         }
         if (pendingTasks>= maxPendingTasks){
-            sinkTogether(log,delegate void(CharSink sink){
+            sinkTogether(log,delegate void(scope CharSink sink){
                 auto s=dumper(sink);
                 s("too many pending connections, dropping connection immeditely on ")(serviceName)("\n");
             });

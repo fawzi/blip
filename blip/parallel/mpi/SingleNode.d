@@ -82,7 +82,7 @@ class SNSerializer:SBinSerializer{
         res.tag=AnyTag;
         tag=AnyTag;
     }
-    void desc(CharSink s){
+    void desc(scope CharSink s){
         dumper(s)("SNSerializer(")(tag)(",")(cast(void*)target)(")");
     }
 }
@@ -180,14 +180,14 @@ class SNChannel:Channel,BasicObjectI{
         return _recvTask;
     }
     
-    Serializer sendTag(int tag=0,ubyte[] buf=null){
+    Serializer sendTag(int tag=0,in ubyte[] buf=null){
         auto _serializer=new SNSerializer();
         _serializer.tag=tag;
         _serializer.target=recevingChannel;
         return _serializer;
     }
     template sendT(T){
-        void send(Const!(T) v,int tag=0){
+        void send(in T v,int tag=0){
             recevingChannel.data.append(SNMessage(tag,Variant(v)));
             recevingChannel.notify();
         }
@@ -235,7 +235,7 @@ class SNChannel:Channel,BasicObjectI{
             tag=msg.tag;
             return unserializer;
         }
-        auto tAtt=taskAtt.val;
+        auto tAtt=taskAtt;
         if (tAtt !is null && tAtt.mightYield){
             SNMessage msg;
             bool didSetM=false;
@@ -280,7 +280,7 @@ class SNChannel:Channel,BasicObjectI{
                 v=msg.msg.get!(T)();
                 return msg.tag;
             }
-            auto tAtt=taskAtt.val;
+            auto tAtt=taskAtt;
             if (tAtt !is null && tAtt.mightYield){
                 SNMessage msg;
                 bool didSetM=false;
@@ -314,7 +314,7 @@ class SNChannel:Channel,BasicObjectI{
     alias r2.recv recv;
     alias r3.recv recv;
     
-    void sendStr(Const!(char[]) s, int tag=0){
+    void sendStr(in char[] s, int tag=0){
         sendT!(char[]).send(s,tag);
     }
     int recvStr(ref char[] s,int tag=0){
@@ -332,9 +332,9 @@ class SNChannel:Channel,BasicObjectI{
     }
     
     template sendrecvT(T){
-        int sendrecv(Const!(T) sendV,ref T recvV,Channel recvChannel,int sendTag=0,int recvTag=0){
+        int sendrecv(T sendV,ref T recvV,Channel recvChannel,int sendTag=0,int recvTag=0){
             if (recvChannel is this && sendTag==recvTag && data.length==0){
-                recvV=sendV;
+                recvV=(cast(typeof(T.init.ptr))sendV.ptr)[0..sendV.length];
                 return recvTag;
             } else {
                 recvChannel.send(sendV,sendTag);
@@ -350,7 +350,7 @@ class SNChannel:Channel,BasicObjectI{
     alias sr2.sendrecv sendrecv;
     alias sr3.sendrecv sendrecv;
 
-    void desc(void delegate(cstring) s){
+    void desc(scope void delegate(in cstring) s){
         s("{<SNChannel@"); writeOut(s,cast(void*)this); s(">\n");
         s("  queue:"); writeOut(s,data); s(",\n");
         s("  handlers:{");
@@ -466,7 +466,7 @@ class SNLinearComm:LinearComm,BasicObjectI{
         return _myRank;
     }
     int dim(){
-        return channels.length;
+        return cast(int)channels.length;
     }
     Channel opIndex(int rank){
         return channels[rank];
@@ -634,7 +634,7 @@ class SNLinearComm:LinearComm,BasicObjectI{
         (cast(SNChannel)(this[0])).registerHandler(handler,tag);
     }
     
-    void desc(void delegate(cstring) s){
+    void desc(scope void delegate(in cstring) s){
         s("{<SNLinearComm> name:"); s(name); s("}");
     }
 }

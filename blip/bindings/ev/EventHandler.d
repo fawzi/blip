@@ -73,7 +73,7 @@ struct EventHandler{
             inlineAction();
         }
         if (task!is null){
-            throw new Exception(collectIAppender(delegate void(CharSink s){
+            throw new Exception(collectIAppender(delegate void(scope CharSink s){
                 dumper(s)("cannot resume or start a task periodically for task ")(task)
                     (" and watcher ")(w);
             }));
@@ -87,7 +87,7 @@ struct EventHandler{
     }
     void giveBack(){
         if (pool !is null) {
-            pool.giveBack(this);
+            pool.giveBack(&this);
         } else {
             clear();
         }
@@ -159,7 +159,7 @@ struct EventHandler{
     
     static extern(C) void cCallback(ev_loop_t*loop, ev_watcher *w, int revents){
         version(TrackEvents){
-            sinkTogether(sout,delegate void(CharSink s){
+            sinkTogether(sout,delegate void(scope CharSink s){
                 dumper(s)("event@")(cast(void*)w)(" has been fired\n");
             });
         }

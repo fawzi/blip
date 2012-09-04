@@ -23,7 +23,7 @@ import blip.container.FiberPool;
 import blip.container.Cache;
 import blip.container.Pool;
 import blip.math.random.Random;
-import blip.core.Traits: ctfe_i2a;
+import blip.core.Traits: ctfe_i2s;
 import blip.Comp;
 
 enum TaskStatus:int{
@@ -51,7 +51,7 @@ string taskStatusStr(TaskStatus s){
         case TaskStatus.Finished:
             return "Finished";
         default:
-            return "TaskStatus"~ctfe_i2a(cast(int)s);
+            return "TaskStatus"~ctfe_i2s(cast(int)s);
     }
 }
 
@@ -134,9 +134,9 @@ interface TaskSchedulerI:BasicObjectI {
     /// root task, the easy way to add tasks to this scheduler
     TaskI rootTask();
     /// description
-    void desc(void delegate(cstring) s);
+    void desc(scope void delegate(in cstring) s);
     /// possibly short description
-    void desc(void delegate(cstring) s,bool shortVersion);
+    void desc(scope void delegate(in cstring) s,bool shortVersion);
     /// if there are many queued tasks (and one should try not to queue too many of them)
     bool manyQueued();
     /// number of simple tasks wanted
@@ -175,9 +175,9 @@ interface TaskI:SubtaskNotificationsI{
     /// name of the task
     string taskName();
     /// description
-    void desc(void delegate(cstring) s);
+    void desc(scope void delegate(in cstring) s);
     /// possibly short description
-    void desc(void delegate(cstring) s,bool shortVersion);
+    void desc(scope void delegate(in cstring) s,bool shortVersion);
     /// if this task might spawn
     bool mightSpawn();
     /// if this task might Yield
@@ -216,7 +216,7 @@ interface TaskI:SubtaskNotificationsI{
     /// opStart is executed after the task has been flagged as delayed, but before
     /// stopping the current execution. Use it to start the operation that will resume
     /// the task (so that it is not possible to resume before the delay is effective)
-    void delay(void delegate()opStart=null);
+    void delay(scope void delegate()opStart=null);
     /// resubmit a task that was delayed just once
     void resubmitDelayedSingle();
     /// resubmit a delayed task, the value is the delayLevel at which the task will return
@@ -269,11 +269,11 @@ struct Resubmitter{
     }
     void giveBack(){
         if (pool!is null){
-            pool.giveBack(this);
+            pool.giveBack(&this);
         } else {
             task=null;
             delayLevel=int.max;
-            delete this;
+            //delete this; // not possible anymore in D2
         }
     }
     __gshared static PoolI!(Resubmitter*) gPool;
@@ -290,8 +290,8 @@ struct Resubmitter{
         r.delayLevel=delayLevel;
         return r;
     }
-    void desc(CharSink s){
-        dumper(s)("{class:Resubmitter, @:")(cast(void*)this)(", task:")(task)(", delayLevel:")(delayLevel)("}");
+    void desc(scope CharSink s){
+        dumper(s)("{class:Resubmitter, @:")(cast(void*)&this)(", task:")(task)(", delayLevel:")(delayLevel)("}");
     }
 }
 /// returns a delegate that resubmits the task with the given delayLevel

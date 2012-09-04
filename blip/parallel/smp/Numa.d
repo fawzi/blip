@@ -149,7 +149,7 @@ struct NumaNode{
         serial(s);
     }
     string toString(){
-        return serializeToArray(this);
+        return serializeToIArray(this);
     }
     mixin printOut!();
 }
@@ -329,7 +329,7 @@ interface NumaTopology: Topology!(NumaNode){
     SocketInfo nextSocket(NumaNode);
 }
 
-void writeOutTopo(NodeType)(void delegate(cstring) sink,Topology!(NodeType) topo){
+void writeOutTopo(NodeType)(scope void delegate(in cstring) sink,Topology!(NodeType) topo){
     auto s=dumper(sink);
     for (int ilevel=topo.maxLevel;ilevel!=0;--ilevel){
         s("level(")(ilevel)("){");
@@ -381,7 +381,7 @@ class ExplicitTopology(NodeType): Topology!(NodeType){
             el=array[posAtt];
             return true;
         }
-        int opApply(int delegate(ref T el) loopBody){
+        int opApply(scope int delegate(ref T el) loopBody){
             while (left!=0){
                 if (auto res=loopBody(array[pos])){
                     return res;
@@ -391,7 +391,7 @@ class ExplicitTopology(NodeType): Topology!(NodeType){
             }
             return 0;
         }
-        int opApply(int delegate(ref size_t i,ref T el) loopBody){
+        int opApply(scope int delegate(ref size_t i,ref T el) loopBody){
             while (left!=0){
                 if (auto res=loopBody(pos,array[pos])){
                     return res;
@@ -418,7 +418,7 @@ class ExplicitTopology(NodeType): Topology!(NodeType){
         }
         __gshared static ClassMetaInfo metaI;
         shared static this(){
-            metaI=ClassMetaInfo.createForType!(typeof(*this))("ExplicitTopology!("~NodeType.stringof~").NumaLevel",
+            metaI=ClassMetaInfo.createForType!(typeof(this))("ExplicitTopology!("~NodeType.stringof~").NumaLevel",
                 "a level of a numa hierarcy");
             metaI.addFieldOfType!(NodeType[])("nodes","the nodes of this level");
             metaI.addFieldOfType!(NodeType[])("superNodes","the super Nodes of this level");
@@ -515,7 +515,7 @@ class ExplicitTopology(NodeType): Topology!(NodeType){
     void unserialize(Unserializer s){
         s.field(metaI[0],levels);
     }
-    void desc(CharSink sink){
+    void desc(scope CharSink sink){
         writeOutTopo(sink,cast(Topology!(NumaNode))this);
     }
 }
@@ -633,7 +633,7 @@ version(noHwloc){} else {
                 return false;
             }
         
-            int opApply(int delegate(ref NumaNode x) dlg){
+            int opApply(scope int delegate(ref NumaNode x) dlg){
                 if (pos is null) return 0;
                 int nEl=hwloc_get_nbobjs_by_depth(topo.topology,pos.depth);
                 for (int i=pos.logical_index;i<nEl;++i){
@@ -643,7 +643,7 @@ version(noHwloc){} else {
                 }
                 return 0;
             }
-            int opApply(int delegate(ref size_t i,ref NumaNode x) dlg){
+            int opApply(scope int delegate(ref size_t i,ref NumaNode x) dlg){
                 if (pos is null) return 0;
                 int nEl=hwloc_get_nbobjs_by_depth(topo.topology,pos.depth);
                 size_t ii=0;
@@ -656,7 +656,7 @@ version(noHwloc){} else {
                 return 0;
             }
         
-            int opApply(int delegate(ref NumaNode x,ref hwloc_obj_t obj) dlg){
+            int opApply(scope int delegate(ref NumaNode x,ref hwloc_obj_t obj) dlg){
                 if (pos is null) return 0;
                 int nEl=hwloc_get_nbobjs_by_depth(topo.topology,pos.depth);
                 for (int i=pos.logical_index;i<nEl;++i){
@@ -819,7 +819,7 @@ version(noHwloc){} else {
                 return next(res,o);
             }
         
-            int opApply(int delegate(ref NumaNode x) dlg){
+            int opApply(scope int delegate(ref NumaNode x) dlg){
                 NumaNode n;
                 while (next(n)){
                     auto res=dlg(n);
@@ -829,7 +829,7 @@ version(noHwloc){} else {
                 return 0;
             }
 
-            int opApply(int delegate(ref size_t,ref NumaNode) dlg){
+            int opApply(scope int delegate(ref size_t,ref NumaNode) dlg){
                 size_t ii=0;
                 NumaNode n;
                 while (next(n)){
@@ -841,7 +841,7 @@ version(noHwloc){} else {
                 return 0;
             }
         
-            int opApply(int delegate(ref NumaNode x,ref hwloc_obj_t obj) dlg){
+            int opApply(scope int delegate(ref NumaNode x,ref hwloc_obj_t obj) dlg){
                 NumaNode n;
                 hwloc_obj_t obj;
                 while (next(n,obj)){
@@ -949,7 +949,7 @@ version(noHwloc){} else {
             assert(node.level+1<levelMapping.length,"no super node for node at top level"); // return itself?
             auto obj=hwlocObjForNumaNode(node);
             if (obj is null){
-                throw new Exception(collectIAppender(delegate void(CharSink s){
+                throw new Exception(collectIAppender(delegate void(scope CharSink s){
                     s("no object for node "); writeOut(s,node);  s("\n");
                 }),__FILE__,__LINE__);
             }
@@ -974,7 +974,7 @@ version(noHwloc){} else {
                     obj=obj.parent;
                 }
             }
-            throw new Exception(collectIAppender(delegate void(CharSink s){
+            throw new Exception(collectIAppender(delegate void(scope CharSink s){
                 s("no superNode for node "); writeOut(s,node);  s("\n");
             }),__FILE__,__LINE__);
         }
@@ -983,7 +983,7 @@ version(noHwloc){} else {
             assert(node.level!=0,"no subnode of the last level"); // return an empty iterator?
             auto obj=hwlocObjForNumaNode(node);
             if (obj is null){
-                throw new Exception(collectIAppender(delegate void(CharSink s){
+                throw new Exception(collectIAppender(delegate void(scope CharSink s){
                     s("no hwlocObjForNumaNode for node "); writeOut(s,node);  s("\n");
                 }),__FILE__,__LINE__);
             }
@@ -992,7 +992,7 @@ version(noHwloc){} else {
                 obj=obj.first_child;
             }
             if (obj is null){
-                throw new Exception(collectIAppender(delegate void(CharSink s){
+                throw new Exception(collectIAppender(delegate void(scope CharSink s){
                     s("no subnodes for node "); writeOut(s,node);  s("\n");
                 }),__FILE__,__LINE__); // return an empty iterator?
             }
@@ -1177,7 +1177,7 @@ version(noHwloc){} else {
             }
             return true;
         }
-        void desc(CharSink sink){
+        void desc(scope CharSink sink){
             auto s=dumper(sink);
             s("<HwlocTopology@")(cast(void*)this)("\n");
             s("  levelMapping:")(levelMapping)("\n");

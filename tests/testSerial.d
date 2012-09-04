@@ -71,11 +71,11 @@ class A: Serializable{
     Serializable postUnserialize(Unserializer s){
         return this;
     }
-    override int opEquals(Object other){
+    override bool opEquals(Object other){
         if (auto oo=cast(A)other){
             return x==oo.x && y==oo.y;
         }
-        return 0;
+        return false;
     }
 }
 
@@ -156,8 +156,8 @@ class B:A{
             pragma(msg,NewSerializationExpose.handler!(0).end(``));
         }
     }
-    override int opEquals(Object other){
-        if (this.classinfo !is other.classinfo) return 0;
+    override bool opEquals(Object other){
+        if (this.classinfo !is other.classinfo) return false;
         if (auto oo=cast(B)other){
             return super.opEquals(other) &&
                 a==oo.a && b==oo.b && c==oo.c && d==oo.d && e==oo.e && f==oo.f &&
@@ -166,7 +166,7 @@ class B:A{
                 eqStr(q,oo.q) && eqStr(r,oo.r) && s==oo.s && t==oo.t &&
                 u==oo.u && v==oo.v && z==oo.z;
         }
-        return 0;
+        return false;
     }
     void randomize(Rand rr,int idx,ref int nEl, ref bool acceptable){
         super.randomize(rr);
@@ -195,10 +195,10 @@ class C{
         next
         `));
     }
-    override int opEquals(Object o){
-        if (o.classinfo !is this.classinfo) return 0;
+    override bool opEquals(Object o){
+        if (o.classinfo !is this.classinfo) return false;
         C oo=cast(C)o;
-        int res= i==oo.i;
+        bool res= i==oo.i;
         if (next is null){
             res = res && oo.next is null;
         } else {
@@ -509,7 +509,6 @@ void testBin2Unserial2(T,U)(T a,ref U b){
 }
 
 void main(){
-    CoreHandlers ch;
     auto fh=new FormattedWriteHandlers!(char)("sout",sout.call);
     auto i=4;
     fh.handle(i);
@@ -645,7 +644,7 @@ void main(){
       v:31268,
       z:19578
     }
-    `);
+    `.dup);
     auto jus=new JsonUnserializer!()(toReaderT!(char)(buf));
     B b1,b2;
     version(UnserializationTrace) sout("XX unserial reference\n");

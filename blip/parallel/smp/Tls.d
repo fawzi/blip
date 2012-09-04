@@ -33,7 +33,7 @@ import blip.Comp;
 
 version(Win32){
     import tango.sys.win32.UserGdi;
-    const DWORD TLS_OUT_OF_INDEXES  = 0xFFFFFFFF;
+    immutable DWORD TLS_OUT_OF_INDEXES  = 0xFFFFFFFF;
 }
 version(Posix){
     extern(C) {

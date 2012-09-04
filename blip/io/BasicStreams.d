@@ -27,12 +27,12 @@ final class BasicBinStream: OutStreamI{
     void delegate() _flush;
     void delegate() _close;
     string dsc;
-    void delegate(CharSink) dscWriter;
+    void delegate(scope CharSink) dscWriter;
     
-    void _writeDsc(CharSink s){
+    void _writeDsc(scope CharSink s){
         s(dsc);
     }
-    this(string dsc,BinSink s,void delegate()f=null,void delegate()c=null,void delegate(CharSink)dscW=null){
+    this(string dsc,BinSink s,scope void delegate()f=null,scope void delegate()c=null,scope void delegate(scope CharSink)dscW=null){
         this.sink=s;
         this._flush=f;
         this._close=c;
@@ -43,36 +43,36 @@ final class BasicBinStream: OutStreamI{
             this.dscWriter=&_writeDsc;
         }
     }
-    this(void delegate(CharSink)dscW,BinSink s,void delegate()f=null,void delegate()c=null){
+    this(scope void delegate(scope CharSink)dscW,BinSink s,scope void delegate()f=null,scope void delegate()c=null){
         this("",s,f,c,dscW);
     }
     
-    void rawWrite(void[] a){
+    void rawWrite(in void[] a){
         this.sink(a);
     }
-    void rawWriteStrC(cstring s){
+    void rawWriteStrC(in cstring s){
         this.sink(s);
     }
-    void rawWriteStrW(cstringw s){
+    void rawWriteStrW(in cstringw s){
         this.sink(s);
     }
-    void rawWriteStrD(cstringd s){
+    void rawWriteStrD(in cstringd s){
         this.sink(s);
     }
     //alias rawWriteStrC rawWriteStr;
     //alias rawWriteStrW rawWriteStr;
     //alias rawWriteStrD rawWriteStr;
-    void rawWriteStr(cstring s){
+    void rawWriteStr(in cstring s){
         this.sink(s);
     }
-    void rawWriteStr(cstringw s){
+    void rawWriteStr(in cstringw s){
         this.sink(s);
     }
-    void rawWriteStr(cstringd s){
+    void rawWriteStr(in cstringd s){
         this.sink(s);
     }
     CharSink charSink(){
-        return &this.rawWriteStrC; // cast(void delegate(cstring))rawWriteStr does not work on older compilers
+        return &this.rawWriteStrC; // cast(void delegate(in cstring))rawWriteStr does not work on older compilers
     }
     BinSink binSink(){
         return sink;
@@ -88,23 +88,23 @@ final class BasicBinStream: OutStreamI{
             _close();
         }
     }
-    void desc(CharSink s){
+    void desc(scope CharSink s){
         dscWriter(s);
     }
 }
 
 /// basic stream based on a string sink, uses the type T as native type, the others are converted
 final class BasicStrStream(T=char): OutStreamI{
-    void delegate(Const!(T)[]) sink;
+    void delegate(in T[]) sink;
     void delegate() _flush;
     void delegate() _close;
     string dsc;
-    void delegate(CharSink) dscWriter;
+    void delegate(scope CharSink) dscWriter;
     
-    void _writeDsc(CharSink s){
+    void _writeDsc(scope CharSink s){
         s(dsc);
     }
-    this(string dsc,void delegate(Const!(T)[]) s,void delegate()f=null,void delegate()c=null,OutWriter dscW=null){
+    this(string dsc,scope void delegate(in T[]) s,scope void delegate()f=null,scope void delegate()c=null,OutWriter dscW=null){
         this.sink=s;
         this._flush=f;
         this._close=c;
@@ -115,15 +115,15 @@ final class BasicStrStream(T=char): OutStreamI{
             this.dscWriter=&_writeDsc;
         }
     }
-    this(OutWriter dsc,void delegate(Const!(T)[]) s,void delegate()f=null,void delegate()c=null){
+    this(OutWriter dsc,scope void delegate(in T[]) s,scope void delegate()f=null,scope void delegate()c=null){
         this("",s,f,c,dsc);
     }
-    void rawWrite(void[] a){ // written in hex format
+    void rawWrite(in void[] a){ // written in hex format
         writeOut(this.sink,(cast(ubyte*)a.ptr)[0..a.length],"x");
     }
     /// writes a raw string
-    void writeStr(U)(U data){
-        alias Unqual!(U) V;
+    void writeStr(U)(in U data){
+        alias UnqualAll!(U) V;
         static if (is(V==T[])){
             sink(data);
         } else static if (is(V==char[])||is(V==wchar[])||is(V==dchar[])){
@@ -142,35 +142,36 @@ final class BasicStrStream(T=char): OutStreamI{
     // alias writeStr!(char)  rawWriteStrC;
     // alias writeStr!(wchar) rawWriteStrW;
     // alias writeStr!(dchar) rawWriteStrD;
-    void rawWriteStrC(cstring s){
+    void rawWriteStrC(in cstring s){
         writeStr(s);
     }
-    void rawWriteStrW(cstringw s){
+    void rawWriteStrW(in cstringw s){
         writeStr(s);
     }
-    void rawWriteStrD(cstringd s){
+    void rawWriteStrD(in cstringd s){
         writeStr(s);
     }
     //alias rawWriteStrC rawWriteStr;
     //alias rawWriteStrW rawWriteStr;
     //alias rawWriteStrD rawWriteStr;
-    void rawWriteStr(cstring s){
+    void rawWriteStr(in cstring s){
         writeStr(s);
     }
-    void rawWriteStr(cstringw s){
+    void rawWriteStr(in cstringw s){
         writeStr(s);
     }
-    void rawWriteStr(cstringd s){
+    void rawWriteStr(in cstringd s){
         writeStr(s);
     }
     void flush(){
         if (_flush!is null) _flush();
     }
+
     CharSink charSink(){
         static if (is(T==char)){
             return this.sink;
         } else {
-            return &this.writeStr!(Const!(char)[]); // cast(void delegate(cstring))rawWriteStr does not work on older compilers
+            return &(this.writeStr!(cstring)); // cast(void delegate(in cstring))rawWriteStr does not work on older compilers
         }
     }
     BinSink binSink(){
@@ -180,7 +181,7 @@ final class BasicStrStream(T=char): OutStreamI{
         if (_close!is null)
             _close();
     }
-    void desc(CharSink s){
+    void desc(scope CharSink s){
         dscWriter(s);
     }
 }
@@ -196,16 +197,16 @@ final class BufferedBinStream: OutStreamI{
     ubyte[] buf;
     size_t content;
     string dsc;
-    void delegate(CharSink) dscWriter;
+    void delegate(scope CharSink) dscWriter;
     
-    void _writeDsc(CharSink s){
+    void _writeDsc(scope CharSink s){
         s(dsc);
     }
 
     this(string dsc,BinSink s,size_t bufDim=512, void delegate()f=null, void delegate()c=null){
         this(dsc,s,new ubyte[](bufDim),f,c);
     }
-    this(string dsc,BinSink s,ubyte[] buf,void delegate()f=null, void delegate()c=null,OutWriter dscW=null){
+    this(string dsc,BinSink s,ubyte[] buf, void delegate()f=null, void delegate()c=null,OutWriter dscW=null){
         this._sink=s;
         this.buf=buf;
         this._flush=f;
@@ -225,7 +226,7 @@ final class BufferedBinStream: OutStreamI{
         this("",s,buf,f,c,dsc);
     }
     
-    void sink(void[]data){
+    void sink(in void[]data){
         if (data.length<=buf.length-content){
             buf[content..content+data.length]=cast(ubyte[])data;
             content+=data.length;
@@ -253,32 +254,32 @@ final class BufferedBinStream: OutStreamI{
             }
         }
     }
-    void rawWrite(void[] a){
+    void rawWrite(in void[] a){
         this.sink(a);
     }
-    void rawWriteStrC(cstring s){
+    void rawWriteStrC(in cstring s){
         this.sink(s);
     }
-    void rawWriteStrW(cstringw s){
+    void rawWriteStrW(in cstringw s){
         this.sink(s);
     }
-    void rawWriteStrD(cstringd s){
+    void rawWriteStrD(in cstringd s){
         this.sink(s);
     }
-    void rawWriteStr(cstring s){
+    void rawWriteStr(in cstring s){
         this.sink(s);
     }
-    void rawWriteStr(cstringw s){
+    void rawWriteStr(in cstringw s){
         this.sink(s);
     }
-    void rawWriteStr(cstringd s){
+    void rawWriteStr(in cstringd s){
         this.sink(s);
     }
     //alias rawWriteStrC rawWriteStr;
     //alias rawWriteStrW rawWriteStr;
     //alias rawWriteStrD rawWriteStr;
     CharSink charSink(){
-        return &this.rawWriteStrC; // cast(void delegate(cstring))rawWriteStr does not work on older compilers
+        return &this.rawWriteStrC; // cast(void delegate(in cstring))rawWriteStr does not work on older compilers
     }
     BinSink binSink(){
         return &this.sink;
@@ -292,25 +293,25 @@ final class BufferedBinStream: OutStreamI{
         if (_close!is null)
             _close();
     }
-    void desc(CharSink s){
+    void desc(scope CharSink s){
         dscWriter(s);
     }
 }
 
 /// basic stream based on a string sink, uses the type T as native type, the others are converted
 final class BufferedStrStream(T=char): OutStreamI{
-    void delegate(Const!(T)[]) _sink;
+    void delegate(in T[]) _sink;
     void delegate() _flush;
     void delegate() _close;
-    Const!(T)[] buf;
+    const(T)[] buf;
     size_t content;
     string dsc;
     
-    this(string dsc,CharSink s,size_t bufDim=512,void delegate()f=null,void delegate()c=null){
+    this(string dsc,scope CharSink s,size_t bufDim=512,void delegate()f=null,void delegate()c=null){
         this(dsc,s,new T[](bufDim),f,c);
     }
     
-    this(string dsc,CharSink s,T[] buf,void delegate()f=null,void delegate()c=null,OutWriter dscW=null){
+    this(string dsc,scope CharSink s,T[] buf,void delegate()f=null,void delegate()c=null,OutWriter dscW=null){
         this._sink=s;
         this.buf=buf;
         this._flush=f;
@@ -323,15 +324,15 @@ final class BufferedStrStream(T=char): OutStreamI{
             this.dscWriter=&_writeDsc;
         }
     }
-    this(OutWriter dsc,CharSink s,size_t bufDim=512,void delegate()f=null,void delegate()c=null){
+    this(OutWriter dsc,scope CharSink s,size_t bufDim=512,void delegate()f=null,void delegate()c=null){
         this("",s,new T[](bufDim),f,c,dsc);
     }
     
-    this(OutWriter dsc,CharSink s,T[] buf,void delegate()f=null,void delegate()c=null){
+    this(OutWriter dsc,scope CharSink s,T[] buf,void delegate()f=null,void delegate()c=null){
         this("",s,buf,f,c,dsc);
     }
     
-    void sink(Const!(T)[]data){
+    void sink(in T[]data){
         synchronized(this){
             if (data.length<=buf.length-content){
                 buf[content..content+data.length]=data;
@@ -367,7 +368,7 @@ final class BufferedStrStream(T=char): OutStreamI{
     }
     /// writes a raw string
     void writeStr(U)(U[]data){
-        alias Unqual!(U) V;
+        alias UnqualAll!(U) V;
         static if (is(V==T[])){
             sink(data);
         } else static if (is(V==char[])||is(V==wchar[])||is(V==dchar[])){
@@ -384,35 +385,35 @@ final class BufferedStrStream(T=char): OutStreamI{
     // alias writeStr!(char)  rawWriteStrC;
     // alias writeStr!(wchar) rawWriteStrW;
     // alias writeStr!(dchar) rawWriteStrD;
-    void rawWriteStrC(cstring s){
+    void rawWriteStrC(in cstring s){
         writeStr(s);
     }
-    void rawWriteStrW(cstringw s){
+    void rawWriteStrW(in cstringw s){
         writeStr(s);
     }
-    void rawWriteStrD(cstringd s){
+    void rawWriteStrD(in cstringd s){
         writeStr(s);
     }
     //alias rawWriteStrC rawWriteStr;
     //alias rawWriteStrW rawWriteStr;
     //alias rawWriteStrD rawWriteStr;
-    void rawWriteStr(cstring s){
+    void rawWriteStr(in cstring s){
         writeStr(s);
     }
-    void rawWriteStr(cstringw s){
+    void rawWriteStr(in cstringw s){
         writeStr(s);
     }
-    void rawWriteStr(cstringd s){
+    void rawWriteStr(in cstringd s){
         writeStr(s);
     }
     void flush(){
         if (_flush!is null) _flush();
     }
-    CharSink charSink(){
+    scope CharSink charSink(){
         static if (is(T==char)){
             return &this.sink;
         } else {
-            return &this.writeStr!(char); // cast(void delegate(cstring))rawWriteStr does not work on older compilers
+            return &this.writeStr!(char); // cast(void delegate(in cstring))rawWriteStr does not work on older compilers
         }
     }
     BinSink binSink(){
@@ -422,7 +423,7 @@ final class BufferedStrStream(T=char): OutStreamI{
         if (_close!is null)
             _close();
     }
-    void desc(CharSink s){
+    void desc(scope CharSink s){
         dscWriter(s);
     }
 }

@@ -44,11 +44,11 @@ class TextParser(T) : InputFilter
 {
     private InputBuffer     source;
     Reader!(T)              reader;
-    protected T[]           slice;
+    protected const(T)[]           slice;
     size_t maxTranscodingOverhead;
     bool skippedWhitespace;
     bool newlineIsSpace; /// newline counts as space
-    T[] delims;
+    const(T)[] delims;
     long line,col;
     long oldLine,oldCol,charPos,oldCharPos;
     enum CommentType{ None, Whitespace, Line } // add nested comments?
@@ -64,7 +64,7 @@ class TextParser(T) : InputFilter
         slice=slice[0..0];
     }+/
     
-    void desc(CharSink s,bool longDesc=false){
+    void desc(scope CharSink s,bool longDesc=false){
         if (longDesc){
             parserPos(s);
         } else {
@@ -78,18 +78,18 @@ class TextParser(T) : InputFilter
         }
     }
     /// position of the parsed token
-    void parserPos(void delegate(cstring) s){
+    void parserPos(scope void delegate(in cstring) s){
         if (source!is null)
             writeOut(s,source.conduit);
         else
             writeOut(s,reader);
         dumper(s)(" line:")(oldLine)(" col:")(oldCol)(" token:\"")(convertToString!(char)(escape(slice)))("\"\n");
-        T[] txt;
+        const(T)[] txt;
         if (source!is null){
-            txt=cast(T[])source.slice;
+            txt=source.slice;
             if (txt.length>250) txt=txt[0..250];
         } else {
-            reader.handleReader(delegate size_t(T[] dta, SliceExtent sExt,out bool iterate){
+	    reader.handleReader(delegate size_t(in T[] dta, SliceExtent sExt,out bool iterate){
                 iterate=false;
                 if (dta.length>250){
                     txt=dta[0..250];
@@ -105,7 +105,7 @@ class TextParser(T) : InputFilter
     /// exception during parsing (adds parser position info)
     static class ParsingException:Exception{
         this(TextParser p,string desc,string filename,long line,Exception next=null){
-            super(collectIAppender(delegate void(CharSink s){ s(desc); s(" parsing "); p.parserPos(s); }),filename,line,next);
+            super(collectIAppender(delegate void(scope CharSink s){ s(desc); s(" parsing "); p.parserPos(s); }),filename,line,next);
         }
     }
     /// exception for when the cached part is too small
@@ -129,13 +129,13 @@ class TextParser(T) : InputFilter
         throw new SmallCacheException(this,desc,filename,line);
     }
     /// updates the position of the parser in the file
-    void updatePos(T[] str){
+    void updatePos(in T[] str){
         oldLine=line;
         oldCol=col;
         oldCharPos=charPos;
         charPos+=str.length;
         foreach(c;str){
-            if (c=='\n'){
+             if (c=='\n'){
                 ++line; col=0;
             } else {
                 ++col;
@@ -144,12 +144,12 @@ class TextParser(T) : InputFilter
     }
     /// scans the contents and is supposed to set slice to something non zero if
     /// it has success
-    final bool next (size_t delegate (T[],SliceExtent) scan,bool setSlice=true)
+    final bool next (scope size_t delegate (in T[],SliceExtent) scan,bool setSlice=true)
     {
         bool matchSuccess=false;
         if (!skippedWhitespace) skipWhitespace();
         if (reader!is null){
-            matchSuccess=reader.handleReader(delegate size_t(T[] dta, SliceExtent sExt,out bool iterate){
+            matchSuccess=reader.handleReader(delegate size_t(in T[] dta, SliceExtent sExt,out bool iterate){
                 iterate=false;
                 size_t res=scan(dta,sExt);if (res!is  Eof){
                     if (setSlice) slice=dta[0..res];
@@ -253,7 +253,7 @@ class TextParser(T) : InputFilter
     }
     /// check if the scan function would give a match without actually reading it
     /// (discards the previous matches though)
-    bool check(size_t delegate(T[],SliceExtent) scan){
+    bool check(scope size_t delegate(in T[],SliceExtent) scan){
         bool success=false;
         next(delegate size_t(T[] data, SliceExtent se){
             auto res=scan(data,se);
@@ -437,7 +437,7 @@ class TextParser(T) : InputFilter
         }
     }
     /// scans a line
-    protected size_t scanLine (T[] data,SliceExtent se){
+    protected size_t scanLine (in T[] data,SliceExtent se){
         size_t i=0;
         bool checkCr=false;
         for(;i!=data.length;++i){
@@ -469,24 +469,24 @@ class TextParser(T) : InputFilter
         assert(false);
     }
     /// returns the next line (as slice in local storage)
-    T[]nextLine(){
+    const(T)[]nextLine(){
         T[] str;
         if (!next(&scanLine))
             return null;
         return slice;
     }
     /// reads n codepoints
-    T[] readNCodePoints(size_t n,bool skipSpace=true){
+    const(T)[] readNCodePoints(size_t n,bool skipSpace=true){
         if (!skipSpace){
             skippedWhitespace=true;
         }
-        if (!next(delegate size_t(T[] data,SliceExtent se){
+        if (!next(delegate size_t(in T[] data,SliceExtent se){
             return scanCodePoints(data,n);
         })) parseError("could not read n codepoints",__FILE__,__LINE__);
         return slice;
     }
     /// scans an int string (base 10, accept also hex?)
-    protected size_t scanInt (T[] data,SliceExtent se){
+    protected size_t scanInt (in T[] data,SliceExtent se){
         size_t i=0;
         auto c=data[i];
         if (data.length>0 && c=='+' || c=='-') ++i;
@@ -508,7 +508,7 @@ class TextParser(T) : InputFilter
         assert(false);
     }
     /// scans a float string
-    protected size_t scanFloat(T[] data,SliceExtent se){
+    protected size_t scanFloat(in T[] data,SliceExtent se){
         size_t i=0;
         if (data.length==0) return Eof;
         T c=data[i];
@@ -556,7 +556,7 @@ class TextParser(T) : InputFilter
         assert(false);
     }
     /// scans either a double quoted string or a token delimited by whitespace and ,;:{}
-    protected size_t scanString (T[] data,SliceExtent se){
+    protected size_t scanString (in T[] data,SliceExtent se){
         size_t i=0;
         if (data.length>0 && data[i]=='"'){
             ++i;
@@ -607,7 +607,8 @@ class TextParser(T) : InputFilter
     }
     /// if longLived is true the result is guaranteed not to contain slices of the buffer
     /// (that might become invalid)
-    void readValue(U)(ref U t,bool longLived=true){
+    void readValue(UU)(ref UU t,bool longLived=true){
+	alias UnqualAll!(UU) U;
         static if(is(U==byte)||is(U==ubyte)||is(U==short)||is(U==ushort)
             ||is(U==int)||is(U==uint)||is(U==long)||is(U==ulong))
         {
@@ -629,7 +630,7 @@ class TextParser(T) : InputFilter
             assert(slice.length>0,"error slice too small");
             static if (is(U==float)||is(U==double)||is(U==real)){
                 foreach(i,c;slice){
-                    if (c=='D'||c=='d') slice[i]='e';
+                    if (c=='D'||c=='d') (cast(char[])slice)[i]='e';// ugly hack
                 }
                 t=cast(U)Float.toFloat(slice);
             } else static if (!is(U==ulong)){
@@ -641,7 +642,7 @@ class TextParser(T) : InputFilter
         } else static if (is(U==ifloat)||is(U==idouble)||is(U==ireal)){
             RealTypeOf!(U) a;
             readValue(a);
-            if (!next(delegate size_t(T[] data,SliceExtent se)
+            if (!next(delegate size_t(in T[] data,SliceExtent se)
                 {
                     if (data.length==0) return Eof;
                     if (data[0]=='i'||data[0]=='I'){
@@ -658,7 +659,7 @@ class TextParser(T) : InputFilter
             RealTypeOf!(U) a;
             readValue(a);
             skipWhitespace();
-            if (!next(delegate size_t(T[] data,SliceExtent se)
+            if (!next(delegate size_t(in T[] data,SliceExtent se)
                 {
                     if(data.length>0 && (data[0]=='+' || data[0]=='-')){
                         return 1;
@@ -686,17 +687,17 @@ class TextParser(T) : InputFilter
                 slice[0]=='T' || slice[0]=='Y' || slice[0]=='J' || slice[0]=='S'){
                 t=true;
             } else {
-                parseError("unexpected token for boolean: "~slice,
+                parseError("unexpected token for boolean: "~slice.idup,
                     __FILE__,__LINE__);
             }
         } else static if(is(U==T[])) {
             if (next(&scanString)) {
                 if (slice.length>0 && slice[0]=='"'){
-                    t=unescape(slice[1..$-1]);
+                    t=cast(UU)unescape(slice[1..$-1]);
                 } else {
-                    t=slice;
+                    t=cast(UU)slice;
                 }
-                if(longLived) t=t.dup;
+                if(longLived) t=cast(UU)t.dup;
             } else {
                 t=[];
                 //parseError("error scanning string",__FILE__,__LINE__);
@@ -713,7 +714,7 @@ class TextParser(T) : InputFilter
     }
     
     /// skips the given string from the input
-    bool skipString(T[]str,bool raise=true){
+    bool skipString(in T[]str,bool raise=true){
         if (next(delegate size_t(T[] data,SliceExtent se){
             if (str.length>data.length) {
                 switch(se){
@@ -741,7 +742,7 @@ class TextParser(T) : InputFilter
     }
     /// skips the given string from the input, which might be quoted or not in the text
     /// but must be delimited (i.e. a does not skip aa)
-    bool skipString2(T[]str,bool raise=true){
+    bool skipString2(in T[]str,bool raise=true){
         if(next(delegate size_t(T[] data,SliceExtent se){
             if (str.length>=data.length){
                 switch(se){
@@ -794,7 +795,7 @@ class TextParser(T) : InputFilter
     }
 
     /// Instantiate with a Reader
-    this(Reader!(T) reader = null,T[]delims=cast(T[])",;:{}[]",size_t maxTranscodingOverhead=6,
+    this(Reader!(T) reader = null,const(T)[]delims=cast(T[])",;:{}[]",size_t maxTranscodingOverhead=6,
         bool skipComments=true, bool newlineIsSpace=true)
     {
         auto tReader=cast(ReadHandler!(T))reader;
@@ -814,7 +815,7 @@ class TextParser(T) : InputFilter
     }
 
     /+/// Instantiate with a buffer
-    this(InputStream stream = null,T[]delims=cast(T[])",;:{}[]",size_t maxTranscodingOverhead=6,
+    this(InputStream stream = null,const(T)[]delims=cast(T[])",;:{}[]",size_t maxTranscodingOverhead=6,
         bool skipComments=true, bool newlineIsSpace=true)
     {       
         super (stream);
@@ -837,7 +838,7 @@ class TextParser(T) : InputFilter
     }
 
     /// Return the current token as a slice of the content
-    final T[] get ()
+    final const(T)[] get ()
     {
         return slice;
     }
@@ -849,11 +850,11 @@ class TextParser(T) : InputFilter
     
     /// helper structure to peek 
     struct Peeker{
-        T[] peekedSlice;
-        size_t delegate (T[] data,SliceExtent se) scanner;
+        const(T)[] peekedSlice;
+        size_t delegate (in T[] data,SliceExtent se) scanner;
         bool noRaise;
         bool didRaise=false;
-        size_t scan(T[] data,SliceExtent se){
+        size_t scan(in T[] data,SliceExtent se){
             size_t res;
             if (noRaise){
                 try{
@@ -875,7 +876,7 @@ class TextParser(T) : InputFilter
     /// peeks what is found by the given scanner. If noRaise is true exception are catched,
     /// if zeroOnFail is false when an exception is raised the full slice evaluated at that moment is
     /// returned (useful to get the beginning of a very long line that overflows the buffer)
-    cstring peek(size_t delegate (Const!(T[]) data,SliceExtent se) scanner,bool noRaise=true,bool zeroOnFail=true){
+    cstring peek(scope size_t delegate (in T[] data,SliceExtent se) scanner,bool noRaise=true,bool zeroOnFail=true){
         Peeker p;
         p.scanner=scanner;
         p.noRaise=noRaise;
@@ -893,7 +894,7 @@ class TextParser(T) : InputFilter
 }
 
 /// if s is a quoted string unescapes it
-T[] maybeUnescape(T)(T[] s){
+inoutT[] maybeUnescape(T)(inout(T)[] s){
     if (s.length>1 && s[0]=='"' && s[$-1]=='"'){
         return unescape(s[1..$-1]);
     } else {

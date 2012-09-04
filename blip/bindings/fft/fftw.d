@@ -74,26 +74,26 @@ struct fftw_iodim64_do_not_use_me {
 };
 
 
-typedef void *fftw_plan;
-typedef fftw_iodim_do_not_use_me fftw_iodim;
-typedef fftw_iodim64_do_not_use_me fftw_iodim64;
+alias void *fftw_plan;
+alias fftw_iodim_do_not_use_me fftw_iodim;
+alias fftw_iodim64_do_not_use_me fftw_iodim64;
 alias fftw_r2r_kind_do_not_use_me fftw_r2r_kind;
 
-typedef void *fftwf_plan;
-typedef fftw_iodim_do_not_use_me fftwf_iodim;
-typedef fftw_iodim64_do_not_use_me fftwf_iodim64;
+alias void *fftwf_plan;
+alias fftw_iodim_do_not_use_me fftwf_iodim;
+alias fftw_iodim64_do_not_use_me fftwf_iodim64;
 alias fftw_r2r_kind_do_not_use_me fftwf_r2r_kind;
 
-typedef void *fftwl_plan;
-typedef fftw_iodim_do_not_use_me fftwl_iodim;
-typedef fftw_iodim64_do_not_use_me fftwl_iodim64;
+alias void *fftwl_plan;
+alias fftw_iodim_do_not_use_me fftwl_iodim;
+alias fftw_iodim64_do_not_use_me fftwl_iodim64;
 alias fftw_r2r_kind_do_not_use_me fftwl_r2r_kind;
 
 enum{
  FFTW_FORWARD=-1,
  FFTW_BACKWARD=1,
 }
-const Immutable!(double) FFTW_NO_TIMELIMIT=-1.0;
+immutable double FFTW_NO_TIMELIMIT=-1.0;
 enum:uint{
 /* documented flags */
  FFTW_MEASURE=0U,
@@ -175,11 +175,17 @@ extern(C):
  extern void fftw_cleanup_threads();
  extern void fftw_export_wisdom_to_file(FILE *output_file);
  extern char *fftw_export_wisdom_to_string();
- extern void fftw_export_wisdom(void (*write_char)(char c, void *), void *data);
+
+ alias extern(C) void function(char c, void *) writeFunc;
+
+ extern void fftw_export_wisdom(writeFunc write_char, void *data);
  extern int fftw_import_system_wisdom();
  extern int fftw_import_wisdom_from_file(FILE *input_file);
  extern int fftw_import_wisdom_from_string(char *input_string);
- extern int fftw_import_wisdom(int (*read_char)(void *), void *data);
+
+ alias extern(C) int function(void *) readFunc;
+ 
+ extern int fftw_import_wisdom(readFunc read_char, void *data);
  extern void fftw_fprint_plan(fftw_plan p, FILE *output_file);
  extern void fftw_print_plan(fftw_plan p);
  extern void *fftw_malloc(size_t n);
@@ -241,11 +247,11 @@ extern(C):
  extern void fftwf_cleanup_threads();
  extern void fftwf_export_wisdom_to_file(FILE *output_file);
  extern char *fftwf_export_wisdom_to_string();
- extern void fftwf_export_wisdom(void (*write_char)(char c, void *), void *data);
+ extern void fftwf_export_wisdom(writeFunc write_fun, void *data);
  extern int fftwf_import_system_wisdom();
  extern int fftwf_import_wisdom_from_file(FILE *input_file);
  extern int fftwf_import_wisdom_from_string(char *input_string);
- extern int fftwf_import_wisdom(int (*read_char)(void *), void *data);
+ extern int fftwf_import_wisdom(readFunc rfun, void *data);
  extern void fftwf_fprint_plan(fftwf_plan p, FILE *output_file);
  extern void fftwf_print_plan(fftwf_plan p);
  extern void *fftwf_malloc(size_t n);
@@ -307,11 +313,11 @@ extern(C):
  extern void fftwl_cleanup_threads();
  extern void fftwl_export_wisdom_to_file(FILE *output_file);
  extern char *fftwl_export_wisdom_to_string();
- extern void fftwl_export_wisdom(void (*write_char)(char c, void *), void *data);
+ extern void fftwl_export_wisdom(writeFunc wF, void *data);
  extern int fftwl_import_system_wisdom();
  extern int fftwl_import_wisdom_from_file(FILE *input_file);
  extern int fftwl_import_wisdom_from_string(char *input_string);
- extern int fftwl_import_wisdom(int (*read_char)(void *), void *data);
+ extern int fftwl_import_wisdom(readFunc read_char, void *data);
  extern void fftwl_fprint_plan(fftwl_plan p, FILE *output_file);
  extern void fftwl_print_plan(fftwl_plan p);
  extern void *fftwl_malloc(size_t n);

@@ -108,11 +108,11 @@ struct String{
         }
         switch (e){
         case Encoding.Utf8:
-            return toStringT!(T)((cast(Const!(char)*)ptr)[0..(len>>BitshiftForT!(char))]);
+            return toStringT!(T)((cast(const(char)*)ptr)[0..(len>>BitshiftForT!(char))]);
         case Encoding.Utf16:
-            return toStringT!(T)((cast(Const!(wchar)*)ptr)[0..(len>>BitshiftForT!(wchar))]);
+            return toStringT!(T)((cast(const(wchar)*)ptr)[0..(len>>BitshiftForT!(wchar))]);
         case Encoding.Utf32:
-            return toStringT!(T)((cast(Const!(dchar)*)ptr)[0..(len>>BitshiftForT!(dchar))]);
+            return toStringT!(T)((cast(const(dchar)*)ptr)[0..(len>>BitshiftForT!(dchar))]);
         default:
             assert(0,"unknown encoding for type "~T.stringof);
         }
@@ -140,15 +140,15 @@ struct String{
         }
     }
     /// description (used when passing this to a dumper)
-    void desc(void delegate(cstring) sink){
+    void desc(scope void delegate(in cstring) sink){
         sink(asStringT!(char));
     }
     /// ditto
-    void desc(void delegate(cstringw) sink){
+    void desc(scope void delegate(in cstringw) sink){
         sink(asStringT!(wchar));
     }
     /// ditto
-    void desc(void delegate(cstringd) sink){
+    void desc(scope void delegate(in cstringd) sink){
         sink(asStringT!(dchar));
     }
     // implement common python/java/obj-c string ops

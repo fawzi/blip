@@ -41,7 +41,7 @@ void checkLb(T)(T[]arr,T val,size_t lb,size_t ub){
             if (lb1!=lb) throw new Exception("error",__FILE__,__LINE__);
         }
     } catch(Exception e){
-        throw new Exception(collectIAppender(delegate void(CharSink s){
+        throw new Exception(collectIAppender(delegate void(scope CharSink s){
             dumper(s)(lb1)("=lBound(")(arr)(",")(val)(",")(lb)(",")(ub)(")");
         }),__FILE__,__LINE__,e);
     }
@@ -64,7 +64,7 @@ void checkUb(T)(T[]arr,T val,size_t lb,size_t ub){
             if (ub1!=lb) throw new Exception("error",__FILE__,__LINE__);
         }
     } catch(Exception e){
-        throw new Exception(collectIAppender(delegate void(CharSink s){
+        throw new Exception(collectIAppender(delegate void(scope CharSink s){
             dumper(s)(ub1)("=uBound(")(arr)(",")(val)(",")(lb)(",")(ub)(")");
         }),__FILE__,__LINE__,e);
     }
@@ -100,7 +100,7 @@ void testLUBounds(uint[]arr,uint maxVal,uint bound1,uint bound2){
 }
 
 class Summer{
-    int sum;
+    shared int sum;
     LocalGrowableArray!(int) log;
     string name;
     void callBack(string n,Callback* cl,Variant v){

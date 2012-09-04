@@ -60,15 +60,15 @@ struct StcpRequest{
     void delegate(Serializer)serArgs;
     void delegate(Unserializer)unserRes;
     TaskI toResume;
-    char[22] reqBuf;
     PoolI!(StcpRequest*) pool;
+    char[24] reqBuf;
     __gshared static PoolI!(StcpRequest*) gPool;
     shared static this(){
         gPool=cachedPool(function StcpRequest*(PoolI!(StcpRequest*)p){
             auto res=new StcpRequest;
             res.pool=p;
             version(TrackStcpRequests){
-                sinkTogether(sout,delegate void(CharSink s){
+                sinkTogether(sout,delegate void(scope CharSink s){
                     dumper(s)("StcpRequest@")(cast(void*)res)(" created\n");
                 });
             }
@@ -90,18 +90,18 @@ struct StcpRequest{
         }
         if (pool!is null){
             refCount=1;
-            pool.giveBack(this);
+            pool.giveBack(&this);
             version(TrackStcpRequests){
-                sinkTogether(sout,delegate void(CharSink s){
-                    dumper(s)("gave StcpRequest@")(cast(void*)this)(" to pool@")(cast(void*)pool)("\n");
+                sinkTogether(sout,delegate void(scope CharSink s){
+                    dumper(s)("gave StcpRequest@")(cast(void*)&this)(" to pool@")(cast(void*)pool)("\n");
                 });
             }
         } else {
             clear();
-            delete this;
+	    //            delete this; // not possible anymore
             version(TrackStcpRequests){
-                sinkTogether(sout,delegate void(CharSink s){
-                    dumper(s)("destroyed StcpRequest@")(cast(void*)this)("\n");
+                sinkTogether(sout,delegate void(scope CharSink s){
+                    dumper(s)("destroyed StcpRequest@")(cast(void*)&this)("\n");
                 });
             }
         }
@@ -111,7 +111,7 @@ struct StcpRequest{
     void doRequest(){
         retain();// for sendRequest
         // always delay (even oneway) to catch at least immediate send erorrs, and to ensure that one can use on stack delegates/arguments in the serialization...
-        toResume=taskAtt.val;
+        toResume=taskAtt;
         toResume.delay(delegate void(){
             Task("sendReq",&this.sendRequest).autorelease.submit(connection.serTask);
         });
@@ -123,7 +123,7 @@ struct StcpRequest{
     void sendRequest(){
         try{
             auto res=formatInt(reqBuf[],connection.nextRequestId);
-            url.anchor=res; // makes struct non copiable!!!
+            url.anchor=cast(typeof(url.anchor))res; // makes struct non copiable!!!
             if (unserRes){
                 retain(); // for decodeAnswer
                 // register callback
@@ -132,15 +132,15 @@ struct StcpRequest{
             
             char[256] buf2=void;
             version(TrackRpc){
-                sinkTogether(connection.log,delegate void(CharSink s){
-                    dumper(s)(taskAtt.val)(" sending request for ")(&url.urlWriter)("\n");
+                sinkTogether(connection.log,delegate void(scope CharSink s){
+                    dumper(s)(taskAtt)(" sending request for ")(&url.urlWriter)("\n");
                 });
             }
             connection.serializer(url.pathAndRest(buf2));
             serArgs(connection.serializer);
             connection.outStream.flush();
         } catch(Exception o){
-            exception=new Exception(collectIAppender(delegate void(CharSink s){
+            exception=new Exception(collectIAppender(delegate void(scope CharSink s){
                 dumper(s)("exception in sending request for url")(&url.urlWriter);
             }),__FILE__,__LINE__,o);
         }
@@ -152,15 +152,15 @@ struct StcpRequest{
         assert(unserRes!is null,"called decodeAnswer of oneway method with url "~url.url());
         try{
             version(TrackRpc){
-                sinkTogether(connection.log,delegate void(CharSink s){
-                    dumper(s)(taskAtt.val)(" decoding answer to ")(&url.urlWriter)(" with url ")(&urlAnsw.urlWriter)("\n");
+                sinkTogether(connection.log,delegate void(scope CharSink s){
+                    dumper(s)(taskAtt)(" decoding answer to ")(&url.urlWriter)(" with url ")(&urlAnsw.urlWriter)("\n");
                 });
             }
             int resKind;
             u(resKind);
             version(TrackRpc){
-                sinkTogether(connection.log,delegate void(CharSink s){
-                    dumper(s)(taskAtt.val)(" decoding answer to ")(&url.urlWriter)(" has kind ")(resKind)("\n");
+                sinkTogether(connection.log,delegate void(scope CharSink s){
+                    dumper(s)(taskAtt)(" decoding answer to ")(&url.urlWriter)(" has kind ")(resKind)("\n");
                 });
             }
             switch (resKind){
@@ -172,13 +172,13 @@ struct StcpRequest{
             case 2:{
                 char[] errMsg;
                 u(errMsg);
-                exception=new RpcException(errMsg~" calling "~url.url(),__FILE__,__LINE__);
+                exception=new RpcException((errMsg~" calling "~url.url()).idup,__FILE__,__LINE__);
             }
                 break;
             case 3:{
                 char[] errMsg;
                 u(errMsg);
-                exception=new RpcException(errMsg~" calling "~url.url(),__FILE__,__LINE__);
+                exception=new RpcException((errMsg~" calling "~url.url()).idup,__FILE__,__LINE__);
             }
                 break;
             default:
@@ -186,11 +186,11 @@ struct StcpRequest{
                     " calling "~url.url(),__FILE__,__LINE__);
             }
         } catch (Exception o){
-            exception=new Exception("exception decoding res for url "~url.url(),__FILE__,__LINE__,o);
+            exception=new Exception(("exception decoding res for url "~url.url()).idup,__FILE__,__LINE__,o);
         }
         version(TrackRpc){
-            sinkTogether(connection.log,delegate void(CharSink s){
-                dumper(s)(taskAtt.val)(" finished decoding task for ")(&url.urlWriter);
+            sinkTogether(connection.log,delegate void(scope CharSink s){
+                dumper(s)(taskAtt)(" finished decoding task for ")(&url.urlWriter);
                 if (exception!is null){
                     dumper(s)(" with exception ")(exception);
                 }
@@ -216,7 +216,7 @@ struct StcpRequest{
     {
         auto res=StcpRequest(connection,url,serArgs,unserRes);
         version(TrackStcpRequests){
-            sinkTogether(sout,delegate void(CharSink s){
+            sinkTogether(sout,delegate void(scope CharSink s){
                 dumper(s)(&url.urlWriter)(" uses StcpRequest@")(cast(void*)res)("\n");
             });
         }
@@ -244,12 +244,12 @@ class StcpConnection{
     TaskI requestsTask; /// reference to the task that is doing the unserialization/handling requests, worth keeping?
     Serializer serializer;
     Unserializer unserializer;
-    size_t localUsers=1;
+    shared size_t localUsers=1;
     Time lastUse; // valid only if localUsers is 0
     TargetHost targetHost;
     Status status=Status.Setup;
     size_t lastReqId;
-    CharSink log;
+    scope CharSink log;
     LoopHandlerI loop;
     
     override equals_t opEquals(Object o){
@@ -266,7 +266,7 @@ class StcpConnection{
             return lastReqId;
         }
     }
-    final void writeExact(void[] src){
+    final void writeExact(in void[] src){
         this.sock.writeExactTout(src,loop);
     }
     final size_t rawReadInto(void[] dest){
@@ -290,7 +290,7 @@ class StcpConnection{
         outStream=new BufferedBinStream(&this.sock.desc,&this.writeExact,3000,&this.sock.flush,&this.sock.close);
         readIn=new BufferIn!(void)(&this.sock.desc,&this.rawReadInto);
         version(StcpTextualSerialization){
-            auto r=new BufferIn!(char)(&this.sock.desc,cast(size_t delegate(cstring))&this.rawReadInto);
+            auto r=new BufferIn!(char)(&this.sock.desc,cast(size_t delegate(in cstring))&this.rawReadInto);
             //ReinterpretReader!(void,char) r=readIn.reinterpretReader!(char)();
             charReader=r;
             serializer=new JsonSerializer!(char)(&outStream.desc,outStream.charSink());
@@ -307,7 +307,7 @@ class StcpConnection{
         localUsers=1;
         log=protocolHandler.log;
         version(TrackRpc){
-            sinkTogether(log,delegate void(CharSink s){
+            sinkTogether(log,delegate void(scope CharSink s){
 		    dumper(s)("created new connection StcpConnection@")(cast(void*)this)
 			(" in StcpProtocolHandler@")(cast(void*)protocolHandler)
 			(" to ")(targetHost)(" on socket ")(this.sock)("\n");
@@ -347,10 +347,10 @@ class StcpConnection{
         }
     }
     /// sends back a result on this connection
-    void sendReply(ubyte[] reqId,void delegate(Serializer) serRes){
+    void sendReply(in ubyte[] reqId,void delegate(Serializer) serRes){
         version(TrackRpc){
-            sinkTogether(log,delegate void(CharSink s){
-                dumper(s)("sendReply #")(urlEncode2(reqId))(" working in task ")(taskAtt.val)("\n");
+            sinkTogether(log,delegate void(scope CharSink s){
+                dumper(s)("sendReply #")(urlEncode2(reqId))(" working in task ")(taskAtt)("\n");
             });
         }
         Task("sendReply",delegate void(){
@@ -361,20 +361,20 @@ class StcpConnection{
                 auto rc=urlEncode(reqId);
                 buf2[i..i+rc.length]=rc;
                 version(TrackRpc){
-                    sinkTogether(log,delegate void(CharSink s){
-                        dumper(s)(taskAtt.val)(" sending reply for ")(buf2[0..i+rc.length])(" start\n");
+                    sinkTogether(log,delegate void(scope CharSink s){
+                        dumper(s)(taskAtt)(" sending reply for ")(buf2[0..i+rc.length])(" start\n");
                     });
                 }
                 serializer(buf2[0..i+rc.length]);
                 serRes(serializer);
                 outStream.flush();
                 version(TrackRpc){
-                    sinkTogether(log,delegate void(CharSink s){
-                        dumper(s)(taskAtt.val)(" sending reply for ")(buf2[0..i+rc.length])(" success\n");
+                    sinkTogether(log,delegate void(scope CharSink s){
+                        dumper(s)(taskAtt)(" sending reply for ")(buf2[0..i+rc.length])(" success\n");
                     });
                 }
             } catch(Exception o){
-                sinkTogether(log,delegate void(CharSink s){
+                sinkTogether(log,delegate void(scope CharSink s){
                     dumper(s)("exception in sendReply sending result of #")(urlEncode2(reqId))(" ")(o)("\n");
                 });
             }
@@ -384,7 +384,7 @@ class StcpConnection{
     // loop that handles incoming requests on this connection, this defines requestsTask
     void handleRequests(){
         assert(requestsTask is null);
-        requestsTask=taskAtt.val;
+        requestsTask=taskAtt;
         requestsTask.retain();
         scope(exit){requestsTask.release(); requestsTask=null;}
         try{
@@ -421,20 +421,20 @@ class StcpConnection{
 	    dumper(&arr.appendArr)(".lp")(protocolHandler.port);
 	}
         arr("/serv/publisher/handlerUrl");
-        char[] otherUrl;
-        rpcManualResCall(otherUrl,arr.data);
+        string otherUrl;
+        rpcManualResCall(otherUrl,arr.idata);
        	arr.deallocData();
         auto pUrl=ParsedUrl.parseUrl(otherUrl);
         if (pUrl.host!=targetHost.host || pUrl.port!=targetHost.port){
             TargetHost newH;
-            newH.host=pUrl.host.dup;
+            newH.host=pUrl.host.idup;
             auto l=find(pUrl.port,".");
-            newH.port=pUrl.port[0..l].dup;
+            newH.port=pUrl.port[0..l].idup;
             synchronized(protocolHandler.connections){
                 auto oldC=newH in protocolHandler.connections;
                 if (oldC!is null){
                     if ((*oldC) is this) return;
-                    sinkTogether(log,delegate void(CharSink s){
+                    sinkTogether(log,delegate void(scope CharSink s){
 			    dumper(s)("replacing connection to ")(newH)
 				(" from ")(*oldC)("@")(cast(void*)*oldC)
 				(" to ")(this)("@")(cast(void*)this)("\n");
@@ -450,7 +450,7 @@ class StcpConnection{
         char[]path=buf;
         unserializer(path);
         addLocalUser();
-        ParsedUrl url=ParsedUrl.parsePath(path);
+        ParsedUrl url=ParsedUrl.parsePath(path.idup); // trust that we don't need it outside and cast instead of idup?
         protocolHandler.handleRequest(url,unserializer,&this.sendReply);
     }
     
@@ -471,7 +471,7 @@ class StcpConnection{
 /// handles vending (and possibly also receiving the results if using one channel for both)
 class StcpProtocolHandler: ProtocolHandler{
     __gshared static string [] selfHostnames;
-    CharSink log;
+    scope CharSink log;
     RandomSync rand;
     LoopHandlerI loop;
     // well known ports: 0-1023 (needs root)
@@ -529,7 +529,7 @@ class StcpProtocolHandler: ProtocolHandler{
 
     this(){
         version(TrackRpc){
-            sinkTogether(sout,delegate void(CharSink s){
+            sinkTogether(sout,delegate void(scope CharSink s){
                 dumper(s)("creating StcpProtocolHandler@")(cast(void*)this)("\n");
             });
         }
@@ -541,9 +541,9 @@ class StcpProtocolHandler: ProtocolHandler{
         auto vendor=new DefaultVendor(this);
         servPublisher.publishObject(vendor,"publisher",true,Publisher.Flags.Public);
     }
-    this(string group,string port,void delegate(cstring) log=null){
+    this(string group,string port,void delegate(in cstring) log=null){
         version(TrackRpc){
-            sinkTogether(sout,delegate void(CharSink s){
+            sinkTogether(sout,delegate void(scope CharSink s){
                 dumper(s)("creating StcpProtocolHandler@")(cast(void*)this)(" for group '")(group)("' and port: ")(port)("\n");
             });
         }
@@ -571,7 +571,7 @@ class StcpProtocolHandler: ProtocolHandler{
         if (group.length!=1){
             arr(group);
         }
-        _handlerUrl=arr.takeData();
+        _handlerUrl=arr.takeIData();
     }
     /// registers this handler in the global registry of the handlers, there should be just one handler per
     /// group
@@ -591,7 +591,7 @@ class StcpProtocolHandler: ProtocolHandler{
 	    char[128] buf;
 	    auto arr=lGrowableArray(buf,0,GASharing.Local);
 	    dumper(&arr.appendArr)(".lp")(port);
-	    char[] lGroup=arr.takeData();
+	    string lGroup=arr.takeIData();
             auto pHP= lGroup in stcpProtocolHandlers;
             if (pHP !is null && (*pHP) !is this){
                 log("replacing already registred protocol for group "~lGroup~"\n");
@@ -623,7 +623,7 @@ class StcpProtocolHandler: ProtocolHandler{
     }
 /+    /// local rpc call, oneway methods are *not* executed in background (change?)
     override void doRpcCallLocal(ParsedUrl url,void delegate(Serializer) serArgs, void delegate(Unserializer) unserRes,Variant addrArg){
-        sinkTogether(sout,delegate void(CharSink s){
+        sinkTogether(sout,delegate void(scope CharSink s){
             dumper(s)("doRpcCallLocal with url ")(url)("\n");
         });
         ubyte[1024] buf1;
@@ -684,7 +684,7 @@ class StcpProtocolHandler: ProtocolHandler{
     /// perform rpc call using sockets
     override void doRpcCall(ParsedUrl url,void delegate(Serializer) serArgs, void delegate(Unserializer) unserRes,Variant addrArg){
         version(TrackRpc){
-            sinkTogether(sout,delegate void(CharSink s){
+            sinkTogether(sout,delegate void(scope CharSink s){
                 dumper(s)("doRpcCall(")(&url.urlWriter)(",")(serArgs)(",")(unserRes)(",__)\n"); // don't trust variant serialization...
             });
         }
@@ -692,13 +692,13 @@ class StcpProtocolHandler: ProtocolHandler{
         tHost.host=url.host;
         tHost.port=url.port[0..find(url.port,'.')];
         
-        TaskI tAtt=taskAtt.val;
+        TaskI tAtt=taskAtt;
         auto dLevel=tAtt.delayLevel;
         Exception e;
         
         version(TrackRpc){
-            sinkTogether(log,delegate void(CharSink s){
-                dumper(s)(taskAtt.val)(" doRpcCall on remote url ")(&url.urlWriter)("\n");
+            sinkTogether(log,delegate void(scope CharSink s){
+                dumper(s)(taskAtt)(" doRpcCall on remote url ")(&url.urlWriter)("\n");
             });
         }
         StcpConnection connection;
@@ -709,8 +709,8 @@ class StcpProtocolHandler: ProtocolHandler{
             if (connection is null || (! connection.tryAddLocalUser())){
                 version(TrackRpc){
                     if (connection !is null)
-                        sinkTogether(log,delegate void(CharSink s){
-                            dumper(s)(taskAtt.val)(" created double connection to ")(tHost)("\n");
+                        sinkTogether(log,delegate void(scope CharSink s){
+                            dumper(s)(taskAtt)(" created double connection to ")(tHost)("\n");
                         });
                 }
                 connection=new StcpConnection(this,tHost);
@@ -730,15 +730,15 @@ class StcpProtocolHandler: ProtocolHandler{
         TargetHost th=h.otherHost();
         auto newC=new StcpConnection(this,th,h.sock);
         version(TrackRpc){
-            sinkTogether(log,delegate void(CharSink s){
-                dumper(s)(taskAtt.val)(" got connection from ")(th)("\n");
+            sinkTogether(log,delegate void(scope CharSink s){
+                dumper(s)(taskAtt)(" got connection from ")(th)("\n");
             });
         }
         synchronized(connections){
             auto dConn=th in connections;
             if (dConn !is null){
-                sinkTogether(log,delegate void(CharSink s){
-                    dumper(s)(taskAtt.val)(" has double connection from ")(th)("\n");
+                sinkTogether(log,delegate void(scope CharSink s){
+                    dumper(s)(taskAtt)(" has double connection from ")(th)("\n");
                 });
                 doubleConnections~=*dConn;
             }
@@ -791,8 +791,8 @@ class StcpProtocolHandler: ProtocolHandler{
     
     override void handleRequest(ParsedUrl url,Unserializer u, SendResHandler sendRes){
         version(TrackRpc){
-            sinkTogether(log,delegate void(CharSink s){
-                dumper(s)(taskAtt.val)(" handleRequest ")(&url.urlWriter)("\n");
+            sinkTogether(log,delegate void(scope CharSink s){
+                dumper(s)(taskAtt)(" handleRequest ")(&url.urlWriter)("\n");
             });
         }
         if (url.path.length>0){
@@ -825,20 +825,20 @@ class StcpProtocolHandler: ProtocolHandler{
             case "stop":
                 assert(0,"to do"); // should close down the connection, check for requests that were sent after the closing request id and restart them at the moment closig a connection means that it will never be reestablished.
             default:
-                sinkTogether(log,delegate void(CharSink s){
+                sinkTogether(log,delegate void(scope CharSink s){
                     dumper(s)("Warning unknown namespace ")(url.path[0])(" in ")(url)("\n");
                 });
                 sysError(url,"unknown namespace",sendRes,__FILE__,__LINE__);
             }
         } else {
-            sinkTogether(log,delegate void(CharSink s){
+            sinkTogether(log,delegate void(scope CharSink s){
                 dumper(s)("Warning no valid path in url ")(url)("\n");
             });
         }
     }
     
     void lostConnection(StcpConnection c,Exception e){
-        sinkTogether(log,delegate void(CharSink s){
+        sinkTogether(log,delegate void(scope CharSink s){
             dumper(s)(port)(group)(" lostConnection to")(c.targetHost);
             if (e!is null){
                 dumper(s)(" with exception:")(e);
@@ -867,7 +867,7 @@ shared static this(){
         serr("Warning could not establish the hostname\n");
     } else {
         buf[$-1]=0;
-        StcpProtocolHandler.selfHostnames=[buf[0..strlen(buf.ptr)].dup];
+        StcpProtocolHandler.selfHostnames=[buf[0..strlen(buf.ptr)].idup];
         sout("selfHostnames:")(StcpProtocolHandler.selfHostnames)("\n");
     }
     // registers the default stcp protocol

@@ -14,7 +14,7 @@
 /// Things are not so bad though, because it introduces a very light weight approach that can
 /// be wrapped around other approaches, or used "natively".
 /// 
-///  * based on CharSink, i.e. a void delegate(cstring)
+///  * based on CharSink, i.e. a void delegate(in cstring)
 ///     * easy to define new sinks and wrap around things
 ///     * can be used also a low level without introducing dependencies
 ///  * writeOut(sink,obj,args) is a template that tries to write out obj to sink, formatting it using args.
@@ -109,24 +109,24 @@ enum SliceExtent{ Partial, Maximal, ToEnd }
 enum :size_t{Eof=size_t.max}
 
 /// a character sink
-alias void delegate(cstring) CharSink;
+alias void delegate(in cstring) CharSink;
 /// a binary sink
-alias void delegate(const(void)[]) BinSink;
+alias void delegate(in void[]) BinSink;
 /// a delegate that will write out to a character sink
-alias void delegate(void delegate(cstring))  OutWriter;
+alias void delegate(scope void delegate(in cstring))  OutWriter;
 /// a delegate that will write out to a binary sink
-alias void delegate(void delegate(const(void)[]))  BinWriter;
+alias void delegate(scope void delegate(in void[]))  BinWriter;
 
 /// a basic character reader (can be used to build more advanced objects that can handle CharReader, see blip.io.BufferIn)
-alias size_t delegate(cstring) CharRead;
+alias size_t delegate(char[]) CharRead;
 /// a basic binary reader (can be used to build more advanced objects that can handle CharReader and BinReader)
-alias size_t delegate(const(void)[]) BinRead;
+alias size_t delegate(void[]) BinRead;
 /// a delegate that reads in from a character source
-alias size_t delegate(cstring, SliceExtent slice,out bool iterate) CharReader;
+alias size_t delegate(char[], SliceExtent slice,out bool iterate) CharReader;
 /// a delegate that reads in from a binary source
-alias size_t delegate(const(void)[], SliceExtent slice,out bool iterate) BinReader;
+alias size_t delegate(void[], SliceExtent slice,out bool iterate) BinReader;
 /// a handler of CharReader, returns true if something was read
-alias bool delegate(CharReader)CharReaderHandler;
+alias bool delegate(CharReader) CharReaderHandler;
 /// a handler of BinReader, returns true if something was read
 alias bool delegate(BinReader) BinReaderHandler;
 
@@ -145,18 +145,18 @@ class SmallBufferException:BIOException{
 
 /// output stream
 interface OutStreamI{
-    void rawWriteStr(cstring);
-    void rawWriteStr(cstringw);
-    void rawWriteStr(cstringd);
-    void rawWriteStrC(cstring);
-    void rawWriteStrW(cstringw);
-    void rawWriteStrD(cstringd);
-    void rawWrite(const(void)[]);
+    void rawWriteStr(in cstring);
+    void rawWriteStr(in cstringw);
+    void rawWriteStr(in cstringd);
+    void rawWriteStrC(in cstring);
+    void rawWriteStrW(in cstringw);
+    void rawWriteStrD(in cstringd);
+    void rawWrite(in void[]);
     CharSink charSink();
     BinSink  binSink();
     void flush();
     void close();
-    void desc(CharSink s);
+    void desc(scope CharSink s);
 }
 
 /// a reader of elements of type T
@@ -164,7 +164,7 @@ interface Reader(T){
     /// read some data into the given buffer
     size_t readSome(T[]);
     /// character reader handler
-    bool handleReader(size_t delegate(T[], SliceExtent slice,out bool iterate) r);
+    bool handleReader(scope size_t delegate(T[], SliceExtent slice,out bool iterate) r);
     /// shutdown the input source
     void shutdownInput();
     void desc(CharSink s);
@@ -201,8 +201,8 @@ struct OutW(S...){
         }
         return &res.call;
     }
-    void call(void delegate(cstring)sink){
-        writeOut!(void delegate(cstring),S)(sink,this.args);
+    void call(scope void delegate(in cstring)sink){
+        writeOut!(void delegate(in cstring),S)(sink,this.args);
     }
 }
 
@@ -240,7 +240,7 @@ void writeSpace(S)(S s,int amount){
     }
 }
 // this is to write out a value (for debugging and similar purposes)
-void writeOut(V,T,S...)(V sink1,T v,S args){
+void writeOut(V,T,S...)(scope V sink1,T v,S args){
     static if(is(typeof(sink1 is null))){
         assert(!(sink1 is null),"null sink in writeOut");
     }
@@ -253,8 +253,8 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
     } else {
         static assert(0,"invalid sink in writeOut");
     }
-    alias Unqual!(Char) UChar;
-    static if(is(Unqual!(S[0])==UChar[])){
+    alias UnqualAll!(Char) UChar;
+    static if(is(UnqualAll!(S[0])==UChar[])){
         int width=0;
         void delegate(Char[]) sink;
         static if(is(V==typeof(sink))){
@@ -286,9 +286,9 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
             void delegate(Char[]) sinkDlg=delegate void(Char[]s){ sink1(s); };
         }
     }
-    alias Unqual!(T) TT;
+    alias UnqualAll!(T) TT;
     static if (is(T U:U[])){
-        static if(is(Unqual!(U)==UChar)){
+        static if(is(UnqualAll!(U)==UChar)){
             sink(v);
         } else static if(is(U==char)||is(U==wchar)||is(U==dchar)){
             if (v.length<128){
@@ -346,7 +346,7 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
         is(TT==int)||is(TT==uint)||is(TT==long)||is(TT==ulong))
     {
         bool sign=true;
-        static if (is(Unqual!(S[0]):UChar[])){
+        static if (is(UnqualAll!(S[0]):UChar[])){
             if (args[0].length>0){
                 switch (args[0][0]){
                 case 'x':
@@ -403,13 +403,14 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
                 }
             }
         }
-        if (v<0){
+	TT v2=v;
+        if (v2<0){
             UChar[22] res;
             int pos=res.length-1;
-            while(v<0){
-                auto r=v%10;
+            while(v2<0){
+                auto r=v2%10;
                 res[pos]=cast(Char)(cast(T)'0'-r);
-                v=cast(T)(v/10);
+                v2=cast(T)(v2/10);
                 --pos;
             }
             if (sign){
@@ -423,10 +424,10 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
         } else {
             UChar[22] res;
             int pos=res.length-1;
-            while(v>0){
-                auto r=v%10;
+            while(v2>0){
+                auto r=v2%10;
                 res[pos]=cast(Char)(cast(T)'0'+r);
-                v=cast(T)(v/10);
+                v2=cast(T)(v2/10);
                 --pos;
             }
             sink(res[pos+1..$]);
@@ -440,7 +441,7 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
     } else static if (is(TT==float)||is(TT==double)||is(TT==real)){
         char[40] buf;
         int prec=6;
-        static if (is(Unqual!(S[0])==UChar[])){
+        static if (is(UnqualAll!(S[0])==UChar[])){
             if (args[0].length>1){
                 parseInt(args[0][1..$],prec);
             }
@@ -449,7 +450,7 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
     } else static if (is(TT==ifloat)||is(TT==idouble)||is(TT==ireal)){
         char[40] buf;
         int prec=6;
-        static if (is(Unqual!(S[0])==UChar[])){
+        static if (is(UnqualAll!(S[0])==UChar[])){
             if (args[0].length>1){
                 parseInt(args[0][1..$],prec);
             }
@@ -459,7 +460,7 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
     } else static if (is(TT==cfloat)||is(TT==cdouble)||is(TT==creal)){
         char[40] buf;
         int prec=6;
-        static if (is(Unqual!(S[0])==UChar[])){
+        static if (is(UnqualAll!(S[0])==UChar[])){
             if (args[0].length>1){
                 parseInt(args[0][1..$],prec);
             }
@@ -507,20 +508,20 @@ void writeOut(V,T,S...)(V sink1,T v,S args){
         } else static if(is(typeof(v.writeOut(sinkDlg)))){
             v.writeOut(sinkDlg);
         } else static if((nArgs!(S)==0 || (nArgs!(S)==1 && is(S[0]==Char[]))) && 
-            (is(typeof(v(sink))) || is(typeof(v(delegate void(cstring c){ }))) 
-            || is(typeof(v(delegate void(cstringw c){ })))
-            || is(typeof(v(delegate void(cstringd c){ }))) ) )
+            (is(typeof(v(sink))) || is(typeof(v(delegate void(in cstring c){ }))) 
+            || is(typeof(v(delegate void(in cstringw c){ })))
+            || is(typeof(v(delegate void(in cstringd c){ }))) ) )
         {
             static if (is(typeof(v(sink)))){
                 v(sink);
             } else static if (is(typeof(v(sinkDlg)))){
                 v(sinkDlg);
-            } else static if (is(typeof(v(delegate void(cstring c){ })))){
-                v(delegate void(cstring c){ writeOut(sink,c); });
-            } else static if (is(typeof(v(delegate void(cstringw c){ })))){
-                v(delegate void(cstringw c){ writeOut(sink,c); });
-            } else static if (is(typeof(v(delegate void(cstringd c){ }))) ){
-                v(delegate void(cstringd c){ writeOut(sink,c); });
+            } else static if (is(typeof(v(delegate void(in cstring c){ })))){
+                v(delegate void(in cstring c){ writeOut(sink,c); });
+            } else static if (is(typeof(v(delegate void(in cstringw c){ })))){
+                v(delegate void(in cstringw c){ writeOut(sink,c); });
+            } else static if (is(typeof(v(delegate void(in cstringd c){ }))) ){
+                v(delegate void(in cstringd c){ writeOut(sink,c); });
             } else static assert(0,"internal writeOut error");
         } else static if (is(typeof(sink(v.toString())))){
             sink(v.toString());
@@ -586,7 +587,7 @@ Dumper!(T) dumper(T)(T c){
 }
 
 /// fills out outBuf, or throws an exception
-void readExact(TInt,TOut)(size_t delegate(TInt[]) rSome,TOut[]outBuf){
+void readExact(TInt,TOut)(scope size_t delegate(TInt[]) rSome,TOut[]outBuf){
     static assert(TInt.sizeof<=TOut.sizeof,"internal size needs to be smaller than external");
     static assert(TOut.sizeof%TInt.sizeof==0,"external size needs to be a multiple of internal size");
     enum :size_t{OutToIn=TOut.sizeof/TInt.sizeof}
@@ -609,8 +610,8 @@ void readExact(TInt,TOut)(size_t delegate(TInt[]) rSome,TOut[]outBuf){
 
 /// utility function that outputs the given string indenting it
 /// (i.e. adding indent after each newline)
-void sinkIndented(T,U,V)(T[] indent,void delegate(U[]) s,V[] str){
-    static assert(is(Unqual!(T)==Unqual!(U)) && is(Unqual!(T)==Unqual!(V)));
+void sinkIndented(T,U,V)(T[] indent,scope void delegate(U[]) s,V[] str){
+    static assert(is(UnqualAll!(T)==UnqualAll!(U)) && is(UnqualAll!(T)==UnqualAll!(V)));
     size_t i0=0;
     foreach(i,c;str){
         if (c=='\n'){
@@ -626,8 +627,8 @@ void sinkIndented(T,U,V)(T[] indent,void delegate(U[]) s,V[] str){
 }
 /// utility function that forwards the indented writer to the sink
 /// (i.e. adding indent after each newline)
-void indentWriter(T,U,V)(T[] indent,void delegate(U[]) sink,void delegate(void delegate(V[])) writer){
-    static assert(is(Unqual!(T)==Unqual!(U)) && is(V==U));
+void indentWriter(T,U,V)(T[] indent,scope void delegate(U[]) sink,scope void delegate(scope void delegate(V[])) writer){
+    static assert(is(UnqualAll!(T)==UnqualAll!(U)) && is(V==U));
     writer(delegate void(V[] str){
         sinkIndented!(T,U,V)(indent,sink,str);
     });

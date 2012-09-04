@@ -30,7 +30,7 @@ enum LoopType{
 
 /// interface of an object that can describe itself
 interface BasicObjectI{
-    void desc(void delegate(cstring) s);
+    void desc(scope void delegate(in cstring) s);
 }
 
 /// basic interface for objects that can be copied (shallowly)
@@ -50,14 +50,14 @@ interface CopiableObjectI : BasicObjectI,DuplicableI,DeepDuplicableI { }
 interface ForeachableI(T){
     static if (is(T U:U*)){
         /// loop without index, has to be implemented
-        int opApply(int delegate(ref U x) dlg);
+        int opApply(scope int delegate(ref U x) dlg);
         /// loop with index, migh not be implemented (and throw)
-        int opApply(int delegate(ref size_t i,ref U x) dlg);
+        int opApply(scope int delegate(ref size_t i,ref U x) dlg);
     } else {
         /// loop without index, has to be implemented
-        int opApply(int delegate(ref T x) dlg);
+        int opApply(scope int delegate(ref T x) dlg);
         /// loop with index, migh not be implemented (and throw)
-        int opApply(int delegate(ref size_t i,ref T x) dlg);
+        int opApply(scope int delegate(ref size_t i,ref T x) dlg);
     }
 }
 
@@ -83,11 +83,11 @@ interface FIteratorI(T): SimpleIteratorI!(T){
 class EmptyFIterator(T):FIteratorI!(T){
     bool next(ref T){ return false; }
     static if (is(T U:U*)){
-        int opApply(int delegate(ref U x) dlg) { return 0; }
-        int opApply(int delegate(ref size_t i,ref U x) dlg) { return 0; }
+        int opApply(scope int delegate(ref U x) dlg) { return 0; }
+        int opApply(scope int delegate(ref size_t i,ref U x) dlg) { return 0; }
     } else {
-        int opApply(int delegate(ref T x) dlg) { return 0; }
-        int opApply(int delegate(ref size_t i,ref T x) dlg) { return 0; }
+        int opApply(scope int delegate(ref T x) dlg) { return 0; }
+        int opApply(scope int delegate(ref size_t i,ref T x) dlg) { return 0; }
     }
     ForeachableI!(T) parallelLoop(size_t optimalChunkSize){ return this; }
     ForeachableI!(T) parallelLoop() { return this; }
@@ -99,7 +99,7 @@ class EmptyFIterator(T):FIteratorI!(T){
 template opApplyFromNext(T){
     static if(is(T U:U*)){
         /// loop without index
-        int opApply(int delegate(ref U x) loopBody){
+        int opApply(scope int delegate(ref U x) loopBody){
             T el;
             while(next(el)){
                 if (auto res=loopBody(*el)) return res;
@@ -107,7 +107,7 @@ template opApplyFromNext(T){
             return 0;
         }
         /// loop with index
-        int opApply(int delegate(ref size_t i,ref U x) dlg){
+        int opApply(scope int delegate(ref size_t i,ref U x) dlg){
             T el;
             size_t counter=0;
             while(next(el)){
@@ -118,7 +118,7 @@ template opApplyFromNext(T){
         }
     } else {
         /// loop without index
-        int opApply(int delegate(ref T x) loopBody){
+        int opApply(scope int delegate(ref T x) loopBody){
             T el;
             while(next(el)){
                 if (auto res=loopBody(el)) return res;
@@ -126,7 +126,7 @@ template opApplyFromNext(T){
             return 0;
         }
         /// loop with index
-        int opApply(int delegate(ref size_t i,ref T x) loopBody){
+        int opApply(scope int delegate(ref size_t i,ref T x) loopBody){
             T el;
             size_t counter=0;
             while(next(el)){
@@ -145,7 +145,7 @@ template opApplyFromNext(T){
 template opApplyCounterFromNext(T){
     static if(is(T U:U*)){
         /// loop with index
-        int opApply(int delegate(ref size_t i,ref U x) dlg){
+        int opApply(scope int delegate(ref size_t i,ref U x) dlg){
             T el;
             size_t counter=0;
             while(next(el)){
@@ -156,7 +156,7 @@ template opApplyCounterFromNext(T){
         }
     } else {
         /// loop with index
-        int opApply(int delegate(ref size_t i,ref T x) dlg){
+        int opApply(scope int delegate(ref size_t i,ref T x) dlg){
             T el;
             size_t counter=0;
             while(next(el)){
@@ -172,7 +172,7 @@ template opApplyCounterFromNext(T){
 template opApplyCounterFromOpApply(T){
     static if(is(T U:U*)){
         /// loop with index
-        int opApply(int delegate(ref size_t i,ref U x) dlg){
+        int opApply(scope int delegate(ref size_t i,ref U x) dlg){
             size_t counter=0;
             auto inBody=delegate int(ref U x){
                 if (auto res=loopBody(counter,*x)) return res;
@@ -183,7 +183,7 @@ template opApplyCounterFromOpApply(T){
         }
     } else {
         /// loop with index
-        int opApply(int delegate(ref size_t i,ref T x) dlg){
+        int opApply(scope int delegate(ref size_t i,ref T x) dlg){
             size_t counter=0;
             auto inBody=delegate int(ref T x){
                 if (auto res=loopBody(counter,x)) return res;

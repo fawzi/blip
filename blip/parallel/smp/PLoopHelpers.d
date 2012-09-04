@@ -95,7 +95,7 @@ string loopCtxMixin(string ctxName,string ctxExtra,string startLoop, string task
                 auto newChunk2=this.createNew();
                 auto mid=(this.end-this.start)/2;
                 if (blockSize<mid) // try to have exact multiples of optimalBlockSize (so that one can have a fast path for it)
-                    mid=((mid+blockSize-1)/blockSize)*blockSize;
+                    mid=cast(typeof(mid))(((mid+blockSize-1)/blockSize)*blockSize);
                 auto midP=this.start+mid;
                 newChunk.start=this.start;
                 newChunk.end=midP;
@@ -114,7 +114,7 @@ string loopCtxMixin(string ctxName,string ctxExtra,string startLoop, string task
             `~endLoop~`
         }
         void giveBack(){
-            if (this.pool) this.pool.giveBack(this);
+            if (this.pool) this.pool.giveBack(&this);
         }
     }`; 
 }
@@ -124,7 +124,7 @@ class PLoopHelper(T,int loopType){
     size_t optimalBlockSize=1;
     Exception exception=null;
     int res=0;
-    size_t firstDistribution=1;
+    shared size_t firstDistribution=1;
     int stealLevel=int.max;
     static if (is(typeof(T.init[0]))){
         alias size_t IType;
@@ -143,12 +143,10 @@ class PLoopHelper(T,int loopType){
         `,`
         blockSize=context.optimalBlockSize;
         if (context.res!=0||context.exception!is null) return;
-        volatile{
-            while (1){
-                if (context.firstDistribution==0) break;
-                Thread.yield();
-            }
-        }
+	while (1){
+	    if (context.firstDistribution==0) break;
+	    Thread.yield();
+	}
         try{`,`
         t1.stealLevel=context.stealLevel;
         t2.stealLevel=context.stealLevel;
@@ -236,7 +234,7 @@ class PLoopHelper(T,int loopType){
                     this.firstDistribution=0;
                 }
                 static if (loopType==LoopType.Parallel){
-                    auto tAtt=taskAtt.val;
+                    auto tAtt=taskAtt;
                     stealLevel=tAtt.stealLevel();
                     SchedGroupI group=tAtt.scheduler().executer().schedGroup();
                     auto scheds=group.activeScheds();
@@ -338,7 +336,7 @@ class PLoopHelper(T,int loopType){
     }
 
     static if (is(typeof(T.init[0]))){
-        int opApply(int delegate(ref ElT) loopBody){
+        int opApply(scope int delegate(ref ElT) loopBody){
             this.loopBody1=loopBody;
             if (arr.length>optimalBlockSize+optimalBlockSize/2){
                 LoopBlock1.addGPool();
@@ -353,7 +351,7 @@ class PLoopHelper(T,int loopType){
             return res;
         }
 
-        int opApply(int delegate(ref size_t,ref ElT) loopBody){
+        int opApply(scope int delegate(ref size_t,ref ElT) loopBody){
             this.loopBody2=loopBody;
             if (arr.length>optimalBlockSize+optimalBlockSize/2){
                 LoopBlock2.addGPool();
@@ -368,7 +366,7 @@ class PLoopHelper(T,int loopType){
             return res;
         }
     } else {
-        int opApply(int delegate(ref T) loopBody){
+        int opApply(scope int delegate(ref T) loopBody){
             this.loopBody=loopBody;
             if (this.iEnd>this.optimalBlockSize+this.optimalBlockSize/2+this.iStart){
                 LoopBlock3.addGPool();
@@ -516,8 +514,8 @@ class PLoopIter(T){
             }
         }
         void giveBack(){
-            if (pool) pool.giveBack(this);
-            else delete this;
+            if (pool) pool.giveBack(&this);
+            // else delete this;
         }
     }
     
@@ -543,7 +541,7 @@ class PLoopIter(T){
         }
     }
     
-    int opApply(int delegate(ref ElT) loopBody){
+    int opApply(scope int delegate(ref ElT) loopBody){
         version(NoPLoopIter){
             Task("PLoopArrayMainSeq",delegate void(){
                 T el;
@@ -572,7 +570,7 @@ class PLoopIter(T){
         return res;
     }
 
-    int opApply(int delegate(ref size_t,ref ElT) loopBody){
+    int opApply(scope int delegate(ref size_t,ref ElT) loopBody){
         version(NoPLoopIter){
             Task("PLoopArrayMainSeq",delegate void(){
                 T el;

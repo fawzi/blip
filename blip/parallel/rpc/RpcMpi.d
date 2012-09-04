@@ -88,7 +88,7 @@ class MpiProtocolHandler: ProtocolHandler{
         char[128] buf;
         auto arr=lGrowableArray!(char)(buf,0,GASharing.Local);
         dumper(&arr.appendArr)("mpi-sbin://")(comm.myRank)(":")(comm.name)("-")(tag);
-        _handlerUrl=arr.takeData();
+        _handlerUrl=arr.takeIData();
         newRequestId=UniqueNumber!(size_t)(10);
     }
     
@@ -99,7 +99,7 @@ class MpiProtocolHandler: ProtocolHandler{
         unregisterMpiProtocolHandler(this);
     }
     
-    void sendReply(Const!(ubyte)[] reqId,void delegate(Serializer) serRes){
+    void sendReply(in ubyte[] reqId,void delegate(Serializer) serRes){
         ubyte[512] buf=void;
         try{
             char[128] buf2;
@@ -111,7 +111,7 @@ class MpiProtocolHandler: ProtocolHandler{
             buf2[i..i+rc.length]=rc;
             s(buf2[0..i+rc.length]);
             serRes(s);
-        } catch(Object o){
+        } catch(Throwable o){
             Log.lookup ("blip.rpc").warn("exception in sendReply sending result of #{}: {}",cast(string )reqId,o);
         }
     }
@@ -132,15 +132,15 @@ class MpiProtocolHandler: ProtocolHandler{
             ++pos;
             auto res=formatInt(reqBuf[pos..$],newRequestId.next);
             if (res.ptr !is reqBuf.ptr+pos){
-                url.anchor=reqBuf[0..pos]~res;
+                url.anchor=(reqBuf[0..pos]~res).idup;
             } else {
-                url.anchor=reqBuf[0..pos+res.length];
+                url.anchor=cast(string)reqBuf[0..pos+res.length]; // trust that it won't survive this call (.idup and remove constraint?)
             }
         }
         if (target!=comm.myRank){
             if (unserRes!is null){
                 Unserializer u;
-                auto tAtt=taskAtt.val;
+                auto tAtt=taskAtt;
                 auto dLevel=tAtt.delayLevel;
                 tAtt.delay({
                     addPendingRequest(urlDecode(url.anchor),delegate void(ParsedUrl url,Unserializer us){
@@ -164,12 +164,12 @@ class MpiProtocolHandler: ProtocolHandler{
                 case 2:{
                     char[] errMsg;
                     u(errMsg);
-                    throw new RpcException(errMsg~" calling "~url.url(),__FILE__,__LINE__);
+                    throw new RpcException((errMsg~" calling "~url.url()).idup,__FILE__,__LINE__);
                 }
                 case 3:{
                     char[] errMsg;
                     u(errMsg);
-                    throw new RpcException(errMsg~" calling "~url.url(),__FILE__,__LINE__);
+                    throw new RpcException((errMsg~" calling "~url.url()).idup,__FILE__,__LINE__);
                 }
                 default:
                     throw new RpcException("unknown resKind "~to!(string )(resKind)~
@@ -195,7 +195,7 @@ class MpiProtocolHandler: ProtocolHandler{
             arr.assign(cast(ubyte[])buf2,0,GASharing.GlobalNoFree);
             auto u=new SBinUnserializer(toReaderT!(void)(arr2));
             obj.remoteMainCall(url.path[2],urlDecode(url.anchor),u,
-                delegate void(ubyte[]reqId,void delegate(Serializer)sRes){
+                delegate void(in ubyte[]reqId,void delegate(Serializer)sRes){
                     sRes(s);
                 });
             if (unserRes!is null){

@@ -74,15 +74,15 @@ class SBinSerializer : Serializer {
         lastMetaId=3; // 0: null, 1: default type, 2: proxy, 3: metaInfo
         compact=true;
     }
-    this(string desc,void delegate(void[]) s){
+    this(string desc,void delegate(in void[]) s){
         this(new BinaryWriteHandlers!()(desc,s));
     }
-    this(OutWriter desc,void delegate(void[]) s){
+    this(OutWriter desc,void delegate(in void[]) s){
         this(new BinaryWriteHandlers!()(desc,s));
     }
     void writeField(FieldMetaInfo *field){ }
     /// writes something that has a custom write operation
-    override void writeCustomField(FieldMetaInfo *field, void delegate()writeOp){
+    override void writeCustomField(FieldMetaInfo *field, scope void delegate()writeOp){
         writeField(field);
         writeOp();
     }
@@ -103,7 +103,7 @@ class SBinSerializer : Serializer {
         return PosCounter(l);
     }
     /// writes a separator of the array
-    override void writeArrayEl(ref PosCounter ac, void delegate() writeEl) {
+    override void writeArrayEl(ref PosCounter ac, scope void delegate() writeEl) {
         if (ac.length==ulong.max){
             writeCompressed(1u);
         }
@@ -124,7 +124,7 @@ class SBinSerializer : Serializer {
         return PosCounter(l);
     }
     /// writes an entry of the dictionary
-    override void writeEntry(ref PosCounter ac, void delegate() writeKey,void delegate() writeVal) {
+    override void writeEntry(ref PosCounter ac, scope void delegate() writeKey,scope void delegate() writeVal) {
         if (ac.length==ulong.max){
             writeCompressed(1u);
         }
@@ -141,7 +141,7 @@ class SBinSerializer : Serializer {
     }
     /// writes an Object
     override void writeObject(FieldMetaInfo *field, ClassMetaInfo metaInfo, objectId objId,
-        bool isSubclass,void delegate() realWrite, Object o){
+        bool isSubclass,scope void delegate() realWrite, Object o){
         writeField(field);
         assert(metaInfo!is null);
         uint metaId=1;
@@ -171,7 +171,7 @@ class SBinSerializer : Serializer {
     }
     /// write Struct
     override void writeStruct(FieldMetaInfo *field, ClassMetaInfo metaInfo, objectId objId,
-        void delegate() realWrite,void *t){
+	scope void delegate() realWrite,const(void) *t){
         uint metaId=1;
         if (compact){
             writeCompressed(metaId);
@@ -192,7 +192,7 @@ class SBinSerializer : Serializer {
         realWrite();
     }
     /// writes a core type
-    override void writeCoreType(FieldMetaInfo *field, void delegate() realWrite,void *t){
+    override void writeCoreType(FieldMetaInfo *field, scope void delegate() realWrite,void *t){
         writeField(field);
         realWrite();
     }
@@ -218,7 +218,7 @@ class SBinUnserializer: Unserializer {
         uint l;
         reader.handle(l);
         if (l!=0xdeadbeef){
-            serializationError(collectIAppender(delegate void(CharSink s){
+            serializationError(collectIAppender(delegate void(scope CharSink s){
                     dumper(s)("readEndRoot found ")(l)(" instead of 0xdeadbeef, binary stream is likely to be garbled");
                 }),__FILE__,__LINE__);
         }
@@ -280,7 +280,7 @@ class SBinUnserializer: Unserializer {
         FieldMetaInfo *mismatchedField;
         string actualField;
         this(FieldMetaInfo *mismatchedField,string actualField,string desc,string filename,long line){
-            super(collectIAppender(delegate void(CharSink s){ s(desc); s(" at "); reader.parserPos(s); }),filename,line);
+            super(collectIAppender(delegate void(scope CharSink s){ s(desc); s(" at "); reader.parserPos(s); }),filename,line);
             this.actualField=actualField;
             this.mismatchedField=mismatchedField;
         }
@@ -290,7 +290,7 @@ class SBinUnserializer: Unserializer {
     void readField(FieldMetaInfo *field){ }
     
     /// reads something that has a custom write operation
-    override void readCustomField(FieldMetaInfo *field, void delegate()readOp){
+    override void readCustomField(FieldMetaInfo *field, scope void delegate()readOp){
         readField(field);
         readOp();
     }
@@ -317,7 +317,7 @@ class SBinUnserializer: Unserializer {
     }
     /// reads an element of the array (or its end)
     /// returns true if an element was read
-    override bool readArrayEl(ref PosCounter ac, void delegate() readEl) {
+    override bool readArrayEl(ref PosCounter ac, scope void delegate() readEl) {
         if (ac.length==ac.pos) {
             ac.end;
             return false;
@@ -353,7 +353,7 @@ class SBinUnserializer: Unserializer {
         return res;
     }
     /// reads an entry of the dictionary
-    override bool readEntry(ref PosCounter ac, void delegate() readKey,void delegate() readVal) {
+    override bool readEntry(ref PosCounter ac, scope void delegate() readKey,scope void delegate() readVal) {
         if (ac.length==ac.pos) {
             ac.end;
             return false;
@@ -418,14 +418,14 @@ class SBinUnserializer: Unserializer {
         return instantiateClass(metaI);
     }
     /// reads an object (called after readAndInstantiateClass)
-    override void readObject(FieldMetaInfo *field, ClassMetaInfo metaInfo,void delegate() unserializeF,Object o){
+    override void readObject(FieldMetaInfo *field, ClassMetaInfo metaInfo,scope void delegate() unserializeF,Object o){
         readStruct(field,metaInfo,unserializeF,cast(void*)o);
     }
-    override void readStruct(FieldMetaInfo *field, ClassMetaInfo metaInfo,void delegate() unserializeF,void *t){
+    override void readStruct(FieldMetaInfo *field, ClassMetaInfo metaInfo,scope void delegate() unserializeF,void *t){
         unserializeF();
     }
     /// reads a core type
-    void readCoreType(FieldMetaInfo *field,void delegate() realRead){
+    void readCoreType(FieldMetaInfo *field,scope void delegate() realRead){
         readField(field);
         realRead();
     }

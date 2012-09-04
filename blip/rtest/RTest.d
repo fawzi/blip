@@ -177,7 +177,7 @@ import blip.Comp;
 
 mixin testInit!() autoInitTst; 
 
-int[] parseIArray(cstring str){
+int[] parseIArray(in cstring str){
     uint start=locate(str,'[');
     uint end=locate(str,']');
     if (start==str.length || end==str.length || start>=end){
@@ -257,12 +257,12 @@ int mainTestFun(string [] argStr,SingleRTest testSuite){
     } else {
         ArgParser args = new ArgParser();
         args.bind("--","help",delegate void(){ help=true; });
-        args.bind("--","runs",delegate(cstring arg){ runs=to!(int)(arg[1..$]); });
+        args.bind("--","runs",delegate(in cstring arg){ runs=to!(int)(arg[1..$]); });
         args.bind("--","trace",delegate void(){ trace=true; });
-        args.bind("--","seed",delegate(cstring arg){ seed=arg[1..$].dup; });
-        args.bind("--","counter",delegate(cstring arg){ counter=parseIArray(arg[1..$]); });
-        args.bind("--","test",delegate void(cstring arg){ test=arg[1..$].dup; });
-        args.bind("--","on-failure",delegate void(cstring arg){
+        args.bind("--","seed",delegate(in cstring arg){ seed=arg[1..$].dup; });
+        args.bind("--","counter",delegate(in cstring arg){ counter=parseIArray(arg[1..$]); });
+        args.bind("--","test",delegate void(in cstring arg){ test=arg[1..$].dup; });
+        args.bind("--","on-failure",delegate void(in cstring arg){
             if (arg.length==0) throw new Exception("expected an argument after --on-failure");
             if (arg[0]=='=') arg=arg[1..$];
             switch(arg){
@@ -278,7 +278,7 @@ int mainTestFun(string [] argStr,SingleRTest testSuite){
                     exit(-1);
             }
         });
-        args.bind("--","print-level",delegate void(cstringarg){
+        args.bind("--","print-level",delegate void(in cstringarg){
             if (arg[0]=='=') arg=arg[1..$];
             switch(arg){
                 case "Error", "error": printLevel=TextController.PrintLevel.Error; break;
@@ -329,7 +329,7 @@ debug(UnitTest){
     arg1=specialNrs[arg1_i]; arg1_nEl=specialNrs.length;`) combNrTst; // combinatorial cases
 
     unittest{
-        CharSink nullPrt=delegate void(cstring){};
+        CharSink nullPrt=delegate void(in cstring){};
         // nullPrt=sout;
         SingleRTest.defaultTestController=new TextController("",TextController.OnFailure.StopTest,
             TextController.PrintLevel.AllShort,nullPrt,nullPrt);
@@ -390,7 +390,7 @@ debug(UnitTest){
         foreach (i,t;tests){
             t.runTestsTask().submit(sequentialTask);
             if(t.stat.failedTests!=expectedFailures[i])
-                throw new Exception("test `"~t.testName~"` had "~ctfe_i2a(t.stat.failedTests)~" failures, expected "~ctfe_i2a(expectedFailures[i]));
+                throw new Exception("test `"~t.testName~"` had "~ctfe_i2s(t.stat.failedTests)~" failures, expected "~ctfe_i2s(expectedFailures[i]));
         }
     }
 

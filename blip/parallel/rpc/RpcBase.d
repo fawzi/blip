@@ -44,13 +44,13 @@ import blip.container.Deque;
 import blip.core.Traits: cmp;
 import blip.Comp;
 
-alias void delegate(ubyte[] reqId,void delegate(Serializer) sRes) SendResHandler;
+alias void delegate(in ubyte[] reqId,void delegate(Serializer) sRes) SendResHandler;
 
 class RpcException:Exception{
     this(string msg,string file,long line){
         super(msg,file,line);
     }
-    this(void delegate(void delegate(cstring))msg,string file,long line){
+    this(void delegate(scope void delegate(in cstring))msg,string file,long line){
         super(collectIAppender(msg),file,line);
     }
 }
@@ -68,7 +68,7 @@ struct ParsedUrl{
     size_t pathLen;    //
     string [] query;
     string anchor;
-    void fullPathWriter(void delegate(cstring)sink){
+    void fullPathWriter(scope void delegate(in cstring)sink){
         foreach (p;path){
             sink("/");
             sink(p);
@@ -84,7 +84,7 @@ struct ParsedUrl{
         pathPtr=p.ptr;
         pathLen=p.length;
     }
-    static void dumpHost(void delegate(cstring)sink, string host) {
+    static void dumpHost(scope void delegate(in cstring)sink, string host) {
 	bool ipv6ip=false;
 	foreach (c;host)
 	    if (c == ':') ipv6ip=true;
@@ -92,7 +92,7 @@ struct ParsedUrl{
         sink(host);
 	if (ipv6ip) sink("]");
     }
-    void urlWriter(void delegate(cstring)sink){
+    void urlWriter(scope void delegate(in cstring)sink){
         sink(protocol);
         sink("://");
 	dumpHost(sink,host);
@@ -117,11 +117,11 @@ struct ParsedUrl{
             sink(anchor);
         }
     }
-    void desc(void delegate(cstring)sink){
+    void desc(scope void delegate(in cstring)sink){
         urlWriter(sink);
     }
     
-    void pathAndRestWriter(void delegate(cstring)sink){
+    void pathAndRestWriter(scope void delegate(in cstring)sink){
         foreach (p;path){
             sink("/");
             sink(p);
@@ -189,7 +189,7 @@ struct ParsedUrl{
         ParsedUrl res;
         auto len=res.parseUrlInternal(url);
         if (len!=url.length){
-            throw new RpcException(collectIAppender(delegate void(CharSink s){
+            throw new RpcException(collectIAppender(delegate void(scope CharSink s){
                 dumper(s)("url parsing failed:")(len)("vs")(url.length)(", '")(&res.urlWriter)("' vs '")(url)("'");
             }),__FILE__,__LINE__);
         }
@@ -281,7 +281,7 @@ struct ParsedUrl{
 
 /// at the moment just checks that no encoding is needed
 /// actually reallocate and do the encoding?
-string urlEncode(ubyte[]str,bool query=false){
+inout(char)[] urlEncode(inout(ubyte)[]str,bool query=false){
     for(size_t i=0;i<str.length;++i){
         char c=cast(char)str[i];
         if ((c<'a' || c>'z')&&(c<'A' || c>'Z')&&(c<'-' || c>'9' || c=='/') && c!='_' && c!='[' && c!=']'){
@@ -289,14 +289,14 @@ string urlEncode(ubyte[]str,bool query=false){
                 __FILE__,__LINE__);
         }
     }
-    return cast(string )str;
+    return cast(inout(char)[])str;
 }
 /// safe encoding, never raises (switches to '' delimited hex encoding)
-cstring urlEncode2(Const!(ubyte[])str,bool query=false){
+cstring urlEncode2(in ubyte[]str,bool query=false){
     for(size_t i=0;i<str.length;++i){
-        auto c=cast(Const!(char))str[i];
+        auto c=cast(char)str[i];
         if ((c<'a' || c>'z')&&(c<'A' || c>'Z')&&(c<'-' || c>'9' || c=='/') && c!='_' && c!='[' && c!=']'){
-            return collectAppender(delegate void(CharSink s){
+            return collectAppender(delegate void(scope CharSink s){
                 dumper(s)("'")(str)("'");
             });
         }
@@ -305,7 +305,7 @@ cstring urlEncode2(Const!(ubyte[])str,bool query=false){
 }
 
 /// ditto
-Const!(ubyte)[] urlDecode(Const!(char[])str,bool query=false){
+inout(ubyte)[] urlDecode(inout(char)[] str,bool query=false){
     for(size_t i=0;i<str.length;++i){
         char c=str[i];
         if ((c<'a' || c>'z')&&(c<'A' || c>'Z')&&(c<'-' || c>'9' || c=='/') && c!='_' && c!='[' && c!=']'){
@@ -313,13 +313,13 @@ Const!(ubyte)[] urlDecode(Const!(char[])str,bool query=false){
                 __FILE__,__LINE__);
         }
     }
-    return cast(ubyte[])str;
+    return (cast(inout(ubyte*))str.ptr)[0..str.length];
 }
 
 /// an objects that can be published (typically publishes another object)
 interface ObjVendorI{
     Object targetObj();
-    void proxyDescDumper(void delegate(cstring));
+    void proxyDescDumper(scope void delegate(in cstring));
     string proxyDesc();
     string proxyName();
     string objName();
@@ -329,7 +329,7 @@ interface ObjVendorI{
     void publisher(Publisher newP);
     TaskI objTask();
     void objTask(TaskI task);
-    void remoteMainCall(string functionName,ubyte[] requestId, Unserializer u, SendResHandler sendRes);
+    void remoteMainCall(string functionName,in ubyte[] requestId, Unserializer u, SendResHandler sendRes);
 }
 
 class BasicVendor:ObjVendorI{
@@ -346,7 +346,7 @@ class BasicVendor:ObjVendorI{
     Object targetObj(){
         return this;
     }
-    void proxyDescDumper(void delegate(cstring)s){
+    void proxyDescDumper(scope void delegate(in cstring)s){
         s("string proxyDesc()\nstring proxyName()\nstring proxyObjUrl()\n");
     }
     string proxyDesc(){
@@ -378,14 +378,14 @@ class BasicVendor:ObjVendorI{
     }
     
     /// returns res, this should *not* be executed in the unserialization task
-    void simpleReply()(SendResHandler sendRes,ubyte[] reqId)
+    void simpleReply()(SendResHandler sendRes,in ubyte[] reqId)
     {
         sendRes(reqId,delegate void(Serializer s){
             s(0);
         });
     }
     /// returns res, this should *not* be executed in the unserialization task
-    void simpleReply(T)(SendResHandler sendRes,ubyte[] reqId,T res)
+    void simpleReply(T)(SendResHandler sendRes,in ubyte[] reqId,T res)
     {
         sendRes(reqId,delegate void(Serializer s){
             static if (is(T==void)){
@@ -397,7 +397,7 @@ class BasicVendor:ObjVendorI{
         });
     }
     /// returns an exception, this should *not* be executed in the unserialization task
-    void exceptionReply(T)(SendResHandler sendRes,ubyte[] reqId,T exception)
+    void exceptionReply(T)(SendResHandler sendRes,in ubyte[] reqId,T exception)
     {
         sendRes(reqId,delegate void(Serializer s){
             s(2);
@@ -414,13 +414,13 @@ class BasicVendor:ObjVendorI{
         T res;
         PoolI!(SimpleReplyClosure*) pool;
         __gshared static PoolI!(SimpleReplyClosure*) gPool;
-        ubyte[] reqId(){
+        @property ubyte[] reqId(){
             if (reqIdPtr is null){
                 return reqIdBuf[0..reqIdLen];
             }
             return reqIdPtr[0..reqIdLen];
         }
-        void reqId(ubyte[]v){
+        @property void reqId(in ubyte[]v){
             if (v.length<reqIdBuf.length){
                 reqIdBuf[0..v.length]=v;
                 reqIdPtr=null;
@@ -446,14 +446,14 @@ class BasicVendor:ObjVendorI{
         }
         void giveBack(){
             if (pool!is null){
-                pool.giveBack(this);
+                pool.giveBack(&this);
             } else {
-                delete(this); // be more tolerant?
+                // delete(this); // cannot be done anymore
             }
         }
     }
     /// helper to more easily create closures of simpleReply
-    SimpleReplyClosure!(T) *simpleReplyClosure(T)(SendResHandler sendRes,ubyte[] reqId,T res){
+    SimpleReplyClosure!(T) *simpleReplyClosure(T)(SendResHandler sendRes,in ubyte[] reqId,T res){
         auto r=SimpleReplyClosure!(T).gPool.getObj();
         r.sendRes=sendRes;
         r.reqId=reqId;
@@ -462,17 +462,17 @@ class BasicVendor:ObjVendorI{
         return r;
     }
     /// performs simpleReply in another task (detached)
-    void simpleReplyBg(T)(SendResHandler sendRes,ubyte[] reqId,T res){
+    void simpleReplyBg(T)(SendResHandler sendRes,in ubyte[] reqId,T res){
         auto cl=simpleReplyClosure(sendRes,reqId,res);
         Task("simpleReplyBg",&cl.doOp).appendOnFinish(&cl.giveBack).autorelease.submit(defaultTask);
     }
     /// performs exceptionReply in another task (detached)
-    void exceptionReplyBg(T)(SendResHandler sendRes,ubyte[] reqId,T res){
+    void exceptionReplyBg(T)(SendResHandler sendRes,in ubyte[] reqId,T res){
         auto cl=simpleReplyClosure(sendRes,reqId,res);
         Task("exceptionReplyBg",&cl.doOpExcept).appendOnFinish(&cl.giveBack).autorelease.submit(defaultTask);
     }
     
-    void remoteMainCall(string fName,ubyte[] reqId, Unserializer u, SendResHandler sendRes)
+    void remoteMainCall(string fName,in ubyte[] reqId, Unserializer u, SendResHandler sendRes)
     {
         switch(fName){
         case "proxyDesc":
@@ -496,7 +496,7 @@ class BasicVendor:ObjVendorI{
 /// utility method to call an rpc method returning void
 void rpcManualVoidCallPUrl(T...)(ParsedUrl pUrl,T args){
     version(TrackRpc){
-        sinkTogether(sout,delegate void(CharSink s){
+        sinkTogether(sout,delegate void(scope CharSink s){
             dumper(s)("will do rpcManualVoidCallPUrl with url ")(pUrl)("\n");
         });
     }
@@ -509,21 +509,21 @@ void rpcManualVoidCallPUrl(T...)(ParsedUrl pUrl,T args){
     auto handler=ProtocolHandler.protocolForUrl(pUrl);
     if (handler.localUrl(pUrl)) {
         version(TrackRpc){
-            sinkTogether(sout,delegate void(CharSink s){
+            sinkTogether(sout,delegate void(scope CharSink s){
                 dumper(s)("will local call for url ")(pUrl)("\n");
             });
         }
         handler.doRpcCallLocal(pUrl,&serialArgs,&unserialRes,firstArg);
     } else {
         version(TrackRpc){
-            sinkTogether(sout,delegate void(CharSink s){
+            sinkTogether(sout,delegate void(scope CharSink s){
                 dumper(s)("will do remote call for url ")(pUrl)("\n");
             });
         }
         handler.doRpcCall(pUrl,&serialArgs,&unserialRes,firstArg);
     }
     version(TrackRpc){
-        sinkTogether(sout,delegate void(CharSink s){
+        sinkTogether(sout,delegate void(scope CharSink s){
             dumper(s)("finished url ")(pUrl)("\n");
         });
     }
@@ -556,7 +556,7 @@ void rpcManualOnewayCall(T...)(string url,T args){
 /// utility method to call an rpc method that returns a value
 void rpcManualResCallPUrl(U,T...)(out U res,ParsedUrl pUrl,T args){
     version(TrackRpc){
-        sinkTogether(sout,delegate void(CharSink s){
+        sinkTogether(sout,delegate void(scope CharSink s){
             dumper(s)("will do rpcManualResCallPUrl with url ")(pUrl)("\n");
         });
     }
@@ -569,21 +569,21 @@ void rpcManualResCallPUrl(U,T...)(out U res,ParsedUrl pUrl,T args){
     auto handler=ProtocolHandler.protocolForUrl(pUrl);
     if (handler.localUrl(pUrl)) {
         version(TrackRpc){
-            sinkTogether(sout,delegate void(CharSink s){
+            sinkTogether(sout,delegate void(scope CharSink s){
                 dumper(s)("will do local call for url ")(&pUrl.urlWriter)("\n");
             });
         }
         handler.doRpcCallLocal(pUrl,&serialArgs,&unserialRes,firstArg);
     } else {
         version(TrackRpc){
-            sinkTogether(sout,delegate void(CharSink s){
+            sinkTogether(sout,delegate void(scope CharSink s){
                 dumper(s)("will do remote call for url ")(&pUrl.urlWriter)("\n");
             });
         }
         handler.doRpcCall(pUrl,&serialArgs,&unserialRes,firstArg);
     }
     version(TrackRpc){
-        sinkTogether(sout,delegate void(CharSink s){
+        sinkTogether(sout,delegate void(scope CharSink s){
             dumper(s)("did rpcManualResCallPUrl with url ")(&pUrl.urlWriter)("\n");
         });
     }
@@ -746,7 +746,7 @@ class Publisher{
     HashMap!(string ,PublishedObject) objects;
     UniqueNumber!(int) idNr;
     ProtocolHandler protocol;
-    CharSink log;
+    scope CharSink log;
     string namespace;
     
     this(ProtocolHandler pH,string namespace="obj"){
@@ -775,7 +775,7 @@ class Publisher{
         return po.obj;
     }
     string proxyObjUrl(string objName){
-        return collectIAppender(delegate void(CharSink s){
+        return collectIAppender(delegate void(scope CharSink s){
             dumper(s)(protocol.handlerUrl())("/")(namespace)("/")(objName);
         });
     }
@@ -783,7 +783,7 @@ class Publisher{
     {
         char[256] buf;
         if (url.path.length<3){
-            sinkTogether(log,delegate void(CharSink s){
+            sinkTogether(log,delegate void(scope CharSink s){
                 dumper(s)("Warning: ignoring invalid request ")(url)("\n");
             });
             protocol.sysError(url,"invalid request",sendRes,__FILE__,__LINE__);
@@ -791,7 +791,7 @@ class Publisher{
         }
         string objName=url.path[1];
         string fName=url.path[2];
-        ubyte[]requestId=urlDecode(url.anchor);
+        immutable(ubyte)[]requestId=urlDecode(url.anchor);
         auto o=objectNamed(objName);
         if (o is null){
             Log.lookup ("blip.rpc").warn("missing {}",url.url(buf));
@@ -837,15 +837,15 @@ class Publisher{
 
 /// handles failures of remote hosts
 class FailureManager{
-    alias RedBlack!(string ,void delegate(cstring)) Node;
+    alias RedBlack!(string ,void delegate(in cstring)) Node;
     Node* failureCallbacks;
-    alias void delegate(cstring baseUrl,bool delegate(cstring)realFail) FailureHandler;
+    alias void delegate(in cstring baseUrl,bool delegate(in cstring)realFail) FailureHandler;
     Deque!(FailureHandler) failureHandlers;
     this(){
         failureHandlers=new Deque!(FailureHandler)();
     }
     /// register a url to be watched for failures
-    void addFailureCallback(string url,void delegate(cstring)failureOp){
+    void addFailureCallback(string url,void delegate(in cstring)failureOp){
         synchronized(this){
             if (failureCallbacks is null){
                 failureCallbacks=new Node;
@@ -877,7 +877,7 @@ class FailureManager{
             }
         }
     }
-    void rmFailureCallback(string url,void delegate(cstring)failureOp){
+    void rmFailureCallback(string url,void delegate(in cstring)failureOp){
         synchronized(this){
             if (failureCallbacks is null){
                 return;
@@ -918,7 +918,7 @@ class FailureManager{
         failureHandlers.filterInPlace(delegate bool(FailureHandler f){ return f!is fh; });
     }
     /// notifies a failure of some url
-    void notifyFailure(string baseUrl,bool delegate(cstring)realFail){
+    void notifyFailure(string baseUrl,bool delegate(in cstring)realFail){
         synchronized(this){
             if (failureCallbacks!is null){
                 auto iter=failureCallbacks.findFirst(baseUrl,function int(ref string a,ref string b){ return cmp(a,b); },true);
@@ -946,7 +946,7 @@ class ProtocolHandler{
     /// the default protocol handler (to vend objects)
     /// this defaults to StcpProtocol handler if included
     __gshared static ProtocolHandler defaultProtocol;
-    CharSink log;
+    scope CharSink log;
     // static part (move to a singleton?)
     
     alias ProtocolHandler function(ParsedUrl url) ProtocolGetter;
@@ -960,7 +960,7 @@ class ProtocolHandler{
     /// returns the protocol handler for the given url
     static ProtocolHandler protocolForUrl(ParsedUrl url){
         if ((url.protocol in protocolHandlers) is null){
-            sinkTogether(sout,delegate void(CharSink s){
+            sinkTogether(sout,delegate void(scope CharSink s){
                 dumper(s)("no handler for protocol ")(url.protocol)("\n");
             });
         }
@@ -1017,7 +1017,7 @@ class ProtocolHandler{
     Publisher servPublisher;
     string _handlerUrl;
     
-    this(CharSink log=null){
+    this(scope CharSink log=null){
         this.log=log;
         if (log is null)
             this.log=serr.call;
@@ -1058,12 +1058,12 @@ class ProtocolHandler{
         }
         Proxy nP;
         char[256] buf;
-        string objectUrl=Idup(pUrl.url(buf));
+        string objectUrl=pUrl.url(buf).idup; // avoidable?
         if (localUrl(pUrl) && creator.localProxyCreator !is null){
             nP=creator.localProxyCreator(proxyName,objectUrl);
             string objName=pUrl.path[1]; // kind of ugly
             auto lP=cast(LocalProxy)cast(Object)nP;
-            auto vendor=publisher.objectNamed(objName.dup);
+            auto vendor=publisher.objectNamed(objName.idup); // idup avoidable?
             assert(lP!is null,"local proxy is null");
             lP.targetObj=vendor.targetObj();
             lP.objTask=vendor.objTask();
@@ -1089,14 +1089,14 @@ class ProtocolHandler{
     PendingRequest[ubyte[]] pendingRequests;
     
     /// adds a pending request
-    void addPendingRequest(ubyte[]reqId,void delegate(ParsedUrl url,Unserializer u) handleRequest){
+    void addPendingRequest(in ubyte[]reqId,void delegate(ParsedUrl url,Unserializer u) handleRequest){
         PendingRequest pReq;
         pReq.start=Clock.now;
         pReq.handleRequest=handleRequest;
         synchronized(this){
             auto r=reqId in pendingRequests;
             if (r !is null){
-                throw new RpcException("duplicate pending request "~urlEncode2(reqId),__FILE__,__LINE__);
+                throw new RpcException("duplicate pending request "~urlEncode2(reqId).idup,__FILE__,__LINE__);
             }
             pendingRequests[reqId]=pReq;
         }
@@ -1116,28 +1116,28 @@ class ProtocolHandler{
         u(reqKind);
         switch(reqKind){
         case 0:
-            sinkTogether(log,delegate void(CharSink s){
+            sinkTogether(log,delegate void(scope CharSink s){
                 dumper(s)("Warning: received result for non pending request ")(&url.urlWriter)("\n");
             });
             return;
         case 1:
-            sinkTogether(log,delegate void(CharSink s){
+            sinkTogether(log,delegate void(scope CharSink s){
                 dumper(s)("Error: received result for non pending request, possible garbling ")(&url.urlWriter)("\n");
             });
             throw new RpcException("received data for non pending request, possibly garbled receive stream",
                 __FILE__,__LINE__);
         case 2:
-            sinkTogether(log,delegate void(CharSink s){
+            sinkTogether(log,delegate void(scope CharSink s){
                 dumper(s)("Warning: ignoring exception for non pending request ")(&url.urlWriter)("\n");
             });
             return;
         case 3:
-            sinkTogether(log,delegate void(CharSink s){
+            sinkTogether(log,delegate void(scope CharSink s){
                 dumper(s)("Warning: ignoring system error in non pending request ")(&url.urlWriter)("\n");
             });
             return;
         default:
-            sinkTogether(log,delegate void(CharSink s){
+            sinkTogether(log,delegate void(scope CharSink s){
                 dumper(s)("Error: received unknow reqKind ")(reqKind)(" for non pending request, possible garbling ")(&url.urlWriter)("\n");
             });
             throw new RpcException("received data for non pending request, possibly garbled receive stream",
@@ -1147,7 +1147,7 @@ class ProtocolHandler{
     
     void handleRequest(ParsedUrl url,Unserializer u, SendResHandler sendRes){
         version(TrackRpc){
-            sinkTogether(log,delegate void(CharSink s){
+            sinkTogether(log,delegate void(scope CharSink s){
                 dumper(s)(taskAtt.val)("handling request ")(&url.urlWriter)("\n");
             });
         }
@@ -1178,13 +1178,13 @@ class ProtocolHandler{
                 }
                 break;
             default:
-                sinkTogether(log,delegate void(CharSink s){
+                sinkTogether(log,delegate void(scope CharSink s){
                     dumper(s)("Warning unknown namespace ")(url.path[0])(" in ")(url)("\n");
                 });
                 sysError(url,"unknown namespace",sendRes,__FILE__,__LINE__);
             }
         } else {
-            sinkTogether(log,delegate void(CharSink s){
+            sinkTogether(log,delegate void(scope CharSink s){
                 dumper(s)("Warning no valid path in url ")(url)("\n");
             });
         }

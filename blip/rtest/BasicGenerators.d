@@ -108,7 +108,7 @@ struct SizeLikeNumber(int mean=4,int hardMin=0,int hardMax=-3){
         res.val=generateSize(r,mean,hardMin,hardMax);
         return res;
     }
-    void desc(void delegate(cstring)sink){
+    void desc(scope void delegate(in cstring)sink){
         writeOut(sink,this.val);
     }
 }
@@ -124,17 +124,18 @@ T[] mkRandomArray(T)(Rand r,T[] array,ref bool acceptable){
 
 /// adds random entries to an associative array
 V[K] addRandomEntriesToAA(V,K)(Rand r,V[K]a){
+    alias UnqualAll!(K) K2;
     int idx,nEl;
     bool acceptable;
     int size=generateSize(r,10);
     for (int i=0;i<size;++i){
-        K k;
+        K2 k;
         V v;
         for (int j=0;j<10;++j){
             acceptable=true;
             nEl=-1;
             r(idx); // use purely random generation for elements of arrays
-            k=genRandom!(K)(r,idx,nEl,acceptable);
+            k=genRandom!(K2)(r,idx,nEl,acceptable);
             if (acceptable) break;
         }
         if (!acceptable) continue;
@@ -146,7 +147,7 @@ V[K] addRandomEntriesToAA(V,K)(Rand r,V[K]a){
             if (acceptable) break;
         }
         if (acceptable){
-            a[k]=v;
+            a[*cast(K*)&k]=v;
         }
     }
     return a;
@@ -167,7 +168,8 @@ template NonStaticArray(T){
 /// this is the main method, it checks things in the following order:
 /// static method with full interface, static methods with reduced interface,
 /// and finally template specialization of generateRandom
-NonStaticArray!(T) genRandom(T)(Rand r,int idx,ref int nEl, ref bool acceptable){
+NonStaticArray!(TT) genRandom(TT)(Rand r,int idx,ref int nEl, ref bool acceptable){
+    alias UnqualAll!(TT) T;
     static if (is(typeof(T.randomGenerate(r,idx,nEl,acceptable))==T)){
         return T.randomGenerate(r,idx,nEl,acceptable);
     } else static if (is(typeof(T.randomGenerate(r,acceptable))==T)){

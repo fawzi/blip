@@ -118,7 +118,7 @@ class Cache{
         return clear(factory.key);
     }
     /// performs an operation on a cache entry (creating it if needed)
-    void cacheOp(CacheElFactory factory,void delegate(ref CacheEntry) op){
+    void cacheOp(CacheElFactory factory,scope void delegate(ref CacheEntry) op){
         CacheEntry c;
         synchronized(this){
             auto key=factory.key();
@@ -139,7 +139,7 @@ class Cache{
         }
     }
     /// performs an operation on a cache entry if present (without creating it)
-    void cacheOpIf(CacheElFactory factory,void delegate(ref CacheEntry) op){
+    void cacheOpIf(CacheElFactory factory,scope void delegate(ref CacheEntry) op){
         CacheEntry c;
         synchronized(this){
             auto e=factory.key() in entries;
@@ -171,7 +171,7 @@ class Cache{
     }
     
     /// removecached objects that satisfy the filter
-    void purge(bool delegate(ref CacheEntry) filter){
+    void purge(scope bool delegate(ref CacheEntry) filter){
         CKey[128] buf;
         auto toRm=lGrowableArray(buf,0);
         synchronized(this){
@@ -185,7 +185,7 @@ class Cache{
     }
     static struct AllCaches{
         Cache first;
-        int opApply(int delegate(ref Cache c)loopBody){
+        int opApply(scope int delegate(ref Cache c)loopBody){
             if (first is null) return 0;
             auto cAtt=first;
             do {
@@ -197,7 +197,7 @@ class Cache{
             return 0;
         }
 
-        int opApply(int delegate(ref size_t i,ref Cache c)loopBody){
+        int opApply(scope int delegate(ref size_t i,ref Cache c)loopBody){
             if (first is null) return 0;
             auto cAtt=first;
             size_t i=0;
@@ -253,12 +253,12 @@ class Cached:CacheElFactory{
     this(string name="", EntryFlags flags=EntryFlags.Purge){
         this._key=cacheKey.next();
         if (name.length==0){
-            this._name=collectIAppender(delegate void(CharSink sink){
+            this._name=collectIAppender(delegate void(scope CharSink sink){
                 sink("Cache_");
                 writeOut(sink,key);
             });
         } else if (name[$-1]=='_') {
-            this._name=collectIAppender(delegate void(CharSink s){
+            this._name=collectIAppender(delegate void(scope CharSink s){
                 s(name);
                 writeOut(s,key);
             });
@@ -354,7 +354,7 @@ final class CachedT(T):Cached{
 class CachedPool(T):Cached,PoolI!(T){
     PoolI!(T) function() poolCreatorF;
     PoolI!(T) delegate() poolCreatorD;
-    size_t activeUsers=1;
+    shared size_t activeUsers=1;
     bool cacheStopped=false;
     
     this(PoolI!(T) function() poolCreatorF){
