@@ -2,4 +2,4 @@
 ///
 /// wrapping of a tango module
 module blip.util.TangoLogConfig;
-public import tango.util.log.Config;
+import tango.util.log.Config;

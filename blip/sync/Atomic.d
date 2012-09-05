@@ -410,7 +410,7 @@ version(LDC){
         TT oldval = void;
         static if (isPointerOrClass!(T))
         {
-            oldval = cast(TT)cast(void*)llvm_atomic_cmp_swap!(size_t)(cast(size_t*)cast(void*)&val, cast(size_t)cast(void*)equalTo, cast(size_t)cast(void*)newval);
+            oldval = cast(TT)cast(void*)llvm_atomic_cmp_swap!(size_t)(cast(shared size_t*)cast(void*)&val, cast(size_t)cast(void*)equalTo, cast(size_t)cast(void*)newval);
         }
         else static if (is(T == bool)) // correct also if bol has different size?
         {

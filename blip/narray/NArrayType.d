@@ -155,13 +155,13 @@ immutable int manualAllocThreshold=200*1024;
 /// to use ref counting this has to be long lived memory (i.e. survive until 
 /// all finalizers of the current sweep have been run), which is not yet implemented in tango
 /// as some finalizer on half filled pages will be run later...
-class Guard{
-    void *dataPtr;
+final class Guard{
+    shared void *dataPtr;
     size_t dataDim; // just informative, remove?
-    size_t refCount; // used to guarantee collection when used with scope objects
+    shared size_t refCount; // used to guarantee collection when used with scope objects
     PoolI!(ubyte[]) pool;
     this(void[] data){
-        this.dataPtr=cast(void*)data.ptr;
+        this.dataPtr=cast(shared void*)data.ptr;
         this.dataDim=data.length;
     }
     this(size_t size,bool scanPtr=false){
@@ -169,25 +169,23 @@ class Guard{
         //if (!scanPtr)
         //    attr=GC.BlkAttr.NO_SCAN;
         //dataPtr=cast(void*)GC.malloc(size,attr);
-        dataPtr=cstdlib.malloc(size);
+        dataPtr=cast(shared void*)cstdlib.malloc(size);
         if(dataPtr is null && size!=0) throw new Exception("malloc failed");
         if (scanPtr){
-            GC.addRange(dataPtr,size);
+            GC.addRange(cast(void*)dataPtr,size);
         }
         dataDim=size;
         refCount=1;
     }
-    version(RefCount){
-        // warning see note about ref counting
-        void retain(){
-            assert(refCount>0,"refCount was 0 in retain...");
-            atomicAdd(refCount,cast(size_t)1);
-        }
-        void release(){
-            assert(refCount>0,"refCount was 0 in release...");
-            if (atomicAdd(refCount,-cast(size_t)1)==cast(size_t)1){
-                free(true);
-            }
+    // warning see note about ref counting
+    void retain(){
+	assert(refCount>0,"refCount was 0 in retain...");
+	atomicAdd(refCount,cast(size_t)1);
+    }
+    void release(){
+	assert(refCount>0,"refCount was 0 in release...");
+	if (atomicAdd(refCount,-cast(size_t)1)==cast(size_t)1){
+	    free(true);
         }
     }
     ~this(){
@@ -197,7 +195,7 @@ class Guard{
         free(true);
     }
     void free(bool deterministic){
-        void *d=atomicSwap(dataPtr,null);
+        void *d=cast(void*)atomicSwap(dataPtr,null);
         if (d !is null) {
             if (deterministic && pool!is null){
                 pool.giveBack((cast(ubyte*)d)[0..dataDim]);

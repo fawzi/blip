@@ -127,8 +127,8 @@ public import blip.parallel.smp.SmpModels;
 public import blip.parallel.smp.BasicTasks;
 import blip.parallel.smp.BasicExecuters;
 import blip.parallel.smp.BasicTasks;
-import tango.util.log.Config;
-import blip.util.TangoLog;import blip.parallel.smp.NumaSchedulers;
+import blip.util.TangoLog;
+import blip.parallel.smp.NumaSchedulers;
 import blip.parallel.smp.Numa;
 import blip.Comp;
 
