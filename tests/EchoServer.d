@@ -40,7 +40,7 @@ class ConnectionHandler{
     void handleConnection(ref SocketServer.Handler h){
         auto s=h.sock;
         version(NoLog){} else {
-            sinkTogether(sout,delegate void(CharSink sink){
+            sinkTogether(sout,delegate void(scope CharSink sink){
                 dumper(sink)("received connection ")(s.sock)(" from ")(h.otherHost)("\n");
             });
         }
@@ -91,7 +91,7 @@ class ConnectionHandler{
                 }
                 if (read==Eof) break;
                 version(NoLog){} else {
-                    sinkTogether(sout,delegate void(CharSink sink){
+                    sinkTogether(sout,delegate void(scope CharSink sink){
                         dumper(sink)("Connection")(cast(int)s.sock)(" received '")(buf[0..read])("'\n");
                     });
                 }
@@ -103,13 +103,13 @@ class ConnectionHandler{
                 }
             }
             version(NoLog){} else {
-                sinkTogether(sout,delegate void(CharSink sink){
+                sinkTogether(sout,delegate void(scope CharSink sink){
                     dumper(sink)("\nConnection")(cast(int)s.sock)(" closed\n");
                 });
             }
         } catch (Exception e){
             version(NoLog){} else {
-                sinkTogether(sout,delegate void(CharSink sink){
+                sinkTogether(sout,delegate void(scope CharSink sink){
                     dumper(sink)("Exception in connection")(cast(int)s.sock)(":")(e)("\n");
                 });
             }
@@ -142,12 +142,12 @@ void main(string [] argv)
     }
     auto serv=new SocketServer(port,&c.handleConnection,sout.call);
     c.serv=serv;
-    sinkTogether(sout,delegate void(CharSink s){
+    sinkTogether(sout,delegate void(scope CharSink s){
         dumper(s)("starting server on port ")(port)("\n");
     });
     serv.start();
     noToutWatcher.moveLoopHere(); // avoids having a thread blocked just waiting...
     sout("main thread finished...\n");
-    Thread.sleep(0.1);
+    Thread.sleep(tsecs(0.1));
     exit(0); // just to be sure (in case there are still listening sockets in other threads)
 }

@@ -29,7 +29,7 @@ struct LazyArray(T) {
     void delegate(ulong l) setLen; /// set the length (before addition with a guess, after with real size)
     
     /// if you just want to write out this is all that is needed
-    this(int delegate(scope int delegate(ref T)) loopOp,ulong size=ulong.max){
+    this(int delegate(scope int delegate(ref T)) loopOp=null,ulong size=ulong.max){
         this.size=size;
         this.loopOp=loopOp;
     }

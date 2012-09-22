@@ -28,21 +28,21 @@ import blip.io.Console;
 
 class STask{
     static gVal=0;
-    char[] name;
+    string name;
     double sleepTime;
     void delegate()op;
     
     void writeOutSN(){
         {
-            auto tAtt=taskAtt.val;
-            sout(collectAppender(delegate void(CharSink sink){
+            auto tAtt=taskAtt;
+            sout(collectAppender(delegate void(scope CharSink sink){
                 auto s=dumper(sink);
                 s(name)(" from task ")(tAtt.taskName)(" started\n");
             }));
         }
-        Thread.sleep(0.5*sleepTime);
+        Thread.sleep(tsecs(0.5*sleepTime));
         if (op !is null){
-            sout(collectAppender(delegate void(CharSink s){
+            sout(collectAppender(delegate void(scope CharSink s){
                 s(name); s(" executes op \n");
                 s("op ptr:"); writeOut(s,cast(void*)op.ptr); s(" funcptr:"); writeOut(s,cast(void*)op.funcptr);
                 s("\n");
@@ -50,16 +50,16 @@ class STask{
             
             op();
         }
-        Thread.sleep(0.5*sleepTime);
+        Thread.sleep(tsecs(0.5*sleepTime));
         {
-            auto tAtt=taskAtt.val;
-            sout(collectAppender(delegate void(CharSink sink){
+            auto tAtt=taskAtt;
+            sout(collectAppender(delegate void(scope CharSink sink){
                 auto s=dumper(sink);
                 s(name)(" from task ")(tAtt.taskName)(" ended\n");
             }));
         }
     }
-    this(char[] name,double sleepTime=1.0,void delegate() op=null){
+    this(string name,double sleepTime=1.0,void delegate() op=null){
         this.name=name;
         this.sleepTime=sleepTime;
         this.op=op;
@@ -76,7 +76,7 @@ class STask{
         Task(name~"_sub3",&((new STask(name~"_sub3",0.5)).writeOutSN)).submit();
     }
     void immediateWakeUp(){
-        auto tAtt=taskAtt.val;
+        auto tAtt=taskAtt;
         tAtt.delay({
             sout(name~" delayed!\n");
             tAtt.resubmitDelayed(tAtt.delayLevel-1);
@@ -84,9 +84,9 @@ class STask{
         sout(name~" waked!\n");
     }
     void lateWakeUp(){
-        auto tAtt=taskAtt.val;
+        auto tAtt=taskAtt;
         auto resub=resubmitter(tAtt,tAtt.delayLevel);
-        sout(collectAppender(delegate void(CharSink s){
+        sout(collectAppender(delegate void(scope CharSink s){
             s("resub:"); writeOut(s,resub);
             s("\n");
         }));
@@ -111,7 +111,7 @@ class STask{
 void testOnFinish(){
     Task("testOnFinish1",&((new STask("singleTask")).writeOutSN))
         .appendOnFinish({sout("Run onFinish of testOnFinish1\n");}).autorelease().submit();
-    Thread.sleep(3.0);
+    Thread.sleep(tsecs(3.0));
     {
         auto t=new STask("subShort",2.0);
         t.op=&t.submit1;
@@ -222,12 +222,12 @@ class DataFlowTest{
     }
     
     void read1(){
-        sout(collectAppender(delegate void(CharSink s){
+        sout(collectAppender(delegate void(scope CharSink s){
             s("var1 has value:"); writeOut(s,var1()); s("\n");
         }));
     }
     void read2(){
-        sout(collectAppender(delegate void(CharSink s){
+        sout(collectAppender(delegate void(scope CharSink s){
             s("var2 has value:"); writeOut(s,var2()); s("\n");
         }));
     }
@@ -244,7 +244,7 @@ class DataFlowTest{
         Task("read1Write2",&read1Write2).autorelease.submit();
         Task("read1_2",    &read1      ).autorelease.submit();
         Task("read2_1",    &read2      ).autorelease.submit();
-        Thread.sleep(0.5);
+        Thread.sleep(tsecs(0.5));
         Task("write1_1",   &write1     ).autorelease.submit();
         Task("write1_2",   &write1     ).autorelease.submit();
     }
@@ -269,7 +269,7 @@ void tests(){
     sout("testDataFlow\n");
     testDataFlow();
     sout("shoud be done\n");
-    Thread.sleep(8.0);
+    Thread.sleep(tsecs(8.0));
     sout("done\n");
 }
 

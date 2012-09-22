@@ -21,12 +21,13 @@ import blip.io.BasicIO;
 import blip.Comp;
 
 struct String{
-    void* ptr;
+    immutable(void)* ptr;
     size_t _l;
     enum Encoding:size_t{
-        Utf8,
-        Utf16,
-        Utf32,
+	// currently this is also the bitshift for the type...
+        Utf8=0,
+        Utf16=1,
+        Utf32=2,
     }
     template encodingOfT(T){
         static if(is(T==char)){
@@ -68,60 +69,62 @@ struct String{
     enum :int {
         BitsLen=8*size_t.sizeof-2
     }
-    /// length of the string in bytes
-    size_t len(){
-        return (_l & MaskLen);
-    }
     /// encoding of this string
-    size_t encodingId(){
+    @property int encodingId(){
         return cast(int)(_l>>BitsLen);
     }
+    /// bit shift for the stored encoding (use the fact that bishift=encoding id)
+    @property int encodingBitShift(){
+	return cast(int)(_l>>BitsLen);
+    }			    
+    /// length of the string in bytes
+    @property size_t byteLength(){
+        return (_l & MaskLen);
+    }
+    /// length in charcter units (*not* utf codepoints)
+    @property size_t cLength(){
+	return (_l & MaskLen)>>encodingBitShift;
+    }
     /// builds a string from encoded data
-    static String opCall(cstring s){
+    this(immutable(char)[] s){
         assert((s.length&~MaskLen)==0);
-        String res;
-        res.ptr=s.ptr;
-        res._l=(Encoding.Utf8<<BitsLen)|s.length;
-        return res;
+        this.ptr=s.ptr;
+        this._l=(Encoding.Utf8<<BitsLen)|s.length;
     }
     /// ditto
-    static String opCall(cstringw s){
+    this(immutable(wchar)[] s){
         assert((s.length&~(MaskLen>>1))==0);
-        String res;
-        res.ptr=s.ptr;
-        res._l=(Encoding.Utf16<<BitsLen)|(s.length>>1);
-        return res;
+        this.ptr=s.ptr;
+        this._l=(Encoding.Utf16<<BitsLen)|(s.length>>1);
     }
     /// ditto
-    static String opCall(cstringd s){
+    this(immutable(dchar)[] s){
         assert((s.length&~(MaskLen>>2))==0);
-        String res;
-        res.ptr=s.ptr;
-        res._l=(Encoding.Utf32<<BitsLen)|(s.length>>2);
-        return res;
+        this.ptr=s.ptr;
+        this._l=(Encoding.Utf32<<BitsLen)|(s.length>>2);
     }
     /// this string within a given encoding
-    T[] asStringT(T)(T[] buf=null){ // buf not used at the moment...
+    immutable(T)[] asStringT(T)(T[] buf=null){ // buf not used at the moment...
         auto e=encodingId();
         if (e==encodingOfT!(T)) {
-            return (cast(T*)ptr)[0..(len>>BitshiftForT!(T))];
+            return (cast(immutable(T)*)ptr)[0..(cLength)];
         }
         switch (e){
         case Encoding.Utf8:
-            return toStringT!(T)((cast(const(char)*)ptr)[0..(len>>BitshiftForT!(char))]);
+            return toStringT!(T)((cast(immutable(char)*)ptr)[0..cLength]);
         case Encoding.Utf16:
-            return toStringT!(T)((cast(const(wchar)*)ptr)[0..(len>>BitshiftForT!(wchar))]);
+            return toStringT!(T)((cast(immutable(wchar)*)ptr)[0..cLength]);
         case Encoding.Utf32:
-            return toStringT!(T)((cast(const(dchar)*)ptr)[0..(len>>BitshiftForT!(dchar))]);
+            return toStringT!(T)((cast(immutable(dchar)*)ptr)[0..cLength]);
         default:
             assert(0,"unknown encoding for type "~T.stringof);
         }
         
     }
     /// utility internal casting (use only if you know the encoding to be T)
-    T[] asT(T)(){
+    immutable(T)[] asT(T)(){
         assert(encodingOfT!(T)==encodingOfT);
-        return (cast(T*)ptr)[0..(len>>BitshiftForT!(T))];
+        return (cast(T*)ptr)[0..(byteLength>>BitshiftForT!(T))];
     }
     /// sinks the string in the requested encoding
     void sinkTo(T)(T sink){

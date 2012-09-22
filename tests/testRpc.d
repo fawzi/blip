@@ -42,7 +42,7 @@ class A{
         iVal_=i;
     }
     int b(double y){
-        sinkTogether(sout,delegate void(CharSink s){
+        sinkTogether!(typeof(sout),const(char[]),char)(sout,delegate void(scope CharSink s){
             dumper(s)("A.b is being called with ")(y)("\n");
         });
         return 5*cast(int)y;
@@ -54,7 +54,7 @@ class A{
         return x/y;
     }
     void notify(int i){
-        sinkTogether(sout,delegate void(CharSink s){
+        sinkTogether(sout,delegate void(scope CharSink s){
             dumper(s)("A@")(cast(void*)this)(".notify(")(i)(")\n");
         });
     }
@@ -69,7 +69,7 @@ void manualCalls(string proxyUrl){
     rpcManualVoidCall(proxyUrl~"/setIVal",4);
     int res;
     rpcManualResCall(res,proxyUrl~"/iVal");
-    if (res!=4) throw new Exception(collectAppender(delegate void(CharSink s){
+    if (res!=4) throw new Exception(collectIAppender(delegate void(scope CharSink s){
         dumper(s)("unexpected value for ival:")(res);
         }),__FILE__,__LINE__);
     rpcManualOnewayCall(proxyUrl~"/notify",res);
@@ -96,7 +96,7 @@ void rpcTests(){
         rpc1.startServer(false);
         sout("rpc1:")(cast(void*)rpc1)("\n");
         auto pName=rpc1.publisher.publishObject(vendor,"globalA");
-        sinkTogether(sout,delegate void(CharSink s){
+        sinkTogether(sout,delegate void(scope CharSink s){
             dumper(s)("proxy from url: ")(vendor.proxyObjUrl())("\n");
         });
         sout("gc collect!\n");
@@ -111,16 +111,16 @@ void rpcTests(){
         sout("will call localProxy2\n");
         {
             auto res=localP.b(4);
-            sinkTogether(sout,delegate void(CharSink s){
+            sinkTogether(sout,delegate void(scope CharSink s){
                 dumper(s)("b thorugh local proxy2:")(res)("\n");
             });
         }
         double r=ol.mult(3.4,2.0);
-        sinkTogether(sout,delegate void(CharSink s){
+        sinkTogether(sout,delegate void(scope CharSink s){
             dumper(s)("b mult:")(r)("\n");
         });
         r=localP.mult(3.4,2.0);
-        sinkTogether(sout,delegate void(CharSink s){
+        sinkTogether(sout,delegate void(scope CharSink s){
             dumper(s)("b2 mult:")(r)("\n");
         });
         sout("gc collect2!\n");
@@ -132,17 +132,17 @@ void rpcTests(){
         rpc3.startServer(false);
         auto vendor2=new A.AVendor(A.globalA);
         auto pName2=rpc1.publisher.publishObject(vendor2,"globalB");
-        sinkTogether(sout,delegate void(CharSink s){
+        sinkTogether(sout,delegate void(scope CharSink s){
             dumper(s)("url2:")(vendor.proxyObjUrl())("\n");
         });
     
-        sinkTogether(sout,delegate void(CharSink s){
+        sinkTogether(sout,delegate void(scope CharSink s){
             dumper(s)("non loc proxy from url: ")(vendor.proxyObjUrl())("\n");
         });
         auto localP3=ProtocolHandler.proxyForUrl(vendor.proxyObjUrl());
         auto localP4=cast(A.AProxy)localP3;
         if (localP4 is null) throw new Exception("loopBackProxy error",__FILE__,__LINE__);
-        sinkTogether(sout,delegate void(CharSink s){
+        sinkTogether(sout,delegate void(scope CharSink s){
             dumper(s)("b thorugh local proxy2:")(ol.b(4))("\n");
         });
         sout("will call loopBackProxy\n");
@@ -154,25 +154,25 @@ void rpcTests(){
         sout("manualCallsDone\n");
         {
             auto res=localP4.b(4);
-            sinkTogether(sout,delegate void(CharSink s){
+            sinkTogether(sout,delegate void(scope CharSink s){
                 dumper(s)("b thorugh loopBackProxy:")(res)("\n");
             });
         }
         r=localP4.mult(3.4,2.0);
-        sinkTogether(sout,delegate void(CharSink s){
+        sinkTogether(sout,delegate void(scope CharSink s){
             dumper(s)("loopBackProxy mult:")(r)("\n");
         });
         r=localP4.div(3.4,2.0);
-        sinkTogether(sout,delegate void(CharSink s){
+        sinkTogether(sout,delegate void(scope CharSink s){
             dumper(s)("loopBackProxy dif:")(r)("\n");
         });
         version(TestRpcNoOneway){} else {
             localP4.notify(3);
         }
-        sinkTogether(sout,delegate void(CharSink s){
+        sinkTogether(sout,delegate void(scope CharSink s){
             dumper(s)("loopBackProxy notify\n");
         });
-        Thread.sleep(2.0);
+        Thread.sleep(tsecs(2.0));
         localP4.voidMethod();
         sout("loopBackProxy voidMethod\n");
         char[128] buf;
@@ -265,7 +265,7 @@ void rpcTests(){
         }
         sout(arr.data);
     } catch (Exception e){
-        sinkTogether(sout,delegate void(CharSink s){
+        sinkTogether(sout,delegate void(scope CharSink s){
             dumper(s)("Exception during rpcTests:")(e)("\n");
         });
     }
@@ -283,7 +283,7 @@ void rpcTestServer(){
         rpc1.startServer(false);
         sout("rpc1:")(cast(void*)rpc1)("\n");
         auto pName=rpc1.publisher.publishObject(vendor,"globalA");
-        sinkTogether(sout,delegate void(CharSink s){
+        sinkTogether(sout,delegate void(scope CharSink s){
             dumper(s)("vending url: ")(vendor.proxyObjUrl())("\n");
         });
         while(true){
@@ -293,7 +293,7 @@ void rpcTestServer(){
             sout("gc did collect!\n");
         }
     } catch (Exception e){
-        sinkTogether(sout,delegate void(CharSink s){
+        sinkTogether(sout,delegate void(scope CharSink s){
             dumper(s)("Exception during rpcTests:")(e)("\n");
         });
     }
@@ -303,7 +303,7 @@ void rpcTestSimpleClient(string url,int repeat=1){
     try{
         //GC.disable();
         
-        sinkTogether(sout,delegate void(CharSink s){
+        sinkTogether(sout,delegate void(scope CharSink s){
             dumper(s)("testing simpleCall on: ")(url)("\n");
         });
         auto pUrl=ParsedUrl.parseUrl(url);
@@ -311,7 +311,7 @@ void rpcTestSimpleClient(string url,int repeat=1){
         manualCalls(url);
         for (int itime=0;itime<repeat;++itime){
             string res=handler.simpleCall(pUrl);
-            sinkTogether(sout,delegate void(CharSink s){
+            sinkTogether(sout,delegate void(scope CharSink s){
                 dumper(s)("simpleCall returned '")(res)("'\n");
             });
             sout("gc collect!\n");
@@ -319,7 +319,7 @@ void rpcTestSimpleClient(string url,int repeat=1){
             sout("gc did collect!\n");
         }
     } catch(Exception e){
-        sinkTogether(sout,delegate void(CharSink s){
+        sinkTogether(sout,delegate void(scope CharSink s){
             dumper(s)("exception in rpcTestClient:")(e)("\n");
         });
     }
@@ -339,7 +339,7 @@ void rpcTestClient(string url){
     try{
         //GC.disable();
         
-        sinkTogether(sout,delegate void(CharSink s){
+        sinkTogether(sout,delegate void(scope CharSink s){
             dumper(s)("non loc proxy from url: ")(url)("\n");
         });
         auto pUrl=ParsedUrl.parseUrl(url);
@@ -365,34 +365,34 @@ void rpcTestClient(string url){
                 ParsedUrl pUrl2=pUrl;
                 pUrl2.appendToPath("proxyName");
                 string resN=callH.simpleCall(pUrl2);
-                sinkTogether(sout,delegate void(CharSink s){
+                sinkTogether(sout,delegate void(scope CharSink s){
                     dumper(s)("proxyName:")(resN)("\n");
                 });
             }
             res=localP4.iVal();
-            sinkTogether(sout,delegate void(CharSink s){
+            sinkTogether(sout,delegate void(scope CharSink s){
                 dumper(s)("iVal:")(res)("\n");
             });
             res=localP4.b(4);
-            sinkTogether(sout,delegate void(CharSink s){
+            sinkTogether(sout,delegate void(scope CharSink s){
                 dumper(s)("b(4):")(res)("\n");
             });
         }
         auto r=localP4.mult(3.4,2.0);
-        sinkTogether(sout,delegate void(CharSink s){
+        sinkTogether(sout,delegate void(scope CharSink s){
             dumper(s)("Proxy mult:")(r)("\n");
         });
         r=localP4.div(3.4,2.0);
-        sinkTogether(sout,delegate void(CharSink s){
+        sinkTogether(sout,delegate void(scope CharSink s){
             dumper(s)("Proxy div:")(r)("\n");
         });
         version(TestRpcNoOneway){} else {
             localP4.notify(3);
         }
-        sinkTogether(sout,delegate void(CharSink s){
+        sinkTogether(sout,delegate void(scope CharSink s){
             dumper(s)("Proxy notify\n");
         });
-        Thread.sleep(2.0);
+        Thread.sleep(tsecs(2.0));
         localP4.voidMethod();
         sout("Proxy voidMethod\n");
         char[128] buf;
@@ -434,7 +434,7 @@ void rpcTestClient(string url){
                     {
                         ParsedUrl pUrl2=pUrl;//localP4.proxyObjPUrl();
                         pUrl2.appendToPath("iVal");
-                        sinkTogether(sout,delegate void(CharSink s){
+                        sinkTogether(sout,delegate void(scope CharSink s){
                             dumper(s)("pUrl2:")(&pUrl2.urlWriter)("\n");
                         });
                         Variant firstArg;
@@ -443,18 +443,18 @@ void rpcTestClient(string url){
                         sout("cld\n");
                         res=closure.res;
                     }
-                    sinkTogether(sout,delegate void(CharSink s){
+                    sinkTogether(sout,delegate void(scope CharSink s){
                         dumper(s)("i1=")(res)("\n");
                     });
                     res=localP4.iVal();
-                    sinkTogether(sout,delegate void(CharSink s){
+                    sinkTogether(sout,delegate void(scope CharSink s){
                         dumper(s)("i=")(res)("\n");
                     });
                     {
                         ParsedUrl pUrl2=pUrl;
                         pUrl2.appendToPath("proxyName");
                         string resN=callH.simpleCall(pUrl2);
-                        sinkTogether(sout,delegate void(CharSink s){
+                        sinkTogether(sout,delegate void(scope CharSink s){
                             dumper(s)("proxyName:")(resN)("\n");
                         });
                     }
@@ -477,7 +477,7 @@ void rpcTestClient(string url){
         }
         sout("data:")(arr.data)("\n");
     } catch (Exception e){
-        sinkTogether(sout,delegate void(CharSink s){
+        sinkTogether(sout,delegate void(scope CharSink s){
             dumper(s)("Exception during rpcTests:")(e)("\n");
         });
     }
@@ -537,6 +537,6 @@ void main(string []args){
         Task("rpcTests",delegate void(){ rpcTests(); }).autorelease.executeNow();
     }
     sout("done!!\n");
-    Thread.sleep(3.0);
+    Thread.sleep(tsecs(3.0));
     exit(0);
 }

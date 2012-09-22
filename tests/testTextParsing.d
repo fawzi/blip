@@ -40,14 +40,14 @@ void main(){
     assert(nCodePoints("abcabcabcabc"d)==12);
     assert(nCodePoints("åbôdåbôdabbdabddåbôdabc"d)==23);
     
-    auto p=new TextParser!(char)(toReaderChar(new IOArray("12tz,rk tt 23.4 +7.2i \t6.4+3.2i \"a string with space\" \"escapedString\\\"\"\n")));
+    auto p=new TextParser!(char)(toReaderChar(new IOArray("12tz,rk tt 23.4 +7.2i \t6.4+3.2i \"a string with space\" \"escapedString\\\"\"\n".dup)));
     int i;
     real r;
     ireal ir;
     creal cr;
-    char[] s;
-    wchar[] ws;
-    dchar[] ds;
+    const(char)[] s;
+    const(wchar)[] ws;
+    const(dchar)[] ds;
     p(i);
     assert(i==12);
     p(s);
@@ -58,9 +58,9 @@ void main(){
     assert(s=="rk");
     assert(ws=="tt"w);
     p(r)(ir)(cr);
-    assert(abs(r-23.4)<1.e-10);
-    assert(abs(ir-7.2i)<1.e-10);
-    assert(abs(cr-(6.4+3.2i))<1.e-10);
+    assert(abs(r-23.4)<1.9e-10);
+    assert(abs(ir-7.2i)<1.0e-10);
+    assert(abs(cr-(6.4+3.2i))<1.0e-10);
     p(s)(ds);
     assert(s=="a string with space");
     assert(ds==`escapedString"`d);

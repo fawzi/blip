@@ -89,9 +89,9 @@ struct WaitListPtr{
         }
     }
     
-    bool addTask(shared TaskI t){
+    bool addTask(TaskI t){
         return ifNoVal(delegate void(shared WaitList w){
-            w.waiting~=t;
+	    w.waiting~=cast(shared TaskI)t;
         });
     }
     
@@ -249,7 +249,7 @@ struct DataFlow(T){
     
     T val(){
         if (!waitL.hasVal){
-            auto tAtt=taskAtt.val;
+            auto tAtt=taskAtt;
             assert(tAtt!is null);
             tAtt.delay(delegate void(){
                 if (!waitL.addTask(tAtt)){
@@ -291,9 +291,9 @@ struct DataFlow(T){
             if (newVal.waitL.hasVal){
                 waitL.setValLong(delegate void(bool hasV){
                     if (hasV){
-                        unifyVals!(T)(value,newVal.val);
+                        unifyVals!(T)(value,newVal);
                     } else {
-                        value=newVal.val;
+                        value=newVal;
                     }
                 });
             }

@@ -86,7 +86,7 @@ class TextParser(T) : InputFilter
         dumper(s)(" line:")(oldLine)(" col:")(oldCol)(" token:\"")(convertToString!(char)(escape(slice)))("\"\n");
         const(T)[] txt;
         if (source!is null){
-            txt=source.slice;
+            txt=cast(typeof(txt))source.slice;
             if (txt.length>250) txt=txt[0..250];
         } else {
 	    reader.handleReader(delegate size_t(in T[] dta, SliceExtent sExt,out bool iterate){
@@ -170,7 +170,7 @@ class TextParser(T) : InputFilter
                 sliceE=SliceExtent.ToEnd;
             }
             size_t nonGrow=maxTranscodingOverhead;
-            while (source.reader(delegate size_t(void[] rawData)
+            while (source.reader(delegate size_t(const(void)[] rawData)
                     {
                         T[] data=cropRight((cast(T*)rawData.ptr)[0..rawData.length/T.sizeof]);
                         auto res=scan(data,sliceE);
@@ -218,8 +218,8 @@ class TextParser(T) : InputFilter
         return matchSuccess;
     }
     /// returns a separator
-    T[] getSeparator(bool raise=false){
-        auto res=next(delegate size_t(T[]data,SliceExtent se){
+    const(T)[] getSeparator(bool raise=false){
+        auto res=next(delegate size_t(in T[]data,SliceExtent se){
             if (data.length==0) {
                 switch(se){
                 case SliceExtent.Partial:
@@ -242,8 +242,7 @@ class TextParser(T) : InputFilter
         return slice;
     }
     /// returns the next token if one tokenizes with just string and separators
-    T[]nextToken(){
-        T[] str;
+    const(T)[]nextToken(){
         if (getSeparator().length==0){
             if (!next(&scanString)){
                 return null;
@@ -255,7 +254,7 @@ class TextParser(T) : InputFilter
     /// (discards the previous matches though)
     bool check(scope size_t delegate(in T[],SliceExtent) scan){
         bool success=false;
-        next(delegate size_t(T[] data, SliceExtent se){
+        next(delegate size_t(in T[] data, SliceExtent se){
             auto res=scan(data,se);
             if (res == Eof){
                 return Eof;
@@ -268,7 +267,7 @@ class TextParser(T) : InputFilter
     }
     /// scans up to the regexp, slice is set to the scanned part excluding the regexp
     final bool scanToRegexp(RegExpT!(T) regex){
-        return next(delegate size_t(T[]data,SliceExtent se){
+        return next(delegate size_t(in T[]data,SliceExtent se){
                 if (regex.test (data))
                 {
                     size_t start = regex.registers_[0];
@@ -285,7 +284,7 @@ class TextParser(T) : InputFilter
     }
     
     /// scans whitespace (for skipWhitespace)
-    protected size_t scanWhitespace (T[] data,SliceExtent se){
+    protected size_t scanWhitespace (in T[] data,SliceExtent se){
         size_t i=0;
         if (inComment==CommentType.Line){
             for(;i!=data.length;++i){
@@ -297,7 +296,7 @@ class TextParser(T) : InputFilter
             }
         }
         for(;i!=data.length;++i){
-            auto c=data[i];
+            auto c=cast(T)data[i];
             if (!(c==' '||c=='\t'||(newlineIsSpace &&(c=='\r'||c=='\n')))){
                 if (skipComments && c=='#'){
                     inComment=CommentType.Line;
@@ -339,12 +338,12 @@ class TextParser(T) : InputFilter
     }
     /// skips a newline
     bool skipNewline(bool shouldThrow=true){
-        if (next(delegate size_t(T[]data,SliceExtent se){
+        if (next(delegate size_t(in T[]data,SliceExtent se){
             if (data.length<2){
                 switch(se){
                     case SliceExtent.Partial : return Eof;
                     case SliceExtent.Maximal :
-                    smallCacheError("Newline did not terminate within buffer window ("~Integer.toString(data.length)~")",__FILE__,__LINE__);
+                    smallCacheError("Newline did not terminate within buffer window ("~Integer.toString(data.length).idup~")",__FILE__,__LINE__);
                     case SliceExtent.ToEnd :
                         if (data.length==0){
                             return 0;
@@ -372,7 +371,7 @@ class TextParser(T) : InputFilter
     size_t skipLines(size_t nlines,bool shouldThrow=true){
         bool checkCr=false;
         while (1){
-            if (!next(delegate size_t(T[]t,SliceExtent se){
+            if (!next(delegate size_t(in T[]t,SliceExtent se){
                     size_t i=0;
                     for (;i<t.length;++i){
                         if (t[i]=='\r' || checkCr){
@@ -460,7 +459,7 @@ class TextParser(T) : InputFilter
         switch(se){
             case SliceExtent.Partial : return Eof;
             case SliceExtent.Maximal :
-                smallCacheError("line did not terminate within buffer window ("~Integer.toString(data.length)~")",__FILE__,__LINE__);
+                smallCacheError("line did not terminate within buffer window ("~Integer.toString(data.length).idup~")",__FILE__,__LINE__);
             case SliceExtent.ToEnd :
                 return data.length;
             default:
@@ -470,7 +469,6 @@ class TextParser(T) : InputFilter
     }
     /// returns the next line (as slice in local storage)
     const(T)[]nextLine(){
-        T[] str;
         if (!next(&scanLine))
             return null;
         return slice;
@@ -488,7 +486,7 @@ class TextParser(T) : InputFilter
     /// scans an int string (base 10, accept also hex?)
     protected size_t scanInt (in T[] data,SliceExtent se){
         size_t i=0;
-        auto c=data[i];
+        auto c=cast(UnqualAll!(T))data[i];
         if (data.length>0 && c=='+' || c=='-') ++i;
         for(;i!=data.length;++i){
             c=data[i];
@@ -499,7 +497,7 @@ class TextParser(T) : InputFilter
         switch(se){
             case SliceExtent.Partial : return Eof;
             case SliceExtent.Maximal :
-            smallCacheError("int did not terminate within buffer window ("~Integer.toString(data.length)~")",__FILE__,__LINE__);
+            smallCacheError("int did not terminate within buffer window ("~Integer.toString(data.length).idup~")",__FILE__,__LINE__);
             case SliceExtent.ToEnd :
                 return data.length;
             default:
@@ -547,7 +545,7 @@ class TextParser(T) : InputFilter
         switch(se){
             case SliceExtent.Partial : return Eof;
             case SliceExtent.Maximal :
-            smallCacheError("float did not terminate within buffer window ("~Integer.toString(data.length)~")",__FILE__,__LINE__);
+            smallCacheError("float did not terminate within buffer window ("~Integer.toString(data.length).idup~")",__FILE__,__LINE__);
             case SliceExtent.ToEnd :
                 return data.length;
             default:
@@ -577,7 +575,7 @@ class TextParser(T) : InputFilter
             switch(se){
                 case SliceExtent.Partial : return Eof;
                 case SliceExtent.Maximal :
-                smallCacheError("quoted string did not terminate within buffer window ("~Integer.toString(data.length)~")",__FILE__,__LINE__);
+                smallCacheError("quoted string did not terminate within buffer window ("~Integer.toString(data.length).idup~")",__FILE__,__LINE__);
                 case SliceExtent.ToEnd :
                 parseError("quoted string was not closed before EOF",__FILE__,__LINE__);
                 default:
@@ -597,7 +595,7 @@ class TextParser(T) : InputFilter
             switch(se){
                 case SliceExtent.Partial : return Eof;
                 case SliceExtent.Maximal :
-                smallCacheError("string did not terminate within buffer window ("~Integer.toString(data.length)~")",__FILE__,__LINE__);
+                smallCacheError("string did not terminate within buffer window ("~Integer.toString(data.length).idup~")",__FILE__,__LINE__);
                 case SliceExtent.ToEnd :
                     return data.length;
                 default:
@@ -706,7 +704,7 @@ class TextParser(T) : InputFilter
             alias ElementTypeOfArray!(U) S;
             T[] str;
             readValue(str,false);
-            t=convertToString!(S)(str,t);
+            t=convertToString!(S)(str,cast(U)t);
         } else {
             T.triggerError;
             static assert(0,"unsupported type "~U.stringof);
@@ -715,13 +713,13 @@ class TextParser(T) : InputFilter
     
     /// skips the given string from the input
     bool skipString(in T[]str,bool raise=true){
-        if (next(delegate size_t(T[] data,SliceExtent se){
+        if (next(delegate size_t(in T[] data,SliceExtent se){
             if (str.length>data.length) {
                 switch(se){
                 case SliceExtent.Partial:
                     return Eof;
                 case SliceExtent.Maximal:
-                    smallCacheError("skipString string is larger than buffer window ("~Integer.toString(data.length)~"<"~Integer.toString(str.length)~")",__FILE__,__LINE__);
+                    smallCacheError("skipString string is larger than buffer window ("~Integer.toString(data.length).idup~"<"~Integer.toString(str.length).idup~")",__FILE__,__LINE__);
                 case SliceExtent.ToEnd:
                     return 0;
                 default:
@@ -736,20 +734,20 @@ class TextParser(T) : InputFilter
         })){
             return true;
         } else {
-            if (raise) parseError("failed to skip string '"~convertToString!()(str)~"'",__FILE__,__LINE__);
+            if (raise) parseError("failed to skip string '"~convertToString!()(str).idup~"'",__FILE__,__LINE__);
             return false;
         }
     }
     /// skips the given string from the input, which might be quoted or not in the text
     /// but must be delimited (i.e. a does not skip aa)
     bool skipString2(in T[]str,bool raise=true){
-        if(next(delegate size_t(T[] data,SliceExtent se){
+        if(next(delegate size_t(in T[] data,SliceExtent se){
             if (str.length>=data.length){
                 switch(se){
                 case SliceExtent.Partial:
                     return Eof;
                 case SliceExtent.Maximal:
-                    parseError("skipString2 string is larger than buffer window ("~Integer.toString(data.length)~"<"~Integer.toString(str.length)~")",__FILE__,__LINE__);
+                    parseError("skipString2 string is larger than buffer window ("~Integer.toString(data.length).idup~"<"~Integer.toString(str.length).idup~")",__FILE__,__LINE__);
                 case SliceExtent.ToEnd:
                     if (data.length==str.length &&data==str) return str.length;
                     return 0;
@@ -773,7 +771,7 @@ class TextParser(T) : InputFilter
                         case SliceExtent.Partial:
                             return Eof;
                         case SliceExtent.Maximal:
-                            smallCacheError("skipString string is larger than buffer window ("~Integer.toString(data.length)~")",__FILE__,__LINE__);
+                            smallCacheError("skipString string is larger than buffer window ("~Integer.toString(data.length).idup~")",__FILE__,__LINE__);
                         case SliceExtent.ToEnd:
                             return 0;
                         default:
@@ -789,7 +787,7 @@ class TextParser(T) : InputFilter
         })){
             return true;
         } else {
-            if (raise) parseError("failed to skip string2 '"~convertToString!()(str)~"'",__FILE__,__LINE__);
+            if (raise) parseError("failed to skip string2 '"~convertToString!()(str).idup~"'",__FILE__,__LINE__);
             return false;
         }
     }

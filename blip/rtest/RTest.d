@@ -178,8 +178,8 @@ import blip.Comp;
 mixin testInit!() autoInitTst; 
 
 int[] parseIArray(in cstring str){
-    uint start=locate(str,'[');
-    uint end=locate(str,']');
+    size_t start=locate(str,'[');
+    size_t end=locate(str,']');
     if (start==str.length || end==str.length || start>=end){
         sout("'")(str)("'"); writeOut(sout.call,start); sout(" ")(end)("\n");
         throw new Exception("IArray parsing failed");
@@ -215,12 +215,12 @@ int mainTestFun(string [] argStr,SingleRTest testSuite){
     static if (Tango.Major==1){
         auto args=new Arguments;
         args("help").bind(delegate void(){ help=true; });
-        args("runs").bind(delegate string (string arg){ runs=to!(int)(arg[0..$]); return null; });
+        args("runs").bind(delegate string (cstring arg){ runs=to!(int)(arg[0..$]); return null; });
         args("trace").bind(delegate void(){ trace=true; });
-        args("seed").bind(delegate string (string arg){ seed=arg.dup; return null; });
-        args("counter").bind(delegate string (string arg){ counter=parseIArray(arg[0..$]); return null; });
-        args("test").bind(delegate string (string arg){ sout("test:'")(arg)("'\n"); test=arg.dup; return null; });
-        args("on-failure").bind(delegate string (string arg){
+        args("seed").bind(delegate string (cstring arg){ seed=arg.idup; return null; });
+        args("counter").bind(delegate string (cstring arg){ counter=parseIArray(arg[0..$]); return null; });
+        args("test").bind(delegate string (cstring arg){ sout("test:'")(arg)("'\n"); test=arg.idup; return null; });
+        args("on-failure").bind(delegate string (cstring arg){
             if (arg.length==0) throw new Exception("expected an argument after --on-failure");
             if (arg[0]=='=') arg=arg[1..$];
             switch(arg){
@@ -237,7 +237,7 @@ int mainTestFun(string [] argStr,SingleRTest testSuite){
             }
             return null;
         });
-        args("print-level").bind(delegate string (string arg){
+        args("print-level").bind(delegate cstring (cstring arg){
             if (arg[0]=='=') arg=arg[1..$];
             switch(arg){
                 case "Error", "error": printLevel=TextController.PrintLevel.Error; break;
@@ -259,9 +259,9 @@ int mainTestFun(string [] argStr,SingleRTest testSuite){
         args.bind("--","help",delegate void(){ help=true; });
         args.bind("--","runs",delegate(in cstring arg){ runs=to!(int)(arg[1..$]); });
         args.bind("--","trace",delegate void(){ trace=true; });
-        args.bind("--","seed",delegate(in cstring arg){ seed=arg[1..$].dup; });
+        args.bind("--","seed",delegate(in cstring arg){ seed=arg[1..$].idup; });
         args.bind("--","counter",delegate(in cstring arg){ counter=parseIArray(arg[1..$]); });
-        args.bind("--","test",delegate void(in cstring arg){ test=arg[1..$].dup; });
+        args.bind("--","test",delegate void(in cstring arg){ test=arg[1..$].idup; });
         args.bind("--","on-failure",delegate void(in cstring arg){
             if (arg.length==0) throw new Exception("expected an argument after --on-failure");
             if (arg[0]=='=') arg=arg[1..$];

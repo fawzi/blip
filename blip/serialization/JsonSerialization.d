@@ -34,7 +34,7 @@ class JsonSerializer(T=char) : Serializer {
     long writeCount,lineCount;
     bool atStart;
     bool compact; // skips class, id when possible
-    immutable T[1] nline=[cast(T)'\n'];
+    enum T[1] nline=[cast(T)'\n'];
     Dumper!(void delegate(in cstring)) s; // quick dump of strings
     /// writes a newline
     void newline(){

@@ -15,8 +15,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 module blip.util.Grow;
-immutable PAGESIZE=512;
-private immutable smallSizes=[4,8,16,32,48,64,96,128,192,256,384,512,768,1024];
+enum PAGESIZE=512;
+private enum smallSizes=[4,8,16,32,48,64,96,128,192,256,384,512,768,1024];
 
 /**
 * returns the amount to allocate to keep some extra space
@@ -37,9 +37,9 @@ size_t growSize(size_t newlength,size_t elSize=1){
         }
     }
     size_t newext = 0;
-    immutable size_t b=0; // flatness factor, how fast the extra space decreases with array size
-    immutable size_t a=100; // allocate at most a% of the requested size as extra space (rounding will change this)
-    immutable size_t minBits=1; // minimum bit size
+    enum size_t b=0; // flatness factor, how fast the extra space decreases with array size
+    enum size_t a=100; // allocate at most a% of the requested size as extra space (rounding will change this)
+    enum size_t minBits=1; // minimum bit size
 
 
     static size_t log2plusB(size_t c)

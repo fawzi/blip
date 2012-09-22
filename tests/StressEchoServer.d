@@ -57,7 +57,7 @@ class StressGenerator{
     void makeStress(){
         connection=BasicSocket(target);
         version(NoLog){} else {
-            sinkTogether(sout,delegate void(CharSink sink){
+            sinkTogether(sout,delegate void(scope CharSink sink){
                 dumper(sink)("created connection ")(connection.sock)(" to ")(target)("\n");
             });
         }
@@ -73,7 +73,7 @@ class StressGenerator{
                 bool acceptable;
                 mkRandomArray(rand,bufOut[0..toSend],acceptable);
                 version(NoLog){} else {
-                    sinkTogether(sout,delegate void(CharSink sink){
+                    sinkTogether(sout,delegate void(scope CharSink sink){
                         dumper(sink)("Connection")(cast(int)connection.sock)(" sending '")(bufOut[0..toSend])("'\n");
                     });
                 }
@@ -90,11 +90,11 @@ class StressGenerator{
                     connection.rawReadExact(bufIn[0..toSend]);
                 }
                 if (bufOut[0..toSend]!=bufIn[0..toSend]){
-                    throw new Exception("unexpected difference in echo '"~bufOut[0..toSend]~"' vs '"~
-                        bufIn[0..toSend]~"'");
+                    throw new Exception("unexpected difference in echo '"~bufOut[0..toSend].idup~"' vs '"~
+                        bufIn[0..toSend].idup~"'");
                 }
                 version(NoLog){} else {
-                    sinkTogether(sout,delegate void(CharSink sink){
+                    sinkTogether(sout,delegate void(scope CharSink sink){
                         dumper(sink)("Connection")(cast(int)connection.sock)(" echoed\n");
                     });
                 }
@@ -102,7 +102,7 @@ class StressGenerator{
             }
         } catch (Exception e){
             version(NoLog){} else {
-                sinkTogether(sout,delegate void(CharSink sink){
+                sinkTogether(sout,delegate void(scope CharSink sink){
                     dumper(sink)("Exception in connection")(cast(int)connection.sock)(":")(e)("\n");
                 });
             }
@@ -116,13 +116,13 @@ class StressGenerator{
                     connection.close();
                     connection.shutdownInput();
                 }
-                sinkTogether(sout,delegate void(CharSink sink){
+                sinkTogether(sout,delegate void(scope CharSink sink){
                     dumper(sink)("\nConnection")(cast(int)connection.sock)(" closed\n");
                 });
             }
         } catch (Exception e){
             version(NoLog){} else {
-                sinkTogether(sout,delegate void(CharSink sink){
+                sinkTogether(sout,delegate void(scope CharSink sink){
                     dumper(sink)("Exception closing connection")(cast(int)connection.sock)(":")(e)("\n");
                 });
             }

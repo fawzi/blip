@@ -209,7 +209,7 @@ bool checkResStr(U,int rank3)(NArray!(U,rank3)refVal,NArray!(U,rank3)v,int tol=8
             res=false;
         }
     }
-    binaryOp!(checkSame,rank3,U,U)(refVal, v);
+    binaryOp!(checkSame)(refVal, v);
     return res;
 }
 
@@ -304,7 +304,8 @@ void testMultAxis(T,int rank)(NArray!(T,rank) a, Rand r){
 }
 
 void testFilterMask(T,int rank)(NArray!(T,rank) a, Rand r){
-    NArray!(bool,rank) mask=randNArray(r,empty!(bool)(a.shape));
+    NArray!(bool,rank) mask=empty!(bool)(a.shape);
+    randNArray!(NArray!(bool,rank))(r,mask);
 
     auto b=filterMask(a, mask);
     auto c=unfilterMask(b,mask);
@@ -321,7 +322,7 @@ void testFilterMask(T,int rank)(NArray!(T,rank) a, Rand r){
 }
 
 void testAxisFilter(T,int rank)(NArray!(T,rank) a, NArray!(index_type,1)indexes){
-    unaryOp!((ref index_type i){ i=abs(i)%a.shape[0]; },1,index_type)(indexes);
+    unaryOp!((ref index_type i){ i=abs(i)%a.shape[0]; })(indexes);
     auto b=axisFilter!(T,rank,NArray!(index_type,1))(a,indexes);
     auto c=zeros!(T)(a.shape);
     auto d=axisUnfilter1(c,b,indexes);
@@ -329,11 +330,11 @@ void testAxisFilter(T,int rank)(NArray!(T,rank) a, NArray!(index_type,1)indexes)
     foreach (el;indexes){
         if (!(a[el]==c[el])){
             writeOut(sout("b:").call,b); sout("\n");
-            if (b) { b.printData(sout.call); sout("\n"); }
+            b.printData(sout.call); sout("\n");
             writeOut(sout("c:").call,c); sout("\n");
-            if (c) { c.printData(sout.call); sout("\n"); }
+	    c.printData(sout.call); sout("\n");
             writeOut(sout("d:").call,d); sout("\n");
-            if (d) { d.printData(sout.call); sout("\n"); }
+            d.printData(sout.call); sout("\n");
             throw new Exception("axisFilter failed",__FILE__,__LINE__);
         }
     }
@@ -760,20 +761,20 @@ void doNArrayFixTests(){
     arangeTests;
     test_iter;
     auto a6=a4.dup;
-    unaryOp!((ref int x){x*=2;},3,int)(a6);
+    unaryOp!((ref int x){x*=2;})(a6);
     foreach (i,j,k,v;a4.pFlat){
         if (2*v!=a6[i,j,k]) throw new Exception("error",__FILE__,__LINE__);
     }
-    auto large1=reshape(arange(150),[15,10]);
+    auto large1=reshape!(NArray!(int,1),int,2)(arange(150),[15,10]);
     auto large2=large1[Range(10)];
     auto l2=large2.dup;
     auto large3=l2.T;
     if ((large2.flags&ArrayFlags.Large)==0) throw new Exception("error",__FILE__,__LINE__);
-    unaryOp!((ref int x){x*=32;},2,int)(large2);
+    unaryOp!((ref int x){x*=32;})(large2);
     foreach (i,j,v;large2.pFlat){
         if (v!=32*l2[i,j]) throw new Exception("error",__FILE__,__LINE__);
     }
-    binaryOp!((ref int x, int y){x/=y+1;},2,int,int)(large2,large3);
+    binaryOp!((ref int x, int y){x/=y+1;})(large2,large3);
     foreach (i,j,v;large2.pFlat){
         if (v!=(32*l2[i,j])/(large3[i,j]+1)) throw new Exception("error",__FILE__,__LINE__);
     }

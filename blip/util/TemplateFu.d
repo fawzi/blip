@@ -21,11 +21,11 @@ import blip.Comp;
 
 /// returns the number of arguments in the tuple (its length)
 template nArgs(){
-    immutable int nArgs=0;
+    enum int nArgs=0;
 }
 /// returns the number of arguments in the tuple (its length)
 template nArgs(T,S...){
-    immutable int nArgs=1+nArgs!(S);
+    enum int nArgs=1+nArgs!(S);
 }
 
 /// identity function
@@ -64,7 +64,7 @@ bool ctfe_hasToken(string token,string code){
 
 /// replaces all occurrences of token in code with repl
 string ctfe_replaceToken(string token,string repl,string code){
-    string res="".dup;
+    string res="";
     bool outOfTokens=true;
     int i=0,i0;
     while(i<code.length){

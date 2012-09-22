@@ -505,9 +505,9 @@ extern(C){
 }
 
 version(EV_API_STATIC)
-    ev_loop_t* ev_default_loop_ptr;
+    __gshared ev_loop_t* ev_default_loop_ptr;
 else
-    extern(C) extern ev_loop_t* ev_default_loop_ptr;
+    extern(C) extern __gshared ev_loop_t* ev_default_loop_ptr;
 
 alias extern(C) void function(ev_loop_t*,ev_watcher*, int) watcherCbF;
 

@@ -73,11 +73,11 @@ class BatchedGrowableArray(T,int batchSize1=((2048/T.sizeof>128)?2048/T.sizeof:1
             auto bIndex=ii/batchSize;
             return &(this.batches[bIndex][ii-bIndex*batchSize]);
         }
-        T opIndex(size_t i){
-            return this.ptrI(i);
+        ref T opIndex(size_t i){
+            return *this.ptrI(i);
         }
         void opIndexAssign(T val,size_t i){
-            this.ptrI(i)=val;
+            *this.ptrI(i)=val;
         }
         /// loops on a view one batch at a time
         static struct BatchLoop{
@@ -190,9 +190,10 @@ class BatchedGrowableArray(T,int batchSize1=((2048/T.sizeof>128)?2048/T.sizeof:1
                 PoolI!(Batch*) pool;
                 void giveBack(){
                     if (this.pool!is null){
-                        this.pool.giveBack(this);
+                        this.pool.giveBack(&this);
                     } else {
-                        delete this; // avoid???
+                        //delete &this; // not possible in d2
+			this=Batch();
                     }
                 }
                 void doIndexLoop(){
@@ -252,7 +253,7 @@ class BatchedGrowableArray(T,int batchSize1=((2048/T.sizeof>128)?2048/T.sizeof:1
             }
             Batch* allocBatch(){
                 auto res=this.pool.getObj();
-                res.context=this;
+                res.context=&this;
                 return res;
             }
             
@@ -572,7 +573,7 @@ class BatchedGrowableArray(T,int batchSize1=((2048/T.sizeof>128)?2048/T.sizeof:1
         }
     }
     /// returns element at index i
-    T opIndex(size_t i){
+    ref T opIndex(size_t i){
         return this.data[i];
     }
     /// pointer to element at index i
@@ -598,7 +599,7 @@ class BatchedGrowableArray(T,int batchSize1=((2048/T.sizeof>128)?2048/T.sizeof:1
         void preSerialize(Serializer s){ }
         void postSerialize(Serializer s){ }
         void serialize(Serializer s){
-            LazyArray!(T) la=LazyArray!(T).opCall(delegate int(scope int delegate(ref T)loopBody){
+            LazyArray!(T) la=LazyArray!(T)(delegate int(scope int delegate(ref T)loopBody){
                 int res=0;
                 foreach (b;this.view.sBatchLoop){
                     for (size_t i=0;i<b.length;++i){
@@ -613,7 +614,7 @@ class BatchedGrowableArray(T,int batchSize1=((2048/T.sizeof>128)?2048/T.sizeof:1
         }
 
         void unserialize(Unserializer s){
-            LazyArray!(T) la=LazyArray!(T).opCall(&this.appendEl,delegate void(ulong l){ 
+            LazyArray!(T) la=LazyArray!(T)(&this.appendEl,delegate void(ulong l){ 
                 if (l!=ulong.max) this.growCapacityTo(cast(size_t) l);
             });
             s.field(metaI[0],la);

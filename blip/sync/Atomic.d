@@ -32,6 +32,7 @@ version( LDC )
     import ldc.intrinsics;
 }
 import blip.Comp:Unqual;
+import blip.core.Thread; // to yield
 
 template Unshared(T){
     static if (is(T U==shared)){
@@ -40,7 +41,28 @@ template Unshared(T){
 	alias T Unshared;
     }
 }
+/+
+template Unshared1(T){
+    static if (is(T U==shared)){
+	alias U Unshared1;
+    } else {
+	alias T Unshared1;
+    }
+}
 
+
+template Unshared(T){
+    static if (is(T U==shared)){
+	alias U Unshared;
+    } else static if (is(T U:U*)){
+	alias Unshared1!(U)* Unshared;
+    } else static if (is(T U:U[])){
+	alias Unshared1!(U)[] Unshared;
+    } else {
+	alias T Unshared;
+    }
+}
++/
 private {
     // from tango.core.traits:
     /**
@@ -48,7 +70,7 @@ private {
      */
     template isIntegerType( T )
     {
-        immutable bool isIntegerType = isSignedIntegerType!(T) ||
+        enum bool isIntegerType = isSignedIntegerType!(T) ||
                                    isUnsignedIntegerType!(T);
     }
     /**
@@ -56,19 +78,19 @@ private {
      */
     template isPointerOrClass(T)
     {
-        immutable isPointerOrClass = is(T==class);
+        enum isPointerOrClass = is(T==class);
     }
 
     template isPointerOrClass(T : T*)
     {
-            immutable isPointerOrClass = true;
+            enum isPointerOrClass = true;
     }
     /**
      * Evaluates to true if T is a signed integer type.
      */
     template isSignedIntegerType( T )
     {
-        immutable bool isSignedIntegerType = is( T == byte )  ||
+        enum bool isSignedIntegerType = is( T == byte )  ||
                                          is( T == short ) ||
                                          is( T == int )   ||
                                          is( T == long )/+||
@@ -79,7 +101,7 @@ private {
      */
     template isUnsignedIntegerType( T )
     {
-        immutable bool isUnsignedIntegerType = is( T == ubyte )  ||
+        enum bool isUnsignedIntegerType = is( T == ubyte )  ||
                                            is( T == ushort ) ||
                                            is( T == uint )   ||
                                            is( T == ulong )/+||
@@ -95,8 +117,6 @@ private {
         }
     }
 }
-
-extern(C) void thread_yield();
 
 // NOTE: Strictly speaking, the x86 supports atomic operations on
 //       unaligned values.  However, this is far slower than the
@@ -794,7 +814,7 @@ T atomicOp(T,U,V)(ref shared(T) val, scope U delegate(V) f)
         if (nextV is oldV || newV is oldV) return oldV;
     } while(++i<200);
     while (true){
-        thread_yield();
+        Thread.yield();
         oldV=cast(T)val;
         newV=cast(T)f(oldV);
         nextV=aCas!(T)(val,newV,oldV);

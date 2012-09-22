@@ -171,44 +171,45 @@ template NonStaticArray(T){
 NonStaticArray!(TT) genRandom(TT)(Rand r,int idx,ref int nEl, ref bool acceptable){
     alias UnqualAll!(TT) T;
     static if (is(typeof(T.randomGenerate(r,idx,nEl,acceptable))==T)){
-        return T.randomGenerate(r,idx,nEl,acceptable);
+        return cast(TT)T.randomGenerate(r,idx,nEl,acceptable);
     } else static if (is(typeof(T.randomGenerate(r,acceptable))==T)){
-        return T.randomGenerate(r,acceptable);
+        return cast(TT)T.randomGenerate(r,acceptable);
     } else static if (is(typeof(T.randomGenerate(r))==T)){
-        return T.randomGenerate(r);
+        return cast(TT)T.randomGenerate(r);
     } else static if (is(T==Rand)||is(T U:RandomG!(U))) {
-        return r;
+        return cast(TT)r;
     } else static if (is(T==int)||is(T==uint)||is(T==long)||is(T==ulong)||is(T==bool)||
         is(T==byte)||is(T==ubyte)){
-        return r.uniform!(T);
+        return cast(TT)r.uniform!(T);
     } else static if (is(T==short)||is(T==ushort)){
         union U{T s; uint ui;}
         U a;
         a.ui=r.uniform!(uint);
-        return a.s;
+        return cast(TT)a.s;
     } else static if (is(T==char)||is(T==wchar)||is(T==dchar)){
-        return cast(T)r.uniformEl(valid_chars);
+	return cast(TT)cast(T)r.uniformEl(valid_chars);
     } else static if (is(T==float)||is(T==double)||is(T==real)){
-        return r.normalSigma(cast(T)1.5);
+        return cast(TT)r.normalSigma(cast(T)1.5);
     } else static if (is(T==ifloat)||is(T==idouble)||is(T==ireal)){
-        return cast(T)(r.normalSigma(cast(RealTypeOf!(T))1.5)*1i);
+        return cast(TT)cast(T)(r.normalSigma(cast(RealTypeOf!(T))1.5)*1i);
     } else static if (is(T==cfloat)||is(T==cdouble)||is(T==creal)){
-        return cast(T)(r.normalSigma(cast(RealTypeOf!(T))1.5)+1i*r.normalSigma(cast(RealTypeOf!(T))1.5));
-    } else static if (is(T U:U[])){
+        return cast(TT)cast(T)(r.normalSigma(cast(RealTypeOf!(T))1.5)+1i*r.normalSigma(cast(RealTypeOf!(T))1.5));
+    } else static if (is(T UU:UU[])){
+        alias UnqualAll!(UU) U;
         static if (isStaticArrayType!(T)){
             int size=staticArraySize!(T);
         } else {
             int size=generateSize(r,10);
         }
         auto res=new U[size];
-        return mkRandomArray!(U)(r,res,acceptable);
+        return cast(TT)mkRandomArray!(U)(r,res,acceptable);
     } else static if (isAssocArrayType!(T)) {
         alias KeyTypeOfAA!(T) K;
         alias ValTypeOfAA!(T) V;
         T res;
-        return addRandomEntriesToAA!(V,K)(r,res);
+        return cast(TT)addRandomEntriesToAA!(V,K)(r,res);
     } else static if (is(typeof(generateRandom!(T)(r,idx,nEl,acceptable)))){
-        return generateRandom!(T)(r,idx,nEl,acceptable);
+        return cast(TT)generateRandom!(T)(r,idx,nEl,acceptable);
     } else {
         static assert(0,"cannot generate random object for type "~T.stringof
             ~" you should implement one of the static randomGenerate methods, the RandGen interface or a specialization of generateRandom, unfortunately due to compiler limitations (or design choice) specializations external to this module are not picked up by this utility wrapper.");

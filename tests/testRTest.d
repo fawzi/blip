@@ -26,6 +26,7 @@ import blip.io.BasicIO;
 import blip.io.Console;
 import blip.Comp;
 import blip.core.Thread;
+import blip.core.Traits: ctfe_i2s;
 version(Trace){ import blip.core.stacktrace.TraceExceptions; }
 
 private int[4] specialNrs=[0,2,5,8];
@@ -38,7 +39,7 @@ private mixin testInit!("",`arg0=specialNrs[arg0_i]; arg0_nEl=specialNrs.length;
 arg1=specialNrs[arg1_i]; arg1_nEl=specialNrs.length;`) combNrTst; // combinatorial cases
 
 void main(string []argv){
-    CharSink nullPrt=delegate void(string s){};
+    CharSink nullPrt=delegate void(in cstring s){};
     nullPrt=sout.call;
     SingleRTest.defaultTestController=new TextController("",TextController.OnFailure.StopTest,
         TextController.PrintLevel.AllShort,nullPrt,nullPrt,1,false);
@@ -99,7 +100,7 @@ void main(string []argv){
     foreach (i,t;tests){
         t.runTestsTask().submit(immediateTask);
         if(t.stat.failedTests!=expectedFailures[i]){
-            throw new Exception("test `"~t.testName~"` had "~ctfe_i2a(t.stat.failedTests)~" failures, expected "~ctfe_i2a(expectedFailures[i]));
+            throw new Exception("test `"~t.testName~"` had "~ctfe_i2s(t.stat.failedTests)~" failures, expected "~ctfe_i2s(expectedFailures[i]));
         }
     }
     sout("\n=============================================================\n\n");

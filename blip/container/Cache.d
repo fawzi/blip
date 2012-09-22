@@ -26,7 +26,6 @@ import blip.sync.UniqueNumber;
 import blip.sync.Atomic;
 import blip.container.GrowableArray;
 import blip.io.BasicIO;
-import blip.parallel.smp.Tls;
 import blip.container.Pool;
 import blip.core.Traits;
 import blip.Comp;
@@ -57,9 +56,20 @@ class Cache{
     static struct CacheEntry{
         Variant entry;
         CacheElFactory factory;
-        Time lastUsed; // avoid storing??
         size_t idNr; // used to detect looping wrapping
+        Time lastUsed; // avoid storing??
+	// the following two ops are there to cover a variant bug
+	// (no copy of const Variants allowed triggered by the compiler generated opEquals in dmd 2.060)
+	int opEquals (ref const(CacheEntry) o) const 
+        {
+	    return (*cast(Variant*)&entry) == (*cast(Variant*)&o.entry) && factory is o.factory && idNr == o.idNr && lastUsed == o.lastUsed;
+        }
+	int opCmp (ref const(CacheEntry) o) 
+        {
+	    return &o is &this;
+        }
     }
+
     UniqueNumber!(size_t) lastIdNr;
     CacheEntry*[CKey] entries;
     Cache nextCache; // loops on all caches that are "togheter", should be a circular loop
@@ -225,11 +235,11 @@ static this(){
     gCache=new Cache();
 }
 
-mixin(tlsMixin("Cache","_defaultCache"));
+private Cache _defaultCache;
 
 /// the "best" cache, this might be gCache or more local cache (as created by NumaSchedulers)
 Cache defaultCache(){
-    auto res=_defaultCache();
+    auto res=_defaultCache;
     if (res !is null){
         return res;
     }
@@ -241,7 +251,7 @@ Cache defaultCache(){
 /// and you can purge them all (with clearAll) from any of the threads in the group, so when setting 
 /// the cache you should keep that into account.
 void setDefaultCache(Cache c){
-    _defaultCache(c);
+    _defaultCache=c;
 }
 
 /// base class for object that are cached (make the use of the cache easier)

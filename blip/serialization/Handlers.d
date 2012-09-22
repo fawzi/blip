@@ -82,8 +82,9 @@ class CoreHandlers(string constStr){
         } else static if (is(T==BinReader)){
             handleBinReader(t);
         } else {
-            static assert(isCoreType!(T),T.stringof~" is not a core type");
-            mixin("coreHandler_"~strForCoreType!(T)~"(t);");
+	    alias UnqualAll!(T) TT;
+            static assert(isCoreType!(TT),T.stringof~" is not a core type");
+            mixin("coreHandler_"~strForCoreType!(TT)~"(*cast(TT*)&t);");
         }
     }
     void handleOutWriter(OutWriter w){
@@ -211,9 +212,9 @@ class ReadHandlers: CoreHandlers!(""){
         auto res=rawReadStr(nCodePoints(str));
         if (res!=str){
             if (shouldThrow)
-                throw new Exception("could not skip string '"~str~"'",__FILE__,__LINE__);
+                throw new Exception("could not skip string '"~str.idup~"'",__FILE__,__LINE__);
             else
-                throw new Exception("failed skip string '"~str~"' unimplemented",__FILE__,__LINE__);
+                throw new Exception("failed skip string '"~str.idup~"' unimplemented",__FILE__,__LINE__);
         }
         return true;
     }
@@ -286,10 +287,10 @@ final class BinaryWriteHandlers(bool SwapBytes=isSmallEndian):WriteHandlers{
     /// writes an ulong compressed, useful if the value is expected to be small
     void writeCompressed(ulong l){
         while (1){
-            ubyte u=cast(ubyte)(l & 0x7FFF);
+            ubyte u=cast(ubyte)(l & 0x7F);
             l=l>>7;
             if (l!=0){
-                ubyte u2=u|0x8000;
+                ubyte u2=cast(ubyte)(u|0x80);
                 handle(u2);
             } else {
                 handle(u);
@@ -299,15 +300,17 @@ final class BinaryWriteHandlers(bool SwapBytes=isSmallEndian):WriteHandlers{
     }
 
     /// writes a core type
-    void basicWrite(T)(ref T t){
-        static assert(isCoreType!(T),"only core types supported, not "~T.stringof);
-        static if (is(T==cfloat)||is(T==cdouble)||is(T==creal)){
-            RealTypeOf!(T) tt=t.re;
-            basicWrite!(RealTypeOf!(T))(tt);
+    void basicWrite(T)(ref const(T) t){
+	alias UnqualAll!(T) UT;
+        static assert(isCoreType!(UT),"only core types supported, not "~T.stringof);
+        static if (is(UT==cfloat)||is(UT==cdouble)||is(UT==creal)){
+            RealTypeOf!(UT) tt=t.re;
+            basicWrite!(RealTypeOf!(UT))(tt);
             tt=t.im;
-            basicWrite!(RealTypeOf!(T))(tt);
+            basicWrite!(RealTypeOf!(UT))(tt);
         } else static if (is(T U:U[])){
-            if (!is(U==ubyte)){
+	    alias UnqualAll!(U) UU;
+            if (!is(UU==ubyte)){
                 writeCompressed(cast(ulong)t.length*U.sizeof);
             }
             static if ((! SwapBytes) || U.sizeof==1){
@@ -681,7 +684,7 @@ final class FormattedReadHandlers(T):ReadHandlers{
             } else static if (is(U==char[])||is(U==wchar[])||is(U==dchar[])){
                 T[] s;
                 reader(s);
-                t=convertToString!(ElementTypeOfArray!(U))(s,t);
+                t=cast(U)convertToString!(ElementTypeOfArray!(U))(s,t);
             } else {
                 reader(t);
             }

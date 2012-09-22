@@ -18,7 +18,7 @@ version (Win32) {
     // sys/socket.hostname
     public import tango.stdc.posix.sys.socket: sockaddr,sockaddr_storage,socklen_t;
     alias int socket_t; //- = -1;
-    immutable socket_t socket_tInit=-1;
+    enum socket_t socket_tInit=-1;
     extern(C){
         socket_t     accept(socket_t, sockaddr *restrict, socklen_t *restrict);
         int     bind(socket_t, sockaddr *, socklen_t);
@@ -112,7 +112,7 @@ version (Win32) {
 
         private import std.c.windows.winsock;
 	alias SOCKET socket_t;
-	immutable socket_tInit=-1;
+	enum socket_tInit=-1;
 } else {
     public import tango.stdc.posix.sys.socket;
     static if (!is(typeof(SOL_TCP))){

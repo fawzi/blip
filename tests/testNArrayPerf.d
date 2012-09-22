@@ -127,8 +127,8 @@ void tst()
     auto t1=timer.stop();
     
     foreach(i,t;res)
-        if (!(abs(t-res2[i])<1.e-12)) {
-            sout(collectAppender(delegate void(CharSink s){
+        if (!(abs(t-res2[i])<1.0e-12)) {
+            sout(collectAppender(delegate void(scope CharSink s){
                 s("error1"); writeOut(s,i); s(" "); writeOut(s,t); s(" "); writeOut(s,res2[i]); s("\n");
             }));
         }
@@ -144,8 +144,8 @@ void tst()
     }
     auto t2=timer.stop();
     foreach(i,t;res)
-        if (!(abs(t-res2[i])<1.e-12)) {
-            sout(collectAppender(delegate void(CharSink s){
+        if (!(abs(t-res2[i])<1.0e-12)) {
+            sout(collectAppender(delegate void(scope CharSink s){
                 s("error2"); writeOut(s,i); s(" "); writeOut(s,t); s(" "); writeOut(s,res2[i]); s("\n");
             }));
         }
@@ -164,8 +164,8 @@ void tst()
         }
         auto t3=timer.stop();
         foreach(i,t;res)
-            if (!(abs(t-res2[i])<1.e-12)) {
-                sout(collectAppender(delegate void(CharSink s){
+            if (!(abs(t-res2[i])<1.0e-12)) {
+                sout(collectAppender(delegate void(scope CharSink s){
                     s("error3"); writeOut(s,i); s(" "); writeOut(s,t); s(" "); writeOut(s,res2[i]); s("\n");
                 }));
             }
@@ -182,8 +182,8 @@ void tst()
         }
         auto t4=timer.stop();
         foreach(i,t;res)
-            if (!(abs(t-res2[i])<1.e-12)) {
-                sout(collectAppender(delegate void(CharSink s){
+            if (!(abs(t-res2[i])<1.0e-12)) {
+                sout(collectAppender(delegate void(scope CharSink s){
                     s("error4"); writeOut(s,i); s(" "); writeOut(s,t); s(" "); writeOut(s,res2[i]); s("\n");
                 }));
             }
@@ -202,8 +202,8 @@ void tst()
         }
         auto t5=timer.stop();
         foreach(i,t;res)
-            if (!(abs(t-res2[i])<1.e-12)) {
-                sout(collectAppender(delegate void(CharSink s){
+            if (!(abs(t-res2[i])<1.0e-12)) {
+                sout(collectAppender(delegate void(scope CharSink s){
                     s("error5"); writeOut(s,i); s(" "); writeOut(s,t); s(" "); writeOut(s,res2[i]); s("\n");
                 }));
             }
@@ -227,8 +227,8 @@ void tst()
     }
     auto t6=timer.stop();
     foreach(i,t;res)
-        if (!(abs(t-res2[i])<1.e-12)) {
-            sout(collectAppender(delegate void(CharSink s){
+        if (!(abs(t-res2[i])<1.0e-12)) {
+            sout(collectAppender(delegate void(scope CharSink s){
                 s("error6"); writeOut(s,i); s(" "); writeOut(s,t); s(" "); writeOut(s,res2[i]); s("\n");
             }));
         }
@@ -249,8 +249,8 @@ void tst()
     }
     auto t7=timer.stop();
     foreach(i,t;res)
-        if (!(abs(t-res2[i])<1.e-12)) {
-            sout(collectAppender(delegate void(CharSink s){
+        if (!(abs(t-res2[i])<1.0e-12)) {
+            sout(collectAppender(delegate void(scope CharSink s){
                 s("error7"); writeOut(s,i); s(" "); writeOut(s,t); s(" "); writeOut(s,res2[i]); s("\n");
             }));
         }
@@ -279,8 +279,8 @@ void tst()
     }
     auto t8=timer.stop();
     foreach(i,t;res)
-        if (!(abs(t-res2[i])<1.e-12)) {
-            sout(collectAppender(delegate void(CharSink s){
+        if (!(abs(t-res2[i])<1.0e-12)) {
+            sout(collectAppender(delegate void(scope CharSink s){
                 s("error8"); writeOut(s,i); s(" "); writeOut(s,t); s(" "); writeOut(s,res2[i]); s("\n");
             }));
         }
@@ -299,8 +299,8 @@ void tst()
     }
     auto t9=timer.stop();
     foreach(i,t;res)
-        if (!(abs(t-res2[i])<1.e-12)) {
-            sout(collectAppender(delegate void(CharSink s){
+        if (!(abs(t-res2[i])<1.0e-12)) {
+            sout(collectAppender(delegate void(scope CharSink s){
                 s("error9"); writeOut(s,i); s(" "); writeOut(s,t); s(" "); writeOut(s,res2[i]); s("\n");
             }));
         }
@@ -312,13 +312,14 @@ void tst()
         int iii;
         void sumRes(double a,double b){ res[iii]+=a*b; }
         for (iii=0;iii<ndim;iii++){
-            binaryOp!(sumRes,2,double,double)(d1[iii],sc2);
+	    auto aa=d1[iii];
+            binaryOp!(sumRes,typeof(d1[iii]),typeof(sc2))(aa,sc2);
         }
     }
     auto t10=timer.stop();
     foreach(i,t;res)
-        if (!(abs(t-res2[i])<1.e-12)) {
-            sout(collectAppender(delegate void(CharSink s){
+        if (!(abs(t-res2[i])<1.0e-12)) {
+            sout(collectAppender(delegate void(scope CharSink s){
                 s("error10"); writeOut(s,i); s(" "); writeOut(s,t); s(" "); writeOut(s,res2[i]); s("\n");
             }));
         }
@@ -337,8 +338,8 @@ void tst()
     }
     auto t11=timer.stop();
     foreach(i,t;res)
-        if (!(abs(t-res2[i])<1.e-12)) {
-            sout(collectAppender(delegate void(CharSink s){
+        if (!(abs(t-res2[i])<1.0e-12)) {
+            sout(collectAppender(delegate void(scope CharSink s){
                 s("error11"); writeOut(s,i); s(" "); writeOut(s,t); s(" "); writeOut(s,res2[i]); s("\n");
             }));
         }
@@ -357,8 +358,8 @@ void tst()
     }
     auto t12=timer.stop();
     foreach(i,t;res)
-        if (!(abs(t-res2[i])<1.e-12)) {
-            sout(collectAppender(delegate void(CharSink s){
+        if (!(abs(t-res2[i])<1.0e-12)) {
+            sout(collectAppender(delegate void(scope CharSink s){
                 s("error12"); writeOut(s,i); s(" "); writeOut(s,t); s(" "); writeOut(s,res2[i]); s("\n");
             }));
         }
@@ -396,8 +397,8 @@ void tst()
     }
     auto t13=timer.stop();
     foreach(i,t;res)
-        if (!(abs(t-res2[i])<1.e-12)) {
-            sout(collectAppender(delegate void(CharSink s){
+        if (!(abs(t-res2[i])<1.0e-12)) {
+            sout(collectAppender(delegate void(scope CharSink s){
                 s("error13"); writeOut(s,i); s(" "); writeOut(s,t); s(" "); writeOut(s,res2[i]); s("\n");
             }));
         }
@@ -433,8 +434,8 @@ void tst()
     }
     auto t14=timer.stop();
     foreach(i,t;res)
-        if (!(abs(t-res2[i])<1.e-12)) {
-            sout(collectAppender(delegate void(CharSink s){
+        if (!(abs(t-res2[i])<1.0e-12)) {
+            sout(collectAppender(delegate void(scope CharSink s){
                 s("error14"); writeOut(s,i); s(" "); writeOut(s,t); s(" "); writeOut(s,res2[i]); s("\n");
             }));
         }

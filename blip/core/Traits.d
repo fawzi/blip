@@ -5,6 +5,7 @@ module blip.core.Traits;
 public import tango.core.Traits;
 import blip.Comp;
 import tango.core.Tuple;
+import blip.util.Hash;
 
 int cmp(T,U)(T t,U u){
     static if (is(T:Object)&&is(U:Object)){
@@ -20,12 +21,14 @@ int cmp(T,U)(T t,U u){
     }
 }
 
+/+
 /// combines two hashes
 extern(C) hash_t rt_hash_combine( hash_t val1, hash_t val2 );
 /// hashes length bytes
 extern(C) hash_t rt_hash_str(const(void) *bStart,size_t length, hash_t seed=0);
 /// hashes the size_t aligned block bStart[0..length]
 extern(C) hash_t rt_hash_block(const(size_t) *bStart,size_t length, hash_t seed=0);
++/
 
 /// returns a valid hash for the given value, this might be different than the default D hash!
 hash_t getHash(U)(U t){
@@ -171,7 +174,7 @@ bool isNullT(T)(ref T obj){
 
 /// the non array core types
 template isBasicCoreType(T){
-    immutable bool isBasicCoreType=is(T==bool)||is(T==byte)||is(T==ubyte)||is(T==short)
+    enum bool isBasicCoreType=is(T==bool)||is(T==byte)||is(T==ubyte)||is(T==short)
      ||is(T==ushort)||is(T==int)||is(T==uint)||is(T==float)
      ||is(T==long)||is(T==ulong)||is(T==double)||is(T==real)
      ||is(T==ifloat)||is(T==idouble)||is(T==ireal)||is(T==cfloat)
@@ -179,7 +182,7 @@ template isBasicCoreType(T){
 }
 /// the basic types, out of these more complex types are built
 template isCoreType(T){
-    immutable bool isCoreType=is(T==bool)||is(T==byte)||is(T==ubyte)||is(T==short)
+    enum bool isCoreType=is(T==bool)||is(T==byte)||is(T==ubyte)||is(T==short)
      ||is(T==ushort)||is(T==int)||is(T==uint)||is(T==float)
      ||is(T==long)||is(T==ulong)||is(T==double)||is(T==real)
      ||is(T==ifloat)||is(T==idouble)||is(T==ireal)||is(T==cfloat)

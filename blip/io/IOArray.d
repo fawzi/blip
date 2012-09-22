@@ -61,10 +61,10 @@ class IOArray : Conduit, InputBuffer, OutputBuffer, Conduit.Seek
         private size_t  dimension;              // maximum extent of content
         private size_t  expansion;              // for growing instances
 
-        private static immutable string overflow  = "output buffer is full";
-        private static immutable string underflow = "input buffer is empty";
-        private static immutable string eofRead   = "end-of-flow while reading";
-        private static immutable string eofWrite  = "end-of-flow while writing";
+        private enum string overflow  = "output buffer is full";
+        private enum string underflow = "input buffer is empty";
+        private enum string eofRead   = "end-of-flow while reading";
+        private enum string eofWrite  = "end-of-flow while writing";
 
         /***********************************************************************
 

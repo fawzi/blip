@@ -193,7 +193,7 @@ struct YieldableCall{
 /// other tasks. Tasks with higher level are tasks (like communication) that
 /// should be done as soon as possible, even if overlap with other tasks is
 /// then needed
-immutable int SimpleTaskLevel=int.max/2;
+enum int SimpleTaskLevel=int.max/2;
 
 /// no task is executing (just a way to get an error when spawning)
 __gshared TaskI noTask;

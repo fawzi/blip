@@ -20,14 +20,14 @@ import blip.container.GrowableArray;
 import blip.io.BasicIO;
 
 template toStringT(T){
-    T[] toStringT(V)(V v){
+    immutable(T)[] toStringT(V)(V v){
         static if (is(V==T)){
             return v;
         } else { // piggyback on writeOut
             T[256] buf;
             auto b=lGrowableArray(buf,0,GASharing.Local);
             writeOut(&b.appendArr,v);
-            return b.takeData(true);
+            return b.takeIData(true);
         }
     }
 }

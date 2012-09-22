@@ -437,16 +437,16 @@ body {
     if (scaleC==0){
         if (scaleRes==1){
             mixin fuse1!((ref S x,T y,U z){x+=y*z;},(S *x0,ref S x){x=cast(S)0;},
-                (S* x0,S xV){*x0=xV;},T,rank1,U,rank2,S);
+			 (S* x0,S xV){*x0=xV;},typeof(a),typeof(b),typeof(c));
             fuse1(a,b,c,axis1,axis2);
         } else {
             mixin fuse1!((ref S x,T y,U z){x+=y*z;},(S* x0,ref S x){x=cast(S)0;},
-                (S* x0,S xV){*x0=scaleRes*xV;},T,rank1,U,rank2,S);
+                (S* x0,S xV){*x0=scaleRes*xV;},typeof(a),typeof(b),typeof(c));
             fuse1(a,b,c,axis1,axis2);
         }
     } else {
         mixin fuse1!((ref S x,T y,U z){x+=y*z;},(S* x0,ref S x){x=cast(S)0;},
-            (S* x0,S xV){*x0=scaleC*(*x0)+scaleRes*xV;},T,rank1,U,rank2,S);
+            (S* x0,S xV){*x0=scaleC*(*x0)+scaleRes*xV;},typeof(a),typeof(b),typeof(c));
         fuse1(a,b,c,axis1,axis2);
     }
     return c;
@@ -463,7 +463,7 @@ in {
 }
 body {
     alias typeof(T.init*U.init) S;
-    immutable int rank3=rank1+rank2-2;
+    enum int rank3=rank1+rank2-2;
     index_type[rank3] newshape;
     int ii=0;
     if (axis1<0) axis1+=rank1;
@@ -577,7 +577,7 @@ NArray!(typeof(T.init*U.init),rank1+rank2)outerNA(T,int rank1,U,int rank2)
     (NArray!(T,rank1)a,NArray!(U,rank2)b)
 body {
     alias typeof(T.init*U.init) S;
-    immutable int rank3=rank1+rank2;
+    enum int rank3=rank1+rank2;
     index_type[rank3] newshape;
     newshape[0..rank1]=a.shape;
     newshape[rank1..rank1+rank2]=b.shape;
@@ -780,7 +780,7 @@ else {
                 lE=NArray!(T,2).empty(leftEVect.shape,true);
             }
             lEPtr=lE.startPtrArray;
-            lELd=lE.bStrides[1]/cast(index_type)T.sizeof;
+            lELd=cast(f_int)(lE.bStrides[1]/cast(index_type)T.sizeof);
         }
         if (!isNullNArray(rightEVect)){
             if (rightEVect.flags & ArrayFlags.Fortran) {
@@ -791,13 +791,13 @@ else {
                 rE=empty!(T)(rightEVect.shape,true);
             }
             rEPtr=rE.startPtrArray;
-            rELd=rE.bStrides[1]/cast(index_type)T.sizeof;
+            rELd=cast(f_int)(rE.bStrides[1]/cast(index_type)T.sizeof);
         }
         NArray!(ComplexTypeOf!(T),1) eigenval=ev;
         if (isNullNArray(eigenval) || is(T==ComplexTypeOf!(T)) && (!(eigenval.flags&ArrayFlags.Fortran))) {
             eigenval = zeros!(ComplexTypeOf!(T))(a.shape[0]);
         }
-        f_int n=a.shape[0],info;
+        f_int n=cast(f_int)a.shape[0],info;
         f_int lwork = -1;
         T workTmp;
         static if(is(ComplexTypeOf!(T)==T)){
@@ -818,7 +818,7 @@ else {
             scope NArray!(RealTypeOf!(T),1) wr = empty!(RealTypeOf!(T))(n);
             scope NArray!(RealTypeOf!(T),1) wi = empty!(RealTypeOf!(T))(n);
             DLapack.geev(((lEPtr is null)?'N':'V'),((rEPtr is null)?'N':'V'),n,
-                a1.startPtrArray, a1.bStrides[1]/cast(index_type)T.sizeof, wr.startPtrArray, wi.startPtrArray, lEPtr, lELd, rEPtr, rELd,
+			 a1.startPtrArray, cast(f_int)(a1.bStrides[1]/cast(index_type)T.sizeof), wr.startPtrArray, wi.startPtrArray, lEPtr, lELd, rEPtr, rELd,
                 &workTmp, lwork, info);
             lwork = cast(int)abs(workTmp)+1;
             if (lwork<2*n && (lEPtr!is null|| rEPtr!is null)){
@@ -826,7 +826,7 @@ else {
             }
             scope NArray!(T,1) work = empty!(T)(lwork);
             DLapack.geev(((lEPtr is null)?'N':'V'),((rEPtr is null)?'N':'V'),n,
-                a1.startPtrArray, a1.bStrides[1]/cast(index_type)T.sizeof, wr.startPtrArray, wi.startPtrArray, lEPtr, lELd, rEPtr, rELd,
+			 a1.startPtrArray, cast(f_int)(a1.bStrides[1]/cast(index_type)T.sizeof), wr.startPtrArray, wi.startPtrArray, lEPtr, lELd, rEPtr, rELd,
                 work.startPtrArray, lwork, info);
             for (int i=0;i<n;++i)
                 eigenval[i]=cast(ComplexTypeOf!(T))(wr[i]+wi[i]*1i);

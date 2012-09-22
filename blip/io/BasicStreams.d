@@ -132,7 +132,7 @@ final class BasicStrStream(T=char): OutStreamI{
                 auto s=convertToString!(T)(data,buf);
                 sink(s);
             } else {
-                scope T[] s=convertToString!(T)(data);
+                scope const(T)[] s=convertToString!(T)(data);
                 sink(s);
             }
         } else {

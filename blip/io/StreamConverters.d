@@ -196,7 +196,7 @@ class ReadHandler(T):Reader!(T){
         this.maxTranscodingOverhead=maxTranscodingOverhead;
     }
     /// handles a reader
-    bool handleReader(scope size_t delegate (T[],SliceExtent,out bool iterate) scan)
+    bool handleReader(scope size_t delegate (in T[],SliceExtent,out bool iterate) scan)
     {
         SliceExtent sliceE=SliceExtent.Partial;
         if (buf !is null){
@@ -284,7 +284,7 @@ Reader!(T) toReaderT(T)(InputStream i){
 
 alias toReaderT!(char) toReaderChar;
 
-bool delegate(scope size_t delegate(T[],SliceExtent,out bool)) readHandlerT(T)(InputStream i){
+bool delegate(scope size_t delegate(in T[],SliceExtent,out bool)) readHandlerT(T)(InputStream i){
     auto h=new ReadHandler!(T)(i);
     return &h.handleReader;
 }

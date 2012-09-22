@@ -37,6 +37,7 @@ import blip.sync.Atomic;
 import blip.core.sync.Semaphore;
 import blip.io.Console;
 import blip.Comp;
+import blip.util.Hash;
 
 version(linux) {
     enum { IPV6_V6ONLY=26 }
@@ -254,7 +255,7 @@ struct BasicSocket{
         while(true){
             ptrdiff_t wNow;
             for (int itry=0;itry<eagerTries;++itry){
-                wNow=send(sock,src.ptr,src.length,0);
+                wNow=send(sock,cast(void*)src.ptr,src.length,0);
                 if (wNow<0){
                     if (errno()==EINTR) continue;
                     if (wNow!=-1 || errno()!=EWOULDBLOCK){
@@ -266,7 +267,7 @@ struct BasicSocket{
                             writeOut(&a.appendArr,errno());
                             throw new BIOException(a.takeIData(),__FILE__,__LINE__);
                         }
-                        throw new BIOException(buf[0..strlen(buf.ptr)],__FILE__,__LINE__);
+                        throw new BIOException(buf[0..strlen(buf.ptr)].idup,__FILE__,__LINE__);
                     }
                 } else if (wNow>0 || src.length==0){
                     version(SocketEcho){
@@ -279,7 +280,7 @@ struct BasicSocket{
                 if (!Task.yield()) break;
             }
             if (wNow<0){
-                auto tAtt=taskAtt.val;
+                auto tAtt=taskAtt;
                 auto watcher=GenericWatcher.ioCreate(cast(int)sock,EV_WRITE);
                 // implement blocking for non present or non yieldable tasks? it might be dangerous (deadlocks)
                 if (!loop.waitForEvent(watcher)){
@@ -299,7 +300,7 @@ struct BasicSocket{
         while(written<src.length){
             ptrdiff_t wNow;
             for (int itry=0;itry<eagerTries;++itry){
-                wNow=send(sock,src.ptr+written,src.length-written,0);
+                wNow=send(sock,cast(void*)src.ptr+written,src.length-written,0);
                 if (wNow<0){
                     if (errno()==EINTR) continue;
                     if (wNow!=-1 || errno()!=EWOULDBLOCK){
@@ -311,7 +312,7 @@ struct BasicSocket{
                             writeOut(&a.appendArr,errno());
                             throw new BIOException(a.takeIData(),__FILE__,__LINE__);
                         }
-                        throw new BIOException(buf[0..strlen(buf.ptr)],__FILE__,__LINE__);
+                        throw new BIOException(buf[0..strlen(buf.ptr)].idup,__FILE__,__LINE__);
                     }
                 } else {
                     break;
@@ -319,7 +320,7 @@ struct BasicSocket{
                 if (!Task.yield()) break;
             }
             if (wNow<0){
-                auto tAtt=taskAtt.val;
+                auto tAtt=taskAtt;
                 auto watcher=GenericWatcher.ioCreate(cast(int)sock,EV_WRITE);
                 // implement blocking for non present or non yieldable tasks? it might be dangeroues (deadlocks)
                 if (!loop.waitForEvent(watcher)){
@@ -360,7 +361,7 @@ struct BasicSocket{
                             writeOut(&a.appendArr,errno());
                             throw new BIOException(a.takeIData(),__FILE__,__LINE__);
                         }
-                        throw new BIOException(errMsg,__FILE__,__LINE__);
+                        throw new BIOException(errMsg.idup,__FILE__,__LINE__);
                     }
                 } else {
                     version(SocketEcho){
@@ -373,7 +374,7 @@ struct BasicSocket{
                 if (!Task.yield()) break;
             }
             if (res<0){
-                auto tAtt=taskAtt.val;
+                auto tAtt=taskAtt;
                 auto watcher=GenericWatcher.ioCreate(cast(int)sock,EV_READ);
                 // implement blocking for non present or non yieldable tasks? it might be dangeroues (deadlocks)
                 version(LogReadWaits){
@@ -442,7 +443,7 @@ class SocketServer{
     fd_set selectSet;
     socket_t maxDesc;
     GenericWatcher[] watchers;
-    size_t pendingTasks;
+    shared size_t pendingTasks;
     size_t maxPendingTasks=size_t.max;
     scope CharSink log;
     bool requireFirst;
@@ -530,9 +531,9 @@ class SocketServer{
                 arr.clearData();
                 arr("getaddrinfo error:");
                 writeOut(&arr.appendArr,err);
-                throw new BIOException(arr.takeData(),__FILE__,__LINE__);
+                throw new BIOException(arr.takeIData(),__FILE__,__LINE__);
             } else {
-                throw new BIOException(str[0..strlen(str)],__FILE__,__LINE__);
+                throw new BIOException(str[0..strlen(str)].idup,__FILE__,__LINE__);
             } 
         }
         for (res=res0;res;res=res.ai_next){

@@ -258,7 +258,7 @@ class SBinUnserializer: Unserializer {
                 uint kind;
                 readCompressed(kind);
                 if (f.name!=fName || ((f.metaInfo)?cast(uint)f.metaInfo.kind:0u)!=kind){
-                    throw new FieldMismatchException(f,fName," mismatched field in binary unserializing",
+                    throw new FieldMismatchException(f,fName.idup," mismatched field in binary unserializing",
                         __FILE__,__LINE__);
                 }
             }

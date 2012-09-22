@@ -31,6 +31,7 @@ import blip.core.sync.Semaphore;
 import blip.container.HashSet;
 import blip.container.Pool;
 import blip.container.Cache;
+import blip.util.Hash;
 import blip.util.RefCount;
 import blip.math.Math;
 public import blip.bindings.ev.DLibev: GenericWatcher, LoopHandlerI, ev_tstamp, ev_time;

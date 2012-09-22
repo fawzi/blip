@@ -41,12 +41,12 @@ mixin(`
  */
 template isStaticArrayTypeLocal( T : T[U], size_t U )
 {
-    immutable bool isStaticArrayTypeLocal = true;
+    enum bool isStaticArrayTypeLocal = true;
 }
 
 template isStaticArrayTypeLocal( T )
 {
-    immutable bool isStaticArrayTypeLocal = false;
+    enum bool isStaticArrayTypeLocal = false;
 }
 
 template UnqualAll0(T)

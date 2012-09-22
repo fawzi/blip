@@ -25,13 +25,19 @@ import blip.math.IEEE: feqrel;
 import cstdlib = blip.stdc.stdlib : free, malloc;
 import blip.Comp;
 
+template isNArray(T){
+    static if (is(typeof(T.dim)) && is(T.dtype)) // is(T:NArray!(T.dtype,T.dim)) sometime fails with dmd 2.060
+	enum isNArray=true;
+    else
+	enum isNArray=false;
+}
 
 /+ ---------------- structural ops -------------------- +/
 
 /// returns a view of the current data with the axes reordered
-NArray!(T,rank) reorderAxis(T,int rank,int r2)(NArray!(T,rank) a,int[r2] perm)
+    T reorderAxis(T,int r2)(T a,int[r2] perm) if (isNArray!(T))
 in {
-    static assert(rank==r2,"array rank and permutation must have the same size");
+    static assert(T.dim==r2,"array rank and permutation must have the same size");
     foreach (i,iAxis;perm) {
         assert(0<=i && i<rank);
         foreach(iAxis2;perm[0..i])
@@ -40,37 +46,37 @@ in {
 }
 body {
     index_type[rank] newshape,newstrides;
-    for (int i=0;i<rank;++i){
+    for (int i=0;i<T.dim;++i){
         newshape[i]=a.shape[perm[i]];
     }
-    for (int i=0;i<rank;++i){
+    for (int i=0;i<t.dim;++i){
         newstrides[i]=a.bStrides[perm[i]];
     }
-    return NArray!(T,rank)(newstrides,newshape,a.startPtrArray,a.newFlags,a.newBase);
+    return T(newstrides,newshape,a.startPtrArray,a.newFlags,a.newBase);
 }
 
 /// transposed view
-NArray!(T,rank) transpose(T,int rank)(NArray!(T,rank) a){
+T transpose(T)(T a) if (isNArray!(T)) {
     return a.T;
 }
 
 /// returns an array that loops from the end toward the beginning of this array
 /// (returns a view, no data is copied)
-NArray!(T,rank) reverse(T,int rank)(NArray!(T,rank) a)
+T reverse(T)(T a) if (isNArray!(T))
 out(res){
     debug(TestNArray){
-        T[] resData=res.data,aData=a.data;
+        T.dtype[] resData=res.data,aData=a.data;
         assert(resData.ptr==aData.ptr && resData.length==aData.length,"reversed dataSlice changed");
     }
 }
 body {
-    index_type[rank] newstrides;
+    index_type[T.dim] newstrides;
     index_type newStartIdx=0;
-    for (int i=0;i<rank;++i){
+    for (int i=0;i<T.dim;++i){
         newStartIdx+=(a.shape[i]-1)*a.bStrides[i];
         newstrides[i]=-a.bStrides[i];
     }
-    return NArray!(T,rank)(newstrides,a.shape,cast(T*)(cast(size_t)a.startPtrArray+newStartIdx),
+    return T(newstrides,a.shape,cast(T.dtype*)(cast(size_t)a.startPtrArray+newStartIdx),
         a.newFlags,a.newBase);
 }
 
@@ -79,18 +85,19 @@ body {
 /// Use dup to have a writable fully replicated version
 /// note: putting this in the class forces the instantiation of NArray!(T,rank+1)
 ///       which then forces the instantiation of N+2 which...
-NArray!(T,rank+1) repeat(T,int rank)(NArray!(T,rank) a,index_type amount, int axis=0)
+NArray!(T.dtype,T.dim+1) repeat(T)(T a,index_type amount, int axis=0) if (isNArray!(T))
 in {
     assert(0<=amount,"amount should be positive");
-    assert(-rank-1<=axis && axis<rank+1,"axis out of bounds in repeat");
+    assert(-T.dim-1<=axis && axis<T.dim+1,"axis out of bounds in repeat");
 }
 out(res){
     debug(TestNArray){
-        T[] resData=res.data,aData=a.data;
+        T.dtype[] resData=res.data,aData=a.data;
         assert(resData.ptr==aData.ptr && resData.length==aData.length,"repeat changed dataSlice");
     }
 }
 body {
+    alias T.dim rank;
     if (axis<0) axis+=rank+1;
     index_type[rank+1] newshape,newstrides;
     int i=0,ii=0;
@@ -98,7 +105,7 @@ body {
         if (ii==axis) {
             newshape[ii]=amount;
             if (amount==1)
-                newstrides[ii]=a.nElArray*cast(index_type)T.sizeof; // leave it compact if possible
+                newstrides[ii]=a.nElArray*cast(index_type)T.dtype.sizeof; // leave it compact if possible
             else
                 newstrides[ii]=0;
             ++ii;
@@ -120,7 +127,11 @@ body {
 /// if the present array is not 1D or contiguous this operation returns a copy.
 /// fortran returns fortran ordering wrt. to flat iterator (i.e. to C-style looping)
 /// thus fortran=true with a fortran matrix a returns a fortran ordered transpose of it.
-NArray!(T,newRank) reshape(T,int rank,S,int newRank)(NArray!(T,rank) a,S[newRank] newshape,bool fortran=false) {
+NArray!(TT.dtype,newRank) reshape(TT,S,int newRank)(TT a,S[newRank] newshape,bool fortran=false)
+    if (isNArray!(TT))
+{
+    alias TT.dtype T;
+    alias TT.dim rank;
     static assert(is(S==int)|| is(S==long)|| is(S==uint) || is(S==ulong),"newshape must be a static array of integer types");
     static if (newRank==rank) {
         if (newshape == a.shape) return a;
@@ -133,7 +144,7 @@ NArray!(T,newRank) reshape(T,int rank,S,int newRank)(NArray!(T,rank) a,S[newRank
     foreach(i,val; newshape) {
         if (val<0) {
             assert(autosize==-1,"Only one shape dimension can be automatic");
-            autosize = i;
+            autosize = cast(int)i;
         } else {
             newsize *= cast(index_type)val;
         }
@@ -177,21 +188,21 @@ NArray!(T,newRank) reshape(T,int rank,S,int newRank)(NArray!(T,rank) a,S[newRank
 }
 
 /// returns a flattened view of the array, copies if the array is not Contiguos
-NArray!(T,1) ravel(T,int rank)(NArray!(T,rank)a){
+NArray!(T.dtype,1) ravel(T)(T a) if (isNArray!(T)) {
     return reshape(a,[-1]);
 }
 
 /// diagonal view
-NArray!(T,1)diag(T,int rank)(NArray!(T,rank)a)
+NArray!(T.dtype,1)diag(T)(T a) if (isNArray!(T))
 in {
-    static assert(rank>1,"rank must be at least 2");
-    for (int i=0;i<rank;++i) assert(a.shape[0]==a.shape[i],"a must be square");
+    static assert(T.dim>1,"rank must be at least 2");
+    for (int i=0;i<T.dim;++i) assert(a.shape[0]==a.shape[i],"a must be square");
 }
 body {
     index_type inc=0;
-    for (int i=0;i<rank;++i) inc+=a.bStrides[i];
+    for (int i=0;i<T.dim;++i) inc+=a.bStrides[i];
     index_type[1] newstrides=inc, newshape=a.shape[0];
-    return NArray!(T,1)(newstrides,newshape,a.startPtrArray,a.newFlags,a.newBase);
+    return NArray!(T.dtype,1)(newstrides,newshape,a.startPtrArray,a.newFlags,a.newBase);
 }
 /+ --------- array creation ---------- +/
 
@@ -284,7 +295,7 @@ template a2NAof(V){
             checkShape!(T,rankOfArray!(T))(arr,shape);
         }
         body{
-            immutable int rank=rankOfArray!(T);
+            enum int rank=rankOfArray!(T);
             index_type[rank] shape;
             calcShapeArray!(T,rankOfArray!(T))(arr,shape);
             auto res=NArray!(V,cast(int)rankOfArray!(T)).empty(shape,fortran);
@@ -299,8 +310,8 @@ template a2NAof(V){
 /// reshape can be used to perform an immediate reshaping of the array (one -1 can be used for 
 /// an implicitly calculated size)
 /// if shouldFree=true it frees the array when destroyed (using stdc free)
-/// fortran if it should be in fortran order (in fortran order by default the inner shapes are 1, 
-/// by defult the outer ones)
+/// fortran if it should be in fortran order (in fortran order the inner shapes are 1 by default, 
+/// otherwise the outer ones)
 NArray!(T,dim)a2NA(T,int dim=1,U=int)(T[] arr,bool shouldFree=false,bool fortran=false,U[] reshape=null){
     static assert(dim>0,"conversion for arrays of rank at least 1");
     uint flags=ArrayFlags.None;
@@ -390,7 +401,7 @@ private void checkShape(T,uint rank)(T arr,index_type[] shape){
 
 /// returns a D array indexed with the variables of a pLoopIdx or sLoopGenIdx (for a2NA)
 string arrayInLoop(string arrName,int rank,string ivarStr){
-    string res="".dup;
+    string res="";
     res~=arrName;
     for (int i=0;i<rank;++i)
         res~="["~ivarStr~"_"~ctfe_i2s(i)~"_]";
@@ -408,20 +419,23 @@ string arrayInLoop(string arrName,int rank,string ivarStr){
 /// dupInitial(x) is an operation that makes a copy of x (for simple types normally returns x)
 /// and is used to split the loop in different subloops starting with dupInitial(x0)
 /// the folding starts with the element x0, if S==T normally mergeOp==foldOp
-S reduceAllGen(alias foldOp,alias mergeOp, alias dupInitial,T,int rank,S=T)(NArray!(T,rank)a,S x0){
+S reduceAllGen(alias foldOp,alias mergeOp, alias dupInitial,T,S=T.dtype)(T a,S x0) if (isNArray!(T))
+{
     S x=dupInitial(x0);
-    mixin(sLoopPtr(rank,["a"],"foldOp(x,*(aPtr0));\n","i"));
+    mixin(sLoopPtr(T.dim,["a"],"foldOp(x,*(aPtr0));\n","i"));
     mergeOp(x,x0);  /+ just to test it +/
     return x;
 }
 
 /// collects data on the whole array using the given folding operation
 /// if not given mergeOp is built from foldOp 
-S reduceAll(T,int rank,S=T)(scope S delegate(S,T)foldOp,NArray!(T,rank)a,S x0,scope S delegate(S,S)mergeOp=null){
+S reduceAll(T,S=T.dtype,U=S delegate(S,T.dtype),V=S delegate(S,S))(scope U foldOp,T a,S x0,scope V mergeOp=null)
+    if (isNArray!(T))
+{
     if (mergeOp is null){
-        mergeOp=(S x,S y){ x=foldOp(x,cast(T)y); };
+        mergeOp=(S x,S y){ x=foldOp(x,cast(T.dtype)y); };
     }
-    return reduceAllGen!((ref S x,T y){ x=foldOp(x,y); },(ref S x,S y){ x=mergeOp(x,y); },(S x){ return x; }, T,rank,S)(a,x0);
+    return reduceAllGen!((ref S x,T y){ x=foldOp(x,y); },(ref S x,S y){ x=mergeOp(x,y); },(S x){ return x; },T,S)(a,x0);
 }
 
 /// applies an operation that "collects" data on an axis of the array
@@ -432,12 +446,13 @@ S reduceAll(T,int rank,S=T)(scope S delegate(S,T)foldOp,NArray!(T,rank)a,S x0,sc
 /// folding (receiving the value in res), and can be used to set x0.
 /// the folding starts with the corresponding element in the result array.
 /// If S==T normally mergeOp==foldOp
-NArray!(S,rank-1) reduceAxisGen(alias foldOp, alias mergeOp,alias dupInitial, T, int rank, S=T)
-    (NArray!(T,rank)a, int axis=-1, NArray!(S,rank-1) res=nullNArray!(S,rank-1))
+NArray!(S,T.dim-1) reduceAxisGen(alias foldOp, alias mergeOp,alias dupInitial, T, S=T.dtype, V=NArray!(S,rank-1))
+    (T a, int axis=-1,  V res=V.init)
+    if (isNArray!(T))
 in {
-    assert(-rank<=axis && axis<rank,"axis out of bounds");
+    assert(-T.dim<=axis && axis<T.dim,"axis out of bounds");
     int ii=0;
-    static if (rank>1){
+    static if (T.dim>1){
         if (! isNullNArray(res)){
             for(int i=0;i<rank;i++){
                 if(i!=axis && i!=rank+axis){
@@ -449,7 +464,7 @@ in {
     }
 }
 body  {
-    static if (rank==1){
+    static if (T.dim==1){
         S x=dupInitial(res);
         mixin(sLoopPtr(rank,["a"],"foldOp(x,*(aPtr0));\n","i"));
         return x;
@@ -501,43 +516,56 @@ body  {
 }
 
 /// applies a reduction operation along the given axis
-NArray!(S,rank-1) reduceAxis(int rank, T, S=T)
-    (scope S delegate(S,T) foldOp,NArray!(T,rank)a, S x0, int axis=-1, NArray!(S,rank-1) res=nullNArray!(S,rank-1),scope S delegate(S,S)mergeOp=null)
+U reduceAxis(T, S=T.dtype,V=S delegate(S,T),U=NArray!(S,T.dim-1),W=S delegate(S,S))
+    (scope V foldOp,T a, S x0, int axis=-1, U res=U.init,scope W mergeOp=null)
+	if (isNArray!(T))
 {
+    static if (T.dim>1)
+	static assert(U.dim+1==T.dim,"dimension mismatch with "~T.stringof~" and "~U.stringof);
     if (mergeOp is null){
         mergeOp=(S x,S y){ x=foldOp(x,cast(T)y); };
     }
-    return reduceAxisGen!((ref S x,T y){ x=foldOp(x,y); },(ref S x,S y){ x=mergeOp(x,y); },(S x){ return x0; }, T,rank,S)(a,axis,res);
+    return reduceAxisGen!((ref S x,T.dtype y){ x=foldOp(x,y); },(ref S x,S y){ x=mergeOp(x,y); },(S x){ return x0; })(a,axis,res);
 }
 
 /// sums along the given axis
-NArray!(S,rank-1) sumAxis(int rank, T, S=T) (int axis=-1, NArray!(S,rank-1) res=nullNArray!(S,rank-1))
+S sumAxis(T,S=NArray!(T.dtype,T.dim-1)) (T a,int axis=-1, S res=S.init)
+    if (isNArray!(T))
 {
-    return reduceAxisGen!((ref S x,T y){ x+=y; },(ref S x,S y){ x+=y; },(S x){ return cast(S)0; }, T,rank,S)(a,axis,res);
+    static if (is(S.dtype)){
+	alias S.dtype SS;
+	static assert(S.dim+1==T.dim,"rank mismatch for result "~S.stringof~" when summing on an axis of "~T.stringof);
+    } else {
+	alias S SS;
+	static assert(1==T.dim,"rank mismatch for result "~S.stringof~" when summing on an axis of "~T.stringof);
+    }
+    return reduceAxisGen!((ref SS x,T.dtype y){ x+=cast(SS)y; },(ref SS x,SS y){ x+=y; },(SS x){ return cast(SS)0; })
+	(a,axis,res);
 }
 
 /// sum of the whole array
-S sumAll(T,int rank,S=T)(NArray!(T,rank)a){
-    return reduceAllGen!((ref S x,T y){x+=cast(S)y;},(ref S x,S y){x+=y;}, (S x){ return x;},
-        T, rank,S)(a,cast(S)0);
-}
-/// sum along an axis of the array
-NArray!(S,rank-1) sumAxis(T,int rank,S=T)(NArray!(T,rank)a,int axis=-1,NArray!(S,rank-1) res=nullNArray!(S,rank-1))
-{
-    return reduceAxisGen!((ref S x,T y){x+=cast(S)y;},(ref S x,S y){x+=y;}, (S x){ return cast(S)0;},
-        T, rank,S)(a,axis,res);
+S sumAll(T,S=T.dtype)(T a) if (isNArray!(T)) {
+    return reduceAllGen!((ref S x,T.dtype y){x+=cast(S)y;},(ref S x,S y){x+=y;}, (S x){ return x;})(a,cast(S)0);
 }
 
 /// multiplies of the whole array
-S multiplyAll(T,int rank,S=T)(NArray!(T,rank)a){
-    return reduceAllGen!((ref S x,T y){x*=cast(S)y;},(ref S x,S y){x*=y;}, (S x){ return x; },
-        T, rank,S)(a,cast(S)1);
-}
-/// sum along an axis of the array
-NArray!(S,rank-1) multiplyAxis(T,int rank,S=T)(NArray!(T,rank)a,int axis=-1,NArray!(S,rank-1) res=nullNArray!(S,rank-1))
+S multiplyAll(T,S=T.dtype)(T a)
+    if (isNArray!(T))
 {
-    return reduceAxisGen!(delegate void(ref S x,T y){x=cast(S)(x*y);},delegate void(ref S x,S y){x*=y;},delegate S(S x){ return cast(S)1; },
-        T, rank,S)(a,axis,res);
+    return reduceAllGen!((ref S x,T.dtype y){x*=cast(S)y;},(ref S x,S y){x*=y;}, (S x){ return x; })(a,cast(S)1);
+}
+/// multiplies along an axis of the array
+NArray!(S,rank-1) multiplyAxis(T,S=NArray!(T.dtype,T.dim-1))(T a,int axis=-1,S res=S.init)
+    if (isNArray!(T))
+{
+    static if (is(S.dtype)){
+	alias S.dtype SS;
+	static assert(S.dim+1==T.dim,"rank mismatch for result "~S.stringof~" when multiplying on an axis of "~T.stringof);
+    } else {
+	alias S SS;
+	static assert(1==T.dim,"rank mismatch for result "~S.stringof~" when multiplying on an axis of "~T.stringof);
+    }
+    return reduceAxisGen!(delegate void(ref SS x,T.dtype y){x=cast(SS)(x*y);},delegate void(ref SS x,SS y){x*=y;},delegate SS(SS x){ return cast(S)1; })(a,axis,res);
 }
 
 /// fuses two arrays combining two axis of the same length with the given fuse op
@@ -547,10 +575,12 @@ NArray!(S,rank-1) multiplyAxis(T,int rank,S=T)(NArray!(T,rank)a,int axis=-1,NArr
 /// should look into something like "A Cache Oblivious Algorithm for Matrix 
 /// Multiplication Based on Peano’s Space Filling Curve" by Michael Bader and Christoph Zenger
 /// or other kinds of recursive refinements
-void fuse1(alias fuseOp,alias inOp, alias outOp, T,int rank1,S,int rank2,U)(NArray!(T,rank1) a,
-    NArray!(S,rank2) b, ref NArray!(U,rank1+rank2-2) c, int axis1=-1, int axis2=0,
-    index_type optimalChunkSize=NArray!(U,rank1+rank2-1).defaultOptimalChunkSize)
+void fuse1(alias fuseOp,alias inOp, alias outOp, TT,SS,UU)(TT a,
+    SS b, ref UU c, int axis1=-1, int axis2=0,
+    index_type optimalChunkSize=TT.defaultOptimalChunkSize)
 in {
+    alias TT.dim rank1;
+    alias SS.dim rank2;
     static assert(rank1>0,"rank1 should be at least 1");
     static assert(rank2>0,"rank2 should be at least 1");
     assert(-rank1<=axis1 && axis1<rank1,"invalid axis1 in fuse1");
@@ -558,6 +588,8 @@ in {
     assert(a.shape[((axis1<0)?(rank1+axis1):axis1)]==b.shape[((axis2<0)?(rank2+axis2):axis2)],
         "fuse axis has to have the same size in a and b");
     static if(rank1+rank2>2){
+	alias UU.dim rank3;
+	static assert(rank3==rank1+rank2-2,"rank3 has incorrect size");
         int ii=0;
         for(int i=0;i<rank1;i++){
             if(i!=axis1 && i!=axis1+rank1){
@@ -573,13 +605,21 @@ in {
         }
     }
 } body {
-    void myFuse(U* x0,T* start1Ptr, int my_stride1, 
-        S* start2Ptr, int my_stride2, int my_dim){
+    alias TT.dim rank1;
+    alias SS.dim rank2;
+    alias TT.dtype T;
+    alias SS.dtype S;
+    static if (is(UU.dtype))
+	alias UU.dtype U;
+    else
+	alias UU U;
+    void myFuse(U* x0,T* start1Ptr, index_type my_stride1, 
+        S* start2Ptr, index_type my_stride2, index_type my_dim){
         T*yPtr=start1Ptr;
         S*zPtr=start2Ptr;
         U xVal;
         inOp(x0,xVal);
-        for (int i=my_dim;i!=0;--i){
+        for (index_type i=my_dim;i!=0;--i){
             fuseOp(xVal,*yPtr,*zPtr);
             yPtr=cast(T*)(cast(size_t)yPtr+my_stride1);
             zPtr=cast(S*)(cast(size_t)zPtr+my_stride2);
@@ -660,9 +700,11 @@ in {
 
 /// filters the array with a mask array. If allocSize>0 it is used for the initial allocation
 /// of the filtred array
-NArray!(T,1) filterMask(T,int rank)(NArray!(T,rank) a,NArray!(bool,rank) mask, index_type allocSize=0)
+NArray!(TT.dtype,1) filterMask(TT,U)(TT a,U mask, index_type allocSize=0)
+    if (is(U.dtype:bool) && TT.dim==U.dim)
 in { assert(mask.shape==a.shape); }
 body {
+    alias TT.dtype T;
     index_type sz=1;
     foreach (d;a.shape)
         sz*=d;
@@ -713,7 +755,7 @@ body {
         *resP=*aPtr0;
         ++resP;
     }`;
-    mixin(sLoopPtr(rank,["a","mask"],loopInstr,"i"));
+    mixin(sLoopPtr(TT.dim,["a","mask"],loopInstr,"i"));
     resSize=resP-res;
     if(manualAlloc){
         //res=cast(T*)GC.realloc(res,resSize*T.sizeof,GC.BlkAttr.NO_SCAN);
@@ -764,18 +806,18 @@ body {
 /// returns the reduction of the rank done by the arguments in the tuple
 /// allow also static arrays?
 template reductionFactorFilt(){
-    immutable int reductionFactorFilt=0;
+    enum int reductionFactorFilt=0;
 }
 /// ditto
 template reductionFactorFilt(T,S...){
     static if (is(T==int) || is(T==long)||is(T==uint)||is(T==ulong)){
-        immutable int reductionFactorFilt=1+reductionFactorFilt!(S);
+        enum int reductionFactorFilt=1+reductionFactorFilt!(S);
     } else static if (is(T==Range)){
-        immutable int reductionFactorFilt=reductionFactorFilt!(S);
+        enum int reductionFactorFilt=reductionFactorFilt!(S);
     } else static if (is(T:int[])||is(T:long[])||is(T:uint[])||is(T:ulong[])){
-        immutable int reductionFactorFilt=reductionFactorFilt!(S);
+        enum int reductionFactorFilt=reductionFactorFilt!(S);
     } else static if (is(T:NArray!(long,1))||is(T:NArray!(int,1))||is(T:NArray!(uint,1))||is(T:NArray!(ulong,1))){
-        immutable int reductionFactorFilt=reductionFactorFilt!(S);
+        enum int reductionFactorFilt=reductionFactorFilt!(S);
     } else {
         static assert(0,"ERROR: unexpected type <"~T.stringof~"> in reductionFactorFilt, this will fail");
     }
@@ -784,7 +826,7 @@ template reductionFactorFilt(T,S...){
 // creates an empty array of the requested shape for axis filtering (support function)
 NArray!(T,rank-reductionFactorFilt!(S)) arrayAxisFilter(T,int rank,S...)(NArray!(T,rank) a,S idx_tup)
 {
-    immutable int rank2=rank-reductionFactorFilt!(S);
+    enum int rank2=rank-reductionFactorFilt!(S);
     index_type from,to,step;
     index_type[rank2] newshape;
     int ii=0;
@@ -830,8 +872,8 @@ string axisFilterLoop(T,int rank,V,S...)(string loopBody)
     string res;
     string indent;
     indent~="    ";
-    static immutable int rank2=rank-reductionFactorFilt!(S);
-    res~=indent~"immutable int rank2=rank-reductionFactorFilt!(S);";
+    enum int rank2=rank-reductionFactorFilt!(S);
+    res~=indent~"enum int rank2=rank-reductionFactorFilt!(S);";
     res~=indent~"index_type from,to,step;\n";
     res~=indent~"T* aPtr"~ctfe_i2s(rank)~"=a.startPtrArray;\n";
     res~=indent~"T* bPtr"~ctfe_i2s(rank2)~"=b.startPtrArray;\n";

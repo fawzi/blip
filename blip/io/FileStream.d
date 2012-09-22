@@ -43,7 +43,7 @@ enum StreamOptions{
     BaseMask=3,
     Sync=1<<3,
 }
-private immutable File.Style WriteUnique = {File.Access.Write, File.Open.New, File.Share.Read};
+private enum File.Style WriteUnique = {File.Access.Write, File.Open.New, File.Share.Read};
 
 /// general StreamStrWriter for the given file (normally you want strFile and binFile)
 StreamStrWriter!(T) outfileStrWriterT(T)(string path,WriteMode wMode){

@@ -97,7 +97,7 @@ string loopOpMixin(string opMask,string opEl, string opBit){
                 }
                 auto rBlock=(len-bitCp)/bitsPerEl+iBlockStart;
                 size_t iRhs=0;
-                int posRhs=rhs.start+bitCp;
+                int posRhs=cast(int)(rhs.start+bitCp);
                 if (posRhs>bitsPerEl){
                     iRhs=1;
                     posRhs-=bitsPerEl;
@@ -162,7 +162,7 @@ struct BitArray
         size_t p=cast(size_t)storage.ptr;
         auto rest=p%el_t.alignof;
         if (rest!=0){
-            res.start=(el_t.sizeof-rest)*8;
+            res.start=cast(typeof(res.start))(el_t.sizeof-rest)*8;
             res.ptr=cast(el_t*)(p+el_t.sizeof-rest);
         } else {
             res.ptr=cast(el_t*)p;

@@ -19,6 +19,5 @@ module blip.parallel.smp.Smp;
 public import blip.parallel.smp.SmpModels;
 public import blip.parallel.smp.BasicTasks;
 public import blip.parallel.smp.WorkManager;
-public import blip.parallel.smp.Tls;
 public import blip.parallel.smp.Wait;
 public import blip.parallel.smp.DataFlowVar;

@@ -31,8 +31,8 @@ version(Posix){
     
 
     class TraceAll{
-        int abortLevel; /// 0: normal run, 1: master established, 2: slave traces, 3: end
-        int traceLevel; /// 0:no slave trace, 1: should do trace, 2: doing trace, 3: done trace
+        shared int abortLevel; /// 0: normal run, 1: master established, 2: slave traces, 3: end
+        shared int traceLevel; /// 0:no slave trace, 1: should do trace, 2: doing trace, 3: done trace
         Thread tAtt; /// slave that should report the trace
         BasicTraceInfo trace;
     
@@ -41,15 +41,16 @@ version(Posix){
         }
         
         void abort(){
+	    auto wOut=delegate void(const(char)[] s){ serr(s); };
             bool waitFor(scope bool delegate() check){
                 for(int i=0;i<500;++i){
                     for(int j=0;i<100;++i){
-                        volatile auto tLevel=traceLevel;
+                        auto tLevel=traceLevel;
                         if (check()) return true;
                         Thread.yield();
                     }
                     if (check()) return true;
-                    Thread.sleep(0.001);
+                    Thread.sleep(tsecs(0.001));
                 }
                 return false;
             }
@@ -66,7 +67,7 @@ version(Posix){
                         serr(myT.name);
                         serr("\n");
                         trace.trace();
-                        trace.writeOut(serr.call);
+                        trace.writeOut(wOut);
                         if (!atomicCASB(abortLevel,2,1)){
                             serr("unexpected abort level on master\n");
                         }
@@ -81,21 +82,22 @@ version(Posix){
                                     serr(t.name);
                                     serr("\n");
                                     tAtt=null;
-                                    volatile traceLevel=1;
+                                    traceLevel=1;
                                     writeBarrier();
                                     tAtt=t;
-                                    Thread.sleep(0.001);
-                                    if( pthread_kill( t.m_addr, SIGABRT ) != 0 ){
+                                    Thread.sleep(tsecs(0.001));
+				    assert(0,"kill to fix");
+				    /+                                    if( pthread_kill( t.m_addr, SIGABRT ) != 0 ){
                                         serr("could not send signal to a thread\n");
-                                    }
-                                    waitFor(delegate bool(){ volatile auto tLevel=traceLevel; return tLevel==3; });
+                                    }+/
+                                    waitFor(delegate bool(){ auto tLevel=traceLevel; return tLevel==3; });
                                     if (traceLevel!=3){
                                         if (atomicCASB(traceLevel,1,0)){
                                             tAtt=null;
                                             serr("a thread did not respond, race with the GC??, skipping it, but probably further tracing will fail...\n");
-                                            Thread.sleep(0.1);
+                                            Thread.sleep(tsecs(0.1));
                                         } else {
-                                            waitFor(delegate bool(){ volatile auto tLevel=traceLevel; return tLevel==3; });
+                                            waitFor(delegate bool(){ auto tLevel=traceLevel; return tLevel==3; });
                                             if (traceLevel!=3){
                                                 serr("a thread trace failed, exiting\n");
                                                 abortLevel=5;
@@ -109,8 +111,8 @@ version(Posix){
                                             serr("invalid traceLevel on master reset\n");
                                             exit(1);
                                         }
-                                        volatile readBarrier();
-                                        trace.writeOut(serr.call);
+                                        readBarrier();
+                                        trace.writeOut(wOut);
                                     }
                                 }
                             }
@@ -120,15 +122,15 @@ version(Posix){
                     break;
                 case 1: // wait
                     Thread.yield();
-                    volatile aLevel=abortLevel;
+                    aLevel=abortLevel;
                     break;
                 case 2:
                     readBarrier();
-                    volatile auto tAtt1=tAtt;
+                    auto tAtt1=tAtt;
                     if (tAtt1 is myT){
                         if (atomicCASB(traceLevel,2,1)){
                             readBarrier();
-                            volatile tAtt1=tAtt;
+                            tAtt1=tAtt;
                             if(tAtt1!is myT){
                                 serr("double signaling or interrupted tracing\n");
                                 abortLevel=5;

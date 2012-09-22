@@ -39,7 +39,7 @@ final class ReinterpretReader(U,T):Reader!(T){
     }
     
     ///  reader handler
-    bool handleReader(scope size_t delegate(T[], SliceExtent slice,out bool iterate) r){
+    bool handleReader(scope size_t delegate(in T[], SliceExtent slice,out bool iterate) r){
         return this.buf.handleReaderT!(T)(r);
     }
     
@@ -273,7 +273,7 @@ final class BufferIn(TInt):Reader!(TInt){
         return readTot/OutToIn; // as rest/OutToIn==0
     }
     
-    bool handleReaderT(TOut)(scope size_t delegate(TOut[], SliceExtent slice,out bool iterate) r){
+    bool handleReaderT(TOut)(scope size_t delegate(in TOut[], SliceExtent slice,out bool iterate) r){
         static assert(TInt.sizeof<=TOut.sizeof,"internal size needs to be smaller than external");
         static assert(TOut.sizeof%TInt.sizeof==0,"external size needs to be a multiple of internal size");
         enum :size_t{OutToIn=TOut.sizeof/TInt.sizeof}
@@ -332,7 +332,7 @@ final class BufferIn(TInt):Reader!(TInt){
     size_t readSome(TInt[] a){
         return readSomeT!(TInt)(a);
     }
-    bool handleReader(scope size_t delegate(TInt[], SliceExtent slice,out bool iterate) r){
+    bool handleReader(scope size_t delegate(in TInt[], SliceExtent slice,out bool iterate) r){
         return handleReaderT!(TInt)(r);
     }
     

@@ -192,7 +192,7 @@ string mkActionMixin(string name,string locals_,string action){
 /// size_t the default size for simple work
 /// this is used to calculate the default block size for splitting up parallel tasks
 /// (this should probably be at least comparable to the l1 cache per thread)
-immutable size_t defaultSimpleLoopSize=64*1024;
+enum size_t defaultSimpleLoopSize=64*1024;
 
 /// a real scheduler (unless one has version SequentialWorkManager)
 /// shares the work on a pool of threads

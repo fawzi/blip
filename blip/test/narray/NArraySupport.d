@@ -54,7 +54,7 @@ class Dottable(T,int rank1,S,int rank2,bool scanAxis=false, bool randomLayout=fa
     }
     /// returns a random array (here with randNArray & co due to bug 2246)
     static Dottable randomGenerate(Rand r,int idx,ref int nEl,ref bool acceptable){
-        immutable index_type maxSize=1_000_000;
+        enum index_type maxSize=1_000_000;
         float mean=10.0f;
         index_type[rank1+rank2-1] dims;
         index_type totSize;
@@ -83,7 +83,8 @@ class Dottable(T,int rank1,S,int rank2,bool scanAxis=false, bool randomLayout=fa
             int axis2=startAxis2;
         }
         index_type[rank1] dims1=dims[0..rank1];
-        auto a=randNArray(r,NArray!(T,rank1).empty(dims1));
+        auto a=NArray!(T,rank1).empty(dims1);
+	randNArray(r,a);
         static if (randomLayout) {
             if (r.uniform!(bool)()) a=randLayout(r,a);
         }
@@ -97,7 +98,8 @@ class Dottable(T,int rank1,S,int rank2,bool scanAxis=false, bool randomLayout=fa
                 dims2[i]=dims[((axis1<0)?(rank1+axis1):axis1)];
             }
         }
-        auto b=randNArray(r,NArray!(S,rank2).empty(dims2));
+        auto b=NArray!(S,rank2).empty(dims2);
+	randNArray(r,b);
         static if (randomLayout) {
             if (r.uniform!(bool)()) b=randLayout(r,b);
         }
@@ -129,7 +131,7 @@ class Dottable(T,int rank1,S,int rank2,bool scanAxis=false, bool randomLayout=fa
 
 /// a random 1D NArray type T and dimension i (in the arr attribute)
 class SizedRandomNArray(T,int i){
-    static immutable int rank=1;
+    enum int rank=1;
     NArray!(T,rank) arr;
     this(){
         arr=zeros!(T)([i]);
@@ -153,7 +155,7 @@ class SizedRandomNArray(T,int i){
 }
 /// a random 2D NArray type T and dimension i,j (in the arr attribute)
 class SizedRandomNArray(T,int i,int j){
-    static immutable int rank=2;
+    enum int rank=2;
     NArray!(T,rank) arr;
     this(){
         arr=zeros!(T)([i,j]);
@@ -177,7 +179,7 @@ class SizedRandomNArray(T,int i,int j){
 }
 /// a random 3D NArray type T and dimension i,j,k (in the arr attribute)
 class SizedRandomNArray(T,int i,int j,int k){
-    static immutable int rank=3;
+    enum int rank=3;
     NArray!(T,rank) arr;
     this(){
         arr=zeros!(T)([i,j,k]);

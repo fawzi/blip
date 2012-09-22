@@ -262,7 +262,8 @@ class TextController: TestControllerI{
                         s(test.testName);
                         s("`");
                         if (test.testName.length<50){
-                            int l=50-test.testName.length;
+			    auto ll=test.testName.length;
+                            int l=((ll<50)?50-cast(int)ll:0);
                             auto spc="              ";
                             while(l>0){
                                 auto toAdd=((l>spc.length)?spc.length:l);
@@ -764,7 +765,7 @@ class TestCollection: SingleRTest, TestControllerI {
 /// template that checks that the initialization arguments of testInit (checkInit and manualInit)
 /// are compatible with the arguments of the test, and if not gives a nice error message
 template checkTestInitArgs(S...){
-    immutable validArgs=is(typeof(function(){S arg;mixin(completeInitStr!(S)(checkInit,manualInit));}));
+    enum validArgs=is(typeof(function(){S arg;mixin(completeInitStr!(S)(checkInit,manualInit));}));
     static if(!validArgs){
         pragma(msg,"invalid arguments to template testInit for the current context.");
         pragma(msg,"context (arguments to generate randomly for the test):"~S.stringof);
@@ -930,7 +931,7 @@ template testInit(string checkInit="", string manualInit=""){
 		    dumper(&arr.appendArr)("test`")(test.testName)("` failed with exception\n");
                     test.failureLog(arr.data);
                     //test.failureLog.flush();
-                    e.writeOut(test.failureLog);
+                    writeOut(test.failureLog,e);
                     //test.failureLog.flush();
                     mixin(printArgs(nArgs!(S),"test.failureLog"));
                 }
@@ -990,7 +991,7 @@ template testInit(string checkInit="", string manualInit=""){
                     dumper(&arr.appendArr)("test`")(test.testName)("` unexpectedly failed with exception\n");
                     test.failureLog(arr.data);
                     //test.failureLog.flush();
-                    e.writeOut(test.failureLog);
+                    writeOut(test.failureLog,e);
                     //test.failureLog.flush();
                     mixin(printArgs(nArgs!(S),"test.failureLog"));
                 }

@@ -164,7 +164,7 @@ interface Reader(T){
     /// read some data into the given buffer
     size_t readSome(T[]);
     /// character reader handler
-    bool handleReader(scope size_t delegate(T[], SliceExtent slice,out bool iterate) r);
+    bool handleReader(scope size_t delegate(in T[], SliceExtent slice,out bool iterate) r);
     /// shutdown the input source
     void shutdownInput();
     void desc(CharSink s);
@@ -251,7 +251,7 @@ void writeOut(V,T,S...)(scope V sink1,T v,S args){
     } else static if (is(typeof(sink1(" "d)))){
         alias const(dchar) Char;
     } else {
-        static assert(0,"invalid sink in writeOut");
+        static assert(0,"invalid sink in writeOut:"~V.stringof);
     }
     alias UnqualAll!(Char) UChar;
     static if(is(UnqualAll!(S[0])==UChar[])){
@@ -287,16 +287,17 @@ void writeOut(V,T,S...)(scope V sink1,T v,S args){
         }
     }
     alias UnqualAll!(T) TT;
-    static if (is(T U:U[])){
-        static if(is(UnqualAll!(U)==UChar)){
+    static if (is(T UU:UU[])){
+	alias UnqualAll!(UU) U;
+        static if(is(U==UChar)){
             sink(v);
         } else static if(is(U==char)||is(U==wchar)||is(U==dchar)){
             if (v.length<128){
-                Char[256] buf;
-                auto s=convertToString!(Char)(v,buf);
+                UChar[256] buf;
+                auto s=convertToString!(UChar)(v,buf);
                 sink(s);
             } else {
-                auto s=convertToString!(Char)(v);
+                auto s=convertToString!(UChar)(v);
                 sink(s);
             }
         } else static if(is(U==void)||is(U==ubyte)){
@@ -338,10 +339,10 @@ void writeOut(V,T,S...)(scope V sink1,T v,S args){
             writeOut(sink,t);
         }
         sink("]");
-	} else static if (is(TT==char)){
+    } else static if (is(TT==UChar)){
         sink((&v)[0..1]);
-    } else static if(is(TT==wchar)||is(TT==dchar)){
-        sink(cast(cstring)[v]);
+    } else static if(is(TT==char)||is(TT==wchar)||is(TT==dchar)){
+	sink([cast(UChar)v]);
     } else static if (is(TT==byte)||is(TT==ubyte)||is(TT==short)||is(TT==ushort)||
         is(TT==int)||is(TT==uint)||is(TT==long)||is(TT==ulong))
     {

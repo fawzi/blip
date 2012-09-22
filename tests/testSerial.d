@@ -1,3 +1,4 @@
+
 /// tests the serialization facility of blip
 /// author: fawzi
 //
@@ -211,7 +212,7 @@ class C{
 struct TestStruct{
     int[] a;
     int[][] b;
-    int[char[]] c;
+    int[string] c;
     int[int] d;
     A[] e;
     version(Xpose){
@@ -529,11 +530,11 @@ void main(){
     void testLazyArray(void function(LazyArray!(int),LazyArray!(int)) testF){
         FExp fExp;
         FExp fExp2;
-        auto arrayIn=LazyArray!(int)(cast(int delegate(int delegate(ref int)))&fExp.opApply);
+        auto arrayIn=LazyArray!(int)(cast(int delegate(scope int delegate(ref int)))&fExp.opApply);
         auto arrayOut=LazyArray!(int)(delegate void(int i){
                 auto val=fExp2.next();
                 if (i!=val) {
-                    sout(collectAppender(delegate void(CharSink s){
+                    sout(collectAppender(delegate void(scope CharSink s){
                         s("ERROR: read "); writeOut(s,i); s(" vs "); writeOut(s,val); s("\n");
                     }));
                     throw new Exception("unexpected value",__FILE__,__LINE__);
@@ -546,12 +547,12 @@ void main(){
     void testLazyAA(void function(LazyAA!(int,int),LazyAA!(int,int)) testF){
         FExp fExp;
         FExp fExp2;
-        auto arrayIn=LazyAA!(int,int)(cast(int delegate(int delegate(ref int,ref int)))&fExp.opApply);
+        auto arrayIn=LazyAA!(int,int)(cast(int delegate(scope int delegate(ref int,ref int)))&fExp.opApply);
         auto arrayOut=LazyAA!(int,int)(delegate void(int k,int v){
                 auto kR=fExp2.next();
                 auto vR=fExp2.i;
                 if (k!=kR || v!=vR) {
-                    sout(collectAppender(delegate void(CharSink s){
+                    sout(collectAppender(delegate void(scope CharSink s){
                         s("keys:"); writeOut(s,k); s(" vs "); writeOut(s,kR);
                         s(" vals:"); writeOut(s,v); s(" vs "); writeOut(s,vR); s("\n");
                     }));

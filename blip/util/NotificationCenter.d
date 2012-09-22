@@ -41,11 +41,11 @@ struct Callback{
         return callback==c.callback && flags==c.flags;
     }
     
-    __gshared static Callback *freeList;
+    shared static Callback *freeList;
     static Callback *newCallback(void delegate(string,Callback*,Variant) callback,
         Flags flags=Flags.None)
     {
-        auto newC=popFrom(freeList);
+        auto newC=cast(Callback*)popFrom(freeList);
         if (newC is null) {
             newC=new Callback;
         }
@@ -61,8 +61,8 @@ struct Callback{
     }
 }
 struct CallbackList{
-    Callback *catchAll;
-    Callback *dynCallbacks;
+    shared Callback *catchAll;
+    shared Callback *dynCallbacks;
 }
 
 class NotificationCenter{
@@ -75,11 +75,11 @@ class NotificationCenter{
             auto res2=name in notificationLists;
             if (res2 is null) return false;
             auto lst=&((*res2).catchAll);
-            while((*lst)!is null && (*lst)!is cb){
+            while((*lst)!is null && (*cast(Callback**)lst)!is cb){
                 lst= &((*lst).next);
             }
-            if ((*lst)is cb){
-                *lst=cb.next;
+            if ((*cast(Callback**)lst)is cb){
+                *lst=cast(shared Callback*)cb.next;
                 return true;
             }
         }
@@ -124,12 +124,12 @@ class NotificationCenter{
             }
         }
         if (res !is null){
-            auto pos=res.catchAll;
+            auto pos=cast(Callback *)res.catchAll;
             while (pos !is null){
                 pos.callback(name,pos,args);
                 pos=pos.next;
             }
-            pos=atomicSwap(res.dynCallbacks,cast(Callback *)null);
+            pos=atomicSwap!(Callback*,Callback*)(res.dynCallbacks,cast(Callback *)null);
             while (pos !is null){
                 auto pNext=pos.next;
                 auto didResub=false;

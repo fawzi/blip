@@ -92,7 +92,7 @@ enum Border:int{
 }
 
 string incrementA(string indent,int imin,int imax,int jshift){
-    string res="".dup;
+    string res="";
     string aPtrName="";
     for (int i=imin;i<imax;++i){
         if (i==0) aPtrName="aPtrMenoI";
@@ -307,7 +307,7 @@ string convolveILoop(string indent,int jrest,int irest,Border border){
 /// operations to do before convolveIJ
 string preConvolveIJSetup(string indent,string inAName,string outAName,Border border,bool jOnly=false)
 {
-    string res="".dup;
+    string res="";
     res~="/+ line 0 +/ long convolveStartLine=__LINE__; /+ line 0 +/\n";
     res~=indent~"index_type jIn="~inAName~".shape[rank-1];\n";
     res~=indent~"index_type jOut="~outAName~".shape[rank-1];\n";
@@ -323,7 +323,7 @@ string preConvolveIJSetup(string indent,string inAName,string outAName,Border bo
     res~=indent~"index_type aStrideJ="~inAName~".bStrides[rank-1];\n";
     
     if (jOnly){
-        res~=indent~"int switchTag=jrest;\n";
+        res~=indent~"int switchTag=cast(int)jrest;\n";
         res~=indent~"if (jmin<=0) switchTag=-1000;\n";
         res~=indent~"index_type resStrideI=0;\n";
         res~=indent~"index_type aStrideI=0;\n";
@@ -377,7 +377,7 @@ string preConvolveIJSetup(string indent,string inAName,string outAName,Border bo
 /// 2d convolution with nearest neighbors
 /// the variables of preConvolveIJSetup and T*pOutAPtr0,pInAPtr0 have to be defined
 string convolveIJ(string indent,Border border){
-    string res="".dup;
+    string res="";
     res~=indent~"switch (switchTag){\n";
     string indent2=indent~"    ";
     foreach (ires;[-1,0]){
@@ -401,7 +401,7 @@ string convolveIJ(string indent,Border border){
 /// 2d convolution with nearest neighbors
 /// the variables of preConvolveIJSetup and T*pOutAPtr0,pInAPtr0 have to be defined
 string convolveJOnly(string indent,Border border){
-    string res="".dup;
+    string res="";
     res~=indent~"T* resPtr0I=pOutAPtr0;\n";
     res~=indent~"T* aPtr0I=pInAPtr0;\n";
     res~=indent~"switch (switchTag){\n";
@@ -426,7 +426,7 @@ in {
     for (int i=0;i<rank;++i){
         assert(kernel.shape[i]==3,"kernel must have 3 elements in each dimension"); // relax?
     }
-    if (!isNullNArray!(T,rank,true)(outA) && (!(inA.flags & ArrayFlags.Zero))){
+    if (!isNullNArray(outA) && (!(inA.flags & ArrayFlags.Zero))){
         for (int i=0;i<rank;++i){
             index_type inI=inA.shape[i];
             index_type outI=outA.shape[i];
@@ -441,7 +441,7 @@ in {
 }
 body{
     if (inA.flags & ArrayFlags.Zero) return outA;
-    if (isNullNArray!(T,rank,true)(outA)){
+    if (isNullNArray(outA)){
         index_type[rank] outShape=inA.shape;
         foreach(ref el;outShape){
             static if (border==Border.Decrease){
@@ -506,7 +506,7 @@ in {
     for (int i=0;i<rank;++i){
         assert(kernel.shape[i]==3,"kernel must have 3 elements in each dimension"); // relax?
     }
-    if (!isNullNArray!(T,rank,true)(outA) && (!(inA.flags & ArrayFlags.Zero))){
+    if (!isNullNArray(outA) && (!(inA.flags & ArrayFlags.Zero))){
         for (int i=0;i<rank;++i){
             index_type inI=inA.shape[i];
             static if (border==Border.Decrease) {
@@ -522,7 +522,7 @@ in {
 body{
     //pragma(msg,"convolveNN, rank="~ctfe_i2s(rank)~", border="~ctfe_i2s(cast(int)border));
     if (inA.flags & ArrayFlags.Zero) return outA;
-    if (isNullNArray!(T,rank,true)(outA)){
+    if (isNullNArray(outA)){
         index_type[rank] outShape=inA.shape;
         foreach(ref el;outShape){
             static if (border==Border.Decrease){
@@ -536,17 +536,17 @@ body{
     if (outA.flags & ArrayFlags.Zero) return outA;
     static if(rank==1){
         static if (border==Border.Increase){
-            istring startPStr
+            enum string startPStr
             ="    T* pOutAPtr0=cast(T*)(cast(size_t)outA.startPtrArray+outA.bStrides[0]);\n"
             ~"    T* pInAPtr0=inA.startPtrArray;\n";
         } else static if (border==Border.Same){
-            istring startPStr="    T* pOutAPtr0=outA.startPtrArray,pInAPtr0=inA.startPtrArray;\n";
+            enum string startPStr="    T* pOutAPtr0=outA.startPtrArray,pInAPtr0=inA.startPtrArray;\n";
         } else {
-            istring startPStr
+            enum string startPStr
             ="    T* pOutAPtr0=outA.startPtrArray;\n"
             ~"    T* pInAPtr0=cast(T*)(cast(size_t)inA.startPtrArray+inA.bStrides[0]);\n";
         }
-        istring loopStr
+        enum string loopStr
             ="    T c10=kernel[0],c11=kernel[1],c12=kernel[2];\n"
             ~"    T c00,c01,c02,c20,c21,c22;\n"
             ~preConvolveIJSetup("    ","inA","outA",border,true)
@@ -561,17 +561,17 @@ body{
         T c10=kernel[1,0],c11=kernel[1,1],c12=kernel[1,2];
         T c20=kernel[2,0],c21=kernel[2,1],c22=kernel[2,2];
         static if (border==Border.Increase){
-            istring startPStr
+            enum string startPStr
             ="    T* pOutAPtr0=cast(T*)(cast(size_t)outA.startPtrArray+outA.bStrides[0]+outA.bStrides[1]);\n"
             ~"    T* pInAPtr0=inA.startPtrArray;\n";
         } else static if (border==Border.Same){
-            istring startPStr="    T* pOutAPtr0=outA.startPtrArray,pInAPtr0=inA.startPtrArray;\n";
+            enum string startPStr="    T* pOutAPtr0=outA.startPtrArray,pInAPtr0=inA.startPtrArray;\n";
         } else {
-            istring startPStr
+            enum string startPStr
             ="    T* pOutAPtr0=outA.startPtrArray;\n"
             ~"    T* pInAPtr0=cast(T*)(cast(size_t)inA.startPtrArray+inA.bStrides[0]+inA.bStrides[1]);\n";
         }
-        istring loopStr
+        enum string loopStr
         =startPStr
         ~preConvolveIJSetup("    ","inA","outA",border)
         ~convolveIJ("    ",border);
@@ -590,9 +590,9 @@ body{
             cast(T*)(cast(size_t)outA.startPtrArray
                 +((outA.shape[0]-partialShape)/2)*(outA.bStrides[0]+outA.bStrides[1]+outA.bStrides[2])),
             outA.newFlags, outA.newBase);
-        istring intConvolveStr=convolveIJ("    ",border);
+        enum string intConvolveStr=convolveIJ("    ",border);
         static if (border==Border.Increase){
-            immutable loopBody=`
+            enum loopBody=`
             for (index_type kDiff=-1;kDiff<2;++kDiff){
                 T* pOutAPtr0=cast(T*)(cast(size_t)partialOutAPtr0+kDiff*partialOutAStride0);
                 T* pInAPtr0=partialInAPtr0;
@@ -602,7 +602,7 @@ body{
             `~intConvolveStr~`
             }`;
         } else static if (border==Border.Decrease){
-            immutable loopBody=`
+            enum loopBody=`
             for (index_type kDiff=-1;kDiff<2;++kDiff){
                 T* pOutAPtr0=partialOutAPtr0;
                 T* pInAPtr0=cast(T*)(cast(size_t)partialInAPtr0-kDiff*partialInAStride0);
@@ -613,7 +613,7 @@ body{
             }`;
         } else static if (border==Border.Same){
             index_type maxK=partialShape-1;
-            immutable loopBody=`/+ line 0_new +/ convolveStartLine=__LINE__; /+ line 0_new +/
+            enum loopBody=`/+ line 0_new +/ convolveStartLine=__LINE__; /+ line 0_new +/
             for (index_type kDiff=-1;kDiff<2;++kDiff){
                 if (ii_0_==0 && kDiff==-1 || ii_0_==maxK && kDiff==1) continue;
                 T* pOutAPtr0=cast(T*)(cast(size_t)partialOutAPtr0+kDiff*partialOutAStride0);

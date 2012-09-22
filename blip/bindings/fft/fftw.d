@@ -93,7 +93,7 @@ enum{
  FFTW_FORWARD=-1,
  FFTW_BACKWARD=1,
 }
-immutable double FFTW_NO_TIMELIMIT=-1.0;
+enum double FFTW_NO_TIMELIMIT=-1.0;
 enum:uint{
 /* documented flags */
  FFTW_MEASURE=0U,

@@ -22,12 +22,12 @@ import blip.Comp;
 
 /// returns the number of code points in the string str, raise if str contains invalid or 
 /// partial characters (but does not explicitly validate)
-size_t nCodePoints(T)(T[] str){
+size_t nCodePoints(T)(in T[] str){
     static if (is(T==char)){ // optimized for mostly ascii content
-        T* p=str.ptr;
+        const(T)* p=str.ptr;
         size_t l=str.length;
         size_t n=0;
-        bool charLoop(T* pEnd){
+        bool charLoop(const(T)* pEnd){
             while (p<pEnd){
                 if ((*p)&0x80){
                     switch ((*p)&0xF0){
@@ -47,7 +47,7 @@ size_t nCodePoints(T)(T[] str){
             }
             return false;
         }
-        bool charLoop2(T* pEnd){
+        bool charLoop2(const(T)* pEnd){
             while (p<pEnd){
                 if ((*p)&0x80){
                     switch ((*p)&0xF0){
@@ -71,7 +71,7 @@ size_t nCodePoints(T)(T[] str){
         if (l<8){
             if (charLoop(p+l)) throw new Exception("invalid UTF-8",__FILE__,__LINE__);
         } else {
-            T* pEnd=cast(T*)((cast(size_t)(str.ptr+l))&(~cast(size_t)7));
+            auto pEnd=cast(const(T)*)((cast(size_t)(str.ptr+l))&(~cast(size_t)7));
             if (charLoop2(pEnd)) throw new Exception("invalid UTF-8",__FILE__,__LINE__);
             while (p<pEnd){
                 if (((*(cast(int*)p))&0x80808080) ==0){
@@ -85,9 +85,9 @@ size_t nCodePoints(T)(T[] str){
         }
         return n;
     } else static if (is(T==wchar)){
-        T* p=str.ptr;
+	const(T)* p=str.ptr;
         size_t n=0;
-        bool charLoop(T*pEnd){
+        bool charLoop(const(T)*pEnd){
             while(p<pEnd){
                 if (((*p)&0xF800)==0xD800){
                     if ((*p)&0x0400) return true;
@@ -98,7 +98,7 @@ size_t nCodePoints(T)(T[] str){
             }
             return false;
         }
-        bool charLoop2(T*pEnd){
+        bool charLoop2(const(T)*pEnd){
             while(p<pEnd){
                 if (((*p)&0xF800)==0xD800){
                     if ((*p)&0x0400) return true;
@@ -135,13 +135,13 @@ size_t nCodePoints(T)(T[] str){
     }
 }
 
-template convertToString(TT=const(char)){
-    TT[]convertToString(S)(S[]src,TT[]dest=null){
+template convertToString(TT=char){
+    const(TT)[]convertToString(S)(S[]src,TT[]dest=null){
 	alias UnqualAll!(TT) T;
         static if(is(T==UnqualAll!(S))){
-            return cast(T[])src;
+            return cast(const(T)[])src;
         } else static if(is(T==char)){
-            return Utf.toString(src,dest);
+	    return Utf.toString(src,dest);
 	} else static if(is(T==wchar)){
             return Utf.toString16(src,dest);
 	} else static if(is(T==dchar)){
@@ -177,15 +177,16 @@ debug(UnitTest){
 
 /// scans until it has the requested number of code points in the string str
 /// raises if str contains invalid or contains partial characters (but does not explicitly validate)
-size_t scanCodePoints(T)(T[] str,size_t nn){
+size_t scanCodePoints(TT)(TT[] str,size_t nn){
+    alias UnqualAll!(TT) T;
     static if (is(T==char)){ // optimized for mostly ascii content
-        T* p=str.ptr;
+        TT* p=str.ptr;
         size_t l=str.length;
         size_t n=0;
         void invalidUtfError(long line){
             throw new Exception("invalid UTF-8",__FILE__,line);
         }
-        bool charLoop(T* pEnd,long line){
+        bool charLoop(TT* pEnd,long line){
             assert(p<=pEnd,"ppp");
             while (p<pEnd && n<nn){
                 if ((*p)&0x80){ // use the stride table instead?
@@ -210,7 +211,7 @@ size_t scanCodePoints(T)(T[] str,size_t nn){
             }
             return false;
         }
-        bool charLoop2(T* pEnd,long line){
+        bool charLoop2(TT* pEnd,long line){
             assert(p<=pEnd,"ppp");
             while (p<pEnd && n<nn){
                 if ((*p)&0x80){
@@ -239,7 +240,7 @@ size_t scanCodePoints(T)(T[] str,size_t nn){
         if (l<8 || nn<4){
             if (charLoop(p+l,__LINE__)) return IOStream.Eof;
         } else {
-            T* pEnd=cast(T*)((cast(size_t)(str.ptr+l))&(~cast(size_t)7));
+            TT* pEnd=cast(TT*)((cast(size_t)(str.ptr+l))&(~cast(size_t)7));
             nn-=3;
             if (charLoop2(pEnd,__LINE__)) return IOStream.Eof;
             while (p<pEnd && n<nn){
@@ -257,12 +258,12 @@ size_t scanCodePoints(T)(T[] str,size_t nn){
         if (n<nn) return IOStream.Eof;
         return cast(size_t)(p-str.ptr);
     } else static if (is(T==wchar)){
-        T* p=str.ptr;
+        TT* p=str.ptr;
         size_t n=0;
         void invalidUtfError(long line){
             throw new Exception("invalid UTF-16",__FILE__,line);
         }
-        bool charLoop(T*pEnd,long line){
+        bool charLoop(TT*pEnd,long line){
             while(p<pEnd && n<nn){
                 if (((*p)&0xF800)==0xD800){
                     if ((*p)&0x0400) invalidUtfError(line);
@@ -274,7 +275,7 @@ size_t scanCodePoints(T)(T[] str,size_t nn){
             }
             return false;
         }
-        bool charLoop2(T*pEnd,long line){
+        bool charLoop2(TT*pEnd,long line){
             while(p<pEnd && n<nn){
                 if (((*p)&0xF800)==0xD800){
                     if ((*p)&0x0400) invalidUtfError(line);
@@ -291,7 +292,7 @@ size_t scanCodePoints(T)(T[] str,size_t nn){
         if (l<4 || n<1){
             if (charLoop(p+l,__LINE__)) return Eof;
         } else {
-            T*pEnd=cast(T*)((cast(size_t)(p+l))&(~(cast(size_t)7)));
+            TT*pEnd=cast(TT*)((cast(size_t)(p+l))&(~(cast(size_t)7)));
             if (charLoop2(pEnd,__LINE__)) return Eof;
             --nn;
             while (p!=pEnd && nn<nn){

@@ -33,7 +33,7 @@ alias cdouble f_cdouble;
 alias int f_int;
 
 template isBlasType(T){
-   immutable bool isBlasType=is(T==f_float)|| is(T==f_double) ||
+   enum bool isBlasType=is(T==f_float)|| is(T==f_double) ||
        is(T==f_cfloat) || is(T==f_cdouble);
 }
 

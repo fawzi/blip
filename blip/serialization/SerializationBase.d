@@ -103,24 +103,24 @@ struct FieldMetaInfo {
 /// returns the typeid of the given type
 template typeKindForType(T){
     static if(isCoreType!(T)){
-        immutable typeKindForType=TypeKind.PrimitiveK;
+        enum typeKindForType=TypeKind.PrimitiveK;
     } else static if(is(T==class)){
-        immutable typeKindForType=TypeKind.ClassK;
+        enum typeKindForType=TypeKind.ClassK;
     } else static if(is(T:T[])){
-        immutable typeKindForType=TypeKind.ArrayK;
+        enum typeKindForType=TypeKind.ArrayK;
     } else static if(isAssocArrayType!(T)){
         alias UnqualAll!(KeyTypeOfAA!(T)) kType;
         static if (is(kType==char[])||is(kType==wchar[])||is(kType==dchar[])){
-            immutable typeKindForType=TypeKind.DictK;
+            enum typeKindForType=TypeKind.DictK;
         } else {
-            immutable typeKindForType=TypeKind.AAK;
+            enum typeKindForType=TypeKind.AAK;
         }
     } else static if(is(T==struct)){
-        immutable typeKindForType=TypeKind.StructK;
+        enum typeKindForType=TypeKind.StructK;
     } else static if (is(typeof(*T.init))){
-        immutable typeKindForType=typeKindForType!(typeof(*T.init));
+        enum typeKindForType=typeKindForType!(typeof(*T.init));
     } else {
-        immutable typeKindForType=TypeKind.UndefK;
+        enum typeKindForType=TypeKind.UndefK;
     }
 }
 
@@ -533,7 +533,7 @@ class SerializationRegistry {
 }
 
 template isBasicType(T) {
-    immutable bool isBasicType =
+    enum bool isBasicType =
         is(T == long) ||
         is(T == ulong) ||
         is(T == int) ||
@@ -953,7 +953,7 @@ class Serializer {
                     FieldMetaInfo valMetaInfo=FieldMetaInfo("val","",getSerializationInfoForType!(V)());
                     valMetaInfo.pseudo=true;
                 }
-                auto ac=writeDictStart(fieldMeta,t.length,
+                auto ac=writeDictStart(fieldMeta,(*cast(V[immutable(K)]*)&t).length,
                     is(K2==char[])||is(K2==wchar[])||is(K2==dchar[]));
                 foreach (key, ref value; t) {
                     version(SerializationTrace) sout("X serializing associative array entry\n");
@@ -1566,8 +1566,10 @@ class Unserializer {
                         writeOut(s,typeid(T)); s("\n");
                     }));
                 }
-                FieldMetaInfo elMetaInfo=FieldMetaInfo("el","",
-                    getSerializationInfoForType!(V)());
+		auto elType=getSerializationInfoForType!(V)();
+		elType=null;
+		assert(false,"pippo elType");
+                FieldMetaInfo elMetaInfo=FieldMetaInfo("el","",elType);
                 elMetaInfo.pseudo=true;
                 auto ac=readArrayStart(fieldMeta);
                 bool freeOld=false;

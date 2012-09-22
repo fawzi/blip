@@ -118,7 +118,7 @@ class ChunkGuard{
     }
     // maybe it would be better not to implement serialization for this, as it cannot be unserialized...
     mixin(serializeSome("blip.ChunkGuard","an object to 'guard' a chunk of memory, and dispose it",
-        `dataPtr|dataLen|refCount|flags`));
+        `dataPtr|dataLen|refCount` /+ pippo bug for |flags`+/ ));
     void desc(scope CharSink s){
         dumper(s)("{ class:blip.ChunkGuard, at:")(cast(void*)this)(", dataPtr:")(cast(void*)dataPtr)
             (", dataLen:")(dataLen)(", refCount:")(refCount)(", flags:")(flags)(" }");
@@ -132,11 +132,10 @@ struct BulkArray(T){
         Dummy,
     }
     __gshared static size_t defaultOptimalBlockSize=100*1024/T.sizeof;
-    static immutable BulkArrayCallocSize=100*1024;
+    enum BulkArrayCallocSize=100*1024;
     T* ptr, ptrEnd;
     ChunkGuard guard;
     Flags flags=Flags.Dummy;
-    static immutable BulkArray dummy={null,null,null,Flags.Dummy};
     alias T dtype;
     static if(is(T.flt)){
         static if((T.sizeof%T.flt.sizeof==0)){
@@ -147,7 +146,7 @@ struct BulkArray(T){
     } else {
         alias T basicDtype;
     }
-    
+
     // ---- Serialization ---
     __gshared static ClassMetaInfo metaI;
     shared static this(){
@@ -167,8 +166,8 @@ struct BulkArray(T){
         auto ac=s.writeArrayStart(null,dArray.length);
         FieldMetaInfo *elMetaInfoP=null;
         version(PseudoFieldMetaInfo){
-            FieldMetaInfo elMetaInfo=FieldMetaInfo("el","",
-                getSerializationInfoForType!(T)());
+	    FieldMetaInfo elMetaInfo=FieldMetaInfo("el","",
+						   getSerializationInfoForType!(T)());
             elMetaInfo.pseudo=true;
             elMetaInfoP=&elMetaInfo;
         }
@@ -179,8 +178,10 @@ struct BulkArray(T){
     }
     void unserialize(Unserializer s){
         T[] dArray;
-        FieldMetaInfo elMetaInfo=FieldMetaInfo("el","",
-            getSerializationInfoForType!(T)());
+	auto elType=getSerializationInfoForType!(T)();
+	elType=null;
+	assert(0,"dmd 2.060 bug");
+        FieldMetaInfo elMetaInfo=FieldMetaInfo("el","",elType);
         elMetaInfo.pseudo=true;
         auto ac=s.readArrayStart(null);
         size_t lenStart=cast(size_t)ac.sizeHint();
@@ -202,7 +203,6 @@ struct BulkArray(T){
     }
     
     mixin printOut!();
-    
     /// data as array
     T[] data(){
         return ((this.ptr is null)?null:(this.ptr[0..(this.ptrEnd-this.ptr)]));
@@ -224,37 +224,27 @@ struct BulkArray(T){
         this.flags=Flags.None;
     }
     
-    static BulkArray opCall(){
-        BulkArray b;
-        return b;
-    }
-    static BulkArray opCall(size_t size,bool scanPtr=false){
-        BulkArray res;
+    this(size_t size,bool scanPtr=false){
         if (size*T.sizeof>BulkArrayCallocSize){
-            res.guard=new ChunkGuard(size*T.sizeof,typeHasPointers!(T)());
-            res.ptr=cast(T*)res.guard.dataPtr;
-            res.ptrEnd=res.ptr+size;
+            this.guard=new ChunkGuard(size*T.sizeof,typeHasPointers!(T)());
+            this.ptr=cast(T*)this.guard.dataPtr;
+            this.ptrEnd=this.ptr+size;
         } else {
-            res.data=new T[size];
+            this.data=new T[size];
         }
-        res.flags=Flags.None;
-        return res;
+        this.flags=Flags.None;
     }
-    static BulkArray opCall(T[] data,ChunkGuard guard=null){
-        BulkArray res;
-        res.data=data;
-        res.guard=guard;
-        res.flags=Flags.None;
-        return res;
+    this(T[] data,ChunkGuard guard=null){
+        this.data=data;
+        this.guard=guard;
+        this.flags=Flags.None;
     }
-    static BulkArray opCall(T*ptr,T*ptrEnd,ChunkGuard guard=null){
-        BulkArray res;
-        res.ptr=ptr;
-        res.ptrEnd=ptrEnd;
+    this(T*ptr,T*ptrEnd,ChunkGuard guard=null){
+        this.ptr=ptr;
+        this.ptrEnd=ptrEnd;
         assert(ptrEnd>=ptr,"invalid pointers");
-        res.guard=guard;
-        res.flags=Flags.None;
-        return res;
+        this.guard=guard;
+        this.flags=Flags.None;
     }
     /// bulk array of the basic type
     BulkArray!(basicDtype) basicBulkArray(){
@@ -297,13 +287,13 @@ struct BulkArray(T){
     void opIndexAssign(T val,size_t i,size_t j){
         assert(i<=j,"slicing with i>j"); // allow???
         assert(i>=0&&j<=this.length,"slicing index out of bounds");
-        BulkArray(this.data[i..j],this.guard)[]=val;
+        //pippo BulkArray(this.data[i..j],this.guard)[]=val;
     }
     /// ditto
     void opSliceAssign(T val,size_t i,size_t j){
         assert(i<=j,"slicing with i>j"); // allow???
         assert(i>0&&j<=this.length,"slicing index out of bounds");
-        BulkArray(this.data[i..j],this.guard)[]=val;
+        //pippo BulkArray(this.data[i..j],this.guard)[]=val;
     }
     /// gets a slice of the array as normal array (this will get invalid when dis array is collected)
     T[] getSlice(size_t i,size_t j){
@@ -314,7 +304,7 @@ struct BulkArray(T){
     void opIndexAssign(BulkArray val,size_t i,size_t j){
         assert(i<=j,"slicing with i>j"); // allow???
         assert(i>0&&j<=this.length,"slicing index out of bounds");
-        BulkArray(this.data[i..j],this.guard)[]=val;
+        //pippo BulkArray(this.data[i..j],this.guard)[]=val;
     }
     /// copies an bulk array
     void copyFrom(V)(BulkArray!(V) b){
@@ -618,7 +608,7 @@ struct BulkArray(T){
             v=val;
     }
     /// implement an FIterator compliant interface on T*
-    /+ final DMD 1.074 BUG 8069 +/ class FIteratorP:FIteratorI!(DynamicArrayType!(T)*){
+    /+ final DMD 1.074 BUG 8069 +/ static class FIteratorP:FIteratorI!(DynamicArrayType!(T)*){
         BulkArray it;
         bool parallel;
         size_t optimalChunkSize;
@@ -693,3 +683,4 @@ void baTertiaryOpStr(string opStr,T,U,V)(ref BulkArray!(T) a,ref BulkArray!(U) b
 }
 
 alias BulkArray!(double) BulkArrayR;
+
