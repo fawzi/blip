@@ -1872,7 +1872,7 @@ else {
 	    s.field(metaI[0],shp);
             if (shp.length>0) {
                 this.shape[]=shp;
-                scope tmp=empty(this.shape,false);
+                scope tmp=NArray.empty(this.shape,false);
                 this.shape[] = tmp.shape;
                 this.bStrides[] = tmp.bStrides;
                 this.startPtrArray=tmp.startPtrArray;
@@ -1984,13 +1984,13 @@ body {
         "op(*aPtr0,*bPtr0,*cPtr0);\n","i"));
 }
 /// ditto
-void ternaryOpStr(string op, int rank, T, S, U)(ref T a, ref S b, ref U c,
-    index_type optimalChunkSize=NArray!(T,rank).defaultOptimalChunkSize)
+void ternaryOpStr(string op, T, S, U)(ref T a, ref S b, ref U c,
+    index_type optimalChunkSize=T.defaultOptimalChunkSize)
     if (T.dim==S.dim && S.dim==U.dim)
 in { assert(a.shape==b.shape && a.shape==c.shape,"incompatible shapes in ternaryOp"); }
 body {
     index_type optimalChunkSize_i=optimalChunkSize;
-    mixin(pLoopPtr(rank,["a","b","c"],op,"i"));
+    mixin(pLoopPtr(T.dim,["a","b","c"],op,"i"));
 }
 
 /+ -------------- looping mixin constructs ---------------- +/
@@ -2391,18 +2391,18 @@ body {
     }
 }
 /+ ------------------------------------------------- +/
-/// rank of NArray for the given shape (for empty,zeros,ones)
-/// more flexible than member function, accepts int/long, int/long static array
-template rkOfShape(T){
-    static if(isStaticArrayType!(T)){
-        static assert(is(BaseTypeOfArrays!(T)==int)||is(BaseTypeOfArrays!(T)==uint)||
-            is(BaseTypeOfArrays!(T)==long)||is(BaseTypeOfArrays!(T)==ulong),
-            "only integer types supported as shape dimensions");
-        enum int rkOfShape = cast(int)staticArraySize!(T);
+/// rank of NArray for the given arguments (for empty,zeros,ones)
+/// skips ArrayFlags
+template rkOfArgs(){
+    enum rkOfArgs=0;
+}
+/// ditto
+template rkOfArgs(T,S...){
+    static if (is(T==ArrayFlags)){
+	enum rkOfArgs=rkOfArgs!(S);
     } else {
-        static assert(is(T==int)||is(T==uint)||is(T==long)||is(T==ulong),
-            "only integer types (and static arrays of them) supported as dimensions");
-        enum int rkOfShape = 1;
+	static assert(is(T:long)||is(T:ulong),"expected integer type, not "~T.stringof);
+	enum rkOfArgs= 1+rkOfArgs!(S);
     }
 }
 
@@ -2423,18 +2423,29 @@ void randomizeNArray(RandG,T)(RandG r,ref T a){
 /// returns a random array of the given size with the given distribution
 /// this seems to triggers bugs in DMD
 template randomNArray(T){
-    NArray!(T,rkOfShape!(S))randomNArray(RandG,S)(RandG r,S dim){
-        static if (! isStaticArrayType!(S)){
-            index_type[1] mdim;
-            mdim[0]=cast(index_type)dim;
-        } else static if (is(ElementTypeOfArray!(S)==index_type)){
-            alias dim mdim;
-        } else {
-            index_type[rkOfShape!(S)] mdim;
-            foreach (i,ref el;mdim)
-                el=dim[i];
-        }
-        NArray!(T,rkOfShape!(S)) res=NArray!(T,rkOfShape!(S)).empty!(T)(mdim);
+    NArray!(T,rkOfArgs!(S))randomNArray(RandG,S...)(RandG r,S args){
+	alias rkOfArgs!(S) rank;
+	index_type[rank] shape;
+	int irank=0;
+	bool fortran=false;
+	foreach(i,T;S){
+	    static if (is(T==ArrayFlags)){
+		switch(args[i]){
+		case ArrayFlags.Fortran:
+		    fortran=true;
+		    break;
+		case ArrayFlags.Contiguous:
+		    fortran=false;
+		    break;
+		default:
+		    assert(0,"unexpected ArrayFlags value, only Contiguos and Fortran accepted, not "~ctfe_i2s(args[i]));
+		}
+	    } else {
+		shape[irank++]=cast(index_type)args[i];
+	    }
+	}
+	assert(irank==rank);
+	auto res=NArray!(V,rank).empty(shape,fortran);
         randomizeNArray(r,res);
 	return res;
     }
@@ -2461,9 +2472,9 @@ NArray!(T,rank) randLayout(T,int rank)(Rand r, NArray!(T,rank)a){
     if (a.size==0) return a;
     int[rank] permutation,rest;
     foreach (i,ref el;rest)
-        el=i;
+        el=cast(int)i;
     foreach (i,ref el;permutation){
-        int pRest=r.uniformR(rank-i);
+        int pRest=r.uniformR(rank-cast(int)i);
         permutation[i]=rest[pRest];
         rest[pRest]=rest[rank-i-1];
     }

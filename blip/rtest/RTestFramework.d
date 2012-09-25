@@ -807,7 +807,7 @@ template checkTestInitArgs(S...){
 template testInit(string checkInit="", string manualInit=""){
     
     /// creates a test that executes the given function and fails if it throws an exception
-    SingleRTest testNoFail(S...)(string testName, void delegate(S) testF,long sourceLine=-1,
+    SingleRTest testNoFail(S...)(string testName, scope void delegate(S) testF,long sourceLine=-1,
         string sourceFile="unknown",TestControllerI testController=null,
         TestSize testSize=TestSize(),CharSink failureLog=null,Rand r=null)
     {

@@ -16,6 +16,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 module testNArray;
+import blip.narray.NArray;
 import blip.test.narray.NArrayTests;
 import blip.io.Console;
 import blip.io.BasicIO;

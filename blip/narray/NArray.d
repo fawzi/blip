@@ -7,11 +7,11 @@
 /// {{{
 /// import blip.narray.NArray;
 /// 
-/// auto a=zeros!(real)([3,4,12]); // a 3x4x12 array of reals filled with zeros
+/// auto a=zeros!(real)(3,4,12); // a 3x4x12 array of reals filled with zeros
 /// auto b=a[2]; // the last 4x12 slice of a
 /// b[3,4]=1.5; // changes both a and b
 /// c=dot(a,b.T); // 3x4x4 obtained multiplying a b transposed
-/// auto a2=ones!(real)([3,3]); // a 3x3 array of reals filled with ones
+/// auto a2=ones!(real)(3,3); // a 3x3 array of reals filled with ones
 /// c[Range(0,-1),Range(1,4),4]=a2; // using python notation this means c[:,1:,4]=a2
 /// auto a3=empty!(real)(4); // an unitialized 4-vector of reals
 /// foreach(i,v;b){

@@ -346,7 +346,7 @@ body {
                     if (axis2==1) transpose=0;
                     if (b.bStrides[0]!=cast(index_type)T.sizeof) transpose=!transpose;
                     f_int ldb=cast(f_int)((b.bStrides[0]==cast(index_type)T.sizeof)?b.bStrides[1]:b.bStrides[0]);
-                    f_int m=(transpose?a.shape[0]:c.shape[0]);
+                    f_int m=cast(f_int)(transpose?a.shape[0]:c.shape[0]);
                     // this check is needed to give a valid ldb to blas (that checks it)
                     // even if ldb is never needed (only one column)
                     if (ldb!=cast(f_int)T.sizeof){
@@ -355,10 +355,10 @@ body {
                         ldb=m;
                     }
                     DBlas.gemv((transpose?'T':'N'), m,
-                        (transpose?c.shape[0]:a.shape[0]),scaleRes,
-                        b.startPtrArray, ldb,
-                        aStartPtr,a.bStrides[0]/cast(index_type)T.sizeof,
-                        scaleC, c.startPtrArray, c.bStrides[0]/cast(index_type)T.sizeof);
+			       cast(f_int)(transpose?c.shape[0]:a.shape[0]),scaleRes,
+			       b.startPtrArray, ldb,
+			       aStartPtr,cast(f_int)(a.bStrides[0]/cast(index_type)T.sizeof),
+			       scaleC, c.startPtrArray, cast(f_int)(c.bStrides[0]/cast(index_type)T.sizeof));
                     return c;
                 }
             } else static if (rank1==2 && rank2==1) {
@@ -370,19 +370,19 @@ body {
                     if (axis1==1) transpose=0;
                     if (a.bStrides[0]!=cast(index_type)T.sizeof) transpose=!transpose;
                     f_int lda=cast(f_int)((a.bStrides[0]==cast(index_type)T.sizeof)?a.bStrides[1]:a.bStrides[0]);
-                    f_int m=(transpose?b.shape[0]:c.shape[0]);
+                    f_int m=cast(f_int)(transpose?b.shape[0]:c.shape[0]);
                     // this check is needed to give a valid lda to blas (that checks it)
                     // even if lda is never needed (only one column)
                     if (lda!=cast(f_int)T.sizeof){
-                        lda/=cast(index_type)T.sizeof;
+                        lda/=cast(f_int)T.sizeof;
                     } else {
                         lda=m;
                     }
                     DBlas.gemv((transpose?'T':'N'), m,
-                        (transpose?c.shape[0]:b.shape[0]), scaleRes,
-                        a.startPtrArray, lda,
-                        bStartPtr,b.bStrides[0]/cast(index_type)T.sizeof,
-                        scaleC, c.startPtrArray, c.bStrides[0]/cast(index_type)T.sizeof);
+			       cast(f_int)(transpose?c.shape[0]:b.shape[0]), scaleRes,
+			       a.startPtrArray, lda,
+			       bStartPtr,cast(f_int)(b.bStrides[0]/cast(index_type)T.sizeof),
+			       scaleC, c.startPtrArray, cast(f_int)(c.bStrides[0]/cast(index_type)T.sizeof));
                     return c;
                 }
             } else static if(is(S==T)){
@@ -403,31 +403,31 @@ body {
                     // these checks are needed to give a valid ldX to blas (that checks it)
                     // even if ldX is never needed (only one column)
                     if (ldb!=cast(f_int)T.sizeof)
-                        ldb/=cast(index_type)T.sizeof;
+                        ldb/=cast(f_int)T.sizeof;
                     else
-                        ldb=(transposeB?b.shape[1-axis2]:b.shape[axis2]);
+                        ldb=cast(f_int)(transposeB?b.shape[1-axis2]:b.shape[axis2]);
                     if (lda!=cast(f_int)T.sizeof)
-                        lda/=cast(index_type)T.sizeof;
+                        lda/=cast(f_int)T.sizeof;
                     else
-                        lda=(transposeA?a.shape[axis1]:a.shape[1-axis1]);
+                        lda=cast(f_int)(transposeA?a.shape[axis1]:a.shape[1-axis1]);
                     if (ldc!=cast(f_int)T.sizeof)
-                        ldc/=cast(index_type)T.sizeof;
+                        ldc/=cast(f_int)T.sizeof;
                     else
-                        ldc=c.shape[0];
+                        ldc=cast(f_int)c.shape[0];
                     if (swapAB){
                         DBlas.gemm((transposeB?'N':'T'), (transposeA?'N':'T'),
-                        b.shape[1-axis2], a.shape[1-axis1], a.shape[axis1], scaleRes,
-                        b.startPtrArray,ldb,
-                        a.startPtrArray,lda,
-                        scaleC,
-                        c.startPtrArray,ldc);
+				   cast(f_int)b.shape[1-axis2], cast(f_int)a.shape[1-axis1], cast(f_int)a.shape[axis1], scaleRes,
+				   b.startPtrArray,ldb,
+				   a.startPtrArray,lda,
+				   scaleC,
+				   c.startPtrArray,ldc);
                     } else {
                         DBlas.gemm((transposeA?'T':'N'), (transposeB?'T':'N'),
-                        a.shape[1-axis1], b.shape[1-axis2], a.shape[axis1], scaleRes,
-                        a.startPtrArray,lda,
-                        b.startPtrArray,ldb,
-                        scaleC,
-                        c.startPtrArray,ldc);
+				   cast(f_int)a.shape[1-axis1], cast(f_int)b.shape[1-axis2], cast(f_int)a.shape[axis1], scaleRes,
+				   a.startPtrArray,lda,
+				   b.startPtrArray,ldb,
+				   scaleC,
+				   c.startPtrArray,ldc);
                     }
                     return c;
                 }
@@ -650,16 +650,16 @@ else {
         a=a.dup(true);
         scope ipiv=NArray!(f_int,1).empty([a.shape[0]]);
         f_int info;
-        if (isNullNArray(x)) x=empty!(T)(b.shape,true);
+        if (isNullNArray(x)) x=NArray!(T,2).empty(b.shape,true);
         if (!(x.bStrides[0]==cast(index_type)T.sizeof && x.bStrides[1]>0)){
             scope NArray!(T,2) xx=b.dup(true);
-            DLapack.gesv(a.shape[0], b.shape[1], a.startPtrArray, a.bStrides[1]/cast(index_type)T.sizeof, ipiv.startPtrArray,
-                xx.startPtrArray, xx.shape[0], info);
+            DLapack.gesv(cast(f_int)a.shape[0], cast(f_int)b.shape[1], a.startPtrArray, cast(f_int)(a.bStrides[1]/cast(index_type)T.sizeof), ipiv.startPtrArray,
+                xx.startPtrArray, cast(f_int)xx.shape[0], info);
             x[]=xx; // avoid and return xx?
         } else {
             x[]=b;
-            DLapack.gesv(a.shape[0], b.shape[1], a.startPtrArray, a.bStrides[1]/cast(index_type)T.sizeof, ipiv.startPtrArray,
-                x.startPtrArray, x.bStrides[1]/cast(index_type)T.sizeof, info);
+            DLapack.gesv(cast(f_int)a.shape[0], cast(f_int)b.shape[1], a.startPtrArray, cast(f_int)(a.bStrides[1]/cast(index_type)T.sizeof), ipiv.startPtrArray,
+			 x.startPtrArray, cast(f_int)(x.bStrides[1]/cast(index_type)T.sizeof), info);
         }
         if (info > 0)
             throw new LinAlgException("Singular matrix");
@@ -677,11 +677,11 @@ else {
     }
     body {
         scope NArray!(T,2) b1=repeat(b,1,-1);
-        if (isNullNArray(x)) x=zeros!(T)(b.shape,true);
+        if (isNullNArray(x)) x=NArray!(T,1).zeros(b.shape,true);
         scope NArray!(T,2) x1=repeat(x,1,-1);
         auto res=solve(a,b1,x1);
         if (res.startPtrArray!=x.startPtrArray) {
-            x[]=reshape(res,[-1]); // avoid and return res??
+            x[]=reshape(res,-1); // avoid and return res??
         }
         return x;
     }
@@ -734,7 +734,7 @@ else {
         assert(ipiv.shape[0]>=a.shape[0]||ipiv.shape[0]>=a.shape[1],"ipiv should be at least min(a.shape)");
     }
     body {
-        DLapack.getrf(a.shape[0], a.shape[1], a.startPtrArray, a.bStrides[1]/cast(index_type)T.sizeof,
+        DLapack.getrf(cast(f_int)a.shape[0], cast(f_int)a.shape[1], a.startPtrArray, cast(f_int)(a.bStrides[1]/cast(index_type)T.sizeof),
             ipiv.startPtrArray, info);
         if (info < 0)
             throw new LinAlgException("Illegal input to Fortran routine");
@@ -788,35 +788,35 @@ else {
                     cast(T*)(rightEVect.startPtrArray+rightEVect.size)-rightEVect.size,
                     rightEVect.newFlags,rightEVect.newBase);
             } else {
-                rE=empty!(T)(rightEVect.shape,true);
+                rE=NArray!(T,2).empty(rightEVect.shape,true);
             }
             rEPtr=rE.startPtrArray;
             rELd=cast(f_int)(rE.bStrides[1]/cast(index_type)T.sizeof);
         }
         NArray!(ComplexTypeOf!(T),1) eigenval=ev;
         if (isNullNArray(eigenval) || is(T==ComplexTypeOf!(T)) && (!(eigenval.flags&ArrayFlags.Fortran))) {
-            eigenval = zeros!(ComplexTypeOf!(T))(a.shape[0]);
+            eigenval = NArray!(ComplexTypeOf!(T),1).zeros([a.shape[0]]);
         }
         f_int n=cast(f_int)a.shape[0],info;
         f_int lwork = -1;
         T workTmp;
         static if(is(ComplexTypeOf!(T)==T)){
-            scope NArray!(RealTypeOf!(T),1) rwork = empty!(RealTypeOf!(T))(2*n);
+            scope NArray!(RealTypeOf!(T),1) rwork = NArray!(RealTypeOf!(T),1).empty([2*n]);
             DLapack.geev(((lEPtr is null)?'N':'V'),((rEPtr is null)?'N':'V'),n,
-                a1.startPtrArray, a1.bStrides[1]/cast(index_type)T.sizeof, eigenval.startPtrArray, lEPtr, lELd, rEPtr, rELd,
+		a1.startPtrArray, cast(f_int)(a1.bStrides[1]/cast(index_type)T.sizeof), eigenval.startPtrArray, lEPtr, lELd, rEPtr, rELd,
                 &workTmp, lwork, rwork.startPtrArray, info);
             lwork = cast(int)abs(workTmp)+1;
-            scope NArray!(T,1) work = empty!(T)(lwork);
+            scope NArray!(T,1) work = NArray!(T,1).empty([lwork]);
             DLapack.geev(((lEPtr is null)?'N':'V'),((rEPtr is null)?'N':'V'),n,
-                a1.startPtrArray, a1.bStrides[1]/cast(index_type)T.sizeof, eigenval.startPtrArray, lEPtr, lELd, rEPtr, rELd,
+		a1.startPtrArray, cast(f_int)(a1.bStrides[1]/cast(index_type)T.sizeof), eigenval.startPtrArray, lEPtr, lELd, rEPtr, rELd,
                 work.startPtrArray, lwork, rwork.startPtrArray, info);
             
             if (!isNullNArray(leftEVect) && leftEVect.startPtrArray != lE.startPtrArray) leftEVect[]=lE;
             if (!isNullNArray(rightEVect) && rightEVect.startPtrArray != rE.startPtrArray) rightEVect[]=rE;
             if (!isNullNArray(ev) && ev.startPtrArray != eigenval.startPtrArray) ev[]=eigenval;
         } else {
-            scope NArray!(RealTypeOf!(T),1) wr = empty!(RealTypeOf!(T))(n);
-            scope NArray!(RealTypeOf!(T),1) wi = empty!(RealTypeOf!(T))(n);
+            scope NArray!(RealTypeOf!(T),1) wr = NArray!(RealTypeOf!(T),1).empty([n]);
+            scope NArray!(RealTypeOf!(T),1) wi = NArray!(RealTypeOf!(T),1).empty([n]);
             DLapack.geev(((lEPtr is null)?'N':'V'),((rEPtr is null)?'N':'V'),n,
 			 a1.startPtrArray, cast(f_int)(a1.bStrides[1]/cast(index_type)T.sizeof), wr.startPtrArray, wi.startPtrArray, lEPtr, lELd, rEPtr, rELd,
                 &workTmp, lwork, info);
@@ -824,7 +824,7 @@ else {
             if (lwork<2*n && (lEPtr!is null|| rEPtr!is null)){
                 lwork=2*n;
             }
-            scope NArray!(T,1) work = empty!(T)(lwork);
+            scope NArray!(T,1) work = NArray!(T,1).empty([lwork]);
             DLapack.geev(((lEPtr is null)?'N':'V'),((rEPtr is null)?'N':'V'),n,
 			 a1.startPtrArray, cast(f_int)(a1.bStrides[1]/cast(index_type)T.sizeof), wr.startPtrArray, wi.startPtrArray, lEPtr, lELd, rEPtr, rELd,
                 work.startPtrArray, lwork, info);
@@ -920,27 +920,27 @@ else {
         a=a.dup(true);
         auto myS=s;
         if (isNullNArray(s) || s.bStrides[0]!=cast(index_type)RealTypeOf!(T).sizeof){
-            myS=empty!(RealTypeOf!(T))(mn,true);
+            myS=NArray!(RealTypeOf!(T),1).empty([mn],true);
         }
         if (mn==cast(index_type)0) return s;
         char jobz='N';
         T * uPtr=null,vtPtr=null;
         auto myU=u,myVt=vt;
         f_int lda= cast(f_int)(a.bStrides[1]/cast(index_type)T.sizeof);
-        if (lda==1) lda=a.shape[0];
+        if (lda==1) lda=cast(f_int)a.shape[0];
         f_int ldu= cast(f_int)1;
         f_int ldvt=cast(f_int)1;
         if (!isNullNArray(u) || !isNullNArray(vt)){
             if (isNullNArray(u) || u.bStrides[0]!=cast(index_type)T.sizeof || u.bStrides[1]<=0 ){
                 index_type[2] uShape=m;
                 if (!isNullNArray(u)) uShape[1]=mn;
-                myU=empty!(T)(uShape,true);
+                myU=NArray!(T,2).empty(uShape,true);
             }
             uPtr=myU.startPtrArray;
             if (isNullNArray(vt) || vt.bStrides[0]!=cast(index_type)T.sizeof || vt.bStrides[1]<=0){
                 index_type[2] vtShape=n;
                 if (!isNullNArray(vt)) vtShape[0]=mn;
-                myVt=empty!(T)(vtShape,true);
+                myVt=NArray!(T,2).empty(vtShape,true);
             }
             vtPtr=myVt.startPtrArray;
             jobz='A';
@@ -948,21 +948,21 @@ else {
             if (myVt.shape[0]!=n) jobz='S';
             ldu= cast(f_int)(myU.bStrides[1]/cast(index_type)T.sizeof);
             ldvt=cast(f_int)(myVt.bStrides[1]/cast(index_type)T.sizeof);
-            if (ldu==1) ldu=myU.shape[0];
-            if (ldvt==1) ldvt=myVt.shape[0];
+            if (ldu==1) ldu=cast(f_int)myU.shape[0];
+            if (ldvt==1) ldvt=cast(f_int)myVt.shape[0];
         }
         f_int info;
         T tmpWork;
-        scope NArray!(f_int,1) iwork=empty!(f_int)(8*mn);
+        scope NArray!(f_int,1) iwork=NArray!(f_int,1).empty([8*mn]);
         static if (isComplexType!(T)){
-            scope NArray!(RealTypeOf!(T),1) rwork=empty!(RealTypeOf!(T))(jobz=='N'?7*mn:5*(mn*mn+mn));
+            scope NArray!(RealTypeOf!(T),1) rwork=NArray!(RealTypeOf!(T),1).empty([(jobz=='N'?7*mn:5*(mn*mn+mn))]);
             DLapack.gesdd(jobz, cast(f_int) m, cast(f_int) n,
                 a.startPtrArray, lda, myS.startPtrArray, uPtr, ldu,
                 vtPtr, ldvt, &tmpWork, cast(f_int)-1,
                 rwork.startPtrArray, iwork.startPtrArray, info);
             if (info==0){
                 f_int lwork=cast(f_int)tmpWork.re+cast(f_int)1;
-                scope NArray!(T,1) work=empty!(T)(lwork);
+                scope NArray!(T,1) work=NArray!(T,1).empty([lwork]);
                 DLapack.gesdd(jobz, cast(f_int) m, cast(f_int) n,
                     a.startPtrArray, lda, myS.startPtrArray, uPtr, ldu,
                     vtPtr, ldvt, work.startPtrArray, lwork,
@@ -974,7 +974,7 @@ else {
                 &tmpWork, cast(f_int)(-1), iwork.startPtrArray, cast(f_int)info);
             if (info==0){
                 f_int lwork=cast(f_int)tmpWork.re+cast(f_int)1;
-                scope NArray!(T,1) work=empty!(T)(lwork);
+                scope NArray!(T,1) work=NArray!(T,1).empty([lwork]);
                 DLapack.gesdd(jobz, cast(f_int)m, cast(f_int) n, a.startPtrArray, lda,
                     myS.startPtrArray, uPtr, ldu, vtPtr, ldvt,
                     work.startPtrArray, lwork, iwork.startPtrArray, info);
@@ -1011,7 +1011,7 @@ else {
         if (range.kind=='I') m=cast(f_int)(range.toI-range.fromI+1);
         auto myEv=ev;
         if (isNullNArray(ev) || myEv.bStrides[0]!=cast(index_type)RealTypeOf!(T).sizeof){
-            myEv=empty!(RealTypeOf!(T))(n);
+            myEv=NArray!(RealTypeOf!(T),1).empty([n]);
         }
         if (n==0) return myEv;
         a=a.dup(true);
@@ -1021,7 +1021,7 @@ else {
         f_int ldEVect=cast(f_int)1;
         if (!isNullNArray(eVect)) {
             if (eVect.bStrides[0]!=T.sizeof || eVect.bStrides[1]<=cast(index_type)0){
-                myEVect=empty!(T)(eVect.shape);
+                myEVect=NArray!(T,2).empty!(T)(eVect.shape);
             }
             eVectPtr=myEVect.startPtrArray;
             ldEVect=cast(f_int)(myEVect.bStrides[1]/cast(index_type)T.sizeof);
@@ -1029,7 +1029,7 @@ else {
         }
         auto isuppz=supportEVect;
         if (isNullNArray(supportEVect) || (!(supportEVect.flags&ArrayFlags.Fortran))){
-            isuppz=empty!(f_int)([2,max(1,cast(index_type)m)],true);
+            isuppz=NArray!(f_int,2).empty([2,max(1,cast(index_type)m)],true);
         }
         T tmpWork;
         f_int tmpIWork;
@@ -1046,9 +1046,9 @@ else {
                 f_int lwork=cast(f_int)abs(tmpWork)+cast(f_int)1;
                 f_int lrwork=cast(f_int)abs(tmpRWork)+cast(f_int)1;
                 f_int liwork=cast(f_int)abs(tmpIWork)+cast(f_int)1;
-                scope iwork=empty!(f_int)(liwork);
-                scope work=empty!(T)(lwork);
-                scope rwork=empty!(RealTypeOf!(T))(lrwork);
+                scope iwork=NArray!(f_int,1).empty([liwork]);
+                scope work= NArray!(T,1).empty([lwork]);
+                scope rwork=NArray!(RealTypeOf!(T),1).empty([lrwork]);
                 DLapack.heevr((eVectPtr is null)?'N':'V', range.kind,(storage==MStorage.up)?'U':'L', 
                     cast(f_int)n, a.startPtrArray, lda, cast(RealTypeOf!(T))range.fromV,
                     cast(RealTypeOf!(T))range.toV, cast(f_int)range.fromI, cast(f_int)range.toI,
@@ -1074,8 +1074,8 @@ else {
             if (info==0){
                 f_int lwork=cast(f_int)abs(tmpWork)+cast(f_int)1;
                 f_int liwork=cast(f_int)abs(tmpIWork)+cast(f_int)1;
-                scope iwork=empty!(f_int)(liwork);
-                scope work=empty!(T)(lwork);
+                scope iwork=NArray!(f_int,1).empty([cast(index_type)liwork]);
+                scope work= NArray!(T,1).empty([lwork]);
                 /+ Trace.formatln("DLapack.syevr({},{},{},{},{},{},{},{},{},{},\n{},{},{},{},{},{},{},{},{},{}, {});",(eVectPtr is null)?'N':'V', range.kind, (storage==MStorage.up)?'U':'L',
                     cast(f_int) n, a.startPtrArray,
                     lda, cast(T)range.fromV, cast(T)range.toV, cast(f_int)range.fromI, cast(f_int)range.toI,

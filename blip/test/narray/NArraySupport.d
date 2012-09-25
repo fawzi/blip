@@ -113,12 +113,12 @@ class Dottable(T,int rank1,S,int rank2,bool scanAxis=false, bool randomLayout=fa
         s(indent)("axis2=")(this.axis2)("\n");
         s(indent)("k    =")(this.k)("\n");
         s(indent)("a:")(this.a)("\n");
-        if (this.a!is null){
+        if (!this.a.isDummy){
             this.a.printData(sink,formatEl,elPerLine,indent~"  ");
             s("\n");
         }
         s(indent)("b:")(this.b)("\n");
-        if (this.a!is null){
+        if (!this.a.isDummy){
             this.b.printData(sink,formatEl,elPerLine,indent~"  ");
             s("\n");
         }
@@ -134,7 +134,7 @@ class SizedRandomNArray(T,int i){
     enum int rank=1;
     NArray!(T,rank) arr;
     this(){
-        arr=zeros!(T)([i]);
+        arr=zeros!(T)(i);
     }
     static SizedRandomNArray randomGenerate(Rand r){
         auto res=new SizedRandomNArray();
@@ -143,7 +143,7 @@ class SizedRandomNArray(T,int i){
     }
     void desc(scope void delegate(in cstring) sink,string formatEl=",10", index_type elPerLine=10,
         string indent=""){
-        if (arr is null) {
+        if (arr.isDummy) {
             sink("*null*");
             return;
         }
@@ -158,7 +158,7 @@ class SizedRandomNArray(T,int i,int j){
     enum int rank=2;
     NArray!(T,rank) arr;
     this(){
-        arr=zeros!(T)([i,j]);
+        arr=zeros!(T)(i,j);
     }
     static SizedRandomNArray randomGenerate(Rand r){
         auto res=new SizedRandomNArray();
@@ -167,7 +167,7 @@ class SizedRandomNArray(T,int i,int j){
     }
     void desc(scope void delegate(in cstring) sink,string formatEl=",10", index_type elPerLine=10,
         string indent=""){
-        if (arr is null) {
+        if (arr.isDummy) {
             sink("*null*");
             return;
         }
@@ -182,7 +182,7 @@ class SizedRandomNArray(T,int i,int j,int k){
     enum int rank=3;
     NArray!(T,rank) arr;
     this(){
-        arr=zeros!(T)([i,j,k]);
+        arr=zeros!(T)(i,j,k);
     }
     static SizedRandomNArray randomGenerate(Rand r){
         auto res=new SizedRandomNArray();
@@ -191,7 +191,7 @@ class SizedRandomNArray(T,int i,int j,int k){
     }
     void desc(scope void delegate(in cstring) sink,string formatEl=",10", index_type elPerLine=10,
         string indent=""){
-        if (arr is null) {
+        if (arr.isDummy) {
             sink("*null*");
             return;
         }

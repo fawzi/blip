@@ -219,7 +219,7 @@ void testSumAll(T,int rank)(NArray!(T,rank) a){
         foreach(el;a.flatIter){
             refVal+=cast(real)el;
         }
-        real dVal=sumAll!(T,rank,real)(a);
+        real dVal=sumAll!(typeof(a),real)(a);
     }
     int err=feqrel2(refVal,dVal);
     if (err<2*real.mant_dig/3-6){
@@ -235,14 +235,14 @@ void testSumAxis(T,int rank)(NArray!(T,rank) a, Rand r){
     int axis=r.uniformR(rank);
     static if (rank>1) {
         auto sV=a.subView(axis);
-        auto refVal=zeros!(real)(sV.view.shape);
+        auto refVal=NArray!(real,rank-1).zeros(sV.view.shape);
         foreach(el;sV){
             refVal+=el /*.asType!(real)()*/;
         }
-        auto dVal=sumAxis!(T,rank,real)(a,axis);
+        auto dVal=sumAxis!(typeof(a),NArray!(real,rank-1))(a,axis);
     } else static if (rank==1){
-        auto refVal=sumAll!(T,rank,real)(a);
-        auto dVal=sumAxis!(T,rank,real)(a,axis);
+	auto refVal=sumAll!(typeof(a),real)(a);
+	auto dVal=sumAxis!(typeof(a),NArray!(real,rank-1))(a,axis);
     }
     static if (rank==1){
         int err=feqrel2(refVal,dVal);
@@ -264,7 +264,7 @@ void testMultAll(T,int rank)(NArray!(T,rank) a){
         foreach(el;a.flatIter){
             refVal*=cast(real)el;
         }
-        real dVal=multiplyAll!(T,rank,real)(a);
+        real dVal=multiplyAll!(typeof(a),real)(a);
     }
     int err=feqrel2(refVal,dVal);
     if (err<2*real.mant_dig/3-6){
@@ -280,14 +280,14 @@ void testMultAxis(T,int rank)(NArray!(T,rank) a, Rand r){
     int axis=r.uniformR(rank);
     static if (rank>1) {
         auto sV=a.subView(axis);
-        auto refVal=ones!(real)(sV.view.shape);
+        auto refVal=NArray!(real,rank-1).ones(sV.view.shape);
         foreach(el;sV){
             refVal*=el /*.asType!(real)()*/;
         }
-        auto dVal=multiplyAxis!(T,rank,real)(a,axis);
+        auto dVal=multiplyAxis!(typeof(a),NArray!(real,rank-1))(a,axis);
     } else static if (rank==1){
-        auto refVal=multiplyAll!(T,rank,real)(a);
-        auto dVal=multiplyAxis!(T,rank,real)(a,axis);
+	auto refVal=multiplyAll!(typeof(a),real)(a);
+	auto dVal=multiplyAxis!(typeof(a),real)(a,axis);
     }
     static if (rank==1){
         int err=feqrel2(refVal,dVal);
@@ -304,7 +304,7 @@ void testMultAxis(T,int rank)(NArray!(T,rank) a, Rand r){
 }
 
 void testFilterMask(T,int rank)(NArray!(T,rank) a, Rand r){
-    NArray!(bool,rank) mask=empty!(bool)(a.shape);
+    NArray!(bool,rank) mask=NArray!(bool,rank).empty(a.shape);
     randNArray!(NArray!(bool,rank))(r,mask);
 
     auto b=filterMask(a, mask);
@@ -323,8 +323,8 @@ void testFilterMask(T,int rank)(NArray!(T,rank) a, Rand r){
 
 void testAxisFilter(T,int rank)(NArray!(T,rank) a, NArray!(index_type,1)indexes){
     unaryOp!((ref index_type i){ i=abs(i)%a.shape[0]; })(indexes);
-    auto b=axisFilter!(T,rank,NArray!(index_type,1))(a,indexes);
-    auto c=zeros!(T)(a.shape);
+    auto b=axisFilter!(typeof(a),NArray!(index_type,1))(a,indexes);
+    auto c=NArray!(T,rank).zeros(a.shape);
     auto d=axisUnfilter1(c,b,indexes);
     if (c.shape!=a.shape) throw new Exception("different shape",__FILE__,__LINE__);
     foreach (el;indexes){
@@ -402,7 +402,7 @@ void testDot2x2(T,S)(Dottable!(T,2,S,2,true,true) d){
     if (d.axis1==0 || d.axis1==-2) a=d.a.T;
     auto b=d.b;
     if (d.axis2==1 || d.axis2==-1) b=d.b.T;
-    auto refValT=zeros!(MaxPrecTypeOf!(U))([a.shape[0],b.shape[1]]);
+    auto refValT=zeros!(MaxPrecTypeOf!(U))(a.shape[0],b.shape[1]);
     for (index_type i=0;i<a.shape[0];++i){
         for (index_type j=0;j<d.k;++j){
             for (index_type k=0;k<b.shape[1];++k){
@@ -418,7 +418,7 @@ version(no_lapack){ }
 else {
     void testSolve2x2(T)(Dottable!(T,2,T,2,false,true,true,0,0) d,Rand r){
         int tol=9;
-        auto x=randLayout(r,empty!(T)([d.a.shape[1],d.b.shape[1]]));
+        auto x=randLayout(r,empty!(T)(d.a.shape[1],d.b.shape[1]));
         try{
             x=solve(d.a,d.b,x);
             auto b2=dot(d.a,x);
@@ -449,7 +449,7 @@ else {
 
     void testSolve2x1(T)(Dottable!(T,2,T,1,false,true,true,0,0) d,Rand r){
         int tol=9;
-        auto x=randLayout(r,zeros!(T)([d.a.shape[1]]));
+        auto x=randLayout(r,zeros!(T)(d.a.shape[1]));
         try{
             x=solve(d.a,d.b,x);
             auto b2=dot(d.a,x);
@@ -482,19 +482,19 @@ else {
         int tol=6;
         index_type n=d.k;
         auto ev=zeros!(ComplexTypeOf!(T))(n);
-        auto leftEVect=zeros!(ComplexTypeOf!(T))([n,n],true);
-        auto rightEVect=zeros!(ComplexTypeOf!(T))([n,n],true);
+        auto leftEVect=zeros!(ComplexTypeOf!(T))(n,n,ArrayFlags.Fortran);
+        auto rightEVect=zeros!(ComplexTypeOf!(T))(n,n,ArrayFlags.Fortran);
         auto ev2=eig!(T)(d.a, ev,leftEVect,rightEVect);
         auto m1=dot(d.a,rightEVect);
         auto m2=repeat(ev2,n,0)*rightEVect;
-        auto diff1=norm2NA!(ComplexTypeOf!(T),2,real)(m1-m2)/n;
+        auto diff1=norm2NA!(typeof(m1-m2),real)(m1-m2)/n;
         m1=dot(leftEVect.H1,d.a);
         m2=leftEVect.T*repeat(ev2,n,-1);
-        auto diff2=norm2NA!(ComplexTypeOf!(T),2,real)(m1-m2)/n;
+        auto diff2=norm2NA!(typeof(m1-m2),real)(m1-m2)/n;
         auto err1=feqrel(diff1+1.0L,1.0L);
         auto err2=feqrel(diff2+1.0L,1.0L);
-        if (norm2NA!(ComplexTypeOf!(T),2,real)(rightEVect)<=0.5) throw new Exception("rightEVect too small",__FILE__,__LINE__);
-        if (norm2NA!(ComplexTypeOf!(T),2,real)(leftEVect)<=0.5) throw new Exception("leftEVect too small",__FILE__,__LINE__);
+        if (norm2NA!(typeof(rightEVect),real)(rightEVect)<=0.5) throw new Exception("rightEVect too small",__FILE__,__LINE__);
+        if (norm2NA!(typeof(leftEVect),real)(leftEVect)<=0.5) throw new Exception("leftEVect too small",__FILE__,__LINE__);
         if (err1<T.mant_dig*2/3-tol){
             sout("ev:");
             ev2.printData(sout.call,"F8,10"); sout("\n");
@@ -512,7 +512,7 @@ else {
             throw new Exception("leftEVect error too large",__FILE__,__LINE__);
         }
         auto ev3=eig(d.a);
-        auto diff3=norm2NA!(ComplexTypeOf!(T),1,real)(ev2-ev3)/sqrt(cast(real)n);
+        auto diff3=norm2NA!(typeof(ev2-ev3),real)(ev2-ev3)/sqrt(cast(real)n);
         auto err3=feqrel(diff3+1.0L,1.0L);
         if (err3<T.mant_dig*2/3-tol){
             sout(collectIAppender(delegate void(scope CharSink s){
@@ -525,8 +525,8 @@ else {
     void testSvd(T)(Dottable!(T,2,T,1,false,true,false,0,0) d){
         int tol=6;
         index_type m=d.a.shape[0],n=d.a.shape[1],mn=min(n,m);
-        auto u=empty!(T)([m,mn]);
-        auto vt=empty!(T)([mn,n]);
+        auto u=empty!(T)(m,mn);
+        auto vt=empty!(T)(mn,n);
         auto s=empty!(RealTypeOf!(T))(mn);
         auto s2=svd(d.a,u,s,vt);
         NArray!(T,2) a2;
@@ -535,15 +535,15 @@ else {
         } else {
             a2=dot(u*repeat(s2,m,0),vt[Range(0,m)]);
         }
-        auto diff1=norm2NA!(T,2,real)(d.a-a2)/n;
+        auto diff1=norm2NA!(NArray!(T,2),real)(d.a-a2)/n;
 
         auto m1=dot(u.H,u);
         diag(m1)-=cast(T)1;
-        auto diff2=norm2NA!(T,2,real)(m1)/n;
+        auto diff2=norm2NA!(NArray!(T,2),real)(m1)/n;
 
         auto m2=dot(vt,vt.H);
         diag(m2)-=cast(T)1;
-        auto diff3=norm2NA!(T,2,real)(m1)/n;
+        auto diff3=norm2NA!(NArray!(T,2),real)(m1)/n;
 
         auto err1=feqrel(diff1+1.0L,1.0L);
         auto err2=feqrel(diff2+1.0L,1.0L);
@@ -571,7 +571,7 @@ else {
             throw new Exception("vt non orthogonal",__FILE__,__LINE__);
         }
         auto s3=svd(d.a);
-        auto diff4=norm2NA!(RealTypeOf!(T),1,real)(s2-s3)/sqrt(cast(real)n);
+        auto diff4=norm2NA!(NArray!(RealTypeOf!(T),1),real)(s2-s3)/sqrt(cast(real)n);
         auto err4=feqrel(diff4+1.0L,1.0L);
         if (err3<T.mant_dig*2/3-tol){
             sout(collectIAppender(delegate void(scope CharSink s){
@@ -588,15 +588,15 @@ else {
         index_type n=d.k;
         d.a=hermitize(d.a);
         auto ev=zeros!(RealTypeOf!(T))(n);
-        auto eVect=zeros!(T)([n,n],true);
+        auto eVect=zeros!(T)(n,n,ArrayFlags.Fortran);
         auto ev2=eigh!(T)(d.a, MStorage.up,ev,eVect);
         auto m1=dot(d.a,eVect);
         auto m2=repeat(ev2,n,0)*eVect;
-        auto diff1=norm2NA!(T,2,real)(m1-m2)/n;
+        auto diff1=norm2NA!(NArray!(T,2),real)(m1-m2)/n;
         auto m3=dot(eVect.H,eVect);
         auto dd=diag(m3);
         dd-=cast(T)1;
-        auto diff2=norm2NA!(T,2,real)(m3)/n;
+        auto diff2=norm2NA!(NArray!(T,2),real)(m3)/n;
         auto err1=feqrel(diff1+1.0L,1.0L);
         auto err2=feqrel(diff2+1.0L,1.0L);
         if (err1<T.mant_dig*2/3-tol){
@@ -615,7 +615,7 @@ else {
             throw new Exception("non orto eVect error too large",__FILE__,__LINE__);
         }
         auto ev3=eigh(d.a);
-        auto diff3=norm2NA!(RealTypeOf!(T),1,real)(ev2-ev3)/sqrt(cast(real)n);
+        auto diff3=norm2NA!(NArray!(RealTypeOf!(T),1),real)(ev2-ev3)/sqrt(cast(real)n);
         auto err3=feqrel(diff3+1.0L,1.0L);
         if (err3<T.mant_dig*2/3-tol){
             sout(collectIAppender(delegate void(scope CharSink s){
@@ -673,27 +673,27 @@ TestCollection narrayRTst1(T,int rank)(TestCollection superColl){
         __LINE__,__FILE__,coll);
     static if (is(T==int) && rank<4){
         autoInitTst.testNoFail("testConvolveNN1b0",(NArray!(T,rank)a){
-            index_type[rank] kShape=3; testConvolveNN!(T,rank,Border.Same)(a,ones!(T)(kShape)); },
+		index_type[rank] kShape=3; testConvolveNN!(T,rank,Border.Same)(a,NArray!(T,rank).ones(kShape)); },
             __LINE__,__FILE__,coll,TestSize(100/rank));
         autoInitTst.testNoFail("testConvolveNNb0",
             (NArray!(T,rank)a,SizedRandomNArray!(int,ctfe_powI(3,rank)) flatK){
-                index_type[rank] kShape=3; auto kernel=reshape(flatK.arr,kShape);
+				   index_type[rank] kShape=3; auto kernel=reshapeR!(rank)(flatK.arr,kShape);
                 testConvolveNN!(T,rank,Border.Same)(a,kernel);
             },__LINE__,__FILE__,coll,TestSize(100/rank));
         autoInitTst.testNoFail("testConvolveNN1b+",(NArray!(T,rank)a){
-            index_type[rank] kShape=3; testConvolveNN!(T,rank,Border.Increase)(a,ones!(T)(kShape)); },
+		index_type[rank] kShape=3; testConvolveNN!(T,rank,Border.Increase)(a,NArray!(T,rank).ones(kShape)); },
             __LINE__,__FILE__,coll,TestSize(100/rank));
         autoInitTst.testNoFail("testConvolveNNb+",
             (NArray!(T,rank)a,SizedRandomNArray!(int,ctfe_powI(3,rank)) flatK){
-                index_type[rank] kShape=3; auto kernel=reshape(flatK.arr,kShape);
+				   index_type[rank] kShape=3; auto kernel=reshapeR!(rank)(flatK.arr,kShape);
                 testConvolveNN!(T,rank,Border.Increase)(a,kernel);
             },__LINE__,__FILE__,coll,TestSize(100/rank));
         autoInitTst.testNoFail("testConvolveNN1b-",(NArray!(T,rank)a){
-            index_type[rank] kShape=3; testConvolveNN!(T,rank,Border.Decrease)(a,ones!(T)(kShape)); },
+		index_type[rank] kShape=3; testConvolveNN!(T,rank,Border.Decrease)(a,NArray!(T,rank).ones(kShape)); },
             __LINE__,__FILE__,coll,TestSize(100/rank));
         autoInitTst.testNoFail("testConvolveNNb-",
             (NArray!(T,rank)a,SizedRandomNArray!(int,ctfe_powI(3,rank)) flatK){
-                index_type[rank] kShape=3; auto kernel=reshape(flatK.arr,kShape);
+				   index_type[rank] kShape=3; auto kernel=reshapeR!(rank)(flatK.arr,kShape);
                 testConvolveNN!(T,rank,Border.Decrease)(a,kernel);
             },__LINE__,__FILE__,coll,TestSize(100/rank));
     }
@@ -765,7 +765,7 @@ void doNArrayFixTests(){
     foreach (i,j,k,v;a4.pFlat){
         if (2*v!=a6[i,j,k]) throw new Exception("error",__FILE__,__LINE__);
     }
-    auto large1=reshape!(NArray!(int,1),int,2)(arange(150),[15,10]);
+    auto large1=reshape(arange(150),15,10);
     auto large2=large1[Range(10)];
     auto l2=large2.dup;
     auto large3=l2.T;
@@ -782,7 +782,7 @@ void doNArrayFixTests(){
         v+=i+j;
     }
     auto r32=dot(a3,a2);
-    auto t=zeros!(int)(r32.shape);
+    auto t=NArray!(int,1).zeros(r32.shape);
     for (int i=0;i<a3.shape[0];++i)
         for (int j=0;j<a3.shape[1];++j)
             t[i]=t[i]+a3[i,j]*a2[j];

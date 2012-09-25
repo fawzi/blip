@@ -337,7 +337,7 @@ string preConvolveIJSetup(string indent,string inAName,string outAName,Border bo
     
         res~=indent~"if (imin==1)\n";
         res~=indent~"    irest=-1;\n";
-        res~=indent~"int switchTag=jrest;\n";
+        res~=indent~"int switchTag=cast(int)jrest;\n";
         res~=indent~"if (irest==-1) switchTag-=10;\n";
         res~=indent~"if (imin<=0 || jmin<=0) switchTag=-1000;\n";
         res~=indent~"index_type resStrideI="~outAName~".bStrides[rank-2];\n";
@@ -450,7 +450,7 @@ body{
                 el+=cast(index_type)2*cast(index_type)cast(int)border;
             }
         }
-        outA=zeros!(T)(outShape);
+        outA=NArray!(T,rank).zeros(outShape);
     }
     if (outA.flags & ArrayFlags.Zero) return outA;
     index_type iG=cast(index_type)cast(int)border-cast(index_type)1;
@@ -531,7 +531,7 @@ body{
                 el+=cast(index_type)2*cast(index_type)cast(int)border;
             }
         }
-        outA=zeros!(T)(outShape);
+        outA=NArray!(T,rank).zeros(outShape);
     }
     if (outA.flags & ArrayFlags.Zero) return outA;
     static if(rank==1){
