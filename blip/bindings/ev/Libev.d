@@ -330,7 +330,7 @@ extern(C){
 
             ev_timer timer;     // private
             ev_tstamp interval; // ro
-            char *path;   // ro
+            const(char) *path;   // ro
             ev_statdata prev;   // ro
             ev_statdata attr;   // ro
             int wd; // wd for inotify, fd for kqueue
@@ -642,7 +642,7 @@ void ev_child_set(ev_child* w, int pid, int trace)
 }
 
 static if (EV_STAT_ENABLE){
-    void ev_stat_set(ev_stat* w, char* path, ev_tstamp interval)
+    void ev_stat_set(ev_stat* w, const(char)* path, ev_tstamp interval)
     {
         w.path = path;
         w.interval = interval;
@@ -722,7 +722,7 @@ void ev_child_init(ev_child* w, childCbF cb,
 static if (EV_STAT_ENABLE){
     alias callBackF!(ev_stat*) statCbF;
     void ev_stat_init(ev_stat* w, statCbF cb,
-            char* path, ev_tstamp interval)
+            const(char)* path, ev_tstamp interval)
     {
         ev_init!(ev_stat*)(w, cb);
         ev_stat_set(w, path, interval);

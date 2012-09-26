@@ -25,7 +25,7 @@ import Integer=tango.text.convert.Integer;
 import blip.Comp;
 
 long fib(long n){
-    auto tAtt=taskAtt.val;
+    auto tAtt=taskAtt;
     if (n<2) return 1;
     long f1;
     long f2;

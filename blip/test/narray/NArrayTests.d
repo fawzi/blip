@@ -655,11 +655,11 @@ void testSerial(T,int rank)(NArray!(T,rank)a){
 TestCollection narrayRTst1(T,int rank)(TestCollection superColl){
     TestCollection coll=new TestCollection("NArray!("~T.stringof~","~ctfe_i2s(rank)~")",
         __LINE__,__FILE__,superColl);
-    autoInitTst.testNoFail("loopCheck1",(NArray!(T,rank) x){checkLoop1!(T,rank)(x);},
+    autoInitTst.testNoFailF("loopCheck1",&checkLoop1!(T,rank),
         __LINE__,__FILE__,coll);
-    autoInitTst.testNoFail("testSumAll",(NArray!(T,rank) d){ testSumAll!(T,rank)(d); },
+    autoInitTst.testNoFailF("testSumAll",&testSumAll!(T,rank),
         __LINE__,__FILE__,coll);
-    autoInitTst.testNoFail("testSumAxis",(NArray!(T,rank) d,Rand r){ testSumAxis!(T,rank)(d,r); },
+/+    autoInitTst.testNoFail("testSumAxis",(NArray!(T,rank) d,Rand r){ testSumAxis!(T,rank)(d,r); },
         __LINE__,__FILE__,coll);
     autoInitTst.testNoFail("testMultAll",(NArray!(T,rank) d){ testMultAll!(T,rank)(d); },
         __LINE__,__FILE__,coll);
@@ -723,7 +723,7 @@ TestCollection narrayRTst1(T,int rank)(TestCollection superColl){
                     __LINE__,__FILE__,coll);
             }
         }
-    }
+    }+/
     return coll;
 }
 

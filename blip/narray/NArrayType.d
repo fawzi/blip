@@ -93,8 +93,8 @@ enum ArrayFlags {
     ExtFlags = ReadOnly,
     All = Contiguous | Fortran | Compact1 | Compact2 | Small | Large| ReadOnly| Zero, // useful ??
     None = 0,
-    /// a dummy (not initialized) array
-    Dummy = 0x200,
+    /// an initialized array
+    Initialized = 0x200,
 }
 
 alias ptrdiff_t index_type; // switch back to int later?
@@ -234,12 +234,12 @@ else {
         /// size of the array
         index_type nElArray;
         /// flags to quickly check properties of the array
-        uint flags = ArrayFlags.Dummy;
+        uint flags;
         /// owner of the data if it is manually managed
-        Guard mBase = null;
+        Guard mBase;
 	/// if this is a dummy (invalid) array
 	@property bool isDummy(){
-	    return (flags&ArrayFlags.Dummy)!=0;
+	    return !(flags&ArrayFlags.Initialized)==0;
 	}
         /// the underlying data slice
         V[] data() {
@@ -382,6 +382,7 @@ else {
             if (bSize>30*cast(index_type)V.sizeof || bSize>100*cast(index_type)V.sizeof) {
                 flags|=Flags.Large;
             }
+	    flags|=Flags.Initialized;
             return flags;
         }
         

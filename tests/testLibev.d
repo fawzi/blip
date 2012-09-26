@@ -23,6 +23,7 @@ import blip.io.Console;
 import stdlib = blip.stdc.stdlib;
 import unistd = tango.stdc.posix.unistd;
 import blip.stdc.stringz;
+import blip.stdc.string:strlen;
 import signal=tango.stdc.posix.signal;
 import fcntl = tango.stdc.posix.fcntl;
 enum { SIGINT = 2 }
@@ -109,8 +110,8 @@ extern (C) static void cbtimer(ev_loop_t* loop, ev_timer* w,
     sout("\t\topening pipe for writing...\n");
     int pipe_fd = *cast (int*) w.data;
     sout("\t\twriting '")(TEST_TEXT)("' to pipe...\n");
-    int n = unistd.write(pipe_fd, cast (void*) TEST_TEXT,
-            TEST_TEXT.length);
+    long n = unistd.write(pipe_fd, cast (void*) TEST_TEXT,
+			  cast(int)TEST_TEXT.length);
     aassert (n == TEST_TEXT.length,__LINE__);
 }
 extern (C) static void cbio(ev_loop_t* loop, ev_io* w, int revents)
@@ -129,7 +130,7 @@ extern (C) static void cbio(ev_loop_t* loop, ev_io* w, int revents)
     ev_io_stop(loop, w);
     char[TEST_TEXT.length] buffer;
     sout("\treading ")(buffer.length)(" bytes from pipe...");
-    int n = unistd.read(w.fd, cast (void*) buffer, buffer.length);
+    long n = unistd.read(w.fd, cast (void*) buffer, buffer.length);
     aassert (n == TEST_TEXT.length,__LINE__);
     aassert (buffer.dup == TEST_TEXT.dup,__LINE__);
     sout("\tread '")(buffer)("'\n");
@@ -140,7 +141,7 @@ extern (C) static void cbio(ev_loop_t* loop, ev_io* w, int revents)
     aassert (fd != -1,__LINE__);
     sout("\t\tfd: ")(fd)("\n");
     n = unistd.write(fd, cast (void*) TEST_TEXT,
-            TEST_TEXT.length);
+		     TEST_TEXT.length);
     aassert (n == TEST_TEXT.length,__LINE__);
     unistd.close(fd);
 }
@@ -172,7 +173,7 @@ extern (C) static void cbstat(ev_loop_t* loop, ev_stat* w, int revents)
     }
     if (w.attr.st_nlink)
     {
-        sout("\tfile '")(fromStringz(w.path))("' changed\n");
+        sout("\tfile '")(w.path[0..strlen(w.path)])("' changed\n");
         sout("\t\tprevios state:\n");
         print_stat(&w.prev);
         sout("\t\tcurrent state:\n");
@@ -180,7 +181,7 @@ extern (C) static void cbstat(ev_loop_t* loop, ev_stat* w, int revents)
     }
     else
     {
-        sout("\tfile '")(fromStringz(w.path))("' does not exist!\n");
+        sout("\tfile '")(w.path[0..strlen(w.path)])("' does not exist!\n");
         sout("\t\tprevios state:\n");
         print_stat(&w.prev);
     }
@@ -287,7 +288,7 @@ extern (C) static void cbsignal(ev_loop_t* loop, ev_signal* w,
     sout("\t\topening pipe for writing...\n");
     int pipe_fd = *cast(int*)w.data;
     sout("\t\twriting '%s' to pipe...")(TEST_TEXT)("\n");
-    int n = unistd.write(pipe_fd, cast(void*)TEST_TEXT,
+    long n = unistd.write(pipe_fd, cast(void*)TEST_TEXT,
             TEST_TEXT.length);
     aassert (n == TEST_TEXT.length,__LINE__);
 }
@@ -307,7 +308,7 @@ extern (C) static void ecbio(ev_loop_t* loop, ev_io* w, int revents)
     //ev_io_stop(loop, w);
     char[TEST_TEXT.length] buffer;
     sout("\treading ")(buffer.length)(" bytes from pipe...\n");
-    int n = unistd.read(w.fd, cast (void*) buffer, buffer.length);
+    long n = unistd.read(w.fd, cast (void*) buffer, buffer.length);
     aassert (n == TEST_TEXT.length,__LINE__);
     aassert (buffer.dup == TEST_TEXT.dup,__LINE__);
     sout("\tread '")(buffer)("'\n");
@@ -358,7 +359,7 @@ void main(){
 
     int[2] epipe;
     {
-        int ret = unistd.pipe(epipe);
+        int ret = unistd.pipe(epipe.ptr);
         aassert (ret == 0,__LINE__);
     }
     ev_io_init(&ewio, &ecbio, epipe[0], EV_READ);
@@ -366,7 +367,7 @@ void main(){
 
     int[2] pipe;
     {
-        int ret = unistd.pipe(pipe);
+        int ret = unistd.pipe(pipe.ptr);
         aassert (ret == 0,__LINE__);
     }
 
