@@ -276,7 +276,7 @@ struct Resubmitter{
             //delete this; // not possible anymore in D2
         }
     }
-    __gshared static PoolI!(Resubmitter*) gPool;
+    static __gshared PoolI!(Resubmitter*) gPool;
     shared static this(){
         gPool=cachedPool(function Resubmitter*(PoolI!(Resubmitter*)p){
             auto res=new Resubmitter;

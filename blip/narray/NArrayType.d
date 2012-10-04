@@ -224,7 +224,7 @@ else {
         enum :int{ dim=rank };
         alias ArrayFlags Flags;
         // default optimal chunk size for parallel looping
-        __gshared static index_type defaultOptimalChunkSize=defaultSimpleLoopSize/cast(index_type)V.sizeof;
+        static __gshared index_type defaultOptimalChunkSize=defaultSimpleLoopSize/cast(index_type)V.sizeof;
         /// pointer to the element 0,...0 (not necessarily the start of the slice)
         V* startPtrArray;
         /// strides multiplied by V.sizeof (can be negative)
@@ -1829,7 +1829,7 @@ else {
         }
         // ---- Serialization ---
         /// meta information for serialization
-        __gshared static ClassMetaInfo metaI;
+        static __gshared ClassMetaInfo metaI;
         /// registers this type into the serialization facilities
         //static void registerSerialization(){
         shared static this(){

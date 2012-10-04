@@ -28,7 +28,7 @@ version(Xpose){
     template NewSerializationExpose_mix0() {
         static string begin(string target) {
             return `
-            __gshared static ClassMetaInfo serializationMetaInfo;
+            static __gshared ClassMetaInfo serializationMetaInfo;
         
             ClassMetaInfo getSerializationMetaInfo() {
                 return serializationMetaInfo;

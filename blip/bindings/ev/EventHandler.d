@@ -92,7 +92,7 @@ struct EventHandler{
             clear();
         }
     }
-    __gshared static PoolI!(EventHandler*) gPool;
+    static __gshared PoolI!(EventHandler*) gPool;
     shared static this(){
         gPool=cachedPool(function EventHandler*(PoolI!(EventHandler*)p){
             auto res=new EventHandler;

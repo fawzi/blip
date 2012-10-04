@@ -181,12 +181,12 @@ string rpcProxyMixin(string name,string extName,string extraInterfaces,string []
                     // delete this;
                 }
             }
-            __gshared static PoolI!(OnewayClosure*) gPool;
-            __gshared static Mutex gLock;
+            static __gshared PoolI!(OnewayClosure*) gPool;
+            static __gshared Mutex gLock;
             shared static this(){
                 gLock=new Mutex();
             }
-            __gshared static size_t gPoolLevel;
+            static __gshared size_t gPoolLevel;
             static void addGPool(){
                 synchronized(gLock){
                     if (gPoolLevel==0){
@@ -416,12 +416,12 @@ string rpcVendorMixin(string name,string extName_, string [] functionsComments){
                     // delete this;
                 }
             }
-            __gshared static PoolI!(Closure*) gPool;
-            __gshared static Mutex gLock;
+            static __gshared PoolI!(Closure*) gPool;
+            static __gshared Mutex gLock;
             shared static this(){
                 gLock=new Mutex();
             }
-            __gshared static size_t gPoolLevel;
+            static __gshared size_t gPoolLevel;
             static void addGPool(){
                 synchronized(gLock){
                     if (gPoolLevel==0){

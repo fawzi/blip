@@ -325,14 +325,14 @@ enum {
 /*
  * NULL handles
  */
-__gshared const MPI_Group MPI_GROUP_NULL;
-__gshared const MPI_Comm MPI_COMM_NULL;
-__gshared const MPI_Request MPI_REQUEST_NULL;
-__gshared const MPI_Op MPI_OP_NULL;
-__gshared const MPI_Errhandler MPI_ERRHANDLER_NULL;
-__gshared const MPI_Info MPI_INFO_NULL;
-__gshared const MPI_Win MPI_WIN_NULL;
-__gshared const MPI_File MPI_FILE_NULL;
+__gshared const( MPI_Group ) MPI_GROUP_NULL;
+__gshared const( MPI_Comm ) MPI_COMM_NULL;
+__gshared const( MPI_Request ) MPI_REQUEST_NULL;
+__gshared const( MPI_Op ) MPI_OP_NULL;
+__gshared const( MPI_Errhandler ) MPI_ERRHANDLER_NULL;
+__gshared const( MPI_Info ) MPI_INFO_NULL;
+__gshared const( MPI_Win ) MPI_WIN_NULL;
+__gshared const( MPI_File ) MPI_FILE_NULL;
 shared static this(){
     MPI_GROUP_NULL = cast(MPI_Group)&ompi_mpi_group_null;
     MPI_COMM_NULL = cast(MPI_Comm)&ompi_mpi_comm_null;

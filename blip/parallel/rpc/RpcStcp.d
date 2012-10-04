@@ -62,7 +62,7 @@ struct StcpRequest{
     TaskI toResume;
     PoolI!(StcpRequest*) pool;
     char[24] reqBuf;
-    __gshared static PoolI!(StcpRequest*) gPool;
+    static __gshared PoolI!(StcpRequest*) gPool;
     shared static this(){
         gPool=cachedPool(function StcpRequest*(PoolI!(StcpRequest*)p){
             auto res=new StcpRequest;
@@ -470,7 +470,7 @@ class StcpConnection{
 
 /// handles vending (and possibly also receiving the results if using one channel for both)
 class StcpProtocolHandler: ProtocolHandler{
-    __gshared static string [] selfHostnames;
+    static __gshared string [] selfHostnames;
     scope CharSink log;
     RandomSync rand;
     LoopHandlerI loop;

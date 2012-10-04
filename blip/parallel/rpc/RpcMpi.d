@@ -31,7 +31,7 @@ import blip.Comp;
 
 /// handles vending (and possibly also receiving the results if using one channel for both)
 class MpiProtocolHandler: ProtocolHandler{
-    __gshared static MpiProtocolHandler[string ] mpiProtocolHandlers;
+    static __gshared MpiProtocolHandler[string ] mpiProtocolHandlers;
     
     /// those that can actually handle the given protocol
     static ProtocolHandler findHandlerForUrl(ParsedUrl url){

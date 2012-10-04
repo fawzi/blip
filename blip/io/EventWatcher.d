@@ -488,7 +488,7 @@ class TimeoutManager:LoopHandlerI{
             delayLevel=0;
             status=Status.NotStarted;
         }
-        __gshared static PoolI!(TimedEvent*) gPool;
+        static __gshared PoolI!(TimedEvent*) gPool;
         shared static this(){
             gPool=cachedPool(function TimedEvent*(PoolI!(TimedEvent*)p){
                 auto res=new TimedEvent;

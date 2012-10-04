@@ -67,7 +67,7 @@ import blip.stdc.stdlib: abort;
 /// integrate PriQueue in this? it would be slighly more efficient, and already now
 /// depends on its implementation details, or they should be better separated
 class PriQScheduler:TaskSchedulerI {
-    __gshared static CachedT!(PriQueue!(TaskI).PriQPool) pQLevelPool;
+    static __gshared CachedT!(PriQueue!(TaskI).PriQPool) pQLevelPool;
     shared static this(){
         pQLevelPool=new CachedT!(PriQueue!(TaskI).PriQPool)("PriQPool_",function PriQueue!(TaskI).PriQPool(){
             auto res=new PriQueue!(TaskI).PriQPool();
@@ -580,7 +580,7 @@ class PriQScheduler:TaskSchedulerI {
     int nSimpleTasksWanted(){ return 4; }
     // add ref counting
     mixin RefCountMixin!();
-    __gshared static CachedPool!(PriQScheduler) gPool;
+    static __gshared CachedPool!(PriQScheduler) gPool;
     shared static this(){
         gPool=cachedPoolNext(function PriQScheduler(PoolI!(PriQScheduler)p){
             auto res=new PriQScheduler(p);

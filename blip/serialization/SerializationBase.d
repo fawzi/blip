@@ -653,7 +653,7 @@ class SerializationRegistry {
     }
     
     static typeof(this) opCall() {
-        __gshared static typeof(this) instance;
+        static __gshared typeof(this) instance;
         if (instance is null) instance = new typeof(this);
         return instance;
     }

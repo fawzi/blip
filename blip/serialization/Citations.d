@@ -66,7 +66,7 @@ class CitationDB{
         return citations[key];
     }
     /// default instance
-    __gshared static CitationDB defaultDb;
+    static __gshared CitationDB defaultDb;
     shared static this(){
         defaultDb=new CitationDB();
     }

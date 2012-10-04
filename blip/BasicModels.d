@@ -91,7 +91,7 @@ class EmptyFIterator(T):FIteratorI!(T){
     }
     ForeachableI!(T) parallelLoop(size_t optimalChunkSize){ return this; }
     ForeachableI!(T) parallelLoop() { return this; }
-    __gshared static EmptyFIterator instance;
+    static __gshared EmptyFIterator instance;
     shared static this(){ instance=new EmptyFIterator; }
 }
 

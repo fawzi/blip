@@ -142,7 +142,7 @@ class WeakList(T){
     }
     alias EntryCacheT!() EntryCache;
     
-    __gshared static Cached!(EntryCache) eCache;
+    static __gshared Cached!(EntryCache) eCache;
     
     Deque!(JournalEntry) journal;
     long journalFirstId;

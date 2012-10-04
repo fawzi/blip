@@ -131,7 +131,7 @@ struct BulkArray(T){
         None=0,
         Initialized,
     }
-    __gshared static size_t defaultOptimalBlockSize=100*1024/T.sizeof;
+    static __gshared size_t defaultOptimalBlockSize=100*1024/T.sizeof;
     enum BulkArrayCallocSize=100*1024;
     T* ptr, ptrEnd;
     ChunkGuard guard;
@@ -148,7 +148,7 @@ struct BulkArray(T){
     }
 
     // ---- Serialization ---
-    __gshared static ClassMetaInfo metaI;
+    static __gshared ClassMetaInfo metaI;
     shared static this(){
         synchronized{
             if (metaI is null){

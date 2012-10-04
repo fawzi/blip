@@ -482,7 +482,7 @@ struct GenericWatcher{
         return cast(TP)ptr_;
     }
     // global pool - static methods
-    __gshared static PoolI!(GenericWatcher) gPool;
+    static __gshared PoolI!(GenericWatcher) gPool;
     shared static this(){
         gPool=cachedPool( function GenericWatcher(PoolI!(GenericWatcher)p){
             GenericWatcher res;

@@ -158,7 +158,7 @@ version(Posix){
                 }
             }
         }
-        __gshared static TraceAll tracer;
+        static __gshared TraceAll tracer;
         shared static this(){
             tracer=new TraceAll();
             static if (Tango.Major==1) {} else {

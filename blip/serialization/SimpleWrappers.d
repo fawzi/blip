@@ -46,7 +46,7 @@ struct LazyArray(T) {
         this.addOp=addOp;
         this.setLen=setLen;
     }
-    __gshared static ClassMetaInfo metaI;
+    static __gshared ClassMetaInfo metaI;
     shared static this(){
         if (metaI is null){
             metaI=ClassMetaInfo.createForType!(typeof(this))("LazyArray!("~T.mangleof~")",
@@ -129,7 +129,7 @@ struct LazyAA(K,V) {
         res.setLen=setLen;
         return res;
     }
-    __gshared static ClassMetaInfo metaI;
+    static __gshared ClassMetaInfo metaI;
     shared static this(){
         if (metaI is null){
             metaI=ClassMetaInfo.createForType!(typeof(this))("LazyAA!("~K.mangleof~","~V.mangleof~")",

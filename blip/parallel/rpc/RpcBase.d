@@ -413,7 +413,7 @@ class BasicVendor:ObjVendorI{
         size_t reqIdLen;
         T res;
         PoolI!(SimpleReplyClosure*) pool;
-        __gshared static PoolI!(SimpleReplyClosure*) gPool;
+        static __gshared PoolI!(SimpleReplyClosure*) gPool;
         @property ubyte[] reqId(){
             if (reqIdPtr is null){
                 return reqIdBuf[0..reqIdLen];
@@ -701,7 +701,7 @@ class BasicProxy: Proxy {
         proxyObjUrl=url;
         _proxyName=name;
     }
-    __gshared static ClassMetaInfo metaI;
+    static __gshared ClassMetaInfo metaI;
     shared static this(){
         metaI=ClassMetaInfo.createForType!(typeof(this))("blip.parallel.rpc.BasicProxy","a proxy base class");
         metaI.addFieldOfType!(string )("proxyObjUrl","url identifying the proxied object");
@@ -945,13 +945,13 @@ class FailureManager{
 class ProtocolHandler{
     /// the default protocol handler (to vend objects)
     /// this defaults to StcpProtocol handler if included
-    __gshared static ProtocolHandler defaultProtocol;
+    static __gshared ProtocolHandler defaultProtocol;
     scope CharSink log;
     // static part (move to a singleton?)
     
     alias ProtocolHandler function(ParsedUrl url) ProtocolGetter;
     /// those that can actually handle the given protocol
-    __gshared static ProtocolGetter[string ] protocolHandlers;
+    static __gshared ProtocolGetter[string ] protocolHandlers;
     /// registers a handler for a given protocol
     static void registerProtocolHandler(string protocol,ProtocolGetter pH){
         assert((protocol in protocolHandlers)is null,"duplicate handler for protocol "~protocol);
@@ -973,8 +973,8 @@ class ProtocolHandler{
         Proxy function(string name,string url) proxyCreator;
         Proxy function(string name,string url) localProxyCreator;
     }
-    __gshared static ProxyCreators[string ] proxyCreators;
-    __gshared static Mutex proxyCreatorsLock;
+    static __gshared ProxyCreators[string ] proxyCreators;
+    static __gshared Mutex proxyCreatorsLock;
     FailureManager failureManager;
     
     shared static this(){

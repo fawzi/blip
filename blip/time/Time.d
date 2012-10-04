@@ -6,7 +6,7 @@ public import tango.time.Time:Time;
 import blip.serialization.Serialization;
 
 /// add serialization of Time struct...
-__gshared static ClassMetaInfo timeMetaI;
+static __gshared ClassMetaInfo timeMetaI;
 /// serialization of Time struct
 void serializeTime(Serializer s,ClassMetaInfo mInfo,void* o){
     assert(mInfo is timeMetaI);

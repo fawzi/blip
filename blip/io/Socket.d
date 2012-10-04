@@ -488,7 +488,7 @@ class SocketServer{
             res.port=Idup(res.port);
             return res;
         }
-        __gshared static PoolI!(Handler*)gPool;
+        static __gshared PoolI!(Handler*)gPool;
         shared static this(){
             gPool=cachedPool(function Handler*(PoolI!(Handler*)p){
                 auto res=new Handler;

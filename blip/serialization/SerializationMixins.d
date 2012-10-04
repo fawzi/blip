@@ -60,7 +60,7 @@ string serializeSome(string typeName1,string doc,string fieldsDoc){
     bool classAddPost=true;
     string typeName=typeName1;
     string res="";
-    res~="__gshared static ClassMetaInfo metaI;\n";
+    res~="static __gshared ClassMetaInfo metaI;\n";
     res~="shared static this(){\n";
     res~="    if (metaI!is null) return;\n";
     res~="    metaI=ClassMetaInfo.createForType!(typeof(this))(";
@@ -173,7 +173,7 @@ string createView(string viewName,string doc,string fieldsDoc,string baseType=""
         `~baseType~` el;`;
     
     res~=`
-        __gshared static ClassMetaInfo metaI;
+        static __gshared ClassMetaInfo metaI;
         shared static this(){
             metaI=ClassMetaInfo.createForType!(typeof(this))(typeof(this).mangleof,`~
             "`"~doc~"`);";

@@ -95,7 +95,7 @@ version(mpi)
     }
 
     class MpiSerializer:SBinSerializer{
-	__gshared static MpiSerializer freeList;
+	static __gshared MpiSerializer freeList;
         MpiSerializer next;
         int tag;
         LocalGrowableArray!(ubyte) msgData;
@@ -160,7 +160,7 @@ version(mpi)
     }
 
     class MpiUnserializer:SBinUnserializer{
-        __gshared static MpiUnserializer freeList;
+        static __gshared MpiUnserializer freeList;
         SerializedMessage msg;
         MpiUnserializer next;
         static MpiUnserializer opCall(SerializedMessage msg){
@@ -822,7 +822,7 @@ version(mpi)
     
     }
 
-    __gshared static LinearComm mpiWorld;
+    static __gshared LinearComm mpiWorld;
     shared static this(){
         mpiWorld=new MpiLinearComm();
     }
@@ -831,7 +831,7 @@ version(mpi)
     public import blip.parallel.mpi.MpiModels;
     import blip.parallel.mpi.SingleNode;
     
-    __gshared static LinearComm mpiWorld;
+    static __gshared LinearComm mpiWorld;
     shared static this(){
         mpiWorld=new SNLinearComm();
     }

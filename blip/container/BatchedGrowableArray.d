@@ -218,9 +218,9 @@ class BatchedGrowableArray(T,int batchSize1=((2048/T.sizeof>128)?2048/T.sizeof:1
                 }
             }
             
-            __gshared static PoolI!(Batch *) pool;
-            __gshared static size_t poolLevel;
-            __gshared static Mutex poolLock;
+            static __gshared PoolI!(Batch *) pool;
+            static __gshared size_t poolLevel;
+            static __gshared Mutex poolLock;
             shared static this(){
                 if (poolLock is null) poolLock=new Mutex(); // avoid prealloc?
             }
@@ -586,7 +586,7 @@ class BatchedGrowableArray(T,int batchSize1=((2048/T.sizeof>128)?2048/T.sizeof:1
     }
     
     static if (isCoreType!(T) ||is(typeof(T.init.serialize(Serializer.init)))) {
-        __gshared static ClassMetaInfo metaI;
+        static __gshared ClassMetaInfo metaI;
         shared static this(){
             if (metaI is null){
                 metaI=ClassMetaInfo.createForType!(typeof(this))("blip.container.BatchedGrowableArray("~T.mangleof~")","a batched growable array");

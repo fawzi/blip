@@ -410,7 +410,7 @@ class Deque(T):CopiableObjectI{
     }
     
     static if (isCoreType!(T) ||is(typeof(T.init.serialize(Serializer.init)))) {
-        __gshared static ClassMetaInfo metaI;
+        static __gshared ClassMetaInfo metaI;
         shared static this(){
             if (metaI is null){
                 metaI=ClassMetaInfo.createForType!(typeof(this))("blip.container.Deque("~T.mangleof~")","a threadsafe double ended queue");

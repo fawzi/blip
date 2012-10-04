@@ -445,7 +445,7 @@ class RunTestsArgs{
 /// test* functions in the testInit template
 class SingleRTest{
     /// the default test controller
-    __gshared static TestControllerI defaultTestController;
+    static __gshared TestControllerI defaultTestController;
     shared static this(){ defaultTestController=new TextController(); }
 
     /+  --- test info --- +/

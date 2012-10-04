@@ -416,7 +416,7 @@ class ExplicitTopology(NodeType): Topology!(NodeType){
             subNodes.length=size;
             superNodes.length=size;
         }
-        __gshared static ClassMetaInfo metaI;
+        static __gshared ClassMetaInfo metaI;
         shared static this(){
             metaI=ClassMetaInfo.createForType!(typeof(this))("ExplicitTopology!("~NodeType.stringof~").NumaLevel",
                 "a level of a numa hierarcy");
@@ -500,7 +500,7 @@ class ExplicitTopology(NodeType): Topology!(NodeType){
         return new ArrayIterator!(NodeType)(levels[node.level].subNodes[node.pos],start);
     }
     
-    __gshared static ClassMetaInfo metaI;
+    static __gshared ClassMetaInfo metaI;
     shared static this(){
         metaI=ClassMetaInfo.createForType!(typeof(this))("ExplicitTopology!("~NodeType.stringof~")",
             "an explicit topology structure (stored in memory)");
@@ -537,7 +537,7 @@ class ExplicitNumaTopology: ExplicitTopology!(NumaNode), NumaTopology {
     SocketInfo nextSocket(NumaNode){ SocketInfo res; return res; }
     bool bindToNode(NumaNode n,bool singlify=false){ return false; }
     
-    __gshared static ClassMetaInfo metaI;
+    static __gshared ClassMetaInfo metaI;
     shared static this(){
         metaI=ClassMetaInfo.createForType!(typeof(this))("ExplicitNumaTopology",
             "an explicit numa topology");
@@ -682,7 +682,7 @@ version(noHwloc){} else {
             int level; /// the maximum level of the childrens
             int depth2,maxDepth;
             PoolI!(RandomChildernIterator) pool;
-            __gshared static PoolI!(RandomChildernIterator) gPool;
+            static __gshared PoolI!(RandomChildernIterator) gPool;
         
             bool descend(){
                 if (left[lastStack]==0) return false;
@@ -1027,7 +1027,7 @@ version(noHwloc){} else {
             return RandomChildernIterator(this,childrens,start,node.level-1);
         }
     
-    /+    __gshared static ClassMetaInfo metaI;
+    /+    static __gshared ClassMetaInfo metaI;
         shared static this(){
             metaI=ClassMetaInfo.createForType!(typeof(this))("HwlocTopology","numa topology derivad from hwloc");
             metaI.addFieldOfType!(NumaLevel[])("levels","the levels of this topology");
