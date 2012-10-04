@@ -630,7 +630,7 @@ class IOArray : Conduit, InputBuffer, OutputBuffer, Conduit.Seek
                 dg = callback to provide buffer access to
 
                 Returns:
-                Returns whatever The delegate returns.
+                Returns whatever the delegate returns.
 
                 Remarks:
                 Exposes the raw data buffer at the current _read position. The

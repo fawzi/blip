@@ -23,14 +23,6 @@ import blip.Comp;
 struct BitVector(size_t len){
     internal_t[(len+internal_t.sizeof*8-1)/(internal_t.sizeof*8)] data;
     
-    /+static BitVector opCall(bool[] vals){
-        assert(vals.length==len);
-        BitVector res;
-        for (size_t i=0;i<len;++i){
-            res[i]=vals[i];
-        }
-        return res;
-    }+/
 
     this(bool[] vals){
         assert(vals.length==len);
@@ -50,9 +42,10 @@ struct BitVector(size_t len){
     void opAssign( BitVector bits )
     {
         assert(bits.length==len);
-        for (size_t i=0;i<len;++i){
+        this.data[]=bits.data;
+/+        for (size_t i=0;i<len;++i){
             this[i]=bits[i];
-        }
+        }+/
     }
     void opAssign( bool[] bits )
     {

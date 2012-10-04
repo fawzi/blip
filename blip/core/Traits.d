@@ -21,15 +21,6 @@ int cmp(T,U)(T t,U u){
     }
 }
 
-/+
-/// combines two hashes
-extern(C) hash_t rt_hash_combine( hash_t val1, hash_t val2 );
-/// hashes length bytes
-extern(C) hash_t rt_hash_str(const(void) *bStart,size_t length, hash_t seed=0);
-/// hashes the size_t aligned block bStart[0..length]
-extern(C) hash_t rt_hash_block(const(size_t) *bStart,size_t length, hash_t seed=0);
-+/
-
 /// returns a valid hash for the given value, this might be different than the default D hash!
 hash_t getHash(U)(U t){
     alias UnqualAll!(U) T;

@@ -231,7 +231,7 @@ class Cache{
 
 /// global (one per process) cache
 __gshared Cache gCache;
-static this(){
+shared static this(){
     gCache=new Cache();
 }
 

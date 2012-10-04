@@ -598,11 +598,11 @@ class FormattedWriteHandlers(U=char): WriteHandlers{
     }
     /// writes a raw string
     void writeStr(TT)(in TT[]data){
-	UnqualAll!(TT) T;
+	alias UnqualAll!(TT) T;
         static if (is(T==U)){
             writer(data);
         } else static if (is(T==char)||is(T==wchar)||is(T==dchar)){
-            U[] s;
+	    const(U)[] s;
             if (data.length<240){
                 U[256] buf;
                 s=convertToString!(U)(data,buf);
@@ -611,7 +611,7 @@ class FormattedWriteHandlers(U=char): WriteHandlers{
             }
             writer(s);
         } else {
-            assert(0,"unsupported type "~T.stringof);
+            static assert(0,"unsupported type "~T.stringof);
         }
     }
     override void rawWriteStrC(in cstring s){

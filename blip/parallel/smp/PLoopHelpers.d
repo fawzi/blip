@@ -514,8 +514,12 @@ class PLoopIter(T){
             }
         }
         void giveBack(){
-            if (pool) pool.giveBack(&this);
-            // else delete this;
+            if (pool){
+		pool.giveBack(&this);
+	    }else{
+		LoopEl dummy;
+		this=dummy;
+	    }
         }
     }
     

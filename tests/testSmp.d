@@ -23,6 +23,7 @@ import blip.container.GrowableArray;
 import blip.io.BasicIO;
 import blip.core.Thread;
 import blip.parallel.smp.DataFlowVar;
+import blip.util.TangoLogConfig;
 version(NoTrace){} else { import blip.core.stacktrace.TraceExceptions; }
 import blip.io.Console;
 

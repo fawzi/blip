@@ -135,7 +135,7 @@ class TextParser(T) : InputFilter
         oldCharPos=charPos;
         charPos+=str.length;
         foreach(c;str){
-             if (c=='\n'){
+            if (c=='\n'){
                 ++line; col=0;
             } else {
                 ++col;

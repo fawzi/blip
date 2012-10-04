@@ -22,7 +22,8 @@ import blip.core.Variant:Variant;
 import blip.core.sync.Mutex;
 import blip.core.sync.Semaphore;
 import blip.math.Math;
-import blip.util.TangoLog;import blip.math.random.Random;
+import blip.util.TangoLog;
+import blip.math.random.Random;
 import blip.time.Time;
 import blip.time.Clock;
 import blip.io.BasicIO;
@@ -251,7 +252,7 @@ class PriQScheduler:TaskSchedulerI {
             t.status==TaskStatus.Started,"initial");
         debug(TrackQueues){
             sinkTogether(&logMsg,delegate void(scope CharSink s){
-                dumper(s)("will PriQScheduler ")(this,true)(".addTask0(")(t)(",with superTask:")(t.superTask)(" in task ")(taskAtt.val)("):");writeStatus(s,4);
+                dumper(s)("will PriQScheduler ")(this,true)(".addTask0(")(t)(",with superTask:")(t.superTask)(" in task ")(taskAtt)("):");writeStatus(s,4);
             });
             scope(exit){
                 sinkTogether(&logMsg,delegate void(scope CharSink s){

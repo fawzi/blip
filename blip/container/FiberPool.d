@@ -41,11 +41,10 @@ class FiberPoolT(int batchSize=16):Pool!(Fiber,batchSize){
     
     override Fiber clear(Fiber f){
         if (f !is null){
+            f.clear();
             //if (f.stackSize==stackSize){
-                f.clear();
-                return f;
-		//}
-		//delete f;
+	    return f;
+	    //}
         }
         return null;
     }

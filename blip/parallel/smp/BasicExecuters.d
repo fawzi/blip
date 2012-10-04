@@ -35,7 +35,7 @@ import blip.parallel.smp.Numa;
 import blip.container.Cache;
 import blip.Comp;
 
-static this(){
+shared static this(){
     version(DetailedLog){
         Log.lookup("blip.parallel.smp.exec").level(Logger.Level.Info,true);
     } else {

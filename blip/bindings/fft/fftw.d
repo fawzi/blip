@@ -74,19 +74,19 @@ struct fftw_iodim64_do_not_use_me {
 };
 
 
-alias void *fftw_plan;
-alias fftw_iodim_do_not_use_me fftw_iodim;
-alias fftw_iodim64_do_not_use_me fftw_iodim64;
+struct fftw_plan{ void *_plan; alias _plan this; }
+struct fftw_iodim{ fftw_iodim_do_not_use_me _iodim; alias _iodim this; }
+struct fftw_iodim64{ fftw_iodim64_do_not_use_me _iodim64; alias _iodim64 this; }
 alias fftw_r2r_kind_do_not_use_me fftw_r2r_kind;
 
-alias void *fftwf_plan;
-alias fftw_iodim_do_not_use_me fftwf_iodim;
-alias fftw_iodim64_do_not_use_me fftwf_iodim64;
+struct fftwf_plan{ void *_plan; alias _plan this; }
+struct fftwf_iodim{ fftw_iodim_do_not_use_me _iodim; alias _iodim this; }
+struct fftwf_iodim64{ fftw_iodim64_do_not_use_me _iodim64; alias _iodim64 this; }
 alias fftw_r2r_kind_do_not_use_me fftwf_r2r_kind;
 
-alias void *fftwl_plan;
-alias fftw_iodim_do_not_use_me fftwl_iodim;
-alias fftw_iodim64_do_not_use_me fftwl_iodim64;
+struct fftwl_plan{ void *_plan; alias _plan this; }
+struct fftwl_iodim{ fftw_iodim_do_not_use_me _iodim; alias _iodim this; }
+struct fftwl_iodim64{ fftw_iodim64_do_not_use_me _iodim64; alias _iodim64 this; }
 alias fftw_r2r_kind_do_not_use_me fftwl_r2r_kind;
 
 enum{

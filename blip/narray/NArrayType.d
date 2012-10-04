@@ -239,7 +239,7 @@ else {
         Guard mBase;
 	/// if this is a dummy (invalid) array
 	@property bool isDummy(){
-	    return !(flags&ArrayFlags.Initialized)==0;
+	    return (flags&ArrayFlags.Initialized)==0;
 	}
         /// the underlying data slice
         V[] data() {
@@ -386,7 +386,7 @@ else {
             return flags;
         }
         
-	/// woekaround for dmd bug wrt new witout arguments
+	/// workaround for dmd bug wrt new witout arguments
 	this(char x=' '){ }
 
         /// constructor using an array storage, preferred over the pointer based,
@@ -888,10 +888,10 @@ else {
                     writeOut(s,rank);
                     s(")\n");
                     s("baseArray:");
-		    //pippo                    this.baseArray.desc(s);
+                    this.baseArray.desc(s);
                     s(",\n");
                     s("view:");
-                    //pippo this.view.desc(s);
+                    this.view.desc(s);
                     s(",\n");
                     s("idxAtt:");
                     writeOut(s,this.idxAtt);
@@ -1051,7 +1051,7 @@ else {
                 s("<FlatIterator rank:")(rank)(", p:")(cast(void*)this.p)(",\n");
                 s("left:")(this.left)(",\n");
                 s("adds:")(this.adds)(",\n");
-		//pippo                s("baseArray:")(this.baseArray)(",\n");
+                s("baseArray:")(this.baseArray)(",\n");
                 s(">");
             }
         }
@@ -1249,9 +1249,6 @@ else {
             }
             else
             {
-		//alias NArray TT;
-		//pragma(msg,(is(TT:NArray!(TT.dtype,TT.dim))?(TT.stringof~" true"):(TT.stringof~" false")));
-		// pippo dmd 2.060 bug: somethime this prints false.... 
                 binaryOpStr!("*aPtr0=*bPtr0;",NArray,NArray)(res,this);
             }
             return res;

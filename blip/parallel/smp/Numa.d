@@ -129,18 +129,18 @@ struct NumaNode{
         return
             ((v==0)?(pos-n.pos):v);
     }
-    __gshared static ClassMetaInfo metaI;
+    shared static ClassMetaInfo metaI;
     shared static this(){
-        metaI=ClassMetaInfo.createForType!(typeof(this))("NumaNode","identifies a numa node");
-        metaI.addFieldOfType!(int)("level","the level of this node");
-        metaI.addFieldOfType!(int)("pos","position of this node within the level");
+        metaI=cast(shared ClassMetaInfo)ClassMetaInfo.createForType!(typeof(this))("NumaNode","identifies a numa node");
+        (cast(ClassMetaInfo)metaI).addFieldOfType!(int)("level","the level of this node");
+        (cast(ClassMetaInfo)metaI).addFieldOfType!(int)("pos","position of this node within the level");
     }
     ClassMetaInfo getSerializationMetaInfo(){
-        return metaI;
+        return cast(ClassMetaInfo)metaI;
     }
     void serial(Ser)(Ser s){
-        s.field(metaI[0],level);
-        s.field(metaI[1],pos);
+        s.field((cast(ClassMetaInfo)metaI)[0],level);
+        s.field((cast(ClassMetaInfo)metaI)[1],pos);
     }
     void serialize(Serializer s){
         serial(s);

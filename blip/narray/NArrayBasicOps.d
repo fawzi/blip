@@ -816,7 +816,7 @@ U unfilterMask(T,S,U=NArray!(T.dtype,S.dim))(T a,S mask, U res=U.init)
 in{
     static assert(T.dim==1,"a needs to have rank 1");
     static assert(S.dim==U.dim,"mask and result need to have the same shape");
-    static assert(is(S.dtype:bool)||is(S.dtype:int),"maks should be castable to bool");
+    static assert(is(S.dtype:bool)||is(S.dtype:int),"mask should be castable to bool");
     if (! isNullNArray(res)){
         assert(res.shape==mask.shape);
     }

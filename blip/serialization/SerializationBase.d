@@ -101,7 +101,8 @@ struct FieldMetaInfo {
     }
 }
 /// returns the typeid of the given type
-template typeKindForType(T){
+template typeKindForType(TT){
+    alias UnqualAll!(TT) T;
     static if(isCoreType!(T)){
         enum typeKindForType=TypeKind.PrimitiveK;
     } else static if(is(T==class)){
@@ -187,10 +188,9 @@ class ClassMetaInfo {
     /// adds a field with given name and type
     void addFieldOfType(T)(string name,string doc,
         SerializationLevel sLevel=SerializationLevel.normalLevel){
-	ClassMetaInfo tMI=getSerializationInfoForType!(T)();
-	FieldMetaInfo fMI=FieldMetaInfo(name,doc,/+tMI+/ null,sLevel); // pippo suppress compilation error
+	ClassMetaInfo tMI=getSerializationInfoForType!(UnqualAll!(T))();
+	FieldMetaInfo fMI=FieldMetaInfo(name,doc,tMI,sLevel);
 	addField(fMI);
-	assert(0,"pippo use tMI in fMI");
     }
     /// constructor (normally use createForType)
     this(string className,string doc,ClassMetaInfo superMeta,TypeInfo ti,ClassInfo ci,TypeKind kind,void* function(ClassMetaInfo)allocEl){
@@ -205,8 +205,9 @@ class ClassMetaInfo {
     /// creates a new meta info for the given type and registers it
     /// if no name is given, T.mangleof is used.
     /// normally this is the best way to create a new MetaInfo
-    static ClassMetaInfo createForType(T)(string name="",string doc="",
+    static ClassMetaInfo createForType(TT)(string name="",string doc="",
         void *function(ClassMetaInfo) allocEl=cast(void *function(ClassMetaInfo))null){
+	alias UnqualAll!(TT) T;
         static if(is(T==class)){
             ClassInfo newCi=T.classinfo;
             if (name.length==0){
@@ -360,7 +361,80 @@ string coreTypesMetaInfoMixStr(){
     return res;
 }
 
-mixin(coreTypesMetaInfoMixStr());
+// ---- start mixin manual expansion -----
+__gshared ClassMetaInfo boolMetaInfo;
+__gshared ClassMetaInfo byteMetaInfo;
+__gshared ClassMetaInfo ubyteMetaInfo;
+__gshared ClassMetaInfo shortMetaInfo;
+__gshared ClassMetaInfo ushortMetaInfo;
+__gshared ClassMetaInfo intMetaInfo;
+__gshared ClassMetaInfo uintMetaInfo;
+__gshared ClassMetaInfo longMetaInfo;
+__gshared ClassMetaInfo ulongMetaInfo;
+__gshared ClassMetaInfo floatMetaInfo;
+__gshared ClassMetaInfo doubleMetaInfo;
+__gshared ClassMetaInfo realMetaInfo;
+__gshared ClassMetaInfo ifloatMetaInfo;
+__gshared ClassMetaInfo idoubleMetaInfo;
+__gshared ClassMetaInfo irealMetaInfo;
+__gshared ClassMetaInfo cfloatMetaInfo;
+__gshared ClassMetaInfo cdoubleMetaInfo;
+__gshared ClassMetaInfo crealMetaInfo;
+__gshared ClassMetaInfo binaryBlobMetaInfo;
+__gshared ClassMetaInfo charStrMetaInfo;
+__gshared ClassMetaInfo wcharStrMetaInfo;
+__gshared ClassMetaInfo dcharStrMetaInfo;
+__gshared ClassMetaInfo binaryBlob2MetaInfo;
+shared static this(){
+    boolMetaInfo=new ClassMetaInfo("bool","",null,typeid(bool),null,TypeKind.PrimitiveK,cast(void *function (ClassMetaInfo c))null);
+    SerializationRegistry().register!(bool)(boolMetaInfo);
+    byteMetaInfo=new ClassMetaInfo("byte","",null,typeid(byte),null,TypeKind.PrimitiveK,cast(void *function (ClassMetaInfo c))null);
+    SerializationRegistry().register!(byte)(byteMetaInfo);
+    ubyteMetaInfo=new ClassMetaInfo("ubyte","",null,typeid(ubyte),null,TypeKind.PrimitiveK,cast(void *function (ClassMetaInfo c))null);
+    SerializationRegistry().register!(ubyte)(ubyteMetaInfo);
+    shortMetaInfo=new ClassMetaInfo("short","",null,typeid(short),null,TypeKind.PrimitiveK,cast(void *function (ClassMetaInfo c))null);
+    SerializationRegistry().register!(short)(shortMetaInfo);
+    ushortMetaInfo=new ClassMetaInfo("ushort","",null,typeid(ushort),null,TypeKind.PrimitiveK,cast(void *function (ClassMetaInfo c))null);
+    SerializationRegistry().register!(ushort)(ushortMetaInfo);
+    intMetaInfo=new ClassMetaInfo("int","",null,typeid(int),null,TypeKind.PrimitiveK,cast(void *function (ClassMetaInfo c))null);
+    SerializationRegistry().register!(int)(intMetaInfo);
+    uintMetaInfo=new ClassMetaInfo("uint","",null,typeid(uint),null,TypeKind.PrimitiveK,cast(void *function (ClassMetaInfo c))null);
+    SerializationRegistry().register!(uint)(uintMetaInfo);
+    longMetaInfo=new ClassMetaInfo("long","",null,typeid(long),null,TypeKind.PrimitiveK,cast(void *function (ClassMetaInfo c))null);
+    SerializationRegistry().register!(long)(longMetaInfo);
+    ulongMetaInfo=new ClassMetaInfo("ulong","",null,typeid(ulong),null,TypeKind.PrimitiveK,cast(void *function (ClassMetaInfo c))null);
+    SerializationRegistry().register!(ulong)(ulongMetaInfo);
+    floatMetaInfo=new ClassMetaInfo("float","",null,typeid(float),null,TypeKind.PrimitiveK,cast(void *function (ClassMetaInfo c))null);
+    SerializationRegistry().register!(float)(floatMetaInfo);
+    doubleMetaInfo=new ClassMetaInfo("double","",null,typeid(double),null,TypeKind.PrimitiveK,cast(void *function (ClassMetaInfo c))null);
+    SerializationRegistry().register!(double)(doubleMetaInfo);
+    realMetaInfo=new ClassMetaInfo("real","",null,typeid(real),null,TypeKind.PrimitiveK,cast(void *function (ClassMetaInfo c))null);
+    SerializationRegistry().register!(real)(realMetaInfo);
+    ifloatMetaInfo=new ClassMetaInfo("ifloat","",null,typeid(ifloat),null,TypeKind.PrimitiveK,cast(void *function (ClassMetaInfo c))null);
+    SerializationRegistry().register!(ifloat)(ifloatMetaInfo);
+    idoubleMetaInfo=new ClassMetaInfo("idouble","",null,typeid(idouble),null,TypeKind.PrimitiveK,cast(void *function (ClassMetaInfo c))null);
+    SerializationRegistry().register!(idouble)(idoubleMetaInfo);
+    irealMetaInfo=new ClassMetaInfo("ireal","",null,typeid(ireal),null,TypeKind.PrimitiveK,cast(void *function (ClassMetaInfo c))null);
+    SerializationRegistry().register!(ireal)(irealMetaInfo);
+    cfloatMetaInfo=new ClassMetaInfo("cfloat","",null,typeid(cfloat),null,TypeKind.PrimitiveK,cast(void *function (ClassMetaInfo c))null);
+    SerializationRegistry().register!(cfloat)(cfloatMetaInfo);
+    cdoubleMetaInfo=new ClassMetaInfo("cdouble","",null,typeid(cdouble),null,TypeKind.PrimitiveK,cast(void *function (ClassMetaInfo c))null);
+    SerializationRegistry().register!(cdouble)(cdoubleMetaInfo);
+    crealMetaInfo=new ClassMetaInfo("creal","",null,typeid(creal),null,TypeKind.PrimitiveK,cast(void *function (ClassMetaInfo c))null);
+    SerializationRegistry().register!(creal)(crealMetaInfo);
+    binaryBlobMetaInfo=new ClassMetaInfo("ubyte[]","",null,typeid(ubyte[]),null,TypeKind.PrimitiveK,cast(void *function (ClassMetaInfo c))null);
+    SerializationRegistry().register!(ubyte[])(binaryBlobMetaInfo);
+    charStrMetaInfo=new ClassMetaInfo("char[]","",null,typeid(char[]),null,TypeKind.PrimitiveK,cast(void *function (ClassMetaInfo c))null);
+    SerializationRegistry().register!(char[])(charStrMetaInfo);
+    wcharStrMetaInfo=new ClassMetaInfo("wchar[]","",null,typeid(wchar[]),null,TypeKind.PrimitiveK,cast(void *function (ClassMetaInfo c))null);
+    SerializationRegistry().register!(wchar[])(wcharStrMetaInfo);
+    dcharStrMetaInfo=new ClassMetaInfo("dchar[]","",null,typeid(dchar[]),null,TypeKind.PrimitiveK,cast(void *function (ClassMetaInfo c))null);
+    SerializationRegistry().register!(dchar[])(dcharStrMetaInfo);
+    binaryBlob2MetaInfo=new ClassMetaInfo("void[]","",null,typeid(void[]),null,TypeKind.PrimitiveK,cast(void *function (ClassMetaInfo c))null);
+    SerializationRegistry().register!(void[])(binaryBlob2MetaInfo);
+}
+// ---- end mixin manual expansion ----- 
+// mixin(coreTypesMetaInfoMixStr());
 
 /// returns the meta info for the given type
 ClassMetaInfo getSerializationInfoForType(TT)(){
@@ -383,11 +457,63 @@ ClassMetaInfo getSerializationInfoForType(TT)(){
     } else static if (isAssocArrayType!(T)){
         return aaMetaInfo;
     } else static if (isCoreType!(T)){
+	// ---- start static foreach and mixin manual expansion ----
+	static if (is(T==bool))
+	    return boolMetaInfo;
+	else static if (is(T==byte))
+	    return byteMetaInfo;
+	else static if (is(T==ubyte))
+	    return ubyteMetaInfo;
+	else static if (is(T==short))
+	    return shortMetaInfo;
+	else static if (is(T==ushort))
+	    return ushortMetaInfo;
+	else static if (is(T==int))
+	    return intMetaInfo;
+	else static if (is(T==uint))
+	    return uintMetaInfo;
+	else static if (is(T==long))
+	    return longMetaInfo;
+	else static if (is(T==ulong))
+	    return ulongMetaInfo;
+	else static if (is(T==float))
+	    return floatMetaInfo;
+	else static if (is(T==cfloat))
+	    return cfloatMetaInfo;
+	else static if (is(T==ifloat))
+	    return ifloatMetaInfo;
+	else static if (is(T==double))
+	    return doubleMetaInfo;
+	else static if (is(T==idouble))
+	    return idoubleMetaInfo;
+	else static if (is(T==cdouble))
+	    return cdoubleMetaInfo;
+	else static if (is(T==real))
+	    return realMetaInfo;
+	else static if (is(T==ireal))
+	    return irealMetaInfo;
+	else static if (is(T==creal))
+	    return crealMetaInfo;
+	else static if (is(T==ubyte[]))
+	    return bynaryBlobMetaInfo;
+	else static if (is(T==void[]))
+	    return bynaryBlob2MetaInfo;
+	else static if (is(T==char[]))
+	    return charStrMetaInfo;
+	else static if (is(T==wchar[]))
+	    return wcharStrMetaInfo;
+	else static if (is(T==dchar[]))
+	    return dcharStrMetaInfo;
+	else 
+	    static assert(0,"unexpected type as core type:"~T.stringof);
+	// ---- end static foreach and mixin manual expansion ----
+/+
+     // dmd 2.060 bug, so the previous explicit workaround...
         foreach(V;CoreTypes){
             static if(is(T==V)){
                 mixin("return "~strForCoreType!(V)~"MetaInfo;");
             }
-        }
+        }+/
     } else static if (is(T==void*)){
         return voidPtrMetaInfo;
     } else static if (is(typeof(*T))){
@@ -410,7 +536,8 @@ ClassMetaInfo getSerializationInfoForType(TT)(){
 }
 
 /// returns the serialization for the given variable
-ClassMetaInfo getSerializationInfoForVar(T)(T t){
+ClassMetaInfo getSerializationInfoForVar(TT)(TT t){
+    alias UnqualAll!(TT) T;
     static if (is(T==class)){
         return SerializationRegistry().getMetaInfo(t.classinfo);
     } else static if (is(T==struct)){
@@ -1567,8 +1694,6 @@ class Unserializer {
                     }));
                 }
 		auto elType=getSerializationInfoForType!(V)();
-		elType=null;
-		assert(false,"pippo elType");
                 FieldMetaInfo elMetaInfo=FieldMetaInfo("el","",elType);
                 elMetaInfo.pseudo=true;
                 auto ac=readArrayStart(fieldMeta);

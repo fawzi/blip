@@ -75,7 +75,7 @@ string serializeSome(string typeName1,string doc,string fieldsDoc){
     for (int ifield=0;ifield<fieldsDocArray.length/2;++ifield){
         auto field=fieldsDocArray[2*ifield];
         auto docF=fieldsDocArray[2*ifield+1];
-        res~="    metaI.addFieldOfType!(typeof(this."~field~"))(`"~field~"`,`"~docF~"`);\n";
+        res~="    metaI.addFieldOfType!(UnqualAll!(typeof(this."~field~")))(`"~field~"`,`"~docF~"`);\n";
     }
     res~="}\n";
     res~="ClassMetaInfo getSerializationMetaInfo(){\n";
@@ -87,18 +87,20 @@ string serializeSome(string typeName1,string doc,string fieldsDoc){
         res~=`
         {
             static if (is(typeof(this.`~field~`()))){
-                alias typeof(this.`~field~`()) FieldType;
-                    FieldType thisField=this.`~field~`;
+                    alias typeof(this.`~field~`()) FieldType;
+		    alias UnqualAll!(FieldType) FieldTypeU;
+		    FieldTypeU thisField=cast(FieldTypeU)this.`~field~`;
                     s.field(metaI[`~ctfe_i2s(ifield)~`],thisField);
-                    this.`~field~`=thisField;
+                    this.`~field~`=cast(FieldType)thisField;
             } else {
                 alias typeof(this.`~field~`) FieldType;
-                static if(isStaticArrayType!(FieldType)){
+		alias UnqualAll!(FieldType) FieldTypeU;
+                static if(isStaticArrayType!(FieldTypeU)){
                     auto thisField=this.`~field~`[];
                     s.field(metaI[`~ctfe_i2s(ifield)~`],thisField);
                     assert(this.`~field~`.length==thisField.length);
                     if (this.`~field~`.ptr !is thisField.ptr)
-                        this.`~field~`[]=thisField;
+                        this.`~field~`[]=cast(FieldType)thisField;
                 } else {
                     s.field(metaI[`~ctfe_i2s(ifield)~`],this.`~field~`);
                 }

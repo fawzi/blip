@@ -72,7 +72,7 @@ struct hwloc_bitmap_t{
      * or that would have been written  (not including the ending \\0).
      */
     int snprintf(char[] s){
-        return hwloc_bitmap_snprintf(cast(char*)s.ptr,cast(size_t)s.length, this);
+        return hwloc_bitmap_snprintf(s.ptr,s.length, this);
     }
     
     string toString(){

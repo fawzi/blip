@@ -325,14 +325,14 @@ enum {
 /*
  * NULL handles
  */
-const MPI_Group MPI_GROUP_NULL;
-const MPI_Comm MPI_COMM_NULL;
-const MPI_Request MPI_REQUEST_NULL;
-const MPI_Op MPI_OP_NULL;
-const MPI_Errhandler MPI_ERRHANDLER_NULL;
-const MPI_Info MPI_INFO_NULL;
-const MPI_Win MPI_WIN_NULL;
-const MPI_File MPI_FILE_NULL;
+__gshared const MPI_Group MPI_GROUP_NULL;
+__gshared const MPI_Comm MPI_COMM_NULL;
+__gshared const MPI_Request MPI_REQUEST_NULL;
+__gshared const MPI_Op MPI_OP_NULL;
+__gshared const MPI_Errhandler MPI_ERRHANDLER_NULL;
+__gshared const MPI_Info MPI_INFO_NULL;
+__gshared const MPI_Win MPI_WIN_NULL;
+__gshared const MPI_File MPI_FILE_NULL;
 shared static this(){
     MPI_GROUP_NULL = cast(MPI_Group)&ompi_mpi_group_null;
     MPI_COMM_NULL = cast(MPI_Comm)&ompi_mpi_comm_null;
@@ -582,22 +582,22 @@ struct ompi_predefined_communicator_t {
 /*
  * MPI predefined handles
  */
-MPI_Comm MPI_COMM_WORLD;
-MPI_Comm MPI_COMM_SELF;
-MPI_Group MPI_GROUP_EMPTY;
-MPI_Op MPI_MAX;
-MPI_Op MPI_MIN;
-MPI_Op MPI_SUM;
-MPI_Op MPI_PROD;
-MPI_Op MPI_LAND;
-MPI_Op MPI_BAND;
-MPI_Op MPI_LOR;
-MPI_Op MPI_BOR;
-MPI_Op MPI_LXOR;
-MPI_Op MPI_BXOR;
-MPI_Op MPI_MAXLOC;
-MPI_Op MPI_MINLOC;
-MPI_Op MPI_REPLACE;
+__gshared MPI_Comm MPI_COMM_WORLD;
+__gshared MPI_Comm MPI_COMM_SELF;
+__gshared MPI_Group MPI_GROUP_EMPTY;
+__gshared MPI_Op MPI_MAX;
+__gshared MPI_Op MPI_MIN;
+__gshared MPI_Op MPI_SUM;
+__gshared MPI_Op MPI_PROD;
+__gshared MPI_Op MPI_LAND;
+__gshared MPI_Op MPI_BAND;
+__gshared MPI_Op MPI_LOR;
+__gshared MPI_Op MPI_BOR;
+__gshared MPI_Op MPI_LXOR;
+__gshared MPI_Op MPI_BXOR;
+__gshared MPI_Op MPI_MAXLOC;
+__gshared MPI_Op MPI_MINLOC;
+__gshared MPI_Op MPI_REPLACE;
 
 shared static this(){
     MPI_COMM_WORLD = cast(MPI_Comm)&ompi_mpi_comm_world;
@@ -618,35 +618,35 @@ shared static this(){
     MPI_REPLACE = cast(MPI_Op)&ompi_mpi_op_replace;
 }
 /* C datatypes */
-MPI_Datatype MPI_DATATYPE_NULL;
-MPI_Datatype MPI_BYTE;
-MPI_Datatype MPI_PACKED;
-MPI_Datatype MPI_CHAR;
-MPI_Datatype MPI_SHORT;
-MPI_Datatype MPI_INT;
-MPI_Datatype MPI_LONG;
-MPI_Datatype MPI_FLOAT;
-MPI_Datatype MPI_DOUBLE;
-MPI_Datatype MPI_LONG_DOUBLE;
-MPI_Datatype MPI_UNSIGNED_CHAR;
-MPI_Datatype MPI_SIGNED_CHAR;
-MPI_Datatype MPI_UNSIGNED_SHORT;
-MPI_Datatype MPI_UNSIGNED_LONG;
-MPI_Datatype MPI_UNSIGNED;
-MPI_Datatype MPI_FLOAT_INT;
-MPI_Datatype MPI_DOUBLE_INT;
-MPI_Datatype MPI_LONG_DOUBLE_INT;
-MPI_Datatype MPI_LONG_INT;
-MPI_Datatype MPI_SHORT_INT;
-MPI_Datatype MPI_2INT;
-MPI_Datatype MPI_UB;
-MPI_Datatype MPI_LB;
-MPI_Datatype MPI_WCHAR;
-MPI_Datatype MPI_LONG_LONG_INT;
-MPI_Datatype MPI_LONG_LONG;
-MPI_Datatype MPI_UNSIGNED_LONG_LONG;
-MPI_Datatype MPI_2COMPLEX;
-MPI_Datatype MPI_2DOUBLE_COMPLEX;
+__gshared MPI_Datatype MPI_DATATYPE_NULL;
+__gshared MPI_Datatype MPI_BYTE;
+__gshared MPI_Datatype MPI_PACKED;
+__gshared MPI_Datatype MPI_CHAR;
+__gshared MPI_Datatype MPI_SHORT;
+__gshared MPI_Datatype MPI_INT;
+__gshared MPI_Datatype MPI_LONG;
+__gshared MPI_Datatype MPI_FLOAT;
+__gshared MPI_Datatype MPI_DOUBLE;
+__gshared MPI_Datatype MPI_LONG_DOUBLE;
+__gshared MPI_Datatype MPI_UNSIGNED_CHAR;
+__gshared MPI_Datatype MPI_SIGNED_CHAR;
+__gshared MPI_Datatype MPI_UNSIGNED_SHORT;
+__gshared MPI_Datatype MPI_UNSIGNED_LONG;
+__gshared MPI_Datatype MPI_UNSIGNED;
+__gshared MPI_Datatype MPI_FLOAT_INT;
+__gshared MPI_Datatype MPI_DOUBLE_INT;
+__gshared MPI_Datatype MPI_LONG_DOUBLE_INT;
+__gshared MPI_Datatype MPI_LONG_INT;
+__gshared MPI_Datatype MPI_SHORT_INT;
+__gshared MPI_Datatype MPI_2INT;
+__gshared MPI_Datatype MPI_UB;
+__gshared MPI_Datatype MPI_LB;
+__gshared MPI_Datatype MPI_WCHAR;
+__gshared MPI_Datatype MPI_LONG_LONG_INT;
+__gshared MPI_Datatype MPI_LONG_LONG;
+__gshared MPI_Datatype MPI_UNSIGNED_LONG_LONG;
+__gshared MPI_Datatype MPI_2COMPLEX;
+__gshared MPI_Datatype MPI_2DOUBLE_COMPLEX;
 
 shared static this(){
     MPI_DATATYPE_NULL = cast(MPI_Datatype)&ompi_mpi_datatype_null;
@@ -680,32 +680,32 @@ shared static this(){
     MPI_2DOUBLE_COMPLEX = cast(MPI_Datatype)&ompi_mpi_2dblcplex;
 }
 /* Fortran datatype bindings */
-MPI_Datatype MPI_CHARACTER;
-MPI_Datatype MPI_LOGICAL;
-MPI_Datatype MPI_LOGICAL1;
-MPI_Datatype MPI_LOGICAL2;
-MPI_Datatype MPI_LOGICAL4;
-MPI_Datatype MPI_LOGICAL8;
-MPI_Datatype MPI_INTEGER;
-MPI_Datatype MPI_INTEGER1;
-MPI_Datatype MPI_INTEGER2;
-MPI_Datatype MPI_INTEGER4;
-MPI_Datatype MPI_INTEGER8;
-MPI_Datatype MPI_REAL;
-MPI_Datatype MPI_REAL4;
-MPI_Datatype MPI_REAL8;
-MPI_Datatype MPI_REAL16;
-MPI_Datatype MPI_DOUBLE_PRECISION;
-MPI_Datatype MPI_COMPLEX;
-MPI_Datatype MPI_COMPLEX8;
-MPI_Datatype MPI_COMPLEX16;
-MPI_Datatype MPI_COMPLEX32;
-MPI_Datatype MPI_DOUBLE_COMPLEX;
-MPI_Datatype MPI_2REAL;
-MPI_Datatype MPI_2DOUBLE_PRECISION;
-MPI_Datatype MPI_2INTEGER;
-MPI_Errhandler MPI_ERRORS_ARE_FATAL;
-MPI_Errhandler MPI_ERRORS_RETURN;
+__gshared MPI_Datatype MPI_CHARACTER;
+__gshared MPI_Datatype MPI_LOGICAL;
+__gshared MPI_Datatype MPI_LOGICAL1;
+__gshared MPI_Datatype MPI_LOGICAL2;
+__gshared MPI_Datatype MPI_LOGICAL4;
+__gshared MPI_Datatype MPI_LOGICAL8;
+__gshared MPI_Datatype MPI_INTEGER;
+__gshared MPI_Datatype MPI_INTEGER1;
+__gshared MPI_Datatype MPI_INTEGER2;
+__gshared MPI_Datatype MPI_INTEGER4;
+__gshared MPI_Datatype MPI_INTEGER8;
+__gshared MPI_Datatype MPI_REAL;
+__gshared MPI_Datatype MPI_REAL4;
+__gshared MPI_Datatype MPI_REAL8;
+__gshared MPI_Datatype MPI_REAL16;
+__gshared MPI_Datatype MPI_DOUBLE_PRECISION;
+__gshared MPI_Datatype MPI_COMPLEX;
+__gshared MPI_Datatype MPI_COMPLEX8;
+__gshared MPI_Datatype MPI_COMPLEX16;
+__gshared MPI_Datatype MPI_COMPLEX32;
+__gshared MPI_Datatype MPI_DOUBLE_COMPLEX;
+__gshared MPI_Datatype MPI_2REAL;
+__gshared MPI_Datatype MPI_2DOUBLE_PRECISION;
+__gshared MPI_Datatype MPI_2INTEGER;
+__gshared MPI_Errhandler MPI_ERRORS_ARE_FATAL;
+__gshared MPI_Errhandler MPI_ERRORS_RETURN;
 
 shared static this(){
  MPI_CHARACTER = cast(MPI_Datatype)&ompi_mpi_character;

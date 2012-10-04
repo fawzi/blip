@@ -76,8 +76,6 @@ struct LazyArray(T) {
     void unserialize(Unserializer s){
         if (addOp is null) s.serializationError("LazyArray missing addOp",__FILE__,__LINE__);
 	auto typeInfo=getSerializationInfoForType!(T)();
-	typeInfo=null;
-	assert(0,"pippo dmd 2.060 bug to do");
         FieldMetaInfo elMetaInfo=FieldMetaInfo("el","",typeInfo);
         elMetaInfo.pseudo=true;
         auto ac=s.readArrayStart(null);

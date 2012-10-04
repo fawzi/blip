@@ -24,7 +24,6 @@ import blip.util.Grow:growLength;
 import blip.container.Deque;
 import blip.container.AtomicSLink;
 import blip.Comp;
-import blip.io.Console; // pippo
 /// a simple priority queue optimized for adding high priority tasks
 /// (otherwise a heap implementation would be better)
 /// the public interface consists of
@@ -318,7 +317,7 @@ class PriQueue(T){
     }
 }
 
-void pippo(){
+private void dummy(){
     PriQueue!(int*) q;
-    writeOut(sout,q);
+    writeOut(delegate void(cstring s){},q);
 }

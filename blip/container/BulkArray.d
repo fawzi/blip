@@ -118,7 +118,7 @@ class ChunkGuard{
     }
     // maybe it would be better not to implement serialization for this, as it cannot be unserialized...
     mixin(serializeSome("blip.ChunkGuard","an object to 'guard' a chunk of memory, and dispose it",
-        `dataPtr|dataLen|refCount` /+ pippo bug for |flags`+/ ));
+        `dataPtr|dataLen|refCount|flags` ));
     void desc(scope CharSink s){
         dumper(s)("{ class:blip.ChunkGuard, at:")(cast(void*)this)(", dataPtr:")(cast(void*)dataPtr)
             (", dataLen:")(dataLen)(", refCount:")(refCount)(", flags:")(flags)(" }");
@@ -129,13 +129,13 @@ class ChunkGuard{
 struct BulkArray(T){
     enum Flags{
         None=0,
-        Dummy,
+        Initialized,
     }
     __gshared static size_t defaultOptimalBlockSize=100*1024/T.sizeof;
     enum BulkArrayCallocSize=100*1024;
     T* ptr, ptrEnd;
     ChunkGuard guard;
-    Flags flags=Flags.Dummy;
+    Flags flags;
     alias T dtype;
     static if(is(T.flt)){
         static if((T.sizeof%T.flt.sizeof==0)){
@@ -179,8 +179,6 @@ struct BulkArray(T){
     void unserialize(Unserializer s){
         T[] dArray;
 	auto elType=getSerializationInfoForType!(T)();
-	elType=null;
-	assert(0,"dmd 2.060 bug");
         FieldMetaInfo elMetaInfo=FieldMetaInfo("el","",elType);
         elMetaInfo.pseudo=true;
         auto ac=s.readArrayStart(null);
@@ -221,7 +219,7 @@ struct BulkArray(T){
         this.guard=g;
         this.ptr=cast(T*)g.dataPtr;
         this.ptrEnd=this.ptr+g.dataLen/T.sizeof;
-        this.flags=Flags.None;
+        this.flags=Flags.Initialized;
     }
     
     this(size_t size,bool scanPtr=false){
@@ -232,19 +230,19 @@ struct BulkArray(T){
         } else {
             this.data=new T[size];
         }
-        this.flags=Flags.None;
+        this.flags=Flags.Initialized;
     }
     this(T[] data,ChunkGuard guard=null){
         this.data=data;
         this.guard=guard;
-        this.flags=Flags.None;
+        this.flags=Flags.Initialized;
     }
     this(T*ptr,T*ptrEnd,ChunkGuard guard=null){
         this.ptr=ptr;
         this.ptrEnd=ptrEnd;
         assert(ptrEnd>=ptr,"invalid pointers");
         this.guard=guard;
-        this.flags=Flags.None;
+        this.flags=Flags.Initialized;
     }
     /// bulk array of the basic type
     BulkArray!(basicDtype) basicBulkArray(){
@@ -287,13 +285,13 @@ struct BulkArray(T){
     void opIndexAssign(T val,size_t i,size_t j){
         assert(i<=j,"slicing with i>j"); // allow???
         assert(i>=0&&j<=this.length,"slicing index out of bounds");
-        //pippo BulkArray(this.data[i..j],this.guard)[]=val;
+        //BulkArray(this.data[i..j],this.guard)[]=val;
     }
     /// ditto
     void opSliceAssign(T val,size_t i,size_t j){
         assert(i<=j,"slicing with i>j"); // allow???
         assert(i>0&&j<=this.length,"slicing index out of bounds");
-        //pippo BulkArray(this.data[i..j],this.guard)[]=val;
+	BulkArray(this.data[i..j],this.guard)[]=val;
     }
     /// gets a slice of the array as normal array (this will get invalid when dis array is collected)
     T[] getSlice(size_t i,size_t j){
@@ -304,7 +302,7 @@ struct BulkArray(T){
     void opIndexAssign(BulkArray val,size_t i,size_t j){
         assert(i<=j,"slicing with i>j"); // allow???
         assert(i>0&&j<=this.length,"slicing index out of bounds");
-        //pippo BulkArray(this.data[i..j],this.guard)[]=val;
+        BulkArray(this.data[i..j],this.guard)[]=val;
     }
     /// copies an bulk array
     void copyFrom(V)(BulkArray!(V) b){
@@ -653,7 +651,7 @@ BulkArray!(T) bulkArray(T)(T[]arr,ChunkGuard g=null){
 
 /// tests if b is a dummy array
 static bool BulkArrayIsDummy(T)(T b){
-    return (b.flags & T.Flags.Dummy)!=0;
+    return (b.flags & T.Flags.Initialized)==0;
 }
 
 void baUnaryOpStr(string opStr,T)(ref BulkArray!(T) a){

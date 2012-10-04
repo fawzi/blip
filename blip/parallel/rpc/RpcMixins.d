@@ -176,6 +176,8 @@ string rpcProxyMixin(string name,string extName,string extraInterfaces,string []
                 if (pool!is null){
                     pool.giveBack(&this);
                 } else {
+		    typeof(this) dummy;
+		    this=dummy;
                     // delete this;
                 }
             }
@@ -409,6 +411,8 @@ string rpcVendorMixin(string name,string extName_, string [] functionsComments){
                 if (pool!is null){
                     pool.giveBack(&this);
                 } else {
+		    typeof(this) dummy;
+		    this=dummy;
                     // delete this;
                 }
             }
