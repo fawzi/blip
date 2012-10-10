@@ -207,20 +207,13 @@ class ClassMetaInfo {
     /// normally this is the best way to create a new MetaInfo
     static ClassMetaInfo createForType(TT)(string name="",string doc="",
         void *function(ClassMetaInfo) allocEl=cast(void *function(ClassMetaInfo))null){
-	alias UnqualAll!(TT) T;
+ 	alias UnqualAll!(TT) T;
         static if(is(T==class)){
             ClassInfo newCi=T.classinfo;
             if (name.length==0){
                 name=newCi.name; // should be nicer, but has it issues with templates???
             }
             ClassMetaInfo newSuperMeta=null;
-            static if(is(T U==super)){
-                foreach(S;U){
-                    static if (is(S == class)){
-                        newSuperMeta=getSerializationInfoForType!(S)();
-                    }
-                }
-            }
         } else {
             ClassMetaInfo newSuperMeta=null;
             ClassInfo newCi=null;
@@ -241,6 +234,18 @@ class ClassMetaInfo {
             }
         }
         auto res=new ClassMetaInfo(name,doc,newSuperMeta,newTi,newCi,typeKindForType!(T),allocEl);
+        static if(is(T==class)){
+            static if(is(T U==super)){
+                foreach(S;U){
+                    static if (is(S == class)){
+			static if (__traits(compiles,delegate void(S s,Serializer ser,Unserializer u){
+				    s.serialize(ser); s.unserialize(u); }) ){
+			    SerializationRegistry().addDelayedLookup(S.classinfo,&res.superMeta,name);
+			}
+                    }
+                }
+            }
+        }
         SerializationRegistry().register!(T)(res);
         return res;
     }
@@ -598,6 +603,13 @@ struct PosCounter{
 class SerializationRegistry {
     ClassMetaInfo[Object] type2metaInfos;
     ClassMetaInfo[string ] name2metaInfos;
+    static struct PendingLookup{
+	ClassMetaInfo *target;
+	Object key;
+	string context;
+	PendingLookup * next;
+    }
+    PendingLookup[Object] pendingLookups;
 
     Object keyOf(T)() {
         static if (is(T == class)) {
@@ -609,16 +621,61 @@ class SerializationRegistry {
         }
     }
     
-    
+    /// adds a (possibly) delayed lookup
+    void addDelayedLookup(Object key, ClassMetaInfo *target, string context){
+        synchronized(this){
+	    ClassMetaInfo *mInfo= key in type2metaInfos;
+	    if (mInfo !is null){
+		*target = *mInfo;
+		return;
+	    }
+	    PendingLookup *lk=key in pendingLookups;
+	    if (lk is null){
+		PendingLookup pl=PendingLookup(target,key,context);
+		pendingLookups[key]=pl;
+	    } else {
+		PendingLookup *pl2=new PendingLookup;
+		*pl2=PendingLookup(target,key,context,lk.next);
+		lk.next=pl2;
+	    }
+	}
+    }
+
+    /// writes out the pending lookups
+    void writeOutPendingLookups(scope CharSink sink, string indent=""){
+	auto s=dumper(sink);
+	s("pendingLookups:{");
+	bool hasSome=false;
+	synchronized(this){
+	    foreach(k,v;pendingLookups){
+		if (hasSome) s(",");
+		hasSome=true;
+		s("\n")(indent);
+		s("  { key:@")(cast(void*)v.key)(", target:@")(cast(void*)v.target)(", context:`")(v.context)("` }");
+		auto n=v.next;
+		while (n !is null){
+		    s(",\n")(indent);
+		    s("  { key:@")(cast(void*)n.key)(", target:@")(cast(void*)n.target)(", context:`")(n.context)("` }");
+		    n=n.next;
+		}
+	    }
+	}
+	if (hasSome) {
+	    s("\n")(indent);
+	}
+	s("}");
+    }
+
+    /// registers the goven meta info for the type T
     void register(T)(ClassMetaInfo metaInfo) {
         assert(metaInfo!is null,"attempt to register null metaInfo");
+        Object key = keyOf!(T); // use the content of metaInfo???
         version(STrace) {
-            sout(collectIAppender(delegate(scope CharSink s){
-                s("Registering "); s(metaInfo.className);
-                s(" in the serialization factory "~keyOf!(T).toString~" ("~T.stringof~")");
-            }));
+            sinkTogether(sout,delegate(scope CharSink s){
+		    dumper(s)("Registering ")(metaInfo.className)(" in the serialization factory ")
+			(key.toString)(" @")(cast(void*)key)(" (")(T.stringof)(")\n");
+		});
         }
-        Object key = keyOf!(T);
         synchronized(this){
 	    ClassMetaInfo *oldInfo=metaInfo.className in name2metaInfos;
 	    if (oldInfo!is null){
@@ -630,6 +687,18 @@ class SerializationRegistry {
 			    dumper(s)("Registering duplicated name in SerializationRegistry@")(cast(void*)this)(":")(metaInfo.className)
 				(", oldVal:")(*oldInfo)(" newVal:")(metaInfo)("\n");
 			}),__FILE__,__LINE__);
+	    }
+	    PendingLookup *lk=key in pendingLookups;
+	    if (lk !is null){
+		*lk.target=metaInfo;
+		auto n=lk.next;
+		while (n !is null) {
+		    *n.target=metaInfo;
+		    auto old=n;
+		    n=n.next;
+		    old.clear(); // malloc and really free?
+		}
+		pendingLookups.remove(key);
 	    }
 	    name2metaInfos[metaInfo.className]=metaInfo;
             type2metaInfos[key] = metaInfo;

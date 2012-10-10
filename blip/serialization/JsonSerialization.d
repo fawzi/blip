@@ -213,7 +213,7 @@ class JsonSerializer(T=char) : Serializer {
                 atStart=true;
             }
         } else {
-            s(`{ class:"`)(metaInfo.className)("\"");
+            s("{ class:\"")(metaInfo.className)("\"");
             s(`, id:`)(cast(long)objId);
             atStart=false;
         }
