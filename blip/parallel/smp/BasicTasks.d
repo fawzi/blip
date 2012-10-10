@@ -211,7 +211,7 @@ static this(){
 class Task:TaskI{
     int _level; /// priority level of the task, the higher the better
     int _stealLevel; /// maximum steal level of the task (0 thread, 1 core, 2 numa node/socket), default fully stealable
-    TaskStatus _status; /// execution status of the task
+    shared TaskStatus _status; /// execution status of the task
     
     void delegate() taskOp; /// task to execute
     bool delegate() generator; /// generator to run
@@ -324,7 +324,7 @@ class Task:TaskI{
     /// return the name of this task
     string taskName(){ return _taskName; }
     /// returns the the status of the task
-    TaskStatus status(){ return _status; }
+    TaskStatus status(){ return cast(TaskStatus)_status; }
     /// sets the task status
     void status(TaskStatus s) { assert(cast(int)s>=cast(int)_status); _status=s;}
     /// returns the level of the task
