@@ -41,7 +41,7 @@ class FiberPoolT(int batchSize=16):Pool!(Fiber,batchSize){
     
     override Fiber clear(Fiber f){
         if (f !is null){
-            f.clear();
+            f.reset(function void(){}); // clear releases the stack...
             //if (f.stackSize==stackSize){
 	    return f;
 	    //}
