@@ -166,8 +166,8 @@ struct BulkArray(T){
         auto ac=s.writeArrayStart(null,dArray.length);
         FieldMetaInfo *elMetaInfoP=null;
         version(PseudoFieldMetaInfo){
-	    FieldMetaInfo elMetaInfo=FieldMetaInfo("el","",
-						   getSerializationInfoForType!(T)());
+            FieldMetaInfo elMetaInfo=FieldMetaInfo("el","",
+                                                   getSerializationInfoForType!(T)());
             elMetaInfo.pseudo=true;
             elMetaInfoP=&elMetaInfo;
         }
@@ -178,7 +178,7 @@ struct BulkArray(T){
     }
     void unserialize(Unserializer s){
         T[] dArray;
-	auto elType=getSerializationInfoForType!(T)();
+        auto elType=getSerializationInfoForType!(T)();
         FieldMetaInfo elMetaInfo=FieldMetaInfo("el","",elType);
         elMetaInfo.pseudo=true;
         auto ac=s.readArrayStart(null);
@@ -291,7 +291,7 @@ struct BulkArray(T){
     void opSliceAssign(T val,size_t i,size_t j){
         assert(i<=j,"slicing with i>j"); // allow???
         assert(i>0&&j<=this.length,"slicing index out of bounds");
-	BulkArray(this.data[i..j],this.guard)[]=val;
+        BulkArray(this.data[i..j],this.guard)[]=val;
     }
     /// gets a slice of the array as normal array (this will get invalid when dis array is collected)
     T[] getSlice(size_t i,size_t j){

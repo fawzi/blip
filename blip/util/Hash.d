@@ -27,7 +27,7 @@ hash_t rt_hash_str(const(void) *bStart,size_t length, hash_t seed=0){
     static if (is(hash_t==uint)||is(hash_t==int)){
         return cast(hash_t)murmurHashAligned2(bStart,length,cast(uint)seed);
     } else static if (is(hash_t==ulong)||is(hash_t==long)){
-	return cast(hash_t)lookup8_hash(cast(const(ubyte)*)bStart,length,cast(ulong)seed);
+        return cast(hash_t)lookup8_hash(cast(const(ubyte)*)bStart,length,cast(ulong)seed);
     } else {
         static assert(0,"unsupported type for hash_t: "~hash_t.stringof);
     }
@@ -38,7 +38,7 @@ hash_t rt_hash_block(const(size_t) *bStart,size_t length, hash_t seed=0){
     static if (is(hash_t==uint)||is(hash_t==int)){
         return cast(hash_t)murmurHashAligned2(bStart,length,cast(uint)seed);
     } else static if (is(hash_t==ulong)||is(hash_t==long)){
-	return cast(hash_t)lookup8_hash2(cast(const(ulong)*)bStart,length,cast(ulong)seed);
+        return cast(hash_t)lookup8_hash2(cast(const(ulong)*)bStart,length,cast(ulong)seed);
     } else {
         static assert(0,"unsupported type for hash_t: "~hash_t.stringof);
     }

@@ -355,10 +355,10 @@ body {
                         ldb=m;
                     }
                     DBlas.gemv((transpose?'T':'N'), m,
-			       cast(f_int)(transpose?c.shape[0]:a.shape[0]),scaleRes,
-			       b.startPtrArray, ldb,
-			       aStartPtr,cast(f_int)(a.bStrides[0]/cast(index_type)T.sizeof),
-			       scaleC, c.startPtrArray, cast(f_int)(c.bStrides[0]/cast(index_type)T.sizeof));
+                               cast(f_int)(transpose?c.shape[0]:a.shape[0]),scaleRes,
+                               b.startPtrArray, ldb,
+                               aStartPtr,cast(f_int)(a.bStrides[0]/cast(index_type)T.sizeof),
+                               scaleC, c.startPtrArray, cast(f_int)(c.bStrides[0]/cast(index_type)T.sizeof));
                     return c;
                 }
             } else static if (rank1==2 && rank2==1) {
@@ -379,10 +379,10 @@ body {
                         lda=m;
                     }
                     DBlas.gemv((transpose?'T':'N'), m,
-			       cast(f_int)(transpose?c.shape[0]:b.shape[0]), scaleRes,
-			       a.startPtrArray, lda,
-			       bStartPtr,cast(f_int)(b.bStrides[0]/cast(index_type)T.sizeof),
-			       scaleC, c.startPtrArray, cast(f_int)(c.bStrides[0]/cast(index_type)T.sizeof));
+                               cast(f_int)(transpose?c.shape[0]:b.shape[0]), scaleRes,
+                               a.startPtrArray, lda,
+                               bStartPtr,cast(f_int)(b.bStrides[0]/cast(index_type)T.sizeof),
+                               scaleC, c.startPtrArray, cast(f_int)(c.bStrides[0]/cast(index_type)T.sizeof));
                     return c;
                 }
             } else static if(is(S==T)){
@@ -416,18 +416,18 @@ body {
                         ldc=cast(f_int)c.shape[0];
                     if (swapAB){
                         DBlas.gemm((transposeB?'N':'T'), (transposeA?'N':'T'),
-				   cast(f_int)b.shape[1-axis2], cast(f_int)a.shape[1-axis1], cast(f_int)a.shape[axis1], scaleRes,
-				   b.startPtrArray,ldb,
-				   a.startPtrArray,lda,
-				   scaleC,
-				   c.startPtrArray,ldc);
+                                   cast(f_int)b.shape[1-axis2], cast(f_int)a.shape[1-axis1], cast(f_int)a.shape[axis1], scaleRes,
+                                   b.startPtrArray,ldb,
+                                   a.startPtrArray,lda,
+                                   scaleC,
+                                   c.startPtrArray,ldc);
                     } else {
                         DBlas.gemm((transposeA?'T':'N'), (transposeB?'T':'N'),
-				   cast(f_int)a.shape[1-axis1], cast(f_int)b.shape[1-axis2], cast(f_int)a.shape[axis1], scaleRes,
-				   a.startPtrArray,lda,
-				   b.startPtrArray,ldb,
-				   scaleC,
-				   c.startPtrArray,ldc);
+                                   cast(f_int)a.shape[1-axis1], cast(f_int)b.shape[1-axis2], cast(f_int)a.shape[axis1], scaleRes,
+                                   a.startPtrArray,lda,
+                                   b.startPtrArray,ldb,
+                                   scaleC,
+                                   c.startPtrArray,ldc);
                     }
                     return c;
                 }
@@ -437,7 +437,7 @@ body {
     if (scaleC==0){
         if (scaleRes==1){
             mixin fuse1!((ref S x,T y,U z){x+=y*z;},(S *x0,ref S x){x=cast(S)0;},
-			 (S* x0,S xV){*x0=xV;},typeof(a),typeof(b),typeof(c));
+                         (S* x0,S xV){*x0=xV;},typeof(a),typeof(b),typeof(c));
             fuse1(a,b,c,axis1,axis2);
         } else {
             mixin fuse1!((ref S x,T y,U z){x+=y*z;},(S* x0,ref S x){x=cast(S)0;},
@@ -659,7 +659,7 @@ else {
         } else {
             x[]=b;
             DLapack.gesv(cast(f_int)a.shape[0], cast(f_int)b.shape[1], a.startPtrArray, cast(f_int)(a.bStrides[1]/cast(index_type)T.sizeof), ipiv.startPtrArray,
-			 x.startPtrArray, cast(f_int)(x.bStrides[1]/cast(index_type)T.sizeof), info);
+                         x.startPtrArray, cast(f_int)(x.bStrides[1]/cast(index_type)T.sizeof), info);
         }
         if (info > 0)
             throw new LinAlgException("Singular matrix");
@@ -803,12 +803,12 @@ else {
         static if(is(ComplexTypeOf!(T)==T)){
             scope NArray!(RealTypeOf!(T),1) rwork = NArray!(RealTypeOf!(T),1).empty([2*n]);
             DLapack.geev(((lEPtr is null)?'N':'V'),((rEPtr is null)?'N':'V'),n,
-		a1.startPtrArray, cast(f_int)(a1.bStrides[1]/cast(index_type)T.sizeof), eigenval.startPtrArray, lEPtr, lELd, rEPtr, rELd,
+                a1.startPtrArray, cast(f_int)(a1.bStrides[1]/cast(index_type)T.sizeof), eigenval.startPtrArray, lEPtr, lELd, rEPtr, rELd,
                 &workTmp, lwork, rwork.startPtrArray, info);
             lwork = cast(int)abs(workTmp)+1;
             scope NArray!(T,1) work = NArray!(T,1).empty([lwork]);
             DLapack.geev(((lEPtr is null)?'N':'V'),((rEPtr is null)?'N':'V'),n,
-		a1.startPtrArray, cast(f_int)(a1.bStrides[1]/cast(index_type)T.sizeof), eigenval.startPtrArray, lEPtr, lELd, rEPtr, rELd,
+                a1.startPtrArray, cast(f_int)(a1.bStrides[1]/cast(index_type)T.sizeof), eigenval.startPtrArray, lEPtr, lELd, rEPtr, rELd,
                 work.startPtrArray, lwork, rwork.startPtrArray, info);
             
             if (!isNullNArray(leftEVect) && leftEVect.startPtrArray != lE.startPtrArray) leftEVect[]=lE;
@@ -818,7 +818,7 @@ else {
             scope NArray!(RealTypeOf!(T),1) wr = NArray!(RealTypeOf!(T),1).empty([n]);
             scope NArray!(RealTypeOf!(T),1) wi = NArray!(RealTypeOf!(T),1).empty([n]);
             DLapack.geev(((lEPtr is null)?'N':'V'),((rEPtr is null)?'N':'V'),n,
-			 a1.startPtrArray, cast(f_int)(a1.bStrides[1]/cast(index_type)T.sizeof), wr.startPtrArray, wi.startPtrArray, lEPtr, lELd, rEPtr, rELd,
+                         a1.startPtrArray, cast(f_int)(a1.bStrides[1]/cast(index_type)T.sizeof), wr.startPtrArray, wi.startPtrArray, lEPtr, lELd, rEPtr, rELd,
                 &workTmp, lwork, info);
             lwork = cast(int)abs(workTmp)+1;
             if (lwork<2*n && (lEPtr!is null|| rEPtr!is null)){
@@ -826,7 +826,7 @@ else {
             }
             scope NArray!(T,1) work = NArray!(T,1).empty([lwork]);
             DLapack.geev(((lEPtr is null)?'N':'V'),((rEPtr is null)?'N':'V'),n,
-			 a1.startPtrArray, cast(f_int)(a1.bStrides[1]/cast(index_type)T.sizeof), wr.startPtrArray, wi.startPtrArray, lEPtr, lELd, rEPtr, rELd,
+                         a1.startPtrArray, cast(f_int)(a1.bStrides[1]/cast(index_type)T.sizeof), wr.startPtrArray, wi.startPtrArray, lEPtr, lELd, rEPtr, rELd,
                 work.startPtrArray, lwork, info);
             for (int i=0;i<n;++i)
                 eigenval[i]=cast(ComplexTypeOf!(T))(wr[i]+wi[i]*1i);

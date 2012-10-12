@@ -188,9 +188,9 @@ class ClassMetaInfo {
     /// adds a field with given name and type
     void addFieldOfType(T)(string name,string doc,
         SerializationLevel sLevel=SerializationLevel.normalLevel){
-	ClassMetaInfo tMI=getSerializationInfoForType!(UnqualAll!(T))();
-	FieldMetaInfo fMI=FieldMetaInfo(name,doc,tMI,sLevel);
-	addField(fMI);
+        ClassMetaInfo tMI=getSerializationInfoForType!(UnqualAll!(T))();
+        FieldMetaInfo fMI=FieldMetaInfo(name,doc,tMI,sLevel);
+        addField(fMI);
     }
     /// constructor (normally use createForType)
     this(string className,string doc,ClassMetaInfo superMeta,TypeInfo ti,ClassInfo ci,TypeKind kind,void* function(ClassMetaInfo)allocEl){
@@ -207,7 +207,7 @@ class ClassMetaInfo {
     /// normally this is the best way to create a new MetaInfo
     static ClassMetaInfo createForType(TT)(string name="",string doc="",
         void *function(ClassMetaInfo) allocEl=cast(void *function(ClassMetaInfo))null){
- 	alias UnqualAll!(TT) T;
+         alias UnqualAll!(TT) T;
         static if(is(T==class)){
             ClassInfo newCi=T.classinfo;
             if (name.length==0){
@@ -238,10 +238,10 @@ class ClassMetaInfo {
             static if(is(T U==super)){
                 foreach(S;U){
                     static if (is(S == class)){
-			static if (__traits(compiles,delegate void(S s,Serializer ser,Unserializer u){
-				    s.serialize(ser); s.unserialize(u); }) ){
-			    SerializationRegistry().addDelayedLookup(S.classinfo,&res.superMeta,name);
-			}
+                        static if (__traits(compiles,delegate void(S s,Serializer ser,Unserializer u){
+                                    s.serialize(ser); s.unserialize(u); }) ){
+                            SerializationRegistry().addDelayedLookup(S.classinfo,&res.superMeta,name);
+                        }
                     }
                 }
             }
@@ -453,7 +453,7 @@ ClassMetaInfo getSerializationInfoForType(TT)(){
     } else static if (is(T==interface)){
         return SerializationRegistry().getMetaInfo(Object.classinfo);
     } else static if (is(T UU:UU[])){
-	alias UnqualAll!(UU) U;
+        alias UnqualAll!(UU) U;
         static if (is(U:char)||is(U:wchar)||is(U:dchar)){
             return stringMetaInfo;
         } else {
@@ -462,56 +462,56 @@ ClassMetaInfo getSerializationInfoForType(TT)(){
     } else static if (isAssocArrayType!(T)){
         return aaMetaInfo;
     } else static if (isCoreType!(T)){
-	// ---- start static foreach and mixin manual expansion ----
-	static if (is(T==bool))
-	    return boolMetaInfo;
-	else static if (is(T==byte))
-	    return byteMetaInfo;
-	else static if (is(T==ubyte))
-	    return ubyteMetaInfo;
-	else static if (is(T==short))
-	    return shortMetaInfo;
-	else static if (is(T==ushort))
-	    return ushortMetaInfo;
-	else static if (is(T==int))
-	    return intMetaInfo;
-	else static if (is(T==uint))
-	    return uintMetaInfo;
-	else static if (is(T==long))
-	    return longMetaInfo;
-	else static if (is(T==ulong))
-	    return ulongMetaInfo;
-	else static if (is(T==float))
-	    return floatMetaInfo;
-	else static if (is(T==cfloat))
-	    return cfloatMetaInfo;
-	else static if (is(T==ifloat))
-	    return ifloatMetaInfo;
-	else static if (is(T==double))
-	    return doubleMetaInfo;
-	else static if (is(T==idouble))
-	    return idoubleMetaInfo;
-	else static if (is(T==cdouble))
-	    return cdoubleMetaInfo;
-	else static if (is(T==real))
-	    return realMetaInfo;
-	else static if (is(T==ireal))
-	    return irealMetaInfo;
-	else static if (is(T==creal))
-	    return crealMetaInfo;
-	else static if (is(T==ubyte[]))
-	    return bynaryBlobMetaInfo;
-	else static if (is(T==void[]))
-	    return bynaryBlob2MetaInfo;
-	else static if (is(T==char[]))
-	    return charStrMetaInfo;
-	else static if (is(T==wchar[]))
-	    return wcharStrMetaInfo;
-	else static if (is(T==dchar[]))
-	    return dcharStrMetaInfo;
-	else 
-	    static assert(0,"unexpected type as core type:"~T.stringof);
-	// ---- end static foreach and mixin manual expansion ----
+        // ---- start static foreach and mixin manual expansion ----
+        static if (is(T==bool))
+            return boolMetaInfo;
+        else static if (is(T==byte))
+            return byteMetaInfo;
+        else static if (is(T==ubyte))
+            return ubyteMetaInfo;
+        else static if (is(T==short))
+            return shortMetaInfo;
+        else static if (is(T==ushort))
+            return ushortMetaInfo;
+        else static if (is(T==int))
+            return intMetaInfo;
+        else static if (is(T==uint))
+            return uintMetaInfo;
+        else static if (is(T==long))
+            return longMetaInfo;
+        else static if (is(T==ulong))
+            return ulongMetaInfo;
+        else static if (is(T==float))
+            return floatMetaInfo;
+        else static if (is(T==cfloat))
+            return cfloatMetaInfo;
+        else static if (is(T==ifloat))
+            return ifloatMetaInfo;
+        else static if (is(T==double))
+            return doubleMetaInfo;
+        else static if (is(T==idouble))
+            return idoubleMetaInfo;
+        else static if (is(T==cdouble))
+            return cdoubleMetaInfo;
+        else static if (is(T==real))
+            return realMetaInfo;
+        else static if (is(T==ireal))
+            return irealMetaInfo;
+        else static if (is(T==creal))
+            return crealMetaInfo;
+        else static if (is(T==ubyte[]))
+            return bynaryBlobMetaInfo;
+        else static if (is(T==void[]))
+            return bynaryBlob2MetaInfo;
+        else static if (is(T==char[]))
+            return charStrMetaInfo;
+        else static if (is(T==wchar[]))
+            return wcharStrMetaInfo;
+        else static if (is(T==dchar[]))
+            return dcharStrMetaInfo;
+        else 
+            static assert(0,"unexpected type as core type:"~T.stringof);
+        // ---- end static foreach and mixin manual expansion ----
 /+
      // dmd 2.060 bug, so the previous explicit workaround...
         foreach(V;CoreTypes){
@@ -604,10 +604,10 @@ class SerializationRegistry {
     ClassMetaInfo[Object] type2metaInfos;
     ClassMetaInfo[string ] name2metaInfos;
     static struct PendingLookup{
-	ClassMetaInfo *target;
-	Object key;
-	string context;
-	PendingLookup * next;
+        ClassMetaInfo *target;
+        Object key;
+        string context;
+        PendingLookup * next;
     }
     PendingLookup[Object] pendingLookups;
 
@@ -624,46 +624,46 @@ class SerializationRegistry {
     /// adds a (possibly) delayed lookup
     void addDelayedLookup(Object key, ClassMetaInfo *target, string context){
         synchronized(this){
-	    ClassMetaInfo *mInfo= key in type2metaInfos;
-	    if (mInfo !is null){
-		*target = *mInfo;
-		return;
-	    }
-	    PendingLookup *lk=key in pendingLookups;
-	    if (lk is null){
-		PendingLookup pl=PendingLookup(target,key,context);
-		pendingLookups[key]=pl;
-	    } else {
-		PendingLookup *pl2=new PendingLookup;
-		*pl2=PendingLookup(target,key,context,lk.next);
-		lk.next=pl2;
-	    }
-	}
+            ClassMetaInfo *mInfo= key in type2metaInfos;
+            if (mInfo !is null){
+                *target = *mInfo;
+                return;
+            }
+            PendingLookup *lk=key in pendingLookups;
+            if (lk is null){
+                PendingLookup pl=PendingLookup(target,key,context);
+                pendingLookups[key]=pl;
+            } else {
+                PendingLookup *pl2=new PendingLookup;
+                *pl2=PendingLookup(target,key,context,lk.next);
+                lk.next=pl2;
+            }
+        }
     }
 
     /// writes out the pending lookups
     void writeOutPendingLookups(scope CharSink sink, string indent=""){
-	auto s=dumper(sink);
-	s("pendingLookups:{");
-	bool hasSome=false;
-	synchronized(this){
-	    foreach(k,v;pendingLookups){
-		if (hasSome) s(",");
-		hasSome=true;
-		s("\n")(indent);
-		s("  { key:@")(cast(void*)v.key)(", target:@")(cast(void*)v.target)(", context:`")(v.context)("` }");
-		auto n=v.next;
-		while (n !is null){
-		    s(",\n")(indent);
-		    s("  { key:@")(cast(void*)n.key)(", target:@")(cast(void*)n.target)(", context:`")(n.context)("` }");
-		    n=n.next;
-		}
-	    }
-	}
-	if (hasSome) {
-	    s("\n")(indent);
-	}
-	s("}");
+        auto s=dumper(sink);
+        s("pendingLookups:{");
+        bool hasSome=false;
+        synchronized(this){
+            foreach(k,v;pendingLookups){
+                if (hasSome) s(",");
+                hasSome=true;
+                s("\n")(indent);
+                s("  { key:@")(cast(void*)v.key)(", target:@")(cast(void*)v.target)(", context:`")(v.context)("` }");
+                auto n=v.next;
+                while (n !is null){
+                    s(",\n")(indent);
+                    s("  { key:@")(cast(void*)n.key)(", target:@")(cast(void*)n.target)(", context:`")(n.context)("` }");
+                    n=n.next;
+                }
+            }
+        }
+        if (hasSome) {
+            s("\n")(indent);
+        }
+        s("}");
     }
 
     /// registers the goven meta info for the type T
@@ -672,35 +672,35 @@ class SerializationRegistry {
         Object key = keyOf!(T); // use the content of metaInfo???
         version(STrace) {
             sinkTogether(sout,delegate(scope CharSink s){
-		    dumper(s)("Registering ")(metaInfo.className)(" in the serialization factory ")
-			(key.toString)(" @")(cast(void*)key)(" (")(T.stringof)(")\n");
-		});
+                    dumper(s)("Registering ")(metaInfo.className)(" in the serialization factory ")
+                        (key.toString)(" @")(cast(void*)key)(" (")(T.stringof)(")\n");
+                });
         }
         synchronized(this){
-	    ClassMetaInfo *oldInfo=metaInfo.className in name2metaInfos;
-	    if (oldInfo!is null){
+            ClassMetaInfo *oldInfo=metaInfo.className in name2metaInfos;
+            if (oldInfo!is null){
                 if (oldInfo.ci is metaInfo.ci && oldInfo.ti is metaInfo.ti) return; // ignore double registation (tipically from multiple instance of the same template with the same parameter)
-		// exception in static constructors might be tricky...
-		// so we also print out
-		sout("Registering duplicated name:"~metaInfo.className~"\n");
-		throw new Exception(collectIAppender(delegate void(scope CharSink s){
-			    dumper(s)("Registering duplicated name in SerializationRegistry@")(cast(void*)this)(":")(metaInfo.className)
-				(", oldVal:")(*oldInfo)(" newVal:")(metaInfo)("\n");
-			}),__FILE__,__LINE__);
-	    }
-	    PendingLookup *lk=key in pendingLookups;
-	    if (lk !is null){
-		*lk.target=metaInfo;
-		auto n=lk.next;
-		while (n !is null) {
-		    *n.target=metaInfo;
-		    auto old=n;
-		    n=n.next;
-		    old.clear(); // malloc and really free?
-		}
-		pendingLookups.remove(key);
-	    }
-	    name2metaInfos[metaInfo.className]=metaInfo;
+                // exception in static constructors might be tricky...
+                // so we also print out
+                sout("Registering duplicated name:"~metaInfo.className~"\n");
+                throw new Exception(collectIAppender(delegate void(scope CharSink s){
+                            dumper(s)("Registering duplicated name in SerializationRegistry@")(cast(void*)this)(":")(metaInfo.className)
+                                (", oldVal:")(*oldInfo)(" newVal:")(metaInfo)("\n");
+                        }),__FILE__,__LINE__);
+            }
+            PendingLookup *lk=key in pendingLookups;
+            if (lk !is null){
+                *lk.target=metaInfo;
+                auto n=lk.next;
+                while (n !is null) {
+                    *n.target=metaInfo;
+                    auto old=n;
+                    n=n.next;
+                    old.clear(); // malloc and really free?
+                }
+                pendingLookups.remove(key);
+            }
+            name2metaInfos[metaInfo.className]=metaInfo;
             type2metaInfos[key] = metaInfo;
         }
     }    
@@ -883,8 +883,8 @@ class Serializer {
     }
     /// writes out a field of type t
     void field(TT)(FieldMetaInfo *fieldMeta, ref TT t) {
-	alias UnqualAll!(TT) T;
-	fieldT!(T)(fieldMeta,*cast(T*)&t);
+        alias UnqualAll!(TT) T;
+        fieldT!(T)(fieldMeta,*cast(T*)&t);
     }
     void fieldT(T)(FieldMetaInfo *fieldMeta, ref T t) {
         version(SerializationTrace) {
@@ -1288,7 +1288,7 @@ class Serializer {
     }
     /// write Struct
     void writeStruct(FieldMetaInfo *field, ClassMetaInfo metaInfo, objectId objId,
-	scope void delegate() realWrite,const(void)*t){
+        scope void delegate() realWrite,const(void)*t){
         realWrite();
     }
     /// writes a core type
@@ -1459,8 +1459,8 @@ class Unserializer {
     /// main method writes out an object with the given field info
     /// this method cannot be overridden, but call all other methods that can be
     void field(TT)(FieldMetaInfo *fieldMeta, ref TT t) {
-	alias UnqualAll!(TT) T;
-	fieldT!(T)(fieldMeta, *cast(T*)&t);
+        alias UnqualAll!(TT) T;
+        fieldT!(T)(fieldMeta, *cast(T*)&t);
     }
     void fieldT(T)(FieldMetaInfo *fieldMeta, ref T t) {
         version(UnserializationTrace) {
@@ -1754,15 +1754,15 @@ class Unserializer {
                             ~typeid(T).toString~"'("~T.stringof~")");
                     }
                 }
-		} else static if (is(T VV:VV[])) {
-		alias UnqualAll!(VV) V;
+                } else static if (is(T VV:VV[])) {
+                alias UnqualAll!(VV) V;
                 version(UnserializationTrace) {
                     sout(collectIAppender(delegate void(scope CharSink s){
                         s("Y unserializing array: "); s(fieldMeta?fieldMeta.name:"*NULL*");
                         writeOut(s,typeid(T)); s("\n");
                     }));
                 }
-		auto elType=getSerializationInfoForType!(V)();
+                auto elType=getSerializationInfoForType!(V)();
                 FieldMetaInfo elMetaInfo=FieldMetaInfo("el","",elType);
                 elMetaInfo.pseudo=true;
                 auto ac=readArrayStart(fieldMeta);

@@ -31,22 +31,22 @@ ParentChilds!(T) parentChilds(T)(T root,T n,T el){
     T myN=((el+n-root)%n)+1;
     ParentChilds!(T) res;
     if (myN!=1){
-	res.parent=((myN>>1)+root-1)%n;
+        res.parent=((myN>>1)+root-1)%n;
     } else {
-	res.parent=n;
+        res.parent=n;
     }
     T lN=(myN<<1);
     if (lN<n){
-	res.left=(lN+root-1)%n;
-	T rN=lN+1;
-	if (rN<n){
-	    res.right=(rN+root-1)%n;
-	} else {
-	    res.right=n;
-	}
+        res.left=(lN+root-1)%n;
+        T rN=lN+1;
+        if (rN<n){
+            res.right=(rN+root-1)%n;
+        } else {
+            res.right=n;
+        }
     } else {
-	res.left=n;
-	res.right=n;
+        res.left=n;
+        res.right=n;
     }
     return res;
 }

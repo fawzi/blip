@@ -193,7 +193,7 @@ class BatchedGrowableArray(T,int batchSize1=((2048/T.sizeof>128)?2048/T.sizeof:1
                         this.pool.giveBack(&this);
                     } else {
                         //delete &this; // not possible in d2
-			this=Batch();
+                        this=Batch();
                     }
                 }
                 void doIndexLoop(){

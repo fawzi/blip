@@ -98,7 +98,7 @@ struct StcpRequest{
             }
         } else {
             clear();
-	    //            delete this; // not possible anymore
+            //            delete this; // not possible anymore
             version(TrackStcpRequests){
                 sinkTogether(sout,delegate void(scope CharSink s){
                     dumper(s)("destroyed StcpRequest@")(cast(void*)&this)("\n");
@@ -308,9 +308,9 @@ class StcpConnection{
         log=protocolHandler.log;
         version(TrackRpc){
             sinkTogether(log,delegate void(scope CharSink s){
-		    dumper(s)("created new connection StcpConnection@")(cast(void*)this)
-			(" in StcpProtocolHandler@")(cast(void*)protocolHandler)
-			(" to ")(targetHost)(" on socket ")(this.sock)("\n");
+                    dumper(s)("created new connection StcpConnection@")(cast(void*)this)
+                        (" in StcpProtocolHandler@")(cast(void*)protocolHandler)
+                        (" to ")(targetHost)(" on socket ")(this.sock)("\n");
             });
         }
     }
@@ -413,17 +413,17 @@ class StcpConnection{
         char[128] buf=void;
         auto arr=lGrowableArray!(char)(buf,0,GASharing.Local);
         arr("stcp://");
-	ParsedUrl.dumpHost(&arr.appendArr,targetHost.host);
-	dumper(&arr.appendArr)(":")(targetHost.port);
+        ParsedUrl.dumpHost(&arr.appendArr,targetHost.host);
+        dumper(&arr.appendArr)(":")(targetHost.port);
         if (protocolHandler.group.length!=1){
             arr(protocolHandler.group);
         } else if (protocolHandler.port.length>0 && protocolHandler.server !is null) {
-	    dumper(&arr.appendArr)(".lp")(protocolHandler.port);
-	}
+            dumper(&arr.appendArr)(".lp")(protocolHandler.port);
+        }
         arr("/serv/publisher/handlerUrl");
         string otherUrl;
         rpcManualResCall(otherUrl,arr.idata);
-       	arr.deallocData();
+               arr.deallocData();
         auto pUrl=ParsedUrl.parseUrl(otherUrl);
         if (pUrl.host!=targetHost.host || pUrl.port!=targetHost.port){
             TargetHost newH;
@@ -435,9 +435,9 @@ class StcpConnection{
                 if (oldC!is null){
                     if ((*oldC) is this) return;
                     sinkTogether(log,delegate void(scope CharSink s){
-			    dumper(s)("replacing connection to ")(newH)
-				(" from ")(*oldC)("@")(cast(void*)*oldC)
-				(" to ")(this)("@")(cast(void*)this)("\n");
+                            dumper(s)("replacing connection to ")(newH)
+                                (" from ")(*oldC)("@")(cast(void*)*oldC)
+                                (" to ")(this)("@")(cast(void*)this)("\n");
                     });
                 }
                 protocolHandler.connections[newH]=this;
@@ -485,8 +485,8 @@ class StcpProtocolHandler: ProtocolHandler{
     
     /// adds a hostname for this host (or an ip address), and begins to use it to build urls
     static void pushSelfHostname(string hostName) {
-	string[] newNames= [hostName]~selfHostnames;
-	selfHostnames=newNames;
+        string[] newNames= [hostName]~selfHostnames;
+        selfHostnames=newNames;
     }
     /// those that can actually handle the given protocol
     static ProtocolHandler findHandlerForUrl(ParsedUrl url){
@@ -566,8 +566,8 @@ class StcpProtocolHandler: ProtocolHandler{
         char[128] buf=void;
         auto arr=lGrowableArray!(char)(buf,0,GASharing.Local);
         arr("stcp://");
-	ParsedUrl.dumpHost(&arr.appendArr,selfHostnames[0]);
-	dumper(&arr.appendArr)(":")(port);
+        ParsedUrl.dumpHost(&arr.appendArr,selfHostnames[0]);
+        dumper(&arr.appendArr)(":")(port);
         if (group.length!=1){
             arr(group);
         }
@@ -588,10 +588,10 @@ class StcpProtocolHandler: ProtocolHandler{
     /// registers a local group using the listening port
     void registerLocalPort(){
         synchronized(StcpProtocolHandler.classinfo){
-	    char[128] buf;
-	    auto arr=lGrowableArray(buf,0,GASharing.Local);
-	    dumper(&arr.appendArr)(".lp")(port);
-	    string lGroup=arr.takeIData();
+            char[128] buf;
+            auto arr=lGrowableArray(buf,0,GASharing.Local);
+            dumper(&arr.appendArr)(".lp")(port);
+            string lGroup=arr.takeIData();
             auto pHP= lGroup in stcpProtocolHandlers;
             if (pHP !is null && (*pHP) !is this){
                 log("replacing already registred protocol for group "~lGroup~"\n");
@@ -778,7 +778,7 @@ class StcpProtocolHandler: ProtocolHandler{
                 throw new BIONoBindException("could not bind server started with port "~origPort,__FILE__,__LINE__,bindE);
             }
             updateUrl();
-	    registerLocalPort();
+            registerLocalPort();
         }
     }
     

@@ -282,7 +282,7 @@ extern(C){
      uint depth;           /**< \brief Depth of cache */
      uint linesize;                    /**< \brief Cache-line size in bytes */
      int associativity;			  /**< \brief Ways of associativity,
-    					    *  -1 if fully associative, 0 if unknown */
+                                                *  -1 if fully associative, 0 if unknown */
    }
    hwloc_cache_attr_s cache;
    /** \brief Group-specific Object Attributes */
@@ -310,8 +310,8 @@ extern(C){
     hwloc_obj_bridge_type_t upstream_type;
     union downstream_u{
       struct pci_t {
-	ushort domain;
-	ubyte secondary_bus, subordinate_bus;
+        ushort domain;
+        ubyte secondary_bus, subordinate_bus;
       };
       pci_t pci;
     };
@@ -343,22 +343,22 @@ extern(C){
  */
 struct hwloc_distances_s {
   uint relative_depth;	/**< \brief Relative depth of the considered objects
-				 * below the object containing this distance information. */
+                                 * below the object containing this distance information. */
   uint nbobjs;		/**< \brief Number of objects considered in the matrix.
-				 * It is the number of descendant objects at \p relative_depth
-				 * below the containing object.
-				 * It corresponds to the result of hwloc_get_nbobjs_inside_cpuset_by_depth. */
+                                 * It is the number of descendant objects at \p relative_depth
+                                 * below the containing object.
+                                 * It corresponds to the result of hwloc_get_nbobjs_inside_cpuset_by_depth. */
 
   float *latency;		/**< \brief Matrix of latencies between objects, stored as a one-dimension array.
-				 * May be \c NULL if the distances considered here are not latencies.
-				 * Values are normalized to get 1.0 as the minimal value in the matrix.
-				 * Latency from i-th to j-th object is stored in slot i*nbobjs+j.
-				 */
+                                 * May be \c NULL if the distances considered here are not latencies.
+                                 * Values are normalized to get 1.0 as the minimal value in the matrix.
+                                 * Latency from i-th to j-th object is stored in slot i*nbobjs+j.
+                                 */
   float latency_max;		/**< \brief The maximal value in the latency matrix. */
   float latency_base;		/**< \brief The multiplier that should be applied to latency matrix
-				 * to retrieve the original OS-provided latencies.
-				 * Usually 10 on Linux since ACPI SLIT uses 10 for local latency.
-				 */
+                                 * to retrieve the original OS-provided latencies.
+                                 * Usually 10 on Linux since ACPI SLIT uses 10 for local latency.
+                                 */
 }
 
 /** \brief Object info */
@@ -511,8 +511,8 @@ struct hwloc_obj {
   uint infos_count;			/**< \brief Size of infos array. */
 
   int symmetric_subtree;		/**< \brief Set if the subtree of objects below this object is symmetric,
-					  * which means all children and their children have identical subtrees.
-					  */
+                                          * which means all children and their children have identical subtrees.
+                                          */
 
 }
 }//extern(C)
@@ -794,35 +794,35 @@ extern(C){
 struct hwloc_topology_support {
     /** \brief Flags describing actual discovery support for this topology. */
     struct hwloc_topology_discovery_support {
-	/** \brief Detecting the number of PU objects is supported. */
-	ubyte pu;
+        /** \brief Detecting the number of PU objects is supported. */
+        ubyte pu;
     }
     hwloc_topology_discovery_support *discovery;
 
     /** \brief Flags describing actual binding support for this topology. */
     struct hwloc_topology_cpubind_support {
-	/** Binding the whole current process is supported.  */
-	ubyte set_thisproc_cpubind;
-	/** Getting the binding of the whole current process is supported.  */
-	ubyte get_thisproc_cpubind;
-	/** Binding a whole given process is supported.  */
-	ubyte set_proc_cpubind;
-	/** Getting the binding of a whole given process is supported.  */
-	ubyte get_proc_cpubind;
-	/** Binding the current thread only is supported.  */
-	ubyte set_thisthread_cpubind;
-	/** Getting the binding of the current thread only is supported.  */
-	ubyte get_thisthread_cpubind;
-	/** Binding a given thread only is supported.  */
-	ubyte set_thread_cpubind;
-	/** Getting the binding of a given thread only is supported.  */
-	ubyte get_thread_cpubind;
-	/** Getting the last processors where the whole current process ran is supported */
-  	ubyte get_thisproc_last_cpu_location;
-  	/** Getting the last processors where a whole process ran is supported */
-  	ubyte get_proc_last_cpu_location;
-  	/** Getting the last processors where the current thread ran is supported */
-  	ubyte get_thisthread_last_cpu_location;
+        /** Binding the whole current process is supported.  */
+        ubyte set_thisproc_cpubind;
+        /** Getting the binding of the whole current process is supported.  */
+        ubyte get_thisproc_cpubind;
+        /** Binding a whole given process is supported.  */
+        ubyte set_proc_cpubind;
+        /** Getting the binding of a whole given process is supported.  */
+        ubyte get_proc_cpubind;
+        /** Binding the current thread only is supported.  */
+        ubyte set_thisthread_cpubind;
+        /** Getting the binding of the current thread only is supported.  */
+        ubyte get_thisthread_cpubind;
+        /** Binding a given thread only is supported.  */
+        ubyte set_thread_cpubind;
+        /** Getting the binding of a given thread only is supported.  */
+        ubyte get_thread_cpubind;
+        /** Getting the last processors where the whole current process ran is supported */
+          ubyte get_thisproc_last_cpu_location;
+          /** Getting the last processors where a whole process ran is supported */
+          ubyte get_proc_last_cpu_location;
+          /** Getting the last processors where the current thread ran is supported */
+          ubyte get_thisthread_last_cpu_location;
     }
     hwloc_topology_cpubind_support *cpubind;
 
@@ -1057,7 +1057,7 @@ extern(C) hwloc_obj_type_t hwloc_obj_type_of_string (char * string);
  * \return how many characters were actually written (not including the ending \\0).
  */
 extern(C)int hwloc_obj_type_snprintf(char * string, size_t size, hwloc_obj_t obj,
-				   int verbose);
+                                   int verbose);
 /** \brief Stringify the attributes of a given topology object into a human-readable form.
  *
  * Attribute values are separated by \p separator.
@@ -1067,7 +1067,7 @@ extern(C)int hwloc_obj_type_snprintf(char * string, size_t size, hwloc_obj_t obj
  * \return how many characters were actually written (not including the ending \\0).
  */
 extern(C) int hwloc_obj_attr_snprintf(char * string, size_t size, hwloc_obj_t obj, char * separator,
-				   int verbose);
+                                   int verbose);
 
 /** \brief Stringify a given topology object into a human-readable form.
  *
@@ -1309,7 +1309,7 @@ extern(C) int hwloc_get_thread_cpubind(hwloc_topology_t topology, hwloc_thread_t
  */
 enum HWLOC_MEMBIND_POLICY {
   DEFAULT =	0,	/**< \brief Reset the memory allocation policy to the system default.
-					 * \hideinitializer */
+                                         * \hideinitializer */
   FIRSTTOUCH =	1,	/**< \brief Allocate memory
                                          * but do not immediately bind
                                          * it to a specific locality.
@@ -1322,7 +1322,7 @@ enum HWLOC_MEMBIND_POLICY {
                                          * that touches it.
                                          * \hideinitializer */
   BIND =		2,	/**< \brief Allocate memory on the specified nodes.
-					 * \hideinitializer */
+                                         * \hideinitializer */
   INTERLEAVE =	3,	/**< \brief Allocate memory on
                                          * the given nodes in an
                                          * interleaved / round-robin
@@ -1339,27 +1339,27 @@ enum HWLOC_MEMBIND_POLICY {
                                          * the memory references.
                                          * \hideinitializer */
   REPLICATE =	4,	/**< \brief Replicate memory
-					 * on the given nodes; reads
-					 * from this memory will
-					 * attempt to be serviced from
-					 * the NUMA node local to the
-					 * reading thread.
-					 * Replicating can be useful
-					 * when multiple threads from
-					 * the specified NUMA nodes
-					 * will be sharing the same
-					 * read-only data.
+                                         * on the given nodes; reads
+                                         * from this memory will
+                                         * attempt to be serviced from
+                                         * the NUMA node local to the
+                                         * reading thread.
+                                         * Replicating can be useful
+                                         * when multiple threads from
+                                         * the specified NUMA nodes
+                                         * will be sharing the same
+                                         * read-only data.
                                          *
                                          * This policy can only be
-					 * used with existing memory
-					 * allocations (i.e., the
-					 * hwloc_set_*membind*()
-					 * functions); it cannot be
-					 * used with functions that
-					 * allocate new memory (i.e.,
-					 * the hwloc_alloc*()
-					 * functions).
-					 * \hideinitializer */
+                                         * used with existing memory
+                                         * allocations (i.e., the
+                                         * hwloc_set_*membind*()
+                                         * functions); it cannot be
+                                         * used with functions that
+                                         * allocate new memory (i.e.,
+                                         * the hwloc_alloc*()
+                                         * functions).
+                                         * \hideinitializer */
   NEXTTOUCH =	5,	/**< \brief For each page bound
                                          * with this policy, by next time
                                          * it is touched (and next time only),
@@ -1369,7 +1369,7 @@ enum HWLOC_MEMBIND_POLICY {
                                          * thread where the memory
                                          * reference occurred (if it
                                          * needs to be moved at all).
-					 * \hideinitializer */
+                                         * \hideinitializer */
   MIXED = -1              /**< \brief Returned by hwloc_get_membind*()
                                          * functions when multiple threads or
                                          * parts of a memory area have

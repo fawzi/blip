@@ -24,9 +24,9 @@ version(NoTrace){} else { import blip.core.stacktrace.TraceExceptions; }
 void numaLooper(NumaNode n,NumaTopology topo,void delegate(NumaNode) loopBody){
     loopBody(n);
     if (n.level>0){
-	foreach(subN;topo.subNodes(n)){
-	    numaLooper(subN,topo,loopBody);
-	}
+        foreach(subN;topo.subNodes(n)){
+            numaLooper(subN,topo,loopBody);
+        }
     }
 }
     

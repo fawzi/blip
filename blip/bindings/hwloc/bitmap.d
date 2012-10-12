@@ -79,8 +79,8 @@ struct hwloc_bitmap_t{
         char *res;
         auto len=hwloc_bitmap_asprintf(&res, this);
         auto s=res[0..len].dup;
-	stdlib.free(res);
-	return s.idup;
+        stdlib.free(res);
+        return s.idup;
     }
 
     /** \brief Parse a bitmap string.
@@ -106,7 +106,7 @@ struct hwloc_bitmap_t{
     * or that would have been written (not including the ending \\0).
     */
     int listSprintf(char[] s){
-    	return hwloc_bitmap_list_snprintf(s.ptr, s.length, this);
+            return hwloc_bitmap_list_snprintf(s.ptr, s.length, this);
     }
 
     /** \brief Stringify a bitmap into a newly allocated list string.
@@ -114,15 +114,15 @@ struct hwloc_bitmap_t{
     string listString(){
         char *res;
         auto len = hwloc_bitmap_list_asprintf(&res, this);
-	auto s=res[0..len].dup;
-	stdlib.free(res);
-	return s.idup;
+        auto s=res[0..len].dup;
+        stdlib.free(res);
+        return s.idup;
     }
 
     /** \brief Parse a list string and stores it in bitmap \p bitmap.
      */
     int fromListString(in cstring s){
-	return hwloc_bitmap_list_sscanf(this, toStringz(s));
+        return hwloc_bitmap_list_sscanf(this, toStringz(s));
     }
 
     /** \brief

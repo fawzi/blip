@@ -288,7 +288,7 @@ void writeOut(V,T,S...)(scope V sink1,T v,S args){
     }
     alias UnqualAll!(T) TT;
     static if (is(T UU:UU[])){
-	alias UnqualAll!(UU) U;
+        alias UnqualAll!(UU) U;
         static if(is(U==UChar)){
             sink(v);
         } else static if(is(U==char)||is(U==wchar)||is(U==dchar)){
@@ -342,7 +342,7 @@ void writeOut(V,T,S...)(scope V sink1,T v,S args){
     } else static if (is(TT==UChar)){
         sink((&v)[0..1]);
     } else static if(is(TT==char)||is(TT==wchar)||is(TT==dchar)){
-	sink([cast(UChar)v]);
+        sink([cast(UChar)v]);
     } else static if (is(TT==byte)||is(TT==ubyte)||is(TT==short)||is(TT==ushort)||
         is(TT==int)||is(TT==uint)||is(TT==long)||is(TT==ulong))
     {
@@ -404,7 +404,7 @@ void writeOut(V,T,S...)(scope V sink1,T v,S args){
                 }
             }
         }
-	TT v2=v;
+        TT v2=v;
         if (v2<0){
             UChar[22] res;
             int pos=res.length-1;

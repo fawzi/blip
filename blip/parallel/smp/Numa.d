@@ -168,10 +168,10 @@ struct MemoryInfo{
     ulong local_memory_kB;          /**< \brief Size of memory node */
     ulong total_memory_kB;          /**< \brief Size of memory node */
     struct Pages{
-	ulong size;
-	ulong count;
-	mixin(serializeSome("","information on pages (of memory)",`size|count`));
-	mixin printOut!();
+        ulong size;
+        ulong count;
+        mixin(serializeSome("","information on pages (of memory)",`size|count`));
+        mixin printOut!();
     }
     Pages[] page_types;
     mixin(serializeSome("","information on memory", `attachedTo|local_memory_kB|total_memory_kB|page_types`));
@@ -880,7 +880,7 @@ version(noHwloc){} else {
             while(obj!is null){
                 switch (obj.type){
                     case HWLOC_OBJ.SYSTEM,HWLOC_OBJ.MACHINE,HWLOC_OBJ.NODE,
-			HWLOC_OBJ.CORE,HWLOC_OBJ.PU,HWLOC_OBJ.GROUP :
+                        HWLOC_OBJ.CORE,HWLOC_OBJ.PU,HWLOC_OBJ.GROUP :
                     ++nLevels;
                     break;
                     default:
@@ -898,7 +898,7 @@ version(noHwloc){} else {
             while(obj!is null){
                 switch (obj.type){
                     case HWLOC_OBJ.SYSTEM,HWLOC_OBJ.MACHINE,HWLOC_OBJ.NODE,
-			HWLOC_OBJ.CORE,HWLOC_OBJ.PU,HWLOC_OBJ.GROUP :
+                        HWLOC_OBJ.CORE,HWLOC_OBJ.PU,HWLOC_OBJ.GROUP :
                         ++nLevels;
                         levelMapping[nLevels-1].depth=obj.depth;
                         levelMapping[nLevels-1].partition=true;
@@ -1075,21 +1075,21 @@ version(noHwloc){} else {
             return res;
         }
 
-	MemoryInfo memoryInfoFromHwloc(NumaNode attachedTo,
-				       ref hwloc_obj_memory_s memory)
-	{
-	    MemoryInfo res;
-	    res.attachedTo=attachedTo;
-	    res.local_memory_kB=memory.local_memory/1024;
-	    res.total_memory_kB=memory.total_memory/1024;
-	    res.page_types=new MemoryInfo.Pages[](memory.page_types_len);
-	    foreach(i,p;memory.page_types[0..memory.page_types_len]){
-		res.page_types[i].size=p.size;
-		res.page_types[i].count=p.count;
-	    }
-	    return res;
-	}
-	    
+        MemoryInfo memoryInfoFromHwloc(NumaNode attachedTo,
+                                       ref hwloc_obj_memory_s memory)
+        {
+            MemoryInfo res;
+            res.attachedTo=attachedTo;
+            res.local_memory_kB=memory.local_memory/1024;
+            res.total_memory_kB=memory.total_memory/1024;
+            res.page_types=new MemoryInfo.Pages[](memory.page_types_len);
+            foreach(i,p;memory.page_types[0..memory.page_types_len]){
+                res.page_types[i].size=p.size;
+                res.page_types[i].count=p.count;
+            }
+            return res;
+        }
+            
     
         MemoryInfo nextMemory(NumaNode n){
             auto obj=hwlocObjForNumaNode(n);
@@ -1106,8 +1106,8 @@ version(noHwloc){} else {
                     refObj=refObj.parent;
                 }
                 assert(refObj.depth==objDepth);
-		return memoryInfoFromHwloc(NumaNode(level,refObj.logical_index),
-					   obj.memory);
+                return memoryInfoFromHwloc(NumaNode(level,refObj.logical_index),
+                                           obj.memory);
             }
             MemoryInfo res;
             return res;

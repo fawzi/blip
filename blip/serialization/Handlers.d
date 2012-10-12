@@ -82,7 +82,7 @@ class CoreHandlers(string constStr){
         } else static if (is(T==BinReader)){
             handleBinReader(t);
         } else {
-	    alias UnqualAll!(T) TT;
+            alias UnqualAll!(T) TT;
             static assert(isCoreType!(TT),T.stringof~" is not a core type");
             mixin("coreHandler_"~strForCoreType!(TT)~"(*cast(TT*)&t);");
         }
@@ -301,7 +301,7 @@ final class BinaryWriteHandlers(bool SwapBytes=isSmallEndian):WriteHandlers{
 
     /// writes a core type
     void basicWrite(T)(ref const(T) t){
-	alias UnqualAll!(T) UT;
+        alias UnqualAll!(T) UT;
         static assert(isCoreType!(UT),"only core types supported, not "~T.stringof);
         static if (is(UT==cfloat)||is(UT==cdouble)||is(UT==creal)){
             RealTypeOf!(UT) tt=t.re;
@@ -309,7 +309,7 @@ final class BinaryWriteHandlers(bool SwapBytes=isSmallEndian):WriteHandlers{
             tt=t.im;
             basicWrite!(RealTypeOf!(UT))(tt);
         } else static if (is(T U:U[])){
-	    alias UnqualAll!(U) UU;
+            alias UnqualAll!(U) UU;
             if (!is(UU==ubyte)){
                 writeCompressed(cast(ulong)t.length*U.sizeof);
             }
@@ -559,26 +559,26 @@ class FormattedWriteHandlers(U=char): WriteHandlers{
     }
     /// writes a basic type (basic types are atomic types or strings)
     void basicWrite(TT)(ref const TT t){
-	alias UnqualAll!(TT) T;
+        alias UnqualAll!(TT) T;
         static assert(!(is(T==char) || is(T==wchar) || is(T==dchar)),
             "single character writes not supported, only string writes");
-	static if (is(T VV:VV[])) {
-	    alias UnqualAll!(VV) V;
-	    static if (is(V==U)){
-		writer("\"");
-		writer(escape!(char)(t));//escape(t, cast(void delegate(T))&writer.stream.write);
-		writer("\"");
-	    } else static if (is(V==char)||is(V==wchar)||is(V==dchar)){
-		auto s=convertToString!(U)(t);
-		basicWrite(s);
-	    } else static if (is(V==ubyte)||is(V==void)){
-	        scope char[] buf=new char[](allocateEncodeSize(cast(ubyte[])t));
-		writer("\"");
-		writer(cast(U[])encode(cast(ubyte[])t,buf));
-		writer("\"");
-	    } else {
-		static assert(0,"invalid basic type "~T.stringof);
-	    }
+        static if (is(T VV:VV[])) {
+            alias UnqualAll!(VV) V;
+            static if (is(V==U)){
+                writer("\"");
+                writer(escape!(char)(t));//escape(t, cast(void delegate(T))&writer.stream.write);
+                writer("\"");
+            } else static if (is(V==char)||is(V==wchar)||is(V==dchar)){
+                auto s=convertToString!(U)(t);
+                basicWrite(s);
+            } else static if (is(V==ubyte)||is(V==void)){
+                scope char[] buf=new char[](allocateEncodeSize(cast(ubyte[])t));
+                writer("\"");
+                writer(cast(U[])encode(cast(ubyte[])t,buf));
+                writer("\"");
+            } else {
+                static assert(0,"invalid basic type "~T.stringof);
+            }
         } else static if (isBasicCoreType!(T)){
             writeOut(writer,t);
         } else {
@@ -598,11 +598,11 @@ class FormattedWriteHandlers(U=char): WriteHandlers{
     }
     /// writes a raw string
     void writeStr(TT)(in TT[]data){
-	alias UnqualAll!(TT) T;
+        alias UnqualAll!(TT) T;
         static if (is(T==U)){
             writer(data);
         } else static if (is(T==char)||is(T==wchar)||is(T==dchar)){
-	    const(U)[] s;
+            const(U)[] s;
             if (data.length<240){
                 U[256] buf;
                 s=convertToString!(U)(data,buf);
@@ -668,7 +668,7 @@ final class FormattedReadHandlers(T):ReadHandlers{
     }
     /// reads a basic type
     void basicRead(U)(ref U t){
-	alias UnqualAll!(U) UU;
+        alias UnqualAll!(U) UU;
         static if (is(U==CharReader)){
             outRead(t);
         } else static if (is(U==BinReader)){

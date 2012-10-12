@@ -218,14 +218,14 @@ version(Xpose){
     }
 
     struct NewSerializationExpose {
-    	template handler(int i : 0) {
-    		mixin NewSerializationExpose_mix0;
-    	}
+            template handler(int i : 0) {
+                    mixin NewSerializationExpose_mix0;
+            }
 
-    	template handler(int i : 1) {
-    		mixin NewSerializationExpose_mix1;
-    	}
-	
-    	mixin HandlerStructMix;
+            template handler(int i : 1) {
+                    mixin NewSerializationExpose_mix1;
+            }
+        
+            mixin HandlerStructMix;
     }
 }

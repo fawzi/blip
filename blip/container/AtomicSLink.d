@@ -30,8 +30,8 @@ T insertAt(T,U=T)(ref shared T head,U newHead) if(is(UnqualAll!(T)==UnqualAll!(U
         assert(!(newHead is null),"cannot add a null head");
     }
     return atomicOp!(T,T,T)(head,delegate T(T val){
-	newHead.next=cast(typeof(newHead.next))val;
-	memoryBarrier!(false,false,false,true)();
+        newHead.next=cast(typeof(newHead.next))val;
+        memoryBarrier!(false,false,false,true)();
         return cast(T)newHead;
     });
 }
@@ -39,14 +39,14 @@ T insertAt(T,U=T)(ref shared T head,U newHead) if(is(UnqualAll!(T)==UnqualAll!(U
 /// removes one element from the top of list
 T popFrom(T)(ref shared T list){
     return atomicOp!(T,T,T)(list,delegate T(T val){
-	    if (val is null) {
-		return null;
-	    } else {
-		/+ do we really need a barrier? only alpha needed a barrier for dependent loads... +/
-		memoryBarrier!(true,false,false,false)();
-		return val.next;
-	    }
-	});
+            if (val is null) {
+                return null;
+            } else {
+                /+ do we really need a barrier? only alpha needed a barrier for dependent loads... +/
+                memoryBarrier!(true,false,false,false)();
+                return val.next;
+            }
+        });
 }
 
 /// very basic single linked list structure

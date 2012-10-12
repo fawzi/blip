@@ -143,10 +143,10 @@ class PLoopHelper(T,int loopType){
         `,`
         blockSize=context.optimalBlockSize;
         if (context.res!=0||context.exception!is null) return;
-	while (1){
-	    if (context.firstDistribution==0) break;
-	    Thread.yield();
-	}
+        while (1){
+            if (context.firstDistribution==0) break;
+            Thread.yield();
+        }
         try{`,`
         t1.stealLevel=context.stealLevel;
         t2.stealLevel=context.stealLevel;
@@ -515,11 +515,11 @@ class PLoopIter(T){
         }
         void giveBack(){
             if (pool){
-		pool.giveBack(&this);
-	    }else{
-		LoopEl dummy;
-		this=dummy;
-	    }
+                pool.giveBack(&this);
+            }else{
+                LoopEl dummy;
+                this=dummy;
+            }
         }
     }
     

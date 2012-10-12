@@ -41,7 +41,7 @@ version(Posix){
         }
         
         void abort(){
-	    auto wOut=delegate void(const(char)[] s){ serr(s); };
+            auto wOut=delegate void(const(char)[] s){ serr(s); };
             bool waitFor(scope bool delegate() check){
                 for(int i=0;i<500;++i){
                     for(int j=0;i<100;++i){
@@ -86,8 +86,8 @@ version(Posix){
                                     writeBarrier();
                                     tAtt=t;
                                     Thread.sleep(tsecs(0.001));
-				    assert(0,"kill to fix");
-				    /+                                    if( pthread_kill( t.m_addr, SIGABRT ) != 0 ){
+                                    assert(0,"kill to fix");
+                                    /+                                    if( pthread_kill( t.m_addr, SIGABRT ) != 0 ){
                                         serr("could not send signal to a thread\n");
                                     }+/
                                     waitFor(delegate bool(){ auto tLevel=traceLevel; return tLevel==3; });

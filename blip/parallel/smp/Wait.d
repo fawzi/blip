@@ -71,11 +71,11 @@ struct SmpSemaphore{
                     for(int j=0;j<30 && sem is null;++j){
                         Thread.yield();
                     }
-		    if (sem is null){
-			shared newSem=new shared(Semaphore)();
-			writeBarrier();
-			atomicCAS(sem,newSem,cast(Semaphore)null);
-		    }
+                    if (sem is null){
+                        shared newSem=new shared(Semaphore)();
+                        writeBarrier();
+                        atomicCAS(sem,newSem,cast(Semaphore)null);
+                    }
                     readBarrier();
                     (cast(Semaphore)sem).notify();
                 }
@@ -92,7 +92,7 @@ struct SmpSemaphore{
                 tt.el=tAtt;
                 tt.delayLevel=tAtt.delayLevel;
                 tAtt.delay(delegate void(){
-			insertAt!(TaskISlist*)(waiting,tt);
+                        insertAt!(TaskISlist*)(waiting,tt);
                 });
             } else {
                 if (sem is null){

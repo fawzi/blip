@@ -171,7 +171,7 @@ class SBinSerializer : Serializer {
     }
     /// write Struct
     override void writeStruct(FieldMetaInfo *field, ClassMetaInfo metaInfo, objectId objId,
-	scope void delegate() realWrite,const(void) *t){
+        scope void delegate() realWrite,const(void) *t){
         uint metaId=1;
         if (compact){
             writeCompressed(metaId);

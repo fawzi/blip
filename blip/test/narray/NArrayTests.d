@@ -241,8 +241,8 @@ void testSumAxis(T,int rank)(NArray!(T,rank) a, Rand r){
         }
         auto dVal=sumAxis!(typeof(a),NArray!(real,rank-1))(a,axis);
     } else static if (rank==1){
-	auto refVal=sumAll!(typeof(a),real)(a);
-	auto dVal=sumAxis!(typeof(a),NArray!(real,rank-1))(a,axis);
+        auto refVal=sumAll!(typeof(a),real)(a);
+        auto dVal=sumAxis!(typeof(a),NArray!(real,rank-1))(a,axis);
     }
     static if (rank==1){
         int err=feqrel2(refVal,dVal);
@@ -286,8 +286,8 @@ void testMultAxis(T,int rank)(NArray!(T,rank) a, Rand r){
         }
         auto dVal=multiplyAxis!(typeof(a),NArray!(real,rank-1))(a,axis);
     } else static if (rank==1){
-	auto refVal=multiplyAll!(typeof(a),real)(a);
-	auto dVal=multiplyAxis!(typeof(a),real)(a,axis);
+        auto refVal=multiplyAll!(typeof(a),real)(a);
+        auto dVal=multiplyAxis!(typeof(a),real)(a,axis);
     }
     static if (rank==1){
         int err=feqrel2(refVal,dVal);
@@ -332,7 +332,7 @@ void testAxisFilter(T,int rank)(NArray!(T,rank) a, NArray!(index_type,1)indexes)
             writeOut(sout("b:").call,b); sout("\n");
             b.printData(sout.call); sout("\n");
             writeOut(sout("c:").call,c); sout("\n");
-	    c.printData(sout.call); sout("\n");
+            c.printData(sout.call); sout("\n");
             writeOut(sout("d:").call,d); sout("\n");
             d.printData(sout.call); sout("\n");
             throw new Exception("axisFilter failed",__FILE__,__LINE__);
@@ -673,27 +673,27 @@ TestCollection narrayRTst1(T,int rank)(TestCollection superColl){
         __LINE__,__FILE__,coll);
     static if (is(T==int) && rank<4){
         autoInitTst.testNoFail("testConvolveNN1b0",(NArray!(T,rank)a){
-		index_type[rank] kShape=3; testConvolveNN!(T,rank,Border.Same)(a,NArray!(T,rank).ones(kShape)); },
+                index_type[rank] kShape=3; testConvolveNN!(T,rank,Border.Same)(a,NArray!(T,rank).ones(kShape)); },
             __LINE__,__FILE__,coll,TestSize(100/rank));
         autoInitTst.testNoFail("testConvolveNNb0",
             (NArray!(T,rank)a,SizedRandomNArray!(int,ctfe_powI(3,rank)) flatK){
-				   index_type[rank] kShape=3; auto kernel=reshapeR!(rank)(flatK.arr,kShape);
+                                   index_type[rank] kShape=3; auto kernel=reshapeR!(rank)(flatK.arr,kShape);
                 testConvolveNN!(T,rank,Border.Same)(a,kernel);
             },__LINE__,__FILE__,coll,TestSize(100/rank));
         autoInitTst.testNoFail("testConvolveNN1b+",(NArray!(T,rank)a){
-		index_type[rank] kShape=3; testConvolveNN!(T,rank,Border.Increase)(a,NArray!(T,rank).ones(kShape)); },
+                index_type[rank] kShape=3; testConvolveNN!(T,rank,Border.Increase)(a,NArray!(T,rank).ones(kShape)); },
             __LINE__,__FILE__,coll,TestSize(100/rank));
         autoInitTst.testNoFail("testConvolveNNb+",
             (NArray!(T,rank)a,SizedRandomNArray!(int,ctfe_powI(3,rank)) flatK){
-				   index_type[rank] kShape=3; auto kernel=reshapeR!(rank)(flatK.arr,kShape);
+                                   index_type[rank] kShape=3; auto kernel=reshapeR!(rank)(flatK.arr,kShape);
                 testConvolveNN!(T,rank,Border.Increase)(a,kernel);
             },__LINE__,__FILE__,coll,TestSize(100/rank));
         autoInitTst.testNoFail("testConvolveNN1b-",(NArray!(T,rank)a){
-		index_type[rank] kShape=3; testConvolveNN!(T,rank,Border.Decrease)(a,NArray!(T,rank).ones(kShape)); },
+                index_type[rank] kShape=3; testConvolveNN!(T,rank,Border.Decrease)(a,NArray!(T,rank).ones(kShape)); },
             __LINE__,__FILE__,coll,TestSize(100/rank));
         autoInitTst.testNoFail("testConvolveNNb-",
             (NArray!(T,rank)a,SizedRandomNArray!(int,ctfe_powI(3,rank)) flatK){
-				   index_type[rank] kShape=3; auto kernel=reshapeR!(rank)(flatK.arr,kShape);
+                                   index_type[rank] kShape=3; auto kernel=reshapeR!(rank)(flatK.arr,kShape);
                 testConvolveNN!(T,rank,Border.Decrease)(a,kernel);
             },__LINE__,__FILE__,coll,TestSize(100/rank));
     }

@@ -27,9 +27,9 @@ import blip.Comp;
 
 template isNArray(T){
     static if (is(typeof(T.dim)) && is(T.dtype)) // is(T:NArray!(T.dtype,T.dim)) sometime fails with dmd 2.060
-	enum isNArray=true;
+        enum isNArray=true;
     else
-	enum isNArray=false;
+        enum isNArray=false;
 }
 
 /+ ---------------- structural ops -------------------- +/
@@ -192,20 +192,20 @@ NArray!(TT.dtype,rkOfArgs!(S)) reshape(TT,S...)(TT a,S args)
     int irank=0;
     bool fortran=false;
     foreach(i,T;S){
-	static if (is(T==ArrayFlags)){
-	    switch(args[i]){
-	    case ArrayFlags.Fortran:
-		fortran=true;
-		break;
-	    case ArrayFlags.Contiguous:
-		fortran=false;
-		break;
-	    default:
-		assert(0,"unexpected ArrayFlags value, only Contiguos and Fortran accepted, not "~ctfe_i2s(args[i]));
-	    }
-	} else {
-	    newShape[irank++]=cast(index_type)args[i];
-	}
+        static if (is(T==ArrayFlags)){
+            switch(args[i]){
+            case ArrayFlags.Fortran:
+                fortran=true;
+                break;
+            case ArrayFlags.Contiguous:
+                fortran=false;
+                break;
+            default:
+                assert(0,"unexpected ArrayFlags value, only Contiguos and Fortran accepted, not "~ctfe_i2s(args[i]));
+            }
+        } else {
+            newShape[irank++]=cast(index_type)args[i];
+        }
     }
     assert(irank==newRank);
     return reshapeR!(newRank)(a,newShape,fortran);
@@ -234,32 +234,32 @@ body {
 string freeFunMixin(string opName){
     return `
     template `~opName~`(V){
-	template `~opName~`(S...){
-	    NArray!(V,rkOfArgs!(S)) `~opName~`(S args){
-		alias rkOfArgs!(S) rank;
-		index_type[rank] shape;
-		int irank=0;
-		bool fortran=false;
-		foreach(i,T;S){
-		    static if (is(T==ArrayFlags)){
-			switch(args[i]){
-			case ArrayFlags.Fortran:
-			    fortran=true;
-			    break;
-			case ArrayFlags.Contiguous:
-			    fortran=false;
-			    break;
-			default:
-			    assert(0,"unexpected ArrayFlags value, only Contiguos and Fortran accepted, not "~ctfe_i2s(cast(int)args[i]));
-			}
-		    } else {
-			shape[irank++]=cast(index_type)args[i];
-		    }
-		}
-		assert(irank==rank);
-		return NArray!(V,rank).`~opName~`(shape,fortran);
-	    }
-	}
+        template `~opName~`(S...){
+            NArray!(V,rkOfArgs!(S)) `~opName~`(S args){
+                alias rkOfArgs!(S) rank;
+                index_type[rank] shape;
+                int irank=0;
+                bool fortran=false;
+                foreach(i,T;S){
+                    static if (is(T==ArrayFlags)){
+                        switch(args[i]){
+                        case ArrayFlags.Fortran:
+                            fortran=true;
+                            break;
+                        case ArrayFlags.Contiguous:
+                            fortran=false;
+                            break;
+                        default:
+                            assert(0,"unexpected ArrayFlags value, only Contiguos and Fortran accepted, not "~ctfe_i2s(cast(int)args[i]));
+                        }
+                    } else {
+                        shape[irank++]=cast(index_type)args[i];
+                    }
+                }
+                assert(irank==rank);
+                return NArray!(V,rank).`~opName~`(shape,fortran);
+            }
+        }
     }
     `;
 }
@@ -501,9 +501,9 @@ body  {
         mixin(sLoopPtr(T.dim,["a"],"foldOp(x,*(aPtr0));\n","i"));
         return x;
     } else {
-	alias SS.dtype S;
-	alias T.dim rank;
-	alias T.dtype TT;
+        alias SS.dtype S;
+        alias T.dim rank;
+        alias T.dtype TT;
         void myFold(ref S x0,TT* startP, index_type my_stride, index_type my_dim){
             S x=dupInitial(x0);
             TT* ii=startP;
@@ -553,10 +553,10 @@ body  {
 /// applies a reduction operation along the given axis
 U reduceAxis(T, S=T.dtype,V=S delegate(S,T),U=NArray!(S,T.dim-1),W=S delegate(S,S))
     (scope V foldOp,T a, S x0, int axis=-1, U res=U.init,scope W mergeOp=null)
-	if (isNArray!(T))
+        if (isNArray!(T))
 {
     static if (T.dim>1)
-	static assert(U.dim+1==T.dim,"dimension mismatch with "~T.stringof~" and "~U.stringof);
+        static assert(U.dim+1==T.dim,"dimension mismatch with "~T.stringof~" and "~U.stringof);
     if (mergeOp is null){
         mergeOp=(S x,S y){ x=foldOp(x,cast(T)y); };
     }
@@ -568,14 +568,14 @@ S sumAxis(T,S=NArray!(T.dtype,T.dim-1)) (T a,int axis=-1, S res=S.init)
     if (isNArray!(T))
 {
     static if (is(S.dtype)){
-	alias S.dtype SS;
-	static assert(S.dim+1==T.dim,"rank mismatch for result "~S.stringof~" when summing on an axis of "~T.stringof);
+        alias S.dtype SS;
+        static assert(S.dim+1==T.dim,"rank mismatch for result "~S.stringof~" when summing on an axis of "~T.stringof);
     } else {
-	alias S SS;
-	static assert(1==T.dim,"rank mismatch for result "~S.stringof~" when summing on an axis of "~T.stringof);
+        alias S SS;
+        static assert(1==T.dim,"rank mismatch for result "~S.stringof~" when summing on an axis of "~T.stringof);
     }
     return reduceAxisGen!((ref SS x,T.dtype y){ x+=cast(SS)y; },(ref SS x,SS y){ x+=y; },(SS x){ return cast(SS)0; })
-	(a,axis,res);
+        (a,axis,res);
 }
 
 /// sum of the whole array
@@ -594,10 +594,10 @@ S multiplyAxis(T,S=NArray!(T.dtype,T.dim-1))(T a,int axis=-1,S res=S.init)
     if (isNArray!(T))
 {
     static if (T.dim>1){
-	alias S.dtype SS;
-	static assert(S.dim+1==T.dim,"rank mismatch for result "~S.stringof~" when multiplying on an axis of "~T.stringof);
+        alias S.dtype SS;
+        static assert(S.dim+1==T.dim,"rank mismatch for result "~S.stringof~" when multiplying on an axis of "~T.stringof);
     } else {
-	alias S SS;
+        alias S SS;
     }
     return reduceAxisGen!(delegate void(ref SS x,T.dtype y){x=cast(SS)(x*y);},delegate void(ref SS x,SS y){x*=y;},delegate SS(SS x){ return cast(SS)1; })(a,axis,res);
 }
@@ -622,8 +622,8 @@ in {
     assert(a.shape[((axis1<0)?(rank1+axis1):axis1)]==b.shape[((axis2<0)?(rank2+axis2):axis2)],
         "fuse axis has to have the same size in a and b");
     static if(rank1+rank2>2){
-	alias UU.dim rank3;
-	static assert(rank3==rank1+rank2-2,"rank3 has incorrect size");
+        alias UU.dim rank3;
+        static assert(rank3==rank1+rank2-2,"rank3 has incorrect size");
         int ii=0;
         for(int i=0;i<rank1;i++){
             if(i!=axis1 && i!=axis1+rank1){
@@ -644,9 +644,9 @@ in {
     alias TT.dtype T;
     alias SS.dtype S;
     static if (is(UU.dtype))
-	alias UU.dtype U;
+        alias UU.dtype U;
     else
-	alias UU U;
+        alias UU U;
     void myFuse(U* x0,T* start1Ptr, index_type my_stride1, 
         S* start2Ptr, index_type my_stride2, index_type my_dim){
         T*yPtr=start1Ptr;
@@ -1044,14 +1044,14 @@ string axisFilterLoop(T,int rank,V,S...)(string loopBody)
 /// Filters the array a into the array b using indexes, ranges and index arrays
 /// and returns the array b
 B axisFilter1(TT,B,S...)(TT a,B b,S idx_tup)
-	if (isNArray!(TT))
+        if (isNArray!(TT))
 {
     alias TT.dim rank;
     alias TT.dtype T;
     static if (TT.dim>reductionFactorFilt!(S))
-	static assert(isNArray!(B)&&B.dim==TT.dim-reductionFactorFilt!(S),"invalid result type "~B.stringof~" for axis filter "~S.stringof~" on "~TT.stringof);
+        static assert(isNArray!(B)&&B.dim==TT.dim-reductionFactorFilt!(S),"invalid result type "~B.stringof~" for axis filter "~S.stringof~" on "~TT.stringof);
     else
-	static assert(TT.dim==reductionFactorFilt!(S),"invalid result type "~B.stringof~" for axis filter "~S.stringof~" on "~T.stringof);
+        static assert(TT.dim==reductionFactorFilt!(S),"invalid result type "~B.stringof~" for axis filter "~S.stringof~" on "~T.stringof);
     static assert(nArgs!(S)<=TT.dim,"too many indexing arguments");
     mixin(axisFilterLoop!(TT.dtype,TT.dim,B.dtype,S)("*bPtr0 = *aPtr0;"));
     return b;
@@ -1071,10 +1071,10 @@ TT axisUnfilter1(TT,V,S...)
     (TT a,V b,S idx_tup) if (isNArray!(TT))
 {
     static if (TT.dim>reductionFactorFilt!(S))
-	static assert(V.dim==TT.dim-reductionFactorFilt!(S),"b has incorrect rank, expected "~
-		      ctfe_i2s(TT.dim-reductionFactorFilt!(S))~" got "~ctfe_i2s(V.dim));
+        static assert(V.dim==TT.dim-reductionFactorFilt!(S),"b has incorrect rank, expected "~
+                      ctfe_i2s(TT.dim-reductionFactorFilt!(S))~" got "~ctfe_i2s(V.dim));
     else
-	static assert(TT.dim==reductionFactorFilt!(S),"invalid result type "~B.stringof~" for axis filter "~S.stringof~" on "~TT.stringof);
+        static assert(TT.dim==reductionFactorFilt!(S),"invalid result type "~B.stringof~" for axis filter "~S.stringof~" on "~TT.stringof);
     static assert(nArgs!(S)<=TT.dim,"too many indexing arguments");
     alias TT.dim rank;
     alias TT.dtype T;
@@ -1140,7 +1140,7 @@ S norm22NA(T,S=TypeOfNorm22NARes!(T.dtype))(T a)
             (ref S x,S y){ x+=y; }, (S x){return x;})(a,cast(S)0);
     } else {
         S res=reduceAllGen!((ref S x,T.dtype y){ x+=cast(S)y*cast(S)y; },(ref S x,S y){ x+=y; }, (S x){return x;})
-	    (a,cast(S)0);
+            (a,cast(S)0);
     }
     return res;
 }
@@ -1183,7 +1183,7 @@ template TypeOfNorm2(T){
     } else static if (is(typeof(T.init.norm22()))){
         alias typeof(T.init.norm2()) ResType;
     } else static if (is(typeof(sqrt(norm22(T.init))))){
-	alias typeof(sqrt(norm22(T.init))) ResType;
+        alias typeof(sqrt(norm22(T.init))) ResType;
     } else {
         alias void ResType;
     }

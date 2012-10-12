@@ -176,8 +176,8 @@ string rpcProxyMixin(string name,string extName,string extraInterfaces,string []
                 if (pool!is null){
                     pool.giveBack(&this);
                 } else {
-		    typeof(this) dummy;
-		    this=dummy;
+                    typeof(this) dummy;
+                    this=dummy;
                     // delete this;
                 }
             }
@@ -252,9 +252,9 @@ string rpcProxyMixin(string name,string extName,string extraInterfaces,string []
                     static assert(is(`~functionName~`Return==void),"oneway call on non void method `~name~`.`~functionName~`");
                     auto cl=OnewayClosure();
                     cl.closure.`~functionName~`Closure.obj=obj;
-		    foreach (i,TT;`~functionName~`Args){
-			cl.closure.`~functionName~`Closure.args[i]=args[i];
-		    }
+                    foreach (i,TT;`~functionName~`Args){
+                        cl.closure.`~functionName~`Closure.args[i]=args[i];
+                    }
                     cl.callClosureDelegate=&cl.closure.`~functionName~`Closure.call;
                     Task("onewayMethodCall`~name~`.`~functionName~`",cl.callClosureDelegate)
                         .appendOnFinish(&cl.giveBack).autorelease.submitYield(objTask);`;
@@ -411,8 +411,8 @@ string rpcVendorMixin(string name,string extName_, string [] functionsComments){
                 if (pool!is null){
                     pool.giveBack(&this);
                 } else {
-		    typeof(this) dummy;
-		    this=dummy;
+                    typeof(this) dummy;
+                    this=dummy;
                     // delete this;
                 }
             }

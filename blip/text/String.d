@@ -24,7 +24,7 @@ struct String{
     immutable(void)* ptr;
     size_t _l;
     enum Encoding:size_t{
-	// currently this is also the bitshift for the type...
+        // currently this is also the bitshift for the type...
         Utf8=0,
         Utf16=1,
         Utf32=2,
@@ -75,7 +75,7 @@ struct String{
     }
     /// bit shift for the stored encoding (use the fact that bishift=encoding id)
     @property int encodingBitShift(){
-	return cast(int)(_l>>BitsLen);
+        return cast(int)(_l>>BitsLen);
     }			    
     /// length of the string in bytes
     @property size_t byteLength(){
@@ -83,7 +83,7 @@ struct String{
     }
     /// length in charcter units (*not* utf codepoints)
     @property size_t cLength(){
-	return (_l & MaskLen)>>encodingBitShift;
+        return (_l & MaskLen)>>encodingBitShift;
     }
     /// builds a string from encoded data
     this(immutable(char)[] s){

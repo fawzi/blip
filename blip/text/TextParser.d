@@ -89,7 +89,7 @@ class TextParser(T) : InputFilter
             txt=cast(typeof(txt))source.slice;
             if (txt.length>250) txt=txt[0..250];
         } else {
-	    reader.handleReader(delegate size_t(in T[] dta, SliceExtent sExt,out bool iterate){
+            reader.handleReader(delegate size_t(in T[] dta, SliceExtent sExt,out bool iterate){
                 iterate=false;
                 if (dta.length>250){
                     txt=dta[0..250];
@@ -606,7 +606,7 @@ class TextParser(T) : InputFilter
     /// if longLived is true the result is guaranteed not to contain slices of the buffer
     /// (that might become invalid)
     void readValue(UU)(ref UU t,bool longLived=true){
-	alias UnqualAll!(UU) U;
+        alias UnqualAll!(UU) U;
         static if(is(U==byte)||is(U==ubyte)||is(U==short)||is(U==ushort)
             ||is(U==int)||is(U==uint)||is(U==long)||is(U==ulong))
         {

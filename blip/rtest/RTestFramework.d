@@ -262,7 +262,7 @@ class TextController: TestControllerI{
                         s(test.testName);
                         s("`");
                         if (test.testName.length<50){
-			    auto ll=test.testName.length;
+                            auto ll=test.testName.length;
                             int l=((ll<50)?50-cast(int)ll:0);
                             auto spc="              ";
                             while(l>0){
@@ -319,9 +319,9 @@ class TextController: TestControllerI{
         synchronized(_writeLock) {
             char[512] buf;
             auto arr=lGrowableArray!(char)(buf,0,GASharing.GlobalNoFree);
-	    scope(exit){
-		arr.deallocData();
-	    }
+            scope(exit){
+                arr.deallocData();
+            }
             progressLog("\n");
             progressLog("To reproduce:\n");
             if (exeName.length==0){
@@ -928,7 +928,7 @@ template testInit(string checkInit="", string manualInit=""){
                 synchronized(test.testController.writeLock){
                     char[256] buf;
                     auto arr=lGrowableArray!(char)(buf,0,GASharing.GlobalNoFree);
-		    dumper(&arr.appendArr)("test`")(test.testName)("` failed with exception\n");
+                    dumper(&arr.appendArr)("test`")(test.testName)("` failed with exception\n");
                     test.failureLog(arr.data);
                     //test.failureLog.flush();
                     writeOut(test.failureLog,e);

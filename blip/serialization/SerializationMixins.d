@@ -88,13 +88,13 @@ string serializeSome(string typeName1,string doc,string fieldsDoc){
         {
             static if (is(typeof(this.`~field~`()))){
                     alias typeof(this.`~field~`()) FieldType;
-		    alias UnqualAll!(FieldType) FieldTypeU;
-		    FieldTypeU thisField=cast(FieldTypeU)this.`~field~`;
+                    alias UnqualAll!(FieldType) FieldTypeU;
+                    FieldTypeU thisField=cast(FieldTypeU)this.`~field~`;
                     s.field(metaI[`~ctfe_i2s(ifield)~`],thisField);
                     this.`~field~`=cast(FieldType)thisField;
             } else {
                 alias typeof(this.`~field~`) FieldType;
-		alias UnqualAll!(FieldType) FieldTypeU;
+                alias UnqualAll!(FieldType) FieldTypeU;
                 static if(isStaticArrayType!(FieldTypeU)){
                     auto thisField=this.`~field~`[];
                     s.field(metaI[`~ctfe_i2s(ifield)~`],thisField);
@@ -269,10 +269,10 @@ string descSome(string typeName,string fieldsDoc){
         res~="(`"~typeName~"`);";
     }
     res~=`
-	static if (is(typeof(this)==class))
-	    dumper(sink)("@")(cast(void*)this);
-	else
-	    dumper(sink)("@")(cast(void*)&this);
+        static if (is(typeof(this)==class))
+            dumper(sink)("@")(cast(void*)this);
+        else
+            dumper(sink)("@")(cast(void*)&this);
         dumper(sink)`;
     auto fieldsDocArray=extractFieldsAndDocs(fieldsDoc);
     for (int ifield=0;ifield<fieldsDocArray.length/2;++ifield){

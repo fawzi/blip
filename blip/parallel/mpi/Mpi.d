@@ -95,7 +95,7 @@ version(mpi)
     }
 
     class MpiSerializer:SBinSerializer{
-	static __gshared MpiSerializer freeList;
+        static __gshared MpiSerializer freeList;
         MpiSerializer next;
         int tag;
         LocalGrowableArray!(ubyte) msgData;

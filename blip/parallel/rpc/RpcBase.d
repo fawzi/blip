@@ -85,17 +85,17 @@ struct ParsedUrl{
         pathLen=p.length;
     }
     static void dumpHost(scope void delegate(in cstring)sink, string host) {
-	bool ipv6ip=false;
-	foreach (c;host)
-	    if (c == ':') ipv6ip=true;
-	if (ipv6ip) sink("[");
+        bool ipv6ip=false;
+        foreach (c;host)
+            if (c == ':') ipv6ip=true;
+        if (ipv6ip) sink("[");
         sink(host);
-	if (ipv6ip) sink("]");
+        if (ipv6ip) sink("]");
     }
     void urlWriter(scope void delegate(in cstring)sink){
         sink(protocol);
         sink("://");
-	dumpHost(sink,host);
+        dumpHost(sink,host);
         if (port.length!=0){
             sink(":");
             sink(port);
@@ -219,23 +219,23 @@ struct ParsedUrl{
             ++i;
         }
         size_t j;
-	if (url[i]=='[') {
-	    for (j=++i;j<url.length;++j){
-		if (url[j]==']') break;
-	    }
-	    if (j==url.length) return j;
-	    host=url[i..j];
-	    ++j;
-	    if (j==url.length) return j;
-	    if (url[j]!='/' && url[j]!=':') return j;
-	} else {
-	    for (j=i;j<url.length;++j){
-		if (url[j]=='/'||url[j]==':') break;
-	    }
-	    host=url[i..j];
-	    if (j==url.length) return j;
-	}
-	i=j+1;
+        if (url[i]=='[') {
+            for (j=++i;j<url.length;++j){
+                if (url[j]==']') break;
+            }
+            if (j==url.length) return j;
+            host=url[i..j];
+            ++j;
+            if (j==url.length) return j;
+            if (url[j]!='/' && url[j]!=':') return j;
+        } else {
+            for (j=i;j<url.length;++j){
+                if (url[j]=='/'||url[j]==':') break;
+            }
+            host=url[i..j];
+            if (j==url.length) return j;
+        }
+        i=j+1;
         if (url[j]==':'){
             for (j=i;j<url.length;++j){
                 if (url[j]=='/') break;

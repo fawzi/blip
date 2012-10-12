@@ -36,30 +36,30 @@ import blip.core.Thread; // to yield
 
 template Unshared(T){
     static if (is(T U==shared)){
-	alias U Unshared;
+        alias U Unshared;
     } else {
-	alias T Unshared;
+        alias T Unshared;
     }
 }
 /+
 template Unshared1(T){
     static if (is(T U==shared)){
-	alias U Unshared1;
+        alias U Unshared1;
     } else {
-	alias T Unshared1;
+        alias T Unshared1;
     }
 }
 
 
 template Unshared(T){
     static if (is(T U==shared)){
-	alias U Unshared;
+        alias U Unshared;
     } else static if (is(T U:U*)){
-	alias Unshared1!(U)* Unshared;
+        alias Unshared1!(U)* Unshared;
     } else static if (is(T U:U[])){
-	alias Unshared1!(U)[] Unshared;
+        alias Unshared1!(U)[] Unshared;
     } else {
-	alias T Unshared;
+        alias T Unshared;
     }
 }
 +/
@@ -165,21 +165,21 @@ template atomicValueIsProperlyAligned( T )
 version( LDC )
 {
     void memoryBarrier(bool ll, bool ls, bool sl,bool ss)(){
-	// in the weaker barriers one migh want to have a stronger (Sequentially consistent) single thread
-	// barrier, currently (7.7.2012) this is not exposed by ldc intrinsics
-	static if (ls || sl) {
-	    llvm_memory_fence(AtomicOrdering.SequentiallyConsistent);
-	} else static if (ll && !ss) {
-	    llvm_memory_fence(AtomicOrdering.Acquire);
-	} else static if (ss && !ll) {
-	    llvm_memory_fence(AtomicOrdering.Release);
+        // in the weaker barriers one migh want to have a stronger (Sequentially consistent) single thread
+        // barrier, currently (7.7.2012) this is not exposed by ldc intrinsics
+        static if (ls || sl) {
+            llvm_memory_fence(AtomicOrdering.SequentiallyConsistent);
+        } else static if (ll && !ss) {
+            llvm_memory_fence(AtomicOrdering.Acquire);
+        } else static if (ss && !ll) {
+            llvm_memory_fence(AtomicOrdering.Release);
         } else static if (ll && ss) {
-	    llvm_memory_fence(AtomicOrdering.AquireRelease);
-	}
+            llvm_memory_fence(AtomicOrdering.AquireRelease);
+        }
     }
 } else version(D_InlineAsm_X86){
     void memoryBarrier(bool ll, bool ls, bool sl,bool ss)(){
-	static if (ls || sl || (ll && ss)){ // use a sequencing operation like cpuid or simply cmpxch instead?
+        static if (ls || sl || (ll && ss)){ // use a sequencing operation like cpuid or simply cmpxch instead?
             asm {
                 mfence;
             }
@@ -256,10 +256,10 @@ void fullBarrier(){
 version(LDC){
     TT atomicSwap( TT, U=TT )( ref shared(TT) val, U newval0 )
     {
-	
+        
         alias Unshared!(TT) T;
-	T newval=cast(T)newval0;
-	T oldval = void;
+        T newval=cast(T)newval0;
+        T oldval = void;
         static if (isPointerOrClass!(T))
         {
             oldval = cast(T)llvm_atomic_swap!(size_t)(cast(size_t*)&val, cast(size_t)newval);
@@ -284,8 +284,8 @@ version(LDC){
         else
             assert( atomicValueIsProperlyAligned!(TT)( cast(size_t) &val ) );
     } body {
-	alias Unshared!(TT) T;
-	T newval=cast(T)newval0;
+        alias Unshared!(TT) T;
+        T newval=cast(T)newval0;
         T*posVal=cast(T*)&val;
         static if( T.sizeof == byte.sizeof ) {
             asm {
@@ -325,8 +325,8 @@ version(LDC){
     in {
         assert( atomicValueIsProperlyAligned!(TT)( cast(size_t) &val ) );
     } body {
-	alias Unshared!(TT) T;
-	T newval=cast(T)newval0;
+        alias Unshared!(TT) T;
+        T newval=cast(T)newval0;
         T*posVal=cast(T*)&val;
         static if( T.sizeof == byte.sizeof ) {
             asm {
@@ -370,8 +370,8 @@ version(LDC){
     in {
         assert( atomicValueIsProperlyAligned!(TT)( cast(size_t) &val ) );
     } body {
-	alias Unshared!(TT) T;
-	T newval=cast(T)newval0;
+        alias Unshared!(TT) T;
+        T newval=cast(T)newval0;
         TT oldVal;
         synchronized(typeid(T)){ // this is actually slightly incorrect, use a global lock instead?
             oldVal=cast(TT)val;
@@ -397,9 +397,9 @@ private T aCasT(T,V)(ref shared(T) val, T newval, T equalTo){
 /// internal reduction
 private T aCas(T,U=T,V=T)(ref shared(T) val, U newval, V equalTo){
     static if (is(T TT == shared)){
-	alias TT TBase;
+        alias TT TBase;
     } else {
-	alias T TBase;
+        alias T TBase;
     }
     static if (T.sizeof==1){
         return aCasT!(TBase,ubyte)(val,cast(TBase)newval,cast(TBase)equalTo);
@@ -424,9 +424,9 @@ private T aCas(T,U=T,V=T)(ref shared(T) val, U newval, V equalTo){
 version(LDC){
     TT atomicCAS( TT,U=TT,V=TT )( ref shared(TT) val, U newval0, V equalTo0 )
     {
-	alias Unshared!(TT) T;
-	T newval=cast(T)newval0;
-	T equalTo=cast(T)equalTo0;
+        alias Unshared!(TT) T;
+        T newval=cast(T)newval0;
+        T equalTo=cast(T)equalTo0;
         TT oldval = void;
         static if (isPointerOrClass!(T))
         {
@@ -440,7 +440,7 @@ version(LDC){
         {
             oldval = cast(TT)llvm_atomic_cmp_swap!(T)(&val, equalTo, newval);
         } else {
-	    oldval = cast(TT)aCas(val,newval,equalTo);
+            oldval = cast(TT)aCas(val,newval,equalTo);
         }
         return oldval;
     }
@@ -458,9 +458,9 @@ version(LDC){
         else
             assert( atomicValueIsProperlyAligned!(ClassPtr!(TT))( cast(size_t) &val ) );
     } body {
-	alias Unshared!(TT) T;
-	T newval=cast(T)newval0;
-	T equalTo=cast(T)equalTo0;
+        alias Unshared!(TT) T;
+        T newval=cast(T)newval0;
+        T equalTo=cast(T)equalTo0;
         T*posVal=cast(T*)&val;
         static if( T.sizeof == byte.sizeof ) {
             asm {
@@ -544,9 +544,9 @@ version(LDC){
     in {
         assert( atomicValueIsProperlyAligned!(TT)( cast(size_t) &val ) );
     } body {
-	alias Unshared!(TT) T;
-	T newval=cast(T)newval0;
-	T equalTo=cast(T)equalTo0;
+        alias Unshared!(TT) T;
+        T newval=cast(T)newval0;
+        T equalTo=cast(T)equalTo0;
         T*posVal=cast(T*)&val;
         static if( T.sizeof == byte.sizeof ) {
             asm {
@@ -594,9 +594,9 @@ version(LDC){
     in {
         assert( atomicValueIsProperlyAligned!(TT)( cast(size_t) &val ) );
     } body {
-	alias Unshared!(TT) T;
-	T newval=cast(T)newval0;
-	T equalTo=cast(T)equalTo0;
+        alias Unshared!(TT) T;
+        T newval=cast(T)newval0;
+        T equalTo=cast(T)equalTo0;
         TT oldval;
         synchronized(typeid(T)){
             oldval=cast(TT)val;
@@ -654,7 +654,7 @@ in {
 */
 version(LDC){
     TT atomicAdd(TT,U=TT)(ref shared(TT) val, U incV){
-	alias Unshared!(TT) T;
+        alias Unshared!(TT) T;
         static if (isPointerOrClass!(T))
         {
             return cast(TT)llvm_atomic_load_add!(size_t)(cast(size_t*)&val, cast(size_t)incV*T.sizeof);
@@ -664,19 +664,19 @@ version(LDC){
             static assert( isIntegerType!(T), "invalid type "~T.stringof );
             return cast(TT)llvm_atomic_load_add!(T)(&val, cast(T)incV);
         } else {
-	    return cast(TT)atomicOp(val,delegate T(in T a){ return a+incV; });
+            return cast(TT)atomicOp(val,delegate T(in T a){ return a+incV; });
         }
     }
 } else version (D_InlineAsm_X86){
     TT atomicAdd(TT,U=TT)(ref shared(TT) val, U incV_){
-	alias Unshared!(TT) T;
+        alias Unshared!(TT) T;
         static if (isIntegerType!(T)||isPointerOrClass!(T)){
             T* posVal=&val;
-	    static if (isPointerOrClass!(T)) {
-		size_t incV=cast(size_t)incV_*T.sizeof;
-	    } else {
-		T incV=cast(T)incV_;
-	    }
+            static if (isPointerOrClass!(T)) {
+                size_t incV=cast(size_t)incV_*T.sizeof;
+            } else {
+                T incV=cast(T)incV_;
+            }
             T res;
             static if (T.sizeof==1){
                 asm {
@@ -715,13 +715,13 @@ version(LDC){
     }
 } else version (D_InlineAsm_X86_64){
     TT atomicAdd(TT,U=TT)(ref shared(TT) val, U incV_){
-	alias Unshared!(TT) T;
+        alias Unshared!(TT) T;
         static if (isIntegerType!(T)||isPointerOrClass!(T)){
-	    static if (isPointerOrClass!(T)) {
-		size_t incV=cast(size_t)incV_*T.sizeof;
-	    } else {
-		T incV=cast(T)incV_;
-	    }
+            static if (isPointerOrClass!(T)) {
+                size_t incV=cast(size_t)incV_*T.sizeof;
+            } else {
+                T incV=cast(T)incV_;
+            }
             T* posVal=cast(T*)&val;
             T res;
             static if (T.sizeof==1){
@@ -769,7 +769,7 @@ version(LDC){
 } else {
     static if (LockVersion){
         TT atomicAdd(TT,U=TT)(ref shared(TT) val, U incV){
-	    alias Unshared!(TT) T;
+            alias Unshared!(TT) T;
             static assert( isIntegerType!(T)||isPointerOrClass!(T),"invalid type: "~T.stringof );
             synchronized(typeid(T)){
                 TT oldV=cast(TT)val;
@@ -779,7 +779,7 @@ version(LDC){
         }
     } else {
         TT atomicAdd(TT,U=T)(ref shared(TT) val, U incV){
-	    alias Unshared!(TT) T;
+            alias Unshared!(TT) T;
             static assert( isIntegerType!(T)||isPointerOrClass!(T),"invalid type: "~T.stringof );
             synchronized(typeid(T)){
                 TT oldV,newVal,nextVal;

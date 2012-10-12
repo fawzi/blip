@@ -281,7 +281,7 @@ void testJsonUnserial(T)(T a){
         auto js2=new JsonSerializer!()("sout",sout);
         sout("original:----\n");
         js2(a);
-	sout("XXXXXX Unserialization start\n");
+        sout("XXXXXX Unserialization start\n");
     }
     jus(sOut);
     version(UnserializationTrace) {
@@ -316,9 +316,9 @@ void testJson2Unserial(T)(T a){
         sout("-----\n");
     }
     try {
-	jus(sOut);
+        jus(sOut);
     } catch (Exception e) {
-	sout("Unserialization failed with exception "~e.toString()~"\n");
+        sout("Unserialization failed with exception "~e.toString()~"\n");
     }
     version(UnserializationTrace) {
         sout("XXXXXX Unserialization end\n");
@@ -426,9 +426,9 @@ void testJsonUnserial2(T,U)(T a,ref U sOut){
     auto jus=new JsonUnserializer!()(toReaderT!(char)(buf));
     version(UnserializationTrace) sout("XXXXXX Unserialization start\n");
     try {
-	jus(sOut);
+        jus(sOut);
     } catch (Exception e) {
-	sout("exception while userializing:"~e.toString()~"\n");
+        sout("exception while userializing:"~e.toString()~"\n");
     }
     version(UnserializationTrace) {
         auto js2=new JsonSerializer!()("sout",sout);
@@ -568,7 +568,7 @@ void main(){
     void testLazyAA(void function(LazyAA!(int,int),LazyAA!(int,int)) testF){
         FExp fExp;
         FExp fExp2;
-	auto arrayIn=LazyAA!(int,int)(cast(int delegate(scope int delegate(ref int,ref int)))&fExp.opApply);
+        auto arrayIn=LazyAA!(int,int)(cast(int delegate(scope int delegate(ref int,ref int)))&fExp.opApply);
         //auto arrayIn=LazyAA!(int,int)(cast(int delegate(scope int delegate(ref int,ref int)))&fExp.loop2);
         auto arrayOut=LazyAA!(int,int)(delegate void(int k,int v){
                 auto kR=fExp2.next();
@@ -578,12 +578,12 @@ void main(){
                         s("keys:"); writeOut(s,k); s(" vs "); writeOut(s,kR);
                         s(" vals:"); writeOut(s,v); s(" vs "); writeOut(s,vR); s("\n");
                     });
-		    FExp fExp3;
-		foreach(i,j;fExp3){
-		    sinkTogether(sout,delegate void(scope CharSink s){
-			    dumper(s)(i)(":")(j)("\n");
-			});
-		}
+                    FExp fExp3;
+                foreach(i,j;fExp3){
+                    sinkTogether(sout,delegate void(scope CharSink s){
+                            dumper(s)(i)(":")(j)("\n");
+                        });
+                }
                     throw new Exception("unexpected value",__FILE__,__LINE__);
                 }
             });

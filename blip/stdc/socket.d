@@ -111,12 +111,12 @@ version (Win32) {
         pragma (lib, "ws2_32.lib");
 
         private import std.c.windows.winsock;
-	alias SOCKET socket_t;
-	enum socket_tInit=-1;
+        alias SOCKET socket_t;
+        enum socket_tInit=-1;
 } else {
     public import tango.stdc.posix.sys.socket;
     static if (!is(typeof(SOL_TCP))){
-	alias IPPROTO_TCP SOL_TCP;
+        alias IPPROTO_TCP SOL_TCP;
     }
     
     // sys/socket.hostname

@@ -187,7 +187,7 @@ NonStaticArray!(TT) genRandom(TT)(Rand r,int idx,ref int nEl, ref bool acceptabl
         a.ui=r.uniform!(uint);
         return cast(TT)a.s;
     } else static if (is(T==char)||is(T==wchar)||is(T==dchar)){
-	return cast(TT)cast(T)r.uniformEl(valid_chars);
+        return cast(TT)cast(T)r.uniformEl(valid_chars);
     } else static if (is(T==float)||is(T==double)||is(T==real)){
         return cast(TT)r.normalSigma(cast(T)1.5);
     } else static if (is(T==ifloat)||is(T==idouble)||is(T==ireal)){

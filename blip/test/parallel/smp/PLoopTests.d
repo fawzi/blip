@@ -181,7 +181,7 @@ void testLoopIRange(T,LoopType lType)(T from, SizeLikeNumber!() dim){
         foreach (i,v;arr){
             if (v!=1){
                 throw new Exception(collectIAppender(delegate void(scope CharSink s){
-			    dumper(s)("testLoopIRange missing loop for ")(from)("+")(i);
+                            dumper(s)("testLoopIRange missing loop for ")(from)("+")(i);
                 }));
             }
         }

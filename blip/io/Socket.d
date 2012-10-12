@@ -111,9 +111,9 @@ struct BasicSocket{
 
         res.sock=-1;
         auto a1=lGrowableArray(buf,0,GASharing.GlobalNoFree);
-	scope(exit){
-	    a1.deallocData();
-	}
+        scope(exit){
+            a1.deallocData();
+        }
         dumper(&a1.appendArr)(address)("\0")(service)("\0");
         auto addr0=a1.data();
         nodeName=a1.ptr;
@@ -126,10 +126,10 @@ struct BasicSocket{
         err=getaddrinfo(nodeName,serviceName,&hints,&addressInfo);
         if (err!=0){
             char *errStr= gai_strerror(err);
-	    char[256] errBuf;
-	    auto errA=lGrowableArray(errBuf,0);
-	    dumper(&errA.appendArr)("getaddrinfo error:")(errStr[0..strlen(errStr)])
-		(" with address:")(address)(" and service:")(service);
+            char[256] errBuf;
+            auto errA=lGrowableArray(errBuf,0);
+            dumper(&errA.appendArr)("getaddrinfo error:")(errStr[0..strlen(errStr)])
+                (" with address:")(address)(" and service:")(service);
             throw new BIOException(errA.takeIData(),__FILE__,__LINE__);
         }
 
@@ -540,25 +540,25 @@ class SocketServer{
             //printf("will create socket(%d,%d,%d)\n",res.ai_family,res.ai_socktype,res.ai_protocol);
             socket_t s=socket(res.ai_family,res.ai_socktype,res.ai_protocol);
             if (s<0) continue;
-	    static if (is(typeof(IPV6_V6ONLY))) {
-		{
-		    static if (!is(typeof(SOL_IPV6))) {
-			enum { SOL_IPV6 = IPPROTO_IPV6 }
-		    }
-		    // avoid skipping IPv6 if IPv4 is bound first on linux
-		    int tmp = 1;
-		    if (res.ai_family == AF_INET6
-			&& setsockopt (s, SOL_IPV6, IPV6_V6ONLY, cast(char *) &tmp,
-				       cast(socklen_t) tmp.sizeof) != 0)
-			{
-			    sinkTogether(log,delegate void(scope CharSink s){
-				    char[256] buf;
-				    dumper(s)(strerror_d(errno(), buf))
-					(", in setsockopt(s, SOL_IPV6, IPV6_V6ONLY,[1],4)\n");
-				});
-			}
-		}
-	    }
+            static if (is(typeof(IPV6_V6ONLY))) {
+                {
+                    static if (!is(typeof(SOL_IPV6))) {
+                        enum { SOL_IPV6 = IPPROTO_IPV6 }
+                    }
+                    // avoid skipping IPv6 if IPv4 is bound first on linux
+                    int tmp = 1;
+                    if (res.ai_family == AF_INET6
+                        && setsockopt (s, SOL_IPV6, IPV6_V6ONLY, cast(char *) &tmp,
+                                       cast(socklen_t) tmp.sizeof) != 0)
+                        {
+                            sinkTogether(log,delegate void(scope CharSink s){
+                                    char[256] buf;
+                                    dumper(s)(strerror_d(errno(), buf))
+                                        (", in setsockopt(s, SOL_IPV6, IPV6_V6ONLY,[1],4)\n");
+                                });
+                        }
+                }
+            }
             version(TrackSocketServer){
                 sinkTogether(log,delegate void(scope CharSink s){
                     dumper(s)("trying bind to ");

@@ -85,7 +85,7 @@ size_t nCodePoints(T)(in T[] str){
         }
         return n;
     } else static if (is(T==wchar)){
-	const(T)* p=str.ptr;
+        const(T)* p=str.ptr;
         size_t n=0;
         bool charLoop(const(T)*pEnd){
             while(p<pEnd){
@@ -137,14 +137,14 @@ size_t nCodePoints(T)(in T[] str){
 
 template convertToString(TT=char){
     const(TT)[]convertToString(S)(S[]src,TT[]dest=null){
-	alias UnqualAll!(TT) T;
+        alias UnqualAll!(TT) T;
         static if(is(T==UnqualAll!(S))){
             return cast(const(T)[])src;
         } else static if(is(T==char)){
-	    return Utf.toString(src,dest);
-	} else static if(is(T==wchar)){
+            return Utf.toString(src,dest);
+        } else static if(is(T==wchar)){
             return Utf.toString16(src,dest);
-	} else static if(is(T==dchar)){
+        } else static if(is(T==dchar)){
             return Utf.toString32(src,dest);
         } else {
             static assert(0,"unexpected char type "~TT.stringof);

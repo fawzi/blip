@@ -84,7 +84,7 @@ class Dottable(T,int rank1,S,int rank2,bool scanAxis=false, bool randomLayout=fa
         }
         index_type[rank1] dims1=dims[0..rank1];
         auto a=NArray!(T,rank1).empty(dims1);
-	randNArray(r,a);
+        randNArray(r,a);
         static if (randomLayout) {
             if (r.uniform!(bool)()) a=randLayout(r,a);
         }
@@ -99,7 +99,7 @@ class Dottable(T,int rank1,S,int rank2,bool scanAxis=false, bool randomLayout=fa
             }
         }
         auto b=NArray!(S,rank2).empty(dims2);
-	randNArray(r,b);
+        randNArray(r,b);
         static if (randomLayout) {
             if (r.uniform!(bool)()) b=randLayout(r,b);
         }

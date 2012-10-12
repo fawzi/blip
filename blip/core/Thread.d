@@ -6,6 +6,6 @@ public import tango.core.Thread;
 public import tango.core.Time: tsecs=seconds;
 version(D_Version2){
     template ThreadLocal(T){
-	alias T ThreadLocal;
+        alias T ThreadLocal;
     }
 }

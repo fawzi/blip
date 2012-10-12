@@ -126,13 +126,13 @@ version(EV_MANUAL_VERSIONS){
     static assert(0,"system not supported, set the EV_*_ENABLE");
 }
 enum { EV_FEATURES=
-	(EV_FEATURE_CODE    ?  1 : 0)+
-	(EV_FEATURE_DATA    ?  2 : 0)+
-	(EV_FEATURE_CONFIG  ?  4 : 0)+
-	(EV_FEATURE_API     ?  8 : 0)+
-	(EV_FEATURE_WATCHERS? 16 : 0)+
-	(EV_FEATURE_BACKENDS? 32 : 0)+
-	(EV_FEATURE_OS      ? 64 : 0)
+        (EV_FEATURE_CODE    ?  1 : 0)+
+        (EV_FEATURE_DATA    ?  2 : 0)+
+        (EV_FEATURE_CONFIG  ?  4 : 0)+
+        (EV_FEATURE_API     ?  8 : 0)+
+        (EV_FEATURE_WATCHERS? 16 : 0)+
+        (EV_FEATURE_BACKENDS? 32 : 0)+
+        (EV_FEATURE_OS      ? 64 : 0)
 }
 
 /* these priorities are inclusive, higher priorities will be invoked earlier */
@@ -365,7 +365,7 @@ extern(C){
     static if (EV_FORK_ENABLE)
     {
         /** the callback gets invoked before check in the child process when a fork was detected */
-	/* revent EV_FORK */
+        /* revent EV_FORK */
         struct ev_fork
         {
             mixin EV_WATCHER!(ev_fork*);
@@ -373,12 +373,12 @@ extern(C){
     }
 
     static if (EV_CLEANUP_ENABLE){
-	/* is invoked just before the loop gets destroyed */
-	/* revent EV_CLEANUP */
-	struct ev_cleanup
-	{
-	    mixin EV_WATCHER!(ev_cleanup*);
-	}
+        /* is invoked just before the loop gets destroyed */
+        /* revent EV_CLEANUP */
+        struct ev_cleanup
+        {
+            mixin EV_WATCHER!(ev_cleanup*);
+        }
     }
 
 
@@ -398,9 +398,9 @@ extern(C){
             ev_periodic periodic; // unused
             ev_idle idle;         // unused
             ev_fork fork;         // unused
-	    static if (EV_CLEANUP_ENABLE){
-		ev_cleanup cleanup;    /* unused */
-	    }
+            static if (EV_CLEANUP_ENABLE){
+                ev_cleanup cleanup;    /* unused */
+            }
         }
     }
 
@@ -436,9 +436,9 @@ extern(C){
         static if (EV_FORK_ENABLE){
             ev_fork fork;
         }
-	static if (EV_CLEANUP_ENABLE){
-	    ev_cleanup cleanup;
-	}
+        static if (EV_CLEANUP_ENABLE){
+            ev_cleanup cleanup;
+        }
         static if (EV_EMBED_ENABLE){
             ev_embed embed;
         }
@@ -458,8 +458,8 @@ extern(C){
         EVFLAG_FORKCHECK  = 0x02000000, // check for a fork in each iteration
         /* debugging/feature disable */
         EVFLAG_NOINOTIFY  = 0x00100000, /* do not attempt to use inotify */
-	EVFLAG_SIGNALFD   = 0x00200000, /* attempt to use signalfd */
-	EVFLAG_NOSIGMASK = 0x00400000U, /* avoid modifying the signal mask */
+        EVFLAG_SIGNALFD   = 0x00200000, /* attempt to use signalfd */
+        EVFLAG_NOSIGMASK = 0x00400000U, /* avoid modifying the signal mask */
         // method bits to be ored together
         EVBACKEND_SELECT  = 0x00000001, // about anywhere
         EVBACKEND_POLL    = 0x00000002, // !win
@@ -467,8 +467,8 @@ extern(C){
         EVBACKEND_KQUEUE  = 0x00000008, // bsd
         EVBACKEND_DEVPOLL = 0x00000010, // solaris 8 / NYI
         EVBACKEND_PORT    = 0x00000020, // solaris 10
-	EVBACKEND_ALL     = 0x0000003F, // all known backends
-	EVBACKEND_MASK    = 0x0000FFFFU  // all future backends
+        EVBACKEND_ALL     = 0x0000003F, // all known backends
+        EVBACKEND_MASK    = 0x0000FFFFU  // all future backends
     }
 
     int ev_version_major();
@@ -549,8 +549,8 @@ extern(C){
     }
 
     enum EV_RUN {
-	NO_WAIT = 1,
-	ONCE = 2,
+        NO_WAIT = 1,
+        ONCE = 2,
     }
     enum EV_BREAK {
         CANCEL = 0, // undo unloop
@@ -572,30 +572,30 @@ extern(C){
     void ev_once(ev_loop_t*, int fd, int events, ev_tstamp timeout,onceF, void* arg);
 
     static if (EV_FEATURE_API) {
-	uint ev_iteration (ev_loop_t*); /* number of loop iterations */
-	uint ev_depth     (ev_loop_t*); /* #ev_loop enters - #ev_loop leaves */
-	void ev_verify    (ev_loop_t*); /* abort if loop data corrupted */
+        uint ev_iteration (ev_loop_t*); /* number of loop iterations */
+        uint ev_depth     (ev_loop_t*); /* #ev_loop enters - #ev_loop leaves */
+        void ev_verify    (ev_loop_t*); /* abort if loop data corrupted */
 
-	void ev_set_io_collect_interval (ev_loop_t*, ev_tstamp interval); /* sleep at least this time, default 0 */
-	void ev_set_timeout_collect_interval (ev_loop_t*, ev_tstamp interval); /* sleep at least this time, default 0 */
+        void ev_set_io_collect_interval (ev_loop_t*, ev_tstamp interval); /* sleep at least this time, default 0 */
+        void ev_set_timeout_collect_interval (ev_loop_t*, ev_tstamp interval); /* sleep at least this time, default 0 */
 
-	/* advanced stuff for threading etc. support, see docs */
-	void ev_set_userdata (ev_loop_t*, void *data);
-	void *ev_userdata (ev_loop_t*);
-	alias extern(C) void function(ev_loop_t*) invoke_pending_cb;
-	void ev_set_invoke_pending_cb (ev_loop_t*, invoke_pending_cb cb);
-	alias extern(C) void function(ev_loop_t*) release_cb;
-	alias extern(C) void function(ev_loop_t*) acquire_cb;
-	void ev_set_loop_release_cb (ev_loop_t*, release_cb release, acquire_cb acquire);
+        /* advanced stuff for threading etc. support, see docs */
+        void ev_set_userdata (ev_loop_t*, void *data);
+        void *ev_userdata (ev_loop_t*);
+        alias extern(C) void function(ev_loop_t*) invoke_pending_cb;
+        void ev_set_invoke_pending_cb (ev_loop_t*, invoke_pending_cb cb);
+        alias extern(C) void function(ev_loop_t*) release_cb;
+        alias extern(C) void function(ev_loop_t*) acquire_cb;
+        void ev_set_loop_release_cb (ev_loop_t*, release_cb release, acquire_cb acquire);
 
-	uint ev_pending_count (ev_loop_t*); /* number of pending events, if any */
-	void ev_invoke_pending (ev_loop_t*); /* invoke all pending watchers */
+        uint ev_pending_count (ev_loop_t*); /* number of pending events, if any */
+        void ev_invoke_pending (ev_loop_t*); /* invoke all pending watchers */
 
-	/*
-	 * stop/start the timer handling.
-	 */
-	void ev_suspend (ev_loop_t*);
-	void ev_resume  (ev_loop_t*);
+        /*
+         * stop/start the timer handling.
+         */
+        void ev_suspend (ev_loop_t*);
+        void ev_resume  (ev_loop_t*);
     }
 }
 
@@ -823,8 +823,8 @@ extern(C){
     void ev_feed_event(ev_loop_t*, void *w, int revents);
     void ev_feed_fd_event(ev_loop_t*, int fd, int revents);
     static if (EV_SIGNAL_ENABLE) {
-	void ev_feed_signal (int signum);
-	void ev_feed_signal_event (ev_loop_t*, int signum);
+        void ev_feed_signal (int signum);
+        void ev_feed_signal_event (ev_loop_t*, int signum);
     }
     void ev_invoke(ev_loop_t*, void *w, int revents);
     int  ev_clear_pending(ev_loop_t*, void *w);
@@ -847,14 +847,14 @@ extern(C){
 
     /* only supported in the default loop */
     static if (EV_SIGNAL_ENABLE) {
-	void ev_signal_start(ev_loop_t*, ev_signal *w);
-	void ev_signal_stop(ev_loop_t*, ev_signal *w);
+        void ev_signal_start(ev_loop_t*, ev_signal *w);
+        void ev_signal_stop(ev_loop_t*, ev_signal *w);
     }
 
     /* only supported in the default loop */
     static if (EV_CHILD_ENABLE) {
-	void ev_child_start(ev_loop_t*, ev_child *w);
-	void ev_child_stop(ev_loop_t*, ev_child *w);
+        void ev_child_start(ev_loop_t*, ev_child *w);
+        void ev_child_stop(ev_loop_t*, ev_child *w);
     }
     static if (EV_STAT_ENABLE){
         void ev_stat_start(ev_loop_t*, ev_stat *w);
@@ -867,8 +867,8 @@ extern(C){
         void ev_idle_stop(ev_loop_t*, ev_idle *w);
     }
     static if (EV_PREPARE_ENABLE){
-	void ev_prepare_start(ev_loop_t*, ev_prepare *w);
-	void ev_prepare_stop(ev_loop_t*, ev_prepare *w);
+        void ev_prepare_start(ev_loop_t*, ev_prepare *w);
+        void ev_prepare_stop(ev_loop_t*, ev_prepare *w);
     }
     void ev_check_start(ev_loop_t*, ev_check *w);
     void ev_check_stop(ev_loop_t*, ev_check *w);
@@ -878,8 +878,8 @@ extern(C){
         void ev_fork_stop(ev_loop_t*, ev_fork *w);
     }
     static if (EV_CLEANUP_ENABLE){
-	void ev_cleanup_start(ev_loop_t*, ev_cleanup *w);
-	void ev_cleanup_stop(ev_loop_t*, ev_cleanup *w);
+        void ev_cleanup_start(ev_loop_t*, ev_cleanup *w);
+        void ev_cleanup_stop(ev_loop_t*, ev_cleanup *w);
     }
     static if (EV_EMBED_ENABLE)
     {
@@ -899,12 +899,12 @@ version(EV_COMPAT3) {
     extern(C) void ev_loop_fork(ev_loop_t*);
     
     static if (EV_PROTOTYPES) {
-	extern(D) void ev_default_destroy () { ev_loop_destroy (ev_default_loop()); }
-	extern(D) void ev_default_fork    () { ev_loop_fork    (ev_default_loop()); }
-	static if (EV_FEATURE_API) {
-	    extern(D) uint ev_loop_count  (ev_loop_t *loop) { return ev_iteration  (loop); }
-	    extern(D) uint ev_loop_depth  (ev_loop_t *loop) { return ev_depth      (loop); }
-	    extern(D) void         ev_loop_verify (ev_loop_t *loop) {        ev_verify     (loop); }
-	}
+        extern(D) void ev_default_destroy () { ev_loop_destroy (ev_default_loop()); }
+        extern(D) void ev_default_fork    () { ev_loop_fork    (ev_default_loop()); }
+        static if (EV_FEATURE_API) {
+            extern(D) uint ev_loop_count  (ev_loop_t *loop) { return ev_iteration  (loop); }
+            extern(D) uint ev_loop_depth  (ev_loop_t *loop) { return ev_depth      (loop); }
+            extern(D) void         ev_loop_verify (ev_loop_t *loop) {        ev_verify     (loop); }
+        }
     }
 }

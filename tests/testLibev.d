@@ -111,7 +111,7 @@ extern (C) static void cbtimer(ev_loop_t* loop, ev_timer* w,
     int pipe_fd = *cast (int*) w.data;
     sout("\t\twriting '")(TEST_TEXT)("' to pipe...\n");
     long n = unistd.write(pipe_fd, cast (void*) TEST_TEXT,
-			  cast(int)TEST_TEXT.length);
+                          cast(int)TEST_TEXT.length);
     aassert (n == TEST_TEXT.length,__LINE__);
 }
 extern (C) static void cbio(ev_loop_t* loop, ev_io* w, int revents)
@@ -141,7 +141,7 @@ extern (C) static void cbio(ev_loop_t* loop, ev_io* w, int revents)
     aassert (fd != -1,__LINE__);
     sout("\t\tfd: ")(fd)("\n");
     n = unistd.write(fd, cast (void*) TEST_TEXT,
-		     TEST_TEXT.length);
+                     TEST_TEXT.length);
     aassert (n == TEST_TEXT.length,__LINE__);
     unistd.close(fd);
 }
@@ -197,7 +197,7 @@ extern (C) static void cbstat(ev_loop_t* loop, ev_stat* w, int revents)
     else
     {
         sout("\t\tev_stat: in child, calling "
-	     "ev_default_fork...\n");
+             "ev_default_fork...\n");
         ev_loop_fork(ev_default_loop());
     }
 }

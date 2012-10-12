@@ -58,15 +58,15 @@ class Cache{
         CacheElFactory factory;
         size_t idNr; // used to detect looping wrapping
         Time lastUsed; // avoid storing??
-	// the following two ops are there to cover a variant bug
-	// (no copy of const Variants allowed triggered by the compiler generated opEquals in dmd 2.060)
-	int opEquals (ref const(CacheEntry) o) const 
+        // the following two ops are there to cover a variant bug
+        // (no copy of const Variants allowed triggered by the compiler generated opEquals in dmd 2.060)
+        int opEquals (ref const(CacheEntry) o) const 
         {
-	    return (*cast(Variant*)&entry) == (*cast(Variant*)&o.entry) && factory is o.factory && idNr == o.idNr && lastUsed == o.lastUsed;
+            return (*cast(Variant*)&entry) == (*cast(Variant*)&o.entry) && factory is o.factory && idNr == o.idNr && lastUsed == o.lastUsed;
         }
-	int opCmp (ref const(CacheEntry) o) 
+        int opCmp (ref const(CacheEntry) o) 
         {
-	    return &o is &this;
+            return &o is &this;
         }
     }
 

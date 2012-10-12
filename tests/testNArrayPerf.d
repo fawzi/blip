@@ -312,7 +312,7 @@ void tst()
         int iii;
         void sumRes(double a,double b){ res[iii]+=a*b; }
         for (iii=0;iii<ndim;iii++){
-	    auto aa=d1[iii];
+            auto aa=d1[iii];
             binaryOp!(sumRes,typeof(d1[iii]),typeof(sc2))(aa,sc2);
         }
     }

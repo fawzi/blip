@@ -178,7 +178,7 @@ struct LocalGrowableArray(T){
     /// returns of the data contained in this object as immutable data, and clears the content of this object.
     /// data is guaranteed to be global if guaranteeGlobal is true (default)
     immutable(T)[] takeIData(bool guaranteeGlobal=true){
-	return cast(immutable(T)[])takeData(guaranteeGlobal);
+        return cast(immutable(T)[])takeData(guaranteeGlobal);
     }
     /// deallocates data
     void deallocData(){
