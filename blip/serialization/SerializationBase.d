@@ -666,7 +666,7 @@ class SerializationRegistry {
         s("}");
     }
 
-    /// registers the goven meta info for the type T
+    /// registers the given meta info for the type T
     void register(T)(ClassMetaInfo metaInfo) {
         assert(metaInfo!is null,"attempt to register null metaInfo");
         Object key = keyOf!(T); // use the content of metaInfo???
@@ -696,7 +696,7 @@ class SerializationRegistry {
                     *n.target=metaInfo;
                     auto old=n;
                     n=n.next;
-                    old.clear(); // malloc and really free?
+                    clear(old); // malloc and really free?
                 }
                 pendingLookups.remove(key);
             }

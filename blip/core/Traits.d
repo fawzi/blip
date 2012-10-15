@@ -143,12 +143,13 @@ string[] ctfeSplit(string splitChars,string str,bool skipEmpty){
 void tryDeleteT(T)(ref T obj){
     static if (is(typeof(obj.deallocData()))){
         obj.deallocData();
-    } else static if (is(typeof(obj.clear()))){
-        obj.clear();
+    } else static if (is(typeof(obj.clearout()))){
+        obj.clearout();
     }
-    static if (is(typeof(delegate void(){ delete obj; }))){
+    clear(obj);
+/+    static if (is(typeof(delegate void(){ delete obj; }))){
         delete obj;
-    }
+    }+/
 }
 
 bool isNullT(T)(ref T obj){

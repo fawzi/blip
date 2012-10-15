@@ -477,7 +477,7 @@ class TimeoutManager:LoopHandlerI{
             timeoutManager.watcher.addAction(&this.stopEvent);
         }
         /// clears the event for reuse
-        void clear(){
+        void clearout(){
             if (event.ptr() is null) event.giveBack();
             eventOp=null;
             timeoutManager=null;

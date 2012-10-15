@@ -199,16 +199,16 @@ string heapMixinStr(string extraAttribs,string compareMixin,string moveMixin="")
         }
 
         /** Reset this heap. */
-        void clear ()
+        void clearout ()
         {
                 next = 0;
         }
 
         /** reset this heap, and use the provided host for value elements */
-        void clear (T[] host)
+        void clearout (T[] host)
         {
                 this.heap = host;
-                clear;
+                clearout;
         }
 
         /** Get the reserved capacity of this heap. */

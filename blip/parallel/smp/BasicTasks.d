@@ -294,9 +294,9 @@ class Task:TaskI{
     }
     
     /// clears a task for reuse
-    void clear(){
+    void clearout(){
         assert(_status==TaskStatus.Finished || _status==TaskStatus.Building || 
-            _status==TaskStatus.NonStarted,"invalid status for clear");
+            _status==TaskStatus.NonStarted,"invalid status for clearout");
         _level=0;
         _stealLevel=int.max;
         _status=TaskStatus.Finished;

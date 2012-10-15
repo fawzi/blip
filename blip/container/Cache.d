@@ -105,7 +105,7 @@ class Cache{
         return true;
     }
     /// clears a cache entry, returns true if it was present
-    bool clear(CKey key){
+    bool clearout(CKey key){
         Variant entry;
         CacheElFactory factory;
         synchronized(this){
@@ -124,8 +124,8 @@ class Cache{
         return true;
     }
     /// clears a cache entry, returns true if it was present
-    bool clear(CacheElFactory factory){
-        return clear(factory.key);
+    bool clearout(CacheElFactory factory){
+        return clearout(factory.key);
     }
     /// performs an operation on a cache entry (creating it if needed)
     void cacheOp(CacheElFactory factory,scope void delegate(ref CacheEntry) op){
@@ -190,7 +190,7 @@ class Cache{
             }
         }
         foreach (k;toRm.data){
-            clear(k);
+            clearout(k);
         }
     }
     static struct AllCaches{
@@ -292,11 +292,11 @@ class Cached:CacheElFactory{
         return _key;
     }
     void clearLocal(Cache cache){
-        cache.clear(this);
+        cache.clearout(this);
     }
     void clearAll(Cache cache){
         foreach(cAtt;cache.allCaches){
-            cAtt.clear(this);
+            cAtt.clearout(this);
         }
     }
 }

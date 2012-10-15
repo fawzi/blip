@@ -79,7 +79,7 @@ struct EventHandler{
             }));
         }
     }
-    void clear(){
+    void clearout(){
         task=null;
         inlineAction=null;
         inlineActionTout=null;
@@ -89,7 +89,7 @@ struct EventHandler{
         if (pool !is null) {
             pool.giveBack(&this);
         } else {
-            clear();
+            clearout();
         }
     }
     static __gshared PoolI!(EventHandler*) gPool;

@@ -764,7 +764,7 @@ version(noHwloc){} else {
                     delete this;
                 }
             }
-            void clear(){
+            void clearout(){
                 topo=null;
                 childrens=null;
                 pos=null;

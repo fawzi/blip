@@ -75,7 +75,7 @@ struct StcpRequest{
             return res;
         });
     }
-    void clear(){
+    void clearout(){
         exception=null;
         url=ParsedUrl.init;
         connection=null;
@@ -97,7 +97,7 @@ struct StcpRequest{
                 });
             }
         } else {
-            clear();
+            clearout();
             //            delete this; // not possible anymore
             version(TrackStcpRequests){
                 sinkTogether(sout,delegate void(scope CharSink s){

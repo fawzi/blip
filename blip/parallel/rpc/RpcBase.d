@@ -181,7 +181,7 @@ struct ParsedUrl{
             }
         }
     }
-    void clear(){
+    void clearout(){
         clearHost();
         clearPath();
     }

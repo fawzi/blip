@@ -182,7 +182,7 @@ final class BufferIn(TInt):Reader!(TInt){
         }
     }
     
-    void clear(){
+    void clearout(){
         bufPos=0;
         bufLen=0;
         slice=SliceExtent.Partial;

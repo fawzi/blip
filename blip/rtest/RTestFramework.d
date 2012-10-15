@@ -499,7 +499,7 @@ class SingleRTest{
         int failedTests; /// tests failed
 
         /// clears the statistic stored
-        void clear(){
+        void clearout(){
             nTests=0;
             nCombTest=0;
             skippedTests=0;
@@ -515,7 +515,7 @@ class SingleRTest{
         newCounter[]=0;
         hasRandom=false;
         didCombinations=0;
-        stat.clear();
+        stat.clearout();
         return this;
     }
     // runs the tests possibly restarting them with the given rngState/counterVal

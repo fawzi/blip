@@ -150,10 +150,10 @@ class Pool(T,int _batchSize=16):PoolI!(T){
         }
     }
     /// clears object T before adding it to pool storage
-    T clear(T obj){
-        /+static if(is(typeof(obj.clear()))){
-            obj.clear(); // disabled as quick hack, because due to the common calling syntax this is always defined, but does not necessarily do what we want
-        }+/
+    T clearout(T obj){
+        static if(is(typeof(obj.clearout()))){
+            obj.clearout();
+        }
         return obj;
     }
     /// resets a object just before returning it as new
@@ -171,7 +171,7 @@ class Pool(T,int _batchSize=16):PoolI!(T){
             });
         }
         if (isNullT(obj)) return;
-        obj=clear(obj);
+        obj=clearout(obj);
         if (isNullT(obj)) return;
         bool deleteO=false;
         synchronized(this){

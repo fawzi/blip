@@ -435,8 +435,8 @@ struct GenericWatcher{
     
 
     /// clears
-    void clear(){
-        assert(!(isPending()||isActive()),"cannot clear active or pending watcher");
+    void clearout(){
+        assert(!(isPending()||isActive()),"cannot clearout active or pending watcher");
         if (pool!is null){
             kind=Kind.any_watcher;
         } else {

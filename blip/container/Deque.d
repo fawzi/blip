@@ -401,7 +401,7 @@ class Deque(T):CopiableObjectI{
         }
     }
     
-    void clear(){
+    void clearout(){
         synchronized(this){
             baseArr[]=T.init;
             start=0;
