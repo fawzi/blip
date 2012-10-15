@@ -61,8 +61,8 @@ class PriQTaskScheduler:TaskSchedulerI {
     Cache _nnCache;
     RandomSync _rand;
     /// returns a random source for scheduling
-    final RandomSync rand(){ return _rand; }
-    Cache nnCache(){
+    @property final RandomSync rand(){ return _rand; }
+    @property Cache nnCache(){
         return _nnCache;
     }
     /// logs a message
@@ -70,7 +70,7 @@ class PriQTaskScheduler:TaskSchedulerI {
         log.info(m);
     }
     /// returns the root task
-    TaskI rootTask(){ return _rootTask; }
+    @property TaskI rootTask(){ return _rootTask; }
     /// creates a new PriQTaskScheduler
     this(string name,string loggerPath="blip.parallel.smp.queue",int level=0){
         this.name=name;
@@ -197,11 +197,11 @@ class PriQTaskScheduler:TaskSchedulerI {
             Fiber.yield();
     }
     /// sets the executer
-    void executer(ExecuterI nExe){
+    @property void executer(ExecuterI nExe){
         _executer=nExe;
     }
     /// removes the executer
-    ExecuterI executer(){
+    @property ExecuterI executer(){
         return _executer;
     }
     /// description (for debugging)
@@ -248,9 +248,9 @@ class PriQTaskScheduler:TaskSchedulerI {
         }
     }
     /// scheduler logger
-    Logger logger(){ return log; }
+    @property Logger logger(){ return log; }
     /// if there are many queued tasks (and one should try not to queue too many of them)
-    bool manyQueued() { return queue.nEntries>15; }
+    @property bool manyQueued() { return queue.nEntries>15; }
     /// number of simple tasks wanted
-    int nSimpleTasksWanted(){ return 4; }
+    @property int nSimpleTasksWanted(){ return 4; }
 }

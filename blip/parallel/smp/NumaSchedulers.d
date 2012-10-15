@@ -98,7 +98,7 @@ class PriQScheduler:TaskSchedulerI {
     /// executer
     ExecuterI _executer;
     /// returns the root task
-    TaskI rootTask(){ return _rootTask; }
+    @property TaskI rootTask(){ return _rootTask; }
     /// super scheduler, only subclasses of MultiSched are accepted
     MultiSched superScheduler;
     /// liked list for pool of schedulers
@@ -107,12 +107,12 @@ class PriQScheduler:TaskSchedulerI {
     Time waitingSince;
     Cache _nnCache;
     /// cache at numa node level
-    Cache nnCache(){
+    @property Cache nnCache(){
         return _nnCache;
     }
     PoolI!(PriQScheduler) pool;
     /// returns a random source for scheduling
-    final RandomSync rand(){ return _rand; }
+    @property final RandomSync rand(){ return _rand; }
     /// constructor for the pool
     this(PoolI!(PriQScheduler)p,string loggerPath="blip.parallel.smp.queue"){
         version(TrackCollections){
@@ -207,7 +207,7 @@ class PriQScheduler:TaskSchedulerI {
             _rootTask=new RootTask(this,0,name~"RootTask");
         }
     }
-    bool noActiveTasks(){
+    @property bool noActiveTasks(){
         synchronized(queue.queueLock){
             synchronized(this){
                 return queue.nEntries==0 && activeTasks.length==0;
@@ -486,11 +486,11 @@ class PriQScheduler:TaskSchedulerI {
             Fiber.yield();
     }
     /// sets the executer
-    void executer(ExecuterI nExe){
+    @property void executer(ExecuterI nExe){
         _executer=nExe;
     }
-    /// removes the executer
-    ExecuterI executer(){
+    /// returns the executer
+    @property ExecuterI executer(){
         return _executer;
     }
     /// description (for debugging)
@@ -620,7 +620,7 @@ class MultiSched:TaskSchedulerI {
     /// executer
     ExecuterI _executer;
     /// returns the root task
-    TaskI rootTask(){ return _rootTask; }
+    @property TaskI rootTask(){ return _rootTask; }
     /// numa node cache
     Cache _nnCache;
     /// running schedulers
@@ -628,11 +628,11 @@ class MultiSched:TaskSchedulerI {
     /// starvationManager
     StarvationManager starvationManager;
     /// numa numa cache
-    Cache nnCache(){
+    @property Cache nnCache(){
         return _nnCache;
     }
     /// returns a random source for scheduling
-    final RandomSync rand(){ return _rand; }
+    @property final RandomSync rand(){ return _rand; }
     /// creates a new PriQScheduler
     this(string name,NumaNode numaNode,
         StarvationManager starvationManager,
@@ -860,11 +860,11 @@ class MultiSched:TaskSchedulerI {
             Fiber.yield();
     }
     /// sets the executer
-    void executer(ExecuterI nExe){
+    @property void executer(ExecuterI nExe){
         _executer=nExe;
     }
     /// removes the executer
-    ExecuterI executer(){
+    @property ExecuterI executer(){
         return _executer;
     }
     /// description (for debugging)
@@ -925,11 +925,11 @@ class MultiSched:TaskSchedulerI {
         starvationManager.schedulerStopped(this);
     }
     /// scheduler logger
-    Logger logger(){ return log; }
+    @property Logger logger(){ return log; }
     /// if there are many queued tasks (and one should try not to queue too many of them)
-    bool manyQueued() { return queue.length>15; }
+    @property bool manyQueued() { return queue.length>15; }
     /// number of simple tasks wanted
-    int nSimpleTasksWanted(){ return 4; }
+    @property int nSimpleTasksWanted(){ return 4; }
     /// writes just the scheduling status in a way that looks good
     void writeStatus(scope CharSink sink,int indentL){
         auto s=dumper(sink);
@@ -973,11 +973,11 @@ class StarvationManager: TaskSchedulerI, ExecuterI, SchedGroupI {
     OnStarvingScheduler onStarvingSched; /// scheduler for low priority (idle) tasks
     
     /// logger for task execution messages
-    Logger execLogger(){
+    @property Logger execLogger(){
         return _execLogger;
     }
     /// returns a random source for scheduling
-    final RandomSync rand(){ return _rand; }
+    @property final RandomSync rand(){ return _rand; }
     
     void writeStatus(scope CharSink sink,int indentL){
         void ind(int l){
@@ -1040,7 +1040,7 @@ class StarvationManager: TaskSchedulerI, ExecuterI, SchedGroupI {
     }
     
     /// root task execution in one of the schedulers
-    TaskI rootTask(){
+    @property TaskI rootTask(){
         return _rootTask;
     }
     /// numa node cache for the given node
@@ -1069,7 +1069,7 @@ class StarvationManager: TaskSchedulerI, ExecuterI, SchedGroupI {
         }
     }
     /// nnCache, should not be used
-    Cache nnCache(){
+    @property Cache nnCache(){
         return nnCacheForNode(NumaNode(2,0));
     }
     /// correspondence numa node -> position of the scheduler
@@ -1329,11 +1329,11 @@ class StarvationManager: TaskSchedulerI, ExecuterI, SchedGroupI {
             Fiber.yield();
     }
     /// sets the executer
-    void executer(ExecuterI nExe){
+    @property void executer(ExecuterI nExe){
         _executer=nExe;
     }
     /// removes the executer
-    ExecuterI executer(){
+    @property ExecuterI executer(){
         return _executer;
     }
     /// description (for debugging)
@@ -1387,14 +1387,14 @@ class StarvationManager: TaskSchedulerI, ExecuterI, SchedGroupI {
     void onStop(){
     }
     /// scheduler logger
-    Logger logger(){ return log; }
+    @property Logger logger(){ return log; }
     /// if there are many queued tasks (and one should try not to queue too many of them)
-    bool manyQueued() { return false; }
+    @property bool manyQueued() { return false; }
     /// number of simple tasks wanted
-    int nSimpleTasksWanted(){ return max(2,topo.nNodes(exeLevel)/topo.nNodes(schedLevel)); }
+    @property int nSimpleTasksWanted(){ return max(2,topo.nNodes(exeLevel)/topo.nNodes(schedLevel)); }
     
     /// group of this executer, can be used for deterministic task distribution
-    SchedGroupI schedGroup(){
+    @property SchedGroupI schedGroup(){
         return this;
     }
     // schedGroupI
@@ -1411,19 +1411,19 @@ class StarvationManager: TaskSchedulerI, ExecuterI, SchedGroupI {
         }
     }
     /// returns the currently active schedulers
-    TaskSchedulerI[] activeScheds() {
+    @property TaskSchedulerI[] activeScheds() {
         return scheds;
     }
     /// logger for the group
-    Logger groupLogger() {
+    @property Logger groupLogger() {
         return log;
     }
     /// global root task (should submit to the least used scheduler)
-    TaskI gRootTask() {
+    @property TaskI gRootTask() {
         return rootTask();
     }
     /// root task for things that should be executed only if nothing else is executing
-    TaskI onStarvingTask(){
+    @property TaskI onStarvingTask(){
         return onStarvingSched.rootTask();
     }
 }
@@ -1442,10 +1442,10 @@ class MExecuter:ExecuterI{
     /// global group
     StarvationManager sManager;
     /// name accessor
-    string name(){
+    @property string name(){
         return _name;
     }
-    TaskSchedulerI scheduler(){ return _scheduler; }
+    @property TaskSchedulerI scheduler(){ return _scheduler; }
     /// creates a new executer
     this(string name,NumaNode exeNode, MultiSched scheduler, StarvationManager sManager){
         this._name=name;
@@ -1545,7 +1545,7 @@ class MExecuter:ExecuterI{
         s(" >");
     }
     /// logger for task execution messages
-    Logger execLogger(){
+    @property Logger execLogger(){
         return log;
     }
     void pin(int pinLevel){
@@ -1567,7 +1567,7 @@ class MExecuter:ExecuterI{
             });
         }
     }
-    SchedGroupI schedGroup(){
+    @property SchedGroupI schedGroup(){
         return sManager;
     }
 }
@@ -1585,7 +1585,7 @@ class OnStarvingScheduler:TaskSchedulerI{
     }
     
     /// random source (for scheduling)
-    RandomSync rand(){
+    @property RandomSync rand(){
         return mainSched.rand();
     }
     /// changes the current run level of the scheduler
@@ -1630,15 +1630,15 @@ class OnStarvingScheduler:TaskSchedulerI{
         assert(0,"not supposed to be called for OnStarvingScheduler");
     }
     /// returns the executer for this scheduler
-    ExecuterI executer(){
+    @property ExecuterI executer(){
         return mainSched.executer();
     }
     /// sets the executer for this scheduler
-    void executer(ExecuterI nExe){
+    @property void executer(ExecuterI nExe){
         mainSched.executer(nExe);
     }
     /// logger for task/scheduling messages
-    Logger logger(){
+    @property Logger logger(){
         return mainSched.logger();
     }
     /// yields the current fiber if the scheduler is not sequential
@@ -1650,7 +1650,7 @@ class OnStarvingScheduler:TaskSchedulerI{
         mainSched.maybeYield();
     }
     /// root task, the easy way to add tasks to this scheduler
-    TaskI rootTask(){
+    @property TaskI rootTask(){
         return _rootTask;
     }
     /// description
@@ -1671,15 +1671,15 @@ class OnStarvingScheduler:TaskSchedulerI{
         
     }
     /// if there are many queued tasks (and one should try not to queue too many of them)
-    bool manyQueued(){
+    @property bool manyQueued(){
         return mainSched.manyQueued();
     }
     /// number of simple tasks wanted
-    int nSimpleTasksWanted(){
+    @property int nSimpleTasksWanted(){
         return mainSched.nSimpleTasksWanted();
     }
     /// a cache local to the current numa node (useful for memory pools)
-    Cache nnCache(){
+    @property Cache nnCache(){
         return mainSched.nnCache();
     }
     

@@ -52,7 +52,7 @@ class ImmediateExecuter:ExecuterI,TaskSchedulerI,SchedGroupI{
     /// root task
     TaskI _rootTask;
     ///  returns the root task
-    TaskI rootTask(){ return _rootTask; }
+    @property TaskI rootTask(){ return _rootTask; }
     /// name of the executer
     string _name;
     Cache _nnCache;
@@ -60,12 +60,12 @@ class ImmediateExecuter:ExecuterI,TaskSchedulerI,SchedGroupI{
     SchedGroupI _schedGroup;
     TaskSchedulerI[1] _activeSchedulers;
     /// returns a random source for scheduling
-    final RandomSync rand(){ return _rand; }
+    @property final RandomSync rand(){ return _rand; }
     /// name accessor
-    string name(){
+    @property string name(){
         return _name;
     }
-    Cache nnCache(){
+    @property Cache nnCache(){
         auto tAtt=taskAtt;
         if (tAtt!is null && tAtt.superTask !is null && tAtt.superTask.scheduler !is this){
             return tAtt.superTask.scheduler.nnCache();
@@ -91,7 +91,7 @@ class ImmediateExecuter:ExecuterI,TaskSchedulerI,SchedGroupI{
         _activeSchedulers[0]=this;
     }
     /// returns the scheduler (itself in this case)
-    TaskSchedulerI scheduler(){
+    @property TaskSchedulerI scheduler(){
         return this;
     }
     /// description (for debugging)
@@ -168,49 +168,49 @@ class ImmediateExecuter:ExecuterI,TaskSchedulerI,SchedGroupI{
     /// this has to be called by the executer
     void subtaskDeactivated(TaskI st) { }
     /// returns the executer for this task
-    ExecuterI executer() { return this; }
+    @property ExecuterI executer() { return this; }
     /// returns the executer for this task
-    void executer(ExecuterI e) {
+    @property void executer(ExecuterI e) {
         throw new ParaException("cannot set executer of ImmediateExecuter",__FILE__,__LINE__);
     }
     /// logger for task/scheduling messages
-    Logger logger() { return log; }
+    @property Logger logger() { return log; }
     /// yields the current fiber if the scheduler is not sequential
     void yield() { }
     /// yields the current fiber if the scheduler is not sequential
     void maybeYield() { }
     /// number of simple tasks wanted
-    int nSimpleTasksWanted(){
+    @property int nSimpleTasksWanted(){
         return 1;
     }
     /// number of tasks (unknown if simple or not) wanted
-    int nTaskWanted(){
+    @property int nTaskWanted(){
         return 1;
     }
     /// if there are many queued tasks (and one should try not to queue too many of them)
-    bool manyQueued() { return true; }
+    @property bool manyQueued() { return true; }
     /// executer log
-    Logger execLogger(){ return log; }
+    @property Logger execLogger(){ return log; }
     /// group of this scheduler, this can be used to deterministically distribute work
-    SchedGroupI schedGroup(){ return _schedGroup; }
+    @property SchedGroupI schedGroup(){ return _schedGroup; }
     
     // schedGroupI
     /// activate all possible schedulers in the current group
     void activateAll() { }
     /// returns the currently active schedulers
-    TaskSchedulerI[] activeScheds() {
+    @property TaskSchedulerI[] activeScheds() {
         return _activeSchedulers;
     }
     /// logger for the group
-    Logger groupLogger() {
+    @property Logger groupLogger() {
         return log;
     }
     /// global root task (should submit to the least used scheduler)
-    TaskI gRootTask() {
+    @property TaskI gRootTask() {
         return rootTask();
     }
     /// root task for things that should ideally be executed only if executers are idle
-    TaskI onStarvingTask(){
+    @property TaskI onStarvingTask(){
         return rootTask();
     }
 }
@@ -228,14 +228,14 @@ class PExecuter:ExecuterI,SchedGroupI{
     /// name of the executer
     string _name;
     /// name accessor
-    string name(){
+    @property string name(){
         return _name;
     }
     /// logs a message
     void logMsg(in cstring m){
         log.info(m);
     }
-    TaskSchedulerI scheduler(){ return _scheduler[0]; }
+    @property TaskSchedulerI scheduler(){ return _scheduler[0]; }
     /// creates a new executer
     this(string name,TaskSchedulerI scheduler=null,int nproc=-1,string loggerPath="blip.parallel.smp.exec"){
         this._name=name;
@@ -318,39 +318,39 @@ class PExecuter:ExecuterI,SchedGroupI{
         s(" >\n");
     }
     /// number of simple tasks wanted
-    int nSimpleTasksWanted(){
+    @property int nSimpleTasksWanted(){
         return nproc;
     }
     /// number of tasks (unknown if simple or not) wanted
-    int nTaskWanted(){
+    @property int nTaskWanted(){
         return min(2,nproc);
     }
     /// logger for task execution messages
-    Logger execLogger(){
+    @property Logger execLogger(){
         return log;
     }
     
     /// group of this executer, can be used for deterministic task distribution
-    SchedGroupI schedGroup(){
+    @property SchedGroupI schedGroup(){
         return this;
     }
     // schedGroupI
     /// activate all possible schedulers in the current group
     void activateAll() { }
     /// returns the currently active schedulers
-    TaskSchedulerI[] activeScheds() {
+    @property TaskSchedulerI[] activeScheds() {
         return _scheduler;
     }
     /// logger for the group
-    Logger groupLogger() {
+    @property Logger groupLogger() {
         return log;
     }
     /// global root task (should submit to the least used scheduler)
-    TaskI gRootTask() {
+    @property TaskI gRootTask() {
         return scheduler.rootTask();
     }
     /// root task for things that should ideally be executed only if executers are idle
-    TaskI onStarvingTask(){
+    @property TaskI onStarvingTask(){
         return scheduler.rootTask();
     }
     

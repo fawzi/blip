@@ -91,9 +91,9 @@ TaskStatus taskStatusFromStr(string s){
 
 interface ExecuterI:BasicObjectI {
     /// logger for task execution messages
-    Logger execLogger();
+    @property Logger execLogger();
     /// scheduler group of this executer, this can be used to deterministically distribute work
-    SchedGroupI schedGroup();
+    @property SchedGroupI schedGroup();
 }
 
 enum SchedulerRunLevel:int{
@@ -106,7 +106,7 @@ enum SchedulerRunLevel:int{
 
 interface TaskSchedulerI:BasicObjectI {
     /// random source (for scheduling)
-    RandomSync rand();
+    @property RandomSync rand();
     /// changes the current run level of the scheduler
     /// the level can be only raised and the highest run level is "stopped"
     void raiseRunlevel(SchedulerRunLevel level);
@@ -122,27 +122,27 @@ interface TaskSchedulerI:BasicObjectI {
     /// this has to be called by the executer
     void subtaskDeactivated(TaskI st);
     /// returns the executer for this scheduler
-    ExecuterI executer();
+    @property ExecuterI executer();
     /// sets the executer for this scheduler
-    void executer(ExecuterI nExe);
+    @property void executer(ExecuterI nExe);
     /// logger for task/scheduling messages
-    Logger logger();
+    @property Logger logger();
     /// yields the current fiber if the scheduler is not sequential
     void yield();
     /// maybe yields the current fiber (use this to avoid creating too many tasks while reducing context switches)
     void maybeYield();
     /// root task, the easy way to add tasks to this scheduler
-    TaskI rootTask();
+    @property TaskI rootTask();
     /// description
     void desc(scope void delegate(in cstring) s);
     /// possibly short description
     void desc(scope void delegate(in cstring) s,bool shortVersion);
     /// if there are many queued tasks (and one should try not to queue too many of them)
-    bool manyQueued();
+    @property bool manyQueued();
     /// number of simple tasks wanted
-    int nSimpleTasksWanted();
+    @property int nSimpleTasksWanted();
     /// a cache local to the current numa node (useful for memory pools)
-    Cache nnCache();
+    @property Cache nnCache();
 }
 
 // the following subdivisions are more to structure the methods of a task
@@ -153,35 +153,35 @@ interface TaskI:SubtaskNotificationsI{
     /// executes the task
     void execute(bool sequential=false);
     /// returns the status of the task
-    TaskStatus status();
+    @property TaskStatus status();
     /// sets the status of the task
-    void status(TaskStatus s);
+    @property void status(TaskStatus s);
     /// returns the level of the task
-    int level();
+    @property int level();
     /// sets the level of the task
-    void level(int level);
+    @property void level(int level);
     /// returns the steal level of the task (how much it can be stolen)
-    int stealLevel();
+    @property int stealLevel();
     /// sets the steal level of the task
-    void stealLevel(int level);
+    @property void stealLevel(int level);
     /// sets the super task of this task (the one that spawned this)
-    void superTask(TaskI task);
+    @property void superTask(TaskI task);
     /// sets the scheduler of this task
-    void scheduler(TaskSchedulerI sched);
+    @property void scheduler(TaskSchedulerI sched);
     /// returns the super task of this task (the one that spawned this)
-    TaskI superTask();
+    @property TaskI superTask();
     /// returns the scheduler of this task
-    TaskSchedulerI scheduler();
+    @property TaskSchedulerI scheduler();
     /// name of the task
-    string taskName();
+    @property string taskName();
     /// description
     void desc(scope void delegate(in cstring) s);
     /// possibly short description
     void desc(scope void delegate(in cstring) s,bool shortVersion);
     /// if this task might spawn
-    bool mightSpawn();
+    @property bool mightSpawn();
     /// if this task might Yield
-    bool mightYield();
+    @property bool mightYield();
     /// waits for task completion
     void wait();
     /// yields until the subtasks have finished (or waits if Yielding is not possible),
@@ -241,13 +241,13 @@ interface SchedGroupI {
     /// activate all possible schedulers in the current group
     void activateAll();
     /// returns the currently active schedulers
-    TaskSchedulerI[] activeScheds();
+    @property TaskSchedulerI[] activeScheds();
     /// logger for the group
-    Logger groupLogger();
+    @property Logger groupLogger();
     /// global root task (should submit to the least used scheduler)
-    TaskI gRootTask();
+    @property TaskI gRootTask();
     /// root task for things that should ideally be executed only if executers are idle
-    TaskI onStarvingTask();
+    @property TaskI onStarvingTask();
 }
 /// exception for parallelization problems
 class ParaException: Exception{

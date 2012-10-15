@@ -320,31 +320,31 @@ class Task:TaskI{
         waitSem=null;
     }
     /// it the task might be yielded (i.e. if it is a fiber)
-    bool mightYield(){ return !(flags & TaskFlags.NoYield) && (fiber !is null); }
+    @property bool mightYield(){ return !(flags & TaskFlags.NoYield) && (fiber !is null); }
     /// return the name of this task
-    string taskName(){ return _taskName; }
+    @property string taskName(){ return _taskName; }
     /// returns the the status of the task
-    TaskStatus status(){ return cast(TaskStatus)_status; }
+    @property TaskStatus status(){ return cast(TaskStatus)_status; }
     /// sets the task status
-    void status(TaskStatus s) { assert(cast(int)s>=cast(int)_status); _status=s;}
+    @property void status(TaskStatus s) { assert(cast(int)s>=cast(int)_status); _status=s;}
     /// returns the level of the task
-    int level(){ return _level; }
+    @property int level(){ return _level; }
     /// sets the level of the task
-    void level(int l){ assert(status==TaskStatus.Building); _level=l; }
+    @property void level(int l){ assert(status==TaskStatus.Building); _level=l; }
     /// returns the steal level of the task
-    int stealLevel(){ return _stealLevel; }
+    @property int stealLevel(){ return _stealLevel; }
     /// sets the steal level of the task
-    void stealLevel(int l){ /+assert(status==TaskStatus.Building);+/ _stealLevel=l; }
+    @property void stealLevel(int l){ /+assert(status==TaskStatus.Building);+/ _stealLevel=l; }
     /// return the superTask of this task
-    TaskI superTask(){ return _superTask; }
+    @property TaskI superTask(){ return _superTask; }
     /// sets the superTask of this task
-    void superTask(TaskI task){ assert(status==TaskStatus.Building,"unexpected status when setting superTask:"~to!(string )(status)); _superTask=task; }
+    @property void superTask(TaskI task){ assert(status==TaskStatus.Building,"unexpected status when setting superTask:"~to!(string )(status)); _superTask=task; }
     /// return the scheduler of this task
-    TaskSchedulerI scheduler(){ return _scheduler; }
+    @property TaskSchedulerI scheduler(){ return _scheduler; }
     /// sets the scheduler of this task
-    void scheduler(TaskSchedulerI sched){ _scheduler=sched; }
+    @property void scheduler(TaskSchedulerI sched){ _scheduler=sched; }
     /// it the task might spawn other tasks
-    bool mightSpawn() { return !(flags & TaskFlags.NoSpawn); }
+    @property bool mightSpawn() { return !(flags & TaskFlags.NoSpawn); }
 
     /// efficient allocation constructor (with single delegate)
     static Task opCall(string name, void delegate() taskOp,TaskFlags f=TaskFlags.None){
@@ -1073,12 +1073,12 @@ class Task:TaskI{
         return this;
     }
     /// sets the fiber pool used
-    Task setFiberPool(FiberPool fPool){
+    @property Task setFiberPool(FiberPool fPool){
         this.fPool=fPool;
         return this;
     }
     /// returns the fiber pool used
-    FiberPool fiberPool(bool canBeNull=false){
+    @property FiberPool fiberPool(bool canBeNull=false){
         if (canBeNull)
             return fPool;
         else

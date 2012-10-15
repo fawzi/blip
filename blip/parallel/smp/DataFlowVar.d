@@ -80,7 +80,7 @@ struct WaitListPtr{
         return false;
     }
     /// returns true if the value has been set (useful for the fast path)
-    bool hasVal(){
+    @property bool hasVal(){
         if ((data.data & 3)==1){
             static if (is(typeof(this.value))) memoryBarrier!(true,false,false,false)();
             return true;
@@ -247,7 +247,7 @@ struct DataFlow(T){
         }
     }
     
-    T val(){
+    @property T val(){
         if (!waitL.hasVal){
             auto tAtt=taskAtt;
             assert(tAtt!is null);
@@ -276,7 +276,7 @@ struct DataFlow(T){
         }
     }
 
-    void val(T newV){
+    @property void val(T newV){
         opSliceAssign(newV);
     }
     
