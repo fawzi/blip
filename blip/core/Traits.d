@@ -146,10 +146,7 @@ void tryDeleteT(T)(ref T obj){
     } else static if (is(typeof(obj.clearout()))){
         obj.clearout();
     }
-    clear(obj);
-/+    static if (is(typeof(delegate void(){ delete obj; }))){
-        delete obj;
-    }+/
+    destroy(obj);
 }
 
 bool isNullT(T)(ref T obj){

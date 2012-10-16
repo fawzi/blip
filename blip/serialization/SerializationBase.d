@@ -696,7 +696,7 @@ class SerializationRegistry {
                     *n.target=metaInfo;
                     auto old=n;
                     n=n.next;
-                    clear(old); // malloc and really free?
+                    destroy(old); // malloc and really free?
                 }
                 pendingLookups.remove(key);
             }
