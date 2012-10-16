@@ -166,8 +166,15 @@ class Pool(T,int _batchSize=16):PoolI!(T){
     /// returns an object to the pool
     void giveBack(T obj){
         debug(TrackPools){
-            sinkTogether(sout,delegate void(scope CharSink s){
-                dumper(s)("pool @")(cast(void*)this)(" given back ")(T.stringof)("@")(cast(void*)obj)("=")(obj)("\n");
+            sinkTogether(sout,delegate void(scope CharSink sink){
+                    auto s=dumper(sink);
+                    s("pool @")(cast(void*)this)(" given back ")(T.stringof);
+                    static if (__traits(compiles,(){ s(cast(void*)obj);})){
+                        s("@")(cast(void*)obj);
+                    } else static if (__traits(compiles,(){ s(obj);})){
+                        s(obj);
+                    }
+                    s("")(obj)("\n");
             });
         }
         if (isNullT(obj)) return;
@@ -201,8 +208,15 @@ class Pool(T,int _batchSize=16):PoolI!(T){
                 ++nEl;
             }
             debug(TrackPools){
-                if (!deleteO) sinkTogether(sout,delegate void(scope CharSink s){
-                    dumper(s)("pool @")(cast(void*)this)(" added ")(T.stringof)("@")(cast(void*)obj)(" to pool, nEl=")(nEl)(" nCapacity=")(nCapacity)("\n");
+                if (!deleteO) sinkTogether(sout,delegate void(scope CharSink sink){
+                    auto s=dumper(sink);
+                    s("pool @")(cast(void*)this)(" added ")(T.stringof);
+                    static if (__traits(compiles,(){ s(cast(void*)obj);})){
+                        s("@")(cast(void*)obj);
+                    } else static if (__traits(compiles,(){ s(obj);})){
+                        s(obj);
+                    }
+                    s(" to pool, nEl=")(nEl)(" nCapacity=")(nCapacity)("\n");
                 });
             }
         }
@@ -233,8 +247,15 @@ class Pool(T,int _batchSize=16):PoolI!(T){
                         tryDeleteT(toRm);
                     }
                     debug(TrackPools){
-                        sinkTogether(sout,delegate void(scope CharSink s){
-                            dumper(s)("pool @")(cast(void*)this)(" got object from pool ")(T.stringof)("@")(cast(void*)obj)(", nEl=")(nEl)(" nCapacity=")(nCapacity)("\n");
+                        sinkTogether(sout,delegate void(scope CharSink sink){
+                                auto s=dumper(sink);
+                                s("pool @")(cast(void*)this)(" got object from pool ")(T.stringof);
+                                static if (__traits(compiles,(){ s(cast(void*)obj); })){
+                                    s("@")(cast(void*)obj);
+                                } else static if (__traits(compiles,(){ s(obj); })){
+                                    s(obj);
+                                }
+                                s(", nEl=")(nEl)(" nCapacity=")(nCapacity)("\n");
                         });
                     }
                 }
@@ -295,10 +316,17 @@ class Pool(T,int _batchSize=16):PoolI!(T){
                 S* p=pool,pNext=pool.next;
                 while (nEl!=0){
                     --nEl;
-                    size_t pos=nEl&(batchSize-1);
+                    size_t pos=(nEl&(batchSize-1));
                     debug(TrackPools){
-                        sinkTogether(sout,delegate void(scope CharSink s){
-                            dumper(s)("pool @")(cast(void*)this)(" deleting obj ")(T.stringof)("@")(cast(void*)(p.array[pos]))("\n");
+                        sinkTogether(sout,delegate void(scope CharSink sink){
+                                auto s=dumper(sink);
+                                s("pool @")(cast(void*)this)(" deleting obj ")(T.stringof);
+                                static if (__traits(compiles,(){ s(cast(void*)(p.array[pos])); })){
+                                    s("@")(cast(void*)(p.array[pos]));
+                                } else static if (__traits(compiles,(){ s(p.array[pos]); })){
+                                    s(p.array[pos]);
+                                }
+                                s("\n");
                         });
                     }
                     tryDeleteT(p.array[pos]);

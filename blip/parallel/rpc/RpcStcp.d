@@ -225,6 +225,9 @@ struct StcpRequest{
             throw res.exception; // release? the exception might need this...
         res.release();
     }
+    void desc(scope CharSink s){
+        dumper(s)("StcpRequest@")(cast(void*)&this)("{ url:\"")(url)("\" }");
+    }
 }
 
 /// represent a connection with an host

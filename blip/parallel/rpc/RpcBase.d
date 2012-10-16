@@ -451,6 +451,9 @@ class BasicVendor:ObjVendorI{
                 // delete(this); // cannot be done anymore
             }
         }
+        void desc(scope CharSink s){
+            dumper(s)("SimpleReplyClosure{ reqId:")(reqId)(" }");
+        }
     }
     /// helper to more easily create closures of simpleReply
     SimpleReplyClosure!(T) *simpleReplyClosure(T)(SendResHandler sendRes,in ubyte[] reqId,T res){

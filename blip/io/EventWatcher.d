@@ -504,6 +504,9 @@ class TimeoutManager:LoopHandlerI{
             res.endTime=res.timeoutManager.now+res.timeoutManager.timeout;
             return res;
         }
+        void desc(scope CharSink s){
+            s("blip.io.EventWatcher.TimeoutManager.TimedEvent");
+        }
     }
     TimedEvent list;
     

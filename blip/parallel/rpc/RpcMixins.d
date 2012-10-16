@@ -176,9 +176,7 @@ string rpcProxyMixin(string name,string extName,string extraInterfaces,string []
                 if (pool!is null){
                     pool.giveBack(&this);
                 } else {
-                    typeof(this) dummy;
-                    this=dummy;
-                    // delete this;
+                    destroy(this);
                 }
             }
             static __gshared PoolI!(OnewayClosure*) gPool;
@@ -212,6 +210,9 @@ string rpcProxyMixin(string name,string extName,string extraInterfaces,string []
             static OnewayClosure *opCall(){
                 assert(gPoolLevel>0,"opCall outside add/rmGPool in OnewayClosure of "~`~extNameProxy~`);
                 return gPool.getObj();
+            }
+            void desc(scope void delegate(in char[]) s){
+                s("blip.parallel.rpc.RpcMixins.OnewayClosure");
             }
         }
         this(string name,string url){
@@ -447,6 +448,9 @@ string rpcVendorMixin(string name,string extName_, string [] functionsComments){
             static Closure *opCall(){
                 assert(gPoolLevel>0,"opCall outside add/rmGPool in Closure of "~`~extName~`);
                 return gPool.getObj();
+            }
+            void desc(scope void delegate(in char[]) s){
+                s("blip.parallel.rpc.RpcMixin.Closure");
             }
         }
         

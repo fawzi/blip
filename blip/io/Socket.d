@@ -496,6 +496,9 @@ class SocketServer{
                 return res;
             });
         }
+        void desc(scope CharSink s){
+            s("blip.io.Socket.SocketServer.Handler");
+        }
     }
     void delegate (ref Handler) handler;
     
