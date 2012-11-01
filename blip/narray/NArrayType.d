@@ -670,20 +670,20 @@ else {
         }
                 
         /// static array indexing (separted from opIndex as potentially less efficient)
-        NArray!(V,rank-cast(int)staticArraySize!(S))arrayIndex(S)(S index){
+        ref V arrayIndex(S)(S index){
             static assert(is(S:int[])||is(S:long[])||is(S:uint[])||is(S:ulong[]),"only arrays of indexes supported");
-            static assert(isStaticArrayType!(S),"arrayIndex needs *static* arrays as input");
-            enum string loopBody=("auto res=opIndex("~arrayToSeq("index",cast(int)staticArraySize!(S))~");");
+            assert(index.length==rank,"arrayIndex support only full indexing, wrong index size");
+            V *res;
+            enum string loopBody=("res=ptrI("~arrayToSeq("index",rank)~");");
             mixin(loopBody);
-            return res;
+            return *res;
         }
 
         /// static array indexAssign (separted from opIndexAssign as potentially less efficient)
-        NArray!(V,rank-cast(int)staticArraySize!(S))arrayIndexAssign(S,U)(U val,S index){
+        void arrayIndexAssign(S,U)(U val,S index){
             static assert(is(S:int[])||is(S:long[])||is(S:uint[])||is(S:ulong[]),"only arrays of indexes supported");
-            static assert(isStaticArrayType!(S),"arrayIndex needs *static* arrays as input");
-            mixin("NArray!(V,rank-cast(int)staticArraySize!(S)) res=opIndexAssign(val,"~arrayToSeq("index",staticArraySize!(S))~");");
-            return res;
+            assert(index.length==rank,"arrayIndex supports only full indexing, wrong index size");
+            mixin("opIndexAssign(val,"~arrayToSeq("index",rank)~");");
         }
         
         /// copies the array, undefined behaviour if there is overlap
@@ -1611,7 +1611,7 @@ else {
         }
         
         /// increments a static index array, return true if it did wrap
-        bool incrementArrayIdx(index_type[rank] index){
+        bool incrementArrayIdx(ref index_type[rank] index){
             int i=rank-1;
             while (i>=0) {
                 ++index[i];

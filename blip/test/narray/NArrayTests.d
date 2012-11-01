@@ -322,7 +322,8 @@ void testFilterMask(T,int rank)(NArray!(T,rank) a, Rand r){
 }
 
 void testAxisFilter(T,int rank)(NArray!(T,rank) a, NArray!(index_type,1)indexes){
-    unaryOp!((ref index_type i){ i=abs(i)%a.shape[0]; })(indexes);
+    scope dlg=(ref index_type i){ i=abs(i)%a.shape[0]; };
+    unaryOp!(dlg)(indexes);
     auto b=axisFilter!(typeof(a),NArray!(index_type,1))(a,indexes);
     auto c=NArray!(T,rank).zeros(a.shape);
     auto d=axisUnfilter1(c,b,indexes);
@@ -659,71 +660,69 @@ TestCollection narrayRTst1(T,int rank)(TestCollection superColl){
         __LINE__,__FILE__,coll);
     autoInitTst.testNoFailF("testSumAll",&testSumAll!(T,rank),
         __LINE__,__FILE__,coll);
-/+    autoInitTst.testNoFail("testSumAxis",(NArray!(T,rank) d,Rand r){ testSumAxis!(T,rank)(d,r); },
+    autoInitTst.testNoFailF("testSumAxis",&testSumAxis!(T,rank),
         __LINE__,__FILE__,coll);
-    autoInitTst.testNoFail("testMultAll",(NArray!(T,rank) d){ testMultAll!(T,rank)(d); },
+    autoInitTst.testNoFailF("testMultAll",&testMultAll!(T,rank),
         __LINE__,__FILE__,coll);
-    autoInitTst.testNoFail("testMultAxis",(NArray!(T,rank) d,Rand r){ testMultAxis!(T,rank)(d,r); },
+    autoInitTst.testNoFailF("testMultAxis",&testMultAxis!(T,rank),
         __LINE__,__FILE__,coll);
-    autoInitTst.testNoFail("testFilterMask",(NArray!(T,rank) d,Rand r){ testFilterMask!(T,rank)(d,r); },
-        __LINE__,__FILE__,coll);
-    autoInitTst.testNoFail("testAxisFilter",(NArray!(T,rank) d,NArray!(index_type,1) idxs){ testAxisFilter!(T,rank)(d,idxs); },
-        __LINE__,__FILE__,coll);
-    autoInitTst.testNoFail("testSerial",(NArray!(T,rank) d){ testSerial!(T,rank)(d); },
+//    autoInitTst.testNoFailF("testFilterMask",&testFilterMask!(T,rank),
+//        __LINE__,__FILE__,coll); // pippo to do
+//    autoInitTst.testNoFailF("testAxisFilter",&testAxisFilter!(T,rank),
+//        __LINE__,__FILE__,coll); // pippo to do
+    autoInitTst.testNoFailF("testSerial",&testSerial!(T,rank),
         __LINE__,__FILE__,coll);
     static if (is(T==int) && rank<4){
-        autoInitTst.testNoFail("testConvolveNN1b0",(NArray!(T,rank)a){
+        autoInitTst.testNoFailF("testConvolveNN1b0",function void(NArray!(T,rank)a){
                 index_type[rank] kShape=3; testConvolveNN!(T,rank,Border.Same)(a,NArray!(T,rank).ones(kShape)); },
             __LINE__,__FILE__,coll,TestSize(100/rank));
-        autoInitTst.testNoFail("testConvolveNNb0",
-            (NArray!(T,rank)a,SizedRandomNArray!(int,ctfe_powI(3,rank)) flatK){
+        autoInitTst.testNoFailF("testConvolveNNb0",
+            function void(NArray!(T,rank)a,SizedRandomNArray!(int,ctfe_powI(3,rank)) flatK){
                                    index_type[rank] kShape=3; auto kernel=reshapeR!(rank)(flatK.arr,kShape);
                 testConvolveNN!(T,rank,Border.Same)(a,kernel);
             },__LINE__,__FILE__,coll,TestSize(100/rank));
-        autoInitTst.testNoFail("testConvolveNN1b+",(NArray!(T,rank)a){
+        autoInitTst.testNoFailF("testConvolveNN1b+",function void(NArray!(T,rank)a){
                 index_type[rank] kShape=3; testConvolveNN!(T,rank,Border.Increase)(a,NArray!(T,rank).ones(kShape)); },
             __LINE__,__FILE__,coll,TestSize(100/rank));
-        autoInitTst.testNoFail("testConvolveNNb+",
-            (NArray!(T,rank)a,SizedRandomNArray!(int,ctfe_powI(3,rank)) flatK){
+        autoInitTst.testNoFailF("testConvolveNNb+",
+            function void(NArray!(T,rank)a,SizedRandomNArray!(int,ctfe_powI(3,rank)) flatK){
                                    index_type[rank] kShape=3; auto kernel=reshapeR!(rank)(flatK.arr,kShape);
                 testConvolveNN!(T,rank,Border.Increase)(a,kernel);
             },__LINE__,__FILE__,coll,TestSize(100/rank));
-        autoInitTst.testNoFail("testConvolveNN1b-",(NArray!(T,rank)a){
+        autoInitTst.testNoFailF("testConvolveNN1b-",function void(NArray!(T,rank)a){
                 index_type[rank] kShape=3; testConvolveNN!(T,rank,Border.Decrease)(a,NArray!(T,rank).ones(kShape)); },
             __LINE__,__FILE__,coll,TestSize(100/rank));
-        autoInitTst.testNoFail("testConvolveNNb-",
-            (NArray!(T,rank)a,SizedRandomNArray!(int,ctfe_powI(3,rank)) flatK){
+        autoInitTst.testNoFailF("testConvolveNNb-",
+            function void(NArray!(T,rank)a,SizedRandomNArray!(int,ctfe_powI(3,rank)) flatK){
                                    index_type[rank] kShape=3; auto kernel=reshapeR!(rank)(flatK.arr,kShape);
                 testConvolveNN!(T,rank,Border.Decrease)(a,kernel);
             },__LINE__,__FILE__,coll,TestSize(100/rank));
     }
     static if (rank==1){
-        autoInitTst.testNoFail("testDot1x1",(Dottable!(T,1,T,1,true,true) d){ testDot1x1!(T,T)(d); },
+        autoInitTst.testNoFailF("testDot1x1",&testDot1x1!(T,T),
             __LINE__,__FILE__,coll);
-        autoInitTst.testNoFail("testDot1x2",(Dottable!(T,1,T,2,true,true) d){ testDot1x2!(T,T)(d); },
+        autoInitTst.testNoFailF("testDot1x2",&testDot1x2!(T,T),
             __LINE__,__FILE__,coll);
     }
     static if (rank==2){
-        autoInitTst.testNoFail("testDot2x1",(Dottable!(T,2,T,1,true,true) d){ testDot2x1!(T,T)(d); },
+        autoInitTst.testNoFailF("testDot2x1",&testDot2x1!(T,T),
             __LINE__,__FILE__,coll);
-        autoInitTst.testNoFail("testDot2x2",(Dottable!(T,2,T,2,true,true) d){ testDot2x2!(T,T)(d); },
+        autoInitTst.testNoFailF("testDot2x2",&testDot2x2!(T,T),
             __LINE__,__FILE__,coll);
         version(no_lapack){ }
         else {
             static if (isBlasType!(T)){
-                autoInitTst.testNoFail("testSolve2x1",(Dottable!(T,2,T,1,false,true,true,0,0) d,Rand r)
-                    { testSolve2x1!(T)(d,r); },__LINE__,__FILE__,coll);
-                autoInitTst.testNoFail("testSolve2x2",(Dottable!(T,2,T,2,false,true,true,0,0) d,Rand r)
-                    { testSolve2x2!(T)(d,r); },__LINE__,__FILE__,coll);
-                autoInitTst.testNoFail("testEig",(Dottable!(T,2,T,1,false,true,true) d){ testEig!(T)(d); },
+                autoInitTst.testNoFailF("testSolve2x1",&testSolve2x1!(T),__LINE__,__FILE__,coll);
+                autoInitTst.testNoFailF("testSolve2x2",&testSolve2x2!(T),__LINE__,__FILE__,coll);
+                autoInitTst.testNoFailF("testEig",&testEig!(T),
                     __LINE__,__FILE__,coll);
-                //autoInitTst.testNoFail("testEigh",(Dottable!(T,2,T,1,false,true,true) d){ testEigh!(T)(d); },
+                //autoInitTst.testNoFail("testEigh",&testEigh!(T),
                 //    __LINE__,__FILE__,coll); // pippo to fix...
-                autoInitTst.testNoFail("testSvd",(Dottable!(T,2,T,1,false,true,false) d){ testSvd!(T)(d); },
+                autoInitTst.testNoFailF("testSvd",&testSvd!(T),
                     __LINE__,__FILE__,coll);
             }
         }
-    }+/
+    }
     return coll;
 }
 
