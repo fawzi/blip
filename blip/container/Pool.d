@@ -305,46 +305,51 @@ class Pool(T,int _batchSize=16):PoolI!(T){
         }
     }
     /// get rid of all cached values
-    void flush(){
+    void flushNoSync(){
         debug(TrackPools){
             sinkTogether(sout,delegate void(scope CharSink s){
                 dumper(s)("pool @")(cast(void*)this)(" deleting cached objects nEl=")(nEl)(" nCapacity=")(nCapacity)("\n");
             });
         }
-        synchronized(this){
-            if (pool !is null){
-                S* p=pool,pNext=pool.next;
-                while (nEl!=0){
-                    --nEl;
-                    size_t pos=(nEl&(batchSize-1));
-                    debug(TrackPools){
-                        sinkTogether(sout,delegate void(scope CharSink sink){
-                                auto s=dumper(sink);
-                                s("pool @")(cast(void*)this)(" deleting obj ")(T.stringof);
-                                static if (__traits(compiles,(){ s(cast(void*)(p.array[pos])); })){
-                                    s("@")(cast(void*)(p.array[pos]));
-                                } else static if (__traits(compiles,(){ s(p.array[pos]); })){
+        if (pool !is null){
+            S* p=pool,pNext=pool.next;
+            while (nEl!=0){
+                --nEl;
+                size_t pos=(nEl&(batchSize-1));
+                debug(TrackPools){
+                    sinkTogether(sout,delegate void(scope CharSink sink){
+                            auto s=dumper(sink);
+                            s("pool @")(cast(void*)this)(" deleting obj ")(T.stringof);
+                            static if (__traits(compiles,(){ s(cast(void*)(p.array[pos])); })){
+                                s("@")(cast(void*)(p.array[pos]));
+                            } else static if (__traits(compiles,(){ s(p.array[pos]); })){
                                     s(p.array[pos]);
-                                }
-                                s("\n");
+                            }
+                            s("\n");
                         });
-                    }
-                    tryDeleteT(p.array[pos]);
-                    if (pos==0){
-                        delete p;
-                        p=pNext;
-                        pNext=pNext.next;
-                        assert(p!is pool || nEl==0,"nEl pool size mismatch");
-                    }
                 }
-                while (p!is pool && p!is null){
+                tryDeleteT(p.array[pos]);
+                if (pos==0){
                     delete p;
                     p=pNext;
                     pNext=pNext.next;
-                    p.next=null;
+                    assert(p!is pool || nEl==0,"nEl pool size mismatch");
                 }
-                nCapacity=cast(size_t)0;
             }
+            while (p!is pool && p!is null){
+                delete p;
+                p=pNext;
+                pNext=pNext.next;
+                p.next=null;
+            }
+            nCapacity=cast(size_t)0;
+            pool=null;
+        }
+    }
+    /// ditto
+    void flush(){
+        synchronized(this){
+            flushNoSync();
         }
     }
     void stopCaching(){
@@ -369,7 +374,8 @@ class Pool(T,int _batchSize=16):PoolI!(T){
     }
     /// destructor
     ~this(){
-        flush();
+        // we cannot flush as that might already be destroyed unless we move that to non gc memory
+        // flushNoSync();
     }
 }
 

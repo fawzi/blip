@@ -22,6 +22,7 @@ import blip.io.Console;
 import blip.io.BasicIO;
 import tango.math.random.Random;
 import blip.rtest.RTest;
+import blip.util.TangoLogConfig;
 version(NoTrace){} else { import blip.core.stacktrace.TraceExceptions; import blip.util.TraceAll; }
 import blip.Comp;
 

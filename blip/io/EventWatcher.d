@@ -55,7 +55,7 @@ struct WaitLoopOp{
             sem.notify();
         }
     }
-    void waitLoopOp(void delegate() op,void delegate(void delegate())submitter){
+    void waitLoopOp(scope void delegate() op,scope void delegate(void delegate())submitter){
         auto tAtt=taskAtt;
         this.op=op;
         if (tAtt !is null && tAtt.mightYield){
@@ -74,7 +74,7 @@ struct WaitLoopOp{
 }
 /// helper method to wait for the execution of the action op that should be executed
 /// asynchronously after being submitted with the submitter delegate
-void waitLoopOp(void delegate() op,void delegate(void delegate())submitter){
+void waitLoopOp(scope void delegate() op,scope void delegate(void delegate())submitter){
     WaitLoopOp wOp;
     wOp.waitLoopOp(op,submitter);
 }
@@ -179,7 +179,7 @@ class EventWatcher:LoopHandlerI{
             synchronized(this){
                 flags = flags & (~Flags.LoopRunning);
             }
-        } catch (Exception e){
+        } catch (Throwable e){
             sinkTogether(serr,delegate void(scope CharSink s){
                 dumper(s)("EventWatcher thread crashed with Exception:")(e)("\n");
             });
@@ -565,7 +565,7 @@ class TimeoutManager:LoopHandlerI{
         return watcher.loop();
     }
     /// waits for the event w or the timeout whichever comes first
-    bool waitForEvent(GenericWatcher w,void delegate(bool)inlineOp=null){
+    bool waitForEvent(GenericWatcher w,scope void delegate(bool)inlineOp=null){
         auto t=TimedEvent(this,w,inlineOp);
         return t.startAndWait();
     }
@@ -616,11 +616,11 @@ class TimeoutManager:LoopHandlerI{
     }
 }
 /// default watcher without timeout
-EventWatcher noToutWatcher;
+__gshared EventWatcher noToutWatcher;
 /// a watcher with a timeout of few seconds
-TimeoutManager sToutWatcher;
+__gshared TimeoutManager sToutWatcher;
 /// default watcher
-LoopHandlerI defaultWatcher;
+__gshared LoopHandlerI defaultWatcher;
 shared static this(){
     noToutWatcher=new EventWatcher(true);
     noToutWatcher.startThread();

@@ -79,7 +79,7 @@ void testPLoopIter(T)(T[] arr1){
     }
     if (copyArr!=arr1) throw new Exception("copy failed!",__FILE__,__LINE__);
     if (nEl!=arr1.length) throw new Exception("wrong size",__FILE__,__LINE__);
-    foreach(i,e;arr1){
+    foreach(size_t i,T e;arr1){
         if (copyArr[i] !is e){
             throw new Exception(collectIAppender(delegate void(scope CharSink sink){
                 dumper(sink)("pLoopIter copy failed, generated ")(copyArr)(" which differs at ")(i);
@@ -88,14 +88,16 @@ void testPLoopIter(T)(T[] arr1){
     }
     nEl=0;
     ii=0;
-    foreach(ref T e;pLoopIter(delegate bool(ref T*el){
+    // scope delegates to work around dmd bug
+    scope dlg1=delegate bool(ref T*el){
         if (ii<copyArr.length){
             el= &(copyArr[ii]);
             ++ii;
             return true;
         }
         return false;
-    })){
+    };
+    foreach(ref T e;pLoopIter(dlg1)){
         e=e+1;
         atomicAdd(nEl,cast(size_t)1);
     }
@@ -110,14 +112,15 @@ void testPLoopIter(T)(T[] arr1){
     //--------------
     nEl=0;
     ii=0;
-    foreach(i,ref e;pLoopIter(delegate bool(ref T el){
+    scope dlg2=delegate bool(ref T el){
         if (ii<arr1.length){
-            el=arr1[ii];
+            el= arr1[ii];
             ++ii;
             return true;
         }
         return false;
-    })){
+    };
+    foreach(i,ref e;pLoopIter(dlg2)){
         copyArr[i]=e;
         atomicAdd(nEl,cast(size_t)1);
     }
@@ -132,14 +135,15 @@ void testPLoopIter(T)(T[] arr1){
     }
     nEl=0;
     ii=0;
-    foreach(e;pLoopIter(delegate bool(ref T el){
+    scope dlg3=delegate bool(ref T el){
         if (ii<copyArr.length){
             el=copyArr[ii];
             ++ii;
             return true;
         }
         return false;
-    })){
+    };
+    foreach(e;pLoopIter(dlg3)){
         synchronized{
             auto idx=find(copyArr,e);
             if (idx==copyArr.length){

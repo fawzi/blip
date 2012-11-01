@@ -146,7 +146,7 @@ string printArgs(int nargs,string printC="sout.call",string indent="    "){
         res~=indent~"        "~printC~"(\"non printable argument of type \"~(typeof(arg["~ctfe_i2s(i)~"]).stringof)~\" as writeOut cannot handle it.\\n\");\n";
         res~=indent~"    }\n";
     }
-    res~=indent~"}catch (Exception e) {\n";
+    res~=indent~"}catch (Throwable e) {\n";
     res~=indent~"    sout.call(collectIAppender(delegate void(scope void delegate(in cstring)s){ s(\"\\nError: could not print arguments due to exception \"); writeOut(s,e); s(\"\\n\");}));\n";
     res~=indent~"}\n";
     return res;
@@ -822,7 +822,7 @@ template testInit(string checkInit="", string manualInit=""){
                 test.baseDelegate.get!(void delegate(S))()(arg);
             } catch (SkipException s){
                 return TestResult.Skip;
-            } catch (Exception e){
+            } catch (Throwable e){
                 synchronized(test.testController.writeLock()){
                     test.failureLog(collectIAppender(delegate void(scope void delegate(in cstring) s){
                             dumper(s)("test`")(test.testName)("` failed with exception\n"); }));
@@ -867,7 +867,7 @@ template testInit(string checkInit="", string manualInit=""){
                 test.baseDelegate.get!(void delegate(S))()(arg);
             } catch (SkipException s){
                 return TestResult.Skip;
-            } catch (Exception e){
+            } catch (Throwable e){
                 return TestResult.Pass;
             }
             synchronized(test.testController.writeLock){
@@ -924,7 +924,7 @@ template testInit(string checkInit="", string manualInit=""){
                 }
             } catch (SkipException s){
                 return TestResult.Skip;
-            } catch (Exception e){
+            } catch (Throwable e){
                 synchronized(test.testController.writeLock){
                     char[256] buf;
                     auto arr=lGrowableArray!(char)(buf,0,GASharing.GlobalNoFree);
@@ -983,7 +983,7 @@ template testInit(string checkInit="", string manualInit=""){
                 }
             } catch (SkipException s){
                 return TestResult.Skip;
-            } catch (Exception e){
+            } catch (Throwable e){
                 synchronized(test.testController.writeLock){
                     //test.failureLog.flush();
                     char[256] buf;

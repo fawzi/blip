@@ -29,11 +29,12 @@ import Integer=tango.text.convert.Integer;
 import tango.core.Tuple;
 import blip.io.EventWatcher;
 import blip.Comp;
+import blip.util.TangoLogConfig;
 
 version(NoTrace){} else { import blip.core.stacktrace.TraceExceptions; }
 
 class A{
-    static A globalA;
+    static __gshared A globalA;
     int iVal_=1;
     int iVal(){
         return iVal_;

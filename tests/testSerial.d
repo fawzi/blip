@@ -36,8 +36,8 @@ version(Xpose){
 class A: Serializable{
     int x;
     int y;
-    static ClassMetaInfo metaI;
-    static this(){
+    static __gshared ClassMetaInfo metaI;
+    shared static this(){
         metaI=ClassMetaInfo.createForType!(typeof(this))("AKlass","a test class");
         //("AKlass",null,typeid(typeof(this)),typeof(this).classinfo,typeKindForType!(typeof(this)));
         //SerializationRegistry().register!(typeof(this))(metaI);

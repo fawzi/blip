@@ -440,7 +440,7 @@ version(mpi)
                         }
                         handler(comm[status.MPI_SOURCE],status.MPI_TAG);
                     }
-                } catch (Exception e){
+                } catch (Throwable e){
                     serr(collectIAppender(delegate void(scope CharSink s){
                         dumper(s)("Error in mpi handler for comm ")(comm.name)(" tag:")(tag)("\n");
                         e.writeOut(serr.call);

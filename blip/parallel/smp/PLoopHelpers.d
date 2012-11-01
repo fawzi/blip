@@ -472,7 +472,7 @@ class PLoopIter(T){
                 }
             }
         }
-        static LoopEl *opCall(){
+        static LoopEl *createNew(){
             assert(gPool!is null);
             LoopEl*res=gPool.getObj();
             return res;
@@ -517,8 +517,7 @@ class PLoopIter(T){
             if (pool){
                 pool.giveBack(&this);
             }else{
-                LoopEl dummy;
-                this=dummy;
+                destroy(this);
             }
         }
     }
@@ -526,7 +525,7 @@ class PLoopIter(T){
     void doLoop1(){
         T el;
         while(iter(el)){
-            LoopEl *op=LoopEl();
+            LoopEl *op=LoopEl.createNew();
             op.el=el;
             op.context=this;
             Task("PLoopIterTask",&op.exec1).appendOnFinish(&op.giveBack).autorelease.submitYield();
@@ -536,7 +535,7 @@ class PLoopIter(T){
         T el;
         size_t idx=0;
         while(iter(el)){
-            LoopEl *op=LoopEl();
+            LoopEl *op=LoopEl.createNew();
             op.el=el;
             op.context=this;
             op.idx=idx;

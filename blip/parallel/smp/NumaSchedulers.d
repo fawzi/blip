@@ -1494,14 +1494,23 @@ class MExecuter:ExecuterI{
                 TaskI t=scheduler.nextTask();
                 version(DetailedLog){
                     sinkTogether(&logMsg,delegate void(scope CharSink s){
-                        dumper(s)("Work thread ")(Thread.getThis().name)(" starting task ")(t);
+                            dumper(s)("Work thread ")(Thread.getThis().name)(" starting task ");
+                            if (t is null)
+                                s("*null*");
+                            else
+                                writeOut(s,t);
                     });
                 }
                 if (t is null) return;
                 auto schedAtt=t.scheduler; // the task scheduler can change just after execution, but before subtaskDeactivated is called...
                 auto tPos=cast(void*)cast(Object)t;
-                t.execute(false);
                 auto tName=t.taskName;
+                t.execute(false);
+                version(DetailedLog){
+                    sinkTogether(&logMsg,delegate void(scope CharSink s){
+                        dumper(s)("Work thread ")(Thread.getThis().name)(" executed task ")(tName)("@")(tPos);
+                    });
+                }
                 schedAtt.subtaskDeactivated(t);
                 version(DetailedLog){
                     sinkTogether(&logMsg,delegate void(scope CharSink s){
@@ -1509,7 +1518,7 @@ class MExecuter:ExecuterI{
                     });
                 }
             }
-            catch(Exception e) {
+            catch(Throwable e) {
                 log.error("exception in working thread ");
                 //log.error(collectIAppender(&e.writeOut));
                 log.error(e.toString);

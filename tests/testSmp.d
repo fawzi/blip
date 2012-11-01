@@ -28,7 +28,7 @@ version(NoTrace){} else { import blip.core.stacktrace.TraceExceptions; }
 import blip.io.Console;
 
 class STask{
-    static gVal=0;
+    static __gshared gVal=0;
     string name;
     double sleepTime;
     void delegate()op;
@@ -275,5 +275,6 @@ void tests(){
 }
 
 void main(){
+    taskAtt=defaultTask;
     tests();
 }
