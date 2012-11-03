@@ -41,7 +41,7 @@ version(Posix){
         }
         
         void abort(){
-            auto wOut=delegate void(const(char)[] s){ serr(s); };
+            auto wOut=delegate void(const(char[]) s){ serr(s); };
             bool waitFor(scope bool delegate() check){
                 for(int i=0;i<500;++i){
                     for(int j=0;i<100;++i){
