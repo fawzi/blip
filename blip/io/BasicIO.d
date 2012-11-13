@@ -435,9 +435,11 @@ void writeOut(V,T,S...)(scope V sink1,T v,S args){
         }
     } else static if (is(TT==bool)){
         if (v){
-            sink([cast(Char)'1']);
+            enum Char[] oneC=[cast(immutable Char)'1'];
+            sink(oneC);
         } else {
-            sink([cast(Char)'0']);
+            enum Char[] zeroC=[cast(immutable Char)'0'];
+            sink(zeroC);
         }
     } else static if (is(TT==float)||is(TT==double)||is(TT==real)){
         char[40] buf;
