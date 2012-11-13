@@ -1089,11 +1089,12 @@ TT axisUnfilter1(TT,V,S...)
 /// it is much more stringent.
 /// To guarantee T.epsilon absolute error one should use magnitude=1.0.
 /// by default we are more stingent and we use T.mant_dig/4 digits more when close to 0.
+extern extern(C) int printf(const(char)*,...);
 int feqrel2(T,U=RealTypeOf!(T))(T x,T y,U magnitude_=ctfe_powI(0.5,T.mant_dig/4)){
     RealTypeOf!(T) magnitude=cast(RealTypeOf!(T))magnitude_;
     assert(magnitude>=0,"magnitude should be non negative");
     static if(isComplexType!(T)){
-        return min(feqrel2(x.re,y.re),feqrel2(x.im,y.im));
+        return min(feqrel2(x.re,y.re,magnitude),feqrel2(x.im,y.im,magnitude));
     } else {
         if (x<0){
             return feqrel(x-magnitude,y-magnitude);
@@ -1110,8 +1111,12 @@ int minFeqrel2(T,V,U=RealTypeOf!(T.dtype))(T a,V b,U magnitude=ctfe_powI(0.5,T.d
 in { assert(b.shape==a.shape,"array need to have the same size in minFeqrel"); }
 body {
     int minEq=T.dtype.mant_dig;
-    mixin(sLoopPtr(T.dim,["a","b"],
-        "int diffAtt=feqrel2!(T.dtype)(*aPtr0,*bPtr0,magnitude); if (diffAtt<minEq) minEq=diffAtt;","i"));
+    static if (is(T.dtype==cdouble)) // work around dmd 2.060 bug
+        mixin(sLoopPtr(T.dim,["a","b"],
+            "int diffAtt=min(feqrel2!(RealTypeOf!(T.dtype))((*aPtr0).re,(*bPtr0).re,magnitude),feqrel2!(RealTypeOf!(T.dtype))((*aPtr0).im,(*bPtr0).im,magnitude)); if (diffAtt<minEq) minEq=diffAtt;","i"));
+    else
+        mixin(sLoopPtr(T.dim,["a","b"],
+            "int diffAtt=feqrel2!(T.dtype)(*aPtr0,*bPtr0,magnitude); if (diffAtt<minEq) minEq=diffAtt;","i"));
     return minEq;
 }
 

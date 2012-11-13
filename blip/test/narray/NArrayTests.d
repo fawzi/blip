@@ -27,7 +27,7 @@ import blip.parallel.smp.WorkManager;
 import blip.util.TangoLogConfig;
 import blip.container.GrowableArray;
 import blip.math.Math: abs,min,max,sqrt;
-import blip.math.IEEE: feqrel;
+import blip.math.IEEE: feqrel, isNaN;
 import blip.serialization.Serialization;
 import blip.io.IOArray;
 import blip.BasicModels;
@@ -352,7 +352,11 @@ void testDot1x1(T,S)(Dottable!(T,1,S,1,true,true) d){
     U refVal=cast(U)refValT;
     auto v=dot(d.a,d.b,d.axis1,d.axis2);
     static if(is(typeof(feqrel2(U.init,U.init)))&& is(typeof(U.mant_dig))){
-        auto err=feqrel2(refVal,v);
+        static if (is(T==cdouble)){ // work around dmd 2.060 bug
+            auto err=min(feqrel2(refVal.re,v.re),feqrel2(refVal.im,v.im));
+        } else {
+            auto err=feqrel2(refVal,v);
+        }
         if (err<2*U.mant_dig/3-tol){
             sout("a:"); writeOut(sout.call,d.a); sout("\n");
             sout("b:"); writeOut(sout,d.b); sout("\n");
@@ -479,27 +483,35 @@ else {
         }
     }
 
-    void testEig(T)(Dottable!(T,2,T,1,false,true,true,0,0) d){
+    void testEig(T)(Dottable!(T,2,T,1,false,true,true,0,0) d, uint evEval){
         int tol=6;
         index_type n=d.k;
         auto ev=zeros!(ComplexTypeOf!(T))(n);
-        auto leftEVect=zeros!(ComplexTypeOf!(T))(n,n,ArrayFlags.Fortran);
-        auto rightEVect=zeros!(ComplexTypeOf!(T))(n,n,ArrayFlags.Fortran);
+        NArray!(ComplexTypeOf!(T),2) leftEVect, rightEVect;
+        if ((evEval&1u)!=0)
+            leftEVect=zeros!(ComplexTypeOf!(T))(n,n,ArrayFlags.Fortran);
+        if ((evEval&2u)!=0)
+            rightEVect=zeros!(ComplexTypeOf!(T))(n,n,ArrayFlags.Fortran);
         auto ev2=eig!(T)(d.a, ev,leftEVect,rightEVect);
-        auto m1=dot(d.a,rightEVect);
-        auto m2=repeat(ev2,n,0)*rightEVect;
-        auto diff1=norm2NA!(typeof(m1-m2),real)(m1-m2)/n;
-        m1=dot(leftEVect.H1,d.a);
-        m2=leftEVect.T*repeat(ev2,n,-1);
-        auto diff2=norm2NA!(typeof(m1-m2),real)(m1-m2)/n;
+        real diff1=0,diff2=0;
+        if (!rightEVect.isDummy()){
+            auto m1=dot(d.a,rightEVect);
+            auto m2=repeat(ev2,n,0)*rightEVect;
+            diff1=norm2NA!(typeof(m1-m2),real)(m1-m2)/n;
+            if (norm2NA!(typeof(rightEVect),real)(rightEVect)<=0.5) throw new Exception("rightEVect too small",__FILE__,__LINE__);
+        }
+        if (!leftEVect.isDummy()){
+            auto cA=d.a.asType!(ComplexTypeOf!(T))(); // work around dmd 2.060 bug for mixed cdouble double dot
+            auto m1=dot(leftEVect.H1,cA);
+            auto m2=leftEVect.T*repeat(ev2,n,-1);
+            diff2=norm2NA!(typeof(m1-m2),real)(m1-m2)/n;
+            if (norm2NA!(typeof(leftEVect),real)(leftEVect)<=0.5) throw new Exception("leftEVect too small",__FILE__,__LINE__);
+        }
         auto err1=feqrel(diff1+1.0L,1.0L);
         auto err2=feqrel(diff2+1.0L,1.0L);
-        if (norm2NA!(typeof(rightEVect),real)(rightEVect)<=0.5) throw new Exception("rightEVect too small",__FILE__,__LINE__);
-        if (norm2NA!(typeof(leftEVect),real)(leftEVect)<=0.5) throw new Exception("leftEVect too small",__FILE__,__LINE__);
         if (err1<T.mant_dig*2/3-tol){
             sout("ev:");
             ev2.printData(sout.call,"F8,10"); sout("\n");
-            sout("leftEVect:");  leftEVect.printData(sout.call,"F8,10"); sout("\n");
             sout("rightEVect:"); rightEVect.printData(sout.call,"F8,10"); sout("\n");
             sout(collectIAppender(delegate void(scope CharSink s){
                 s("error"); writeOut(s,err1); s("/"); writeOut(s,T.mant_dig); s("\n");
@@ -507,6 +519,9 @@ else {
             throw new Exception("rightEVect error too large",__FILE__,__LINE__);
         }
         if (err2<T.mant_dig*2/3-tol){
+            sout("ev:");
+            ev2.printData(sout.call,"F8,10"); sout("\n");
+            sout("conj(leftEVect):");  leftEVect.printData(sout.call,"F8,10"); sout("\n");
             sout(collectIAppender(delegate void(scope CharSink s){
                 s("error"); writeOut(s,err2); s("/"); writeOut(s,T.mant_dig); s("\n");
             }));
@@ -666,10 +681,10 @@ TestCollection narrayRTst1(T,int rank)(TestCollection superColl){
         __LINE__,__FILE__,coll);
     autoInitTst.testNoFailF("testMultAxis",&testMultAxis!(T,rank),
         __LINE__,__FILE__,coll);
-//    autoInitTst.testNoFailF("testFilterMask",&testFilterMask!(T,rank),
-//        __LINE__,__FILE__,coll); // pippo to do
-//    autoInitTst.testNoFailF("testAxisFilter",&testAxisFilter!(T,rank),
-//        __LINE__,__FILE__,coll); // pippo to do
+    autoInitTst.testNoFailF("testFilterMask",&testFilterMask!(T,rank),
+        __LINE__,__FILE__,coll);
+    autoInitTst.testNoFailF("testAxisFilter",&testAxisFilter!(T,rank),
+        __LINE__,__FILE__,coll);
     autoInitTst.testNoFailF("testSerial",&testSerial!(T,rank),
         __LINE__,__FILE__,coll);
     static if (is(T==int) && rank<4){
@@ -715,9 +730,9 @@ TestCollection narrayRTst1(T,int rank)(TestCollection superColl){
                 autoInitTst.testNoFailF("testSolve2x1",&testSolve2x1!(T),__LINE__,__FILE__,coll);
                 autoInitTst.testNoFailF("testSolve2x2",&testSolve2x2!(T),__LINE__,__FILE__,coll);
                 autoInitTst.testNoFailF("testEig",&testEig!(T),
-                    __LINE__,__FILE__,coll);
-                //autoInitTst.testNoFail("testEigh",&testEigh!(T),
-                //    __LINE__,__FILE__,coll); // pippo to fix...
+                    __LINE__,__FILE__,coll); // pippo to fix
+                autoInitTst.testNoFailF("testEigh",&testEigh!(T),
+                    __LINE__,__FILE__,coll); // pippo to fix...
                 autoInitTst.testNoFailF("testSvd",&testSvd!(T),
                     __LINE__,__FILE__,coll);
             }

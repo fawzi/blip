@@ -674,6 +674,8 @@ class TestCollection: SingleRTest, TestControllerI {
         }
         foreach (t;subTests){
             t.randomInit(r);
+        }
+        foreach (t;subTests){
             version(SequentialTests){
                 t.runTests(testFactor);
             } else {

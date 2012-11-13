@@ -88,7 +88,7 @@ void testPLoopIter(T)(T[] arr1){
     }
     nEl=0;
     ii=0;
-    // scope delegates to work around dmd bug
+    // scope delegates to work around dmd bug 8974 http://d.puremagic.com/issues/show_bug.cgi?id=8974
     scope dlg1=delegate bool(ref T*el){
         if (ii<copyArr.length){
             el= &(copyArr[ii]);

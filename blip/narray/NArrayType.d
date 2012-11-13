@@ -64,7 +64,7 @@ import cstdlib = blip.stdc.stdlib : free, malloc;
 import blip.util.Convert;
 import blip.Comp;
 
-//version=RefCount;
+//version=RefCount; // needs a mallocated guard...
 
 /// flags for fast checking of 
 enum ArrayFlags {
@@ -487,7 +487,7 @@ else {
         /// returns an array initialized to 0 of the requested shape
         static NArray zeros(index_type[rank] shape, bool fortran=false){
             NArray res=empty(shape,fortran);
-            static if(isAtomicType!(V)){
+            static if(isAtomicType!(V) || is(V==cfloat)){ // work around dmd bug http://d.puremagic.com/issues/show_bug.cgi?id=8975
                 memset(res.startPtrArray,0,cast(size_t)(cast(size_t)res.nElArray*V.sizeof));
             } else {
                 res.startPtrArray[0..cast(size_t)res.nElArray]=convertTo!(V)(0);
@@ -497,7 +497,11 @@ else {
         /// returns an array initialized to 1 of the requested shape
         static NArray ones(index_type[rank] shape, bool fortran=false){
             NArray res=empty(shape,fortran);
-            res.startPtrArray[0..cast(size_t)res.nElArray]=convertTo!(V)(1);
+            static if (is(V==cfloat)){ // work around dmd bug http://d.puremagic.com/issues/show_bug.cgi?id=8975
+                unaryOpStr!("*aPtr0=convertTo!("~V.stringof~")(1);",NArray)(res);
+            } else {
+                res.startPtrArray[0..cast(size_t)res.nElArray]=convertTo!(V)(1);
+            }
             return res;
         }
         
@@ -1243,12 +1247,9 @@ else {
         NArray dup(bool fortran)
         {
             NArray res=empty(this.shape,fortran);
-            if ( this.flags & res.flags & (Flags.Fortran | Flags.Contiguous) ) 
-            {
+            if ( this.flags & res.flags & (Flags.Fortran | Flags.Contiguous) ) {
                 memcpy(res.startPtrArray, this.startPtrArray, V.sizeof * cast(size_t)this.nElArray);
-            }
-            else
-            {
+            } else {
                 binaryOpStr!("*aPtr0=*bPtr0;",NArray,NArray)(res,this);
             }
             return res;
@@ -1267,12 +1268,9 @@ else {
             } else static if (is(typeof(V.init.dup()))){
                 binaryOpStr!("*aPtr0=(*bPtr0).dup();",NArray,NArray)(res,this);
             } else{
-                if ( this.flags & res.flags & (Flags.Fortran | Flags.Contiguous) ) 
-                {
+                if ( this.flags & res.flags & (Flags.Fortran | Flags.Contiguous) ) {
                     memcpy(res.startPtrArray, this.startPtrArray, V.sizeof * cast(size_t)this.nElArray);
-                }
-                else
-                {
+                } else {
                     binaryOpStr!("*aPtr0=*bPtr0;")(res,this);
                 }
             }
@@ -2414,8 +2412,9 @@ void randomizeNArray(RandG,T)(RandG r,ref T a){
         T.dtype[] d=a.data;
         r.randomize(d);
     } else {
-        mixin unaryOpStr!("r.randomize(*aPtr0);",typeof(a));
-        unaryOpStr(a);
+        foreach(ref el;a.sFlat()) {
+            r.randomize(el);
+        }
     }
 }
 /// returns a random array of the given size with the given distribution
