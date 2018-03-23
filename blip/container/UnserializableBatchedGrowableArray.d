@@ -17,7 +17,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-module blip.container.BatchedGrowableArray;
+module blip.container.UnserializableBatchedGrowableArray;
 import blip.util.Grow;
 import blip.io.BasicIO: dumper; // needed just for the desc method
 import blip.parallel.smp.WorkManager;
@@ -32,7 +32,7 @@ import blip.stdc.stdlib: malloc,free;
 import blip.Comp;
 import blip.io.Console;
 import blip.core.Traits;
-import blip.serialization.Serialization;
+import tango.stdc.stdio: sprintf;
 
 private int nextPower2(int i){
     int res=1;
@@ -49,7 +49,7 @@ template defaultBatchSize(T){
 /// appending never invalidates older data/pointers, but data is not contiguous in memory
 /// data is written, *then* the new length is set, so accessing the length with a read barrier
 /// guarantees that all the data up to length has been initialized
-class BatchedGrowableArray(T,int batchSize1=((2048/T.sizeof>128)?2048/T.sizeof:128)): Serializable {
+class UnserializableBatchedGrowableArray(T,int batchSize1=((2048/T.sizeof>128)?2048/T.sizeof:128)) {
     enum :bool{ initialize=true }
     enum{batchSize=batchSize1}
     static assert(((batchSize-1)&batchSize)==0,"batchSize should be a power of two"); // relax?
@@ -263,7 +263,7 @@ class BatchedGrowableArray(T,int batchSize1=((2048/T.sizeof>128)?2048/T.sizeof:1
                 this.loopBody.noIndex=loopBody;
                 addPool();
                 scope(exit){ rmPool(); }
-                Task("BatchedGrowableArrayPLoopMain",delegate void(){
+                Task("UnserializableBatchedGrowableArrayPLoopMain",delegate void(){
                     auto ii=0;
                     auto iEnd=this.view.end-this.view.start;
                     auto bIndex=this.view.start/batchSize;
@@ -272,7 +272,7 @@ class BatchedGrowableArray(T,int batchSize1=((2048/T.sizeof>128)?2048/T.sizeof:1
                         auto bAtt=this.allocBatch();
                         bAtt.startI=0;
                         bAtt.data=this.view.batches[bIndex][0..batchSize];
-                        Task("BatchedGrowableArrayPLoopFirst",&bAtt.doNoIndexLoop)
+                        Task("UnserializableBatchedGrowableArrayPLoopFirst",&bAtt.doNoIndexLoop)
                             .appendOnFinish(&bAtt.giveBack).autorelease.submitYield();
                         ii+=batchSize-lStart;
                     } else { // at end
@@ -286,7 +286,7 @@ class BatchedGrowableArray(T,int batchSize1=((2048/T.sizeof>128)?2048/T.sizeof:1
                         auto bAtt=this.allocBatch();
                         bAtt.startI=ii;
                         bAtt.data=this.view.batches[bIndex][0..batchSize];
-                        Task("BatchedGrowableArrayPLoopIter",&bAtt.doNoIndexLoop)
+                        Task("UnserializableBatchedGrowableArrayPLoopIter",&bAtt.doNoIndexLoop)
                             .appendOnFinish(&bAtt.giveBack).autorelease.submitYield();
                         ii+=batchSize;
                     }
@@ -296,11 +296,11 @@ class BatchedGrowableArray(T,int batchSize1=((2048/T.sizeof>128)?2048/T.sizeof:1
                         auto bAtt=this.allocBatch();
                         bAtt.startI=ii;
                         bAtt.data=this.view.batches[bIndex][0..iEnd-ii];
-                        Task("BatchedGrowableArrayPLoopIter",&bAtt.doNoIndexLoop)
+                        Task("UnserializableBatchedGrowableArrayPLoopIter",&bAtt.doNoIndexLoop)
                             .appendOnFinish(&bAtt.giveBack).autorelease.submit();
                     }
                 }).autorelease.executeNow();
-                if (this.exception!is null) throw new Exception("exception in BatchedGrowableArray PLoop",
+                if (this.exception!is null) throw new Exception("exception in UnserializableBatchedGrowableArray PLoop",
                     __FILE__,__LINE__,this.exception);
                 return this.res;
             }
@@ -311,7 +311,7 @@ class BatchedGrowableArray(T,int batchSize1=((2048/T.sizeof>128)?2048/T.sizeof:1
                 this.loopBody.indexed=loopBody;
                 addPool();
                 scope(exit){ rmPool(); }
-                Task("BatchedGrowableArrayPLoopMain",delegate void(){
+                Task("UnserializableBatchedGrowableArrayPLoopMain",delegate void(){
                     size_t ii=0;
                     auto iEnd=this.view.end-this.view.start;
                     auto bIndex=this.view.start/batchSize;
@@ -320,7 +320,7 @@ class BatchedGrowableArray(T,int batchSize1=((2048/T.sizeof>128)?2048/T.sizeof:1
                         auto bAtt=this.allocBatch();
                         bAtt.startI=0;
                         bAtt.data=this.view.batches[bIndex][0..batchSize];
-                        Task("BatchedGrowableArrayPLoopFirst",&bAtt.doIndexLoop)
+                        Task("UnserializableBatchedGrowableArrayPLoopFirst",&bAtt.doIndexLoop)
                             .appendOnFinish(&bAtt.giveBack).autorelease.submitYield();
                         ii+=batchSize-lStart;
                     } else { // at end
@@ -334,7 +334,7 @@ class BatchedGrowableArray(T,int batchSize1=((2048/T.sizeof>128)?2048/T.sizeof:1
                         auto bAtt=this.allocBatch();
                         bAtt.startI=ii;
                         bAtt.data=this.view.batches[bIndex][0..batchSize];
-                        Task("BatchedGrowableArrayPLoopIter",&bAtt.doIndexLoop)
+                        Task("UnserializableBatchedGrowableArrayPLoopIter",&bAtt.doIndexLoop)
                             .appendOnFinish(&bAtt.giveBack).autorelease.submitYield();
                         ii+=batchSize;
                     }
@@ -344,11 +344,11 @@ class BatchedGrowableArray(T,int batchSize1=((2048/T.sizeof>128)?2048/T.sizeof:1
                         auto bAtt=this.allocBatch();
                         bAtt.startI=ii;
                         bAtt.data=this.view.batches[bIndex][0..iEnd-ii];
-                        Task("BatchedGrowableArrayPLoopIter",&bAtt.doIndexLoop)
+                        Task("UnserializableBatchedGrowableArrayPLoopIter",&bAtt.doIndexLoop)
                             .appendOnFinish(&bAtt.giveBack).autorelease.submit();
                     }
                 }).autorelease.executeNow();
-                if (this.exception!is null) throw new Exception("exception in BatchedGrowableArray PLoop",
+                if (this.exception!is null) throw new Exception("exception in UnserializableBatchedGrowableArray PLoop",
                     __FILE__,__LINE__,this.exception);
                 return this.res;
             }
@@ -420,7 +420,7 @@ class BatchedGrowableArray(T,int batchSize1=((2048/T.sizeof>128)?2048/T.sizeof:1
 /*    /// compares two objects, returns a number ret, such (a op b) is rewritten as (a.opCmp(b) op 0)
     /// thus if a>b a.opCmp(b)>0
     override int opCmp(Object o) {
-      auto b = cast(BatchedGrowableArray)(o);
+      auto b = cast(UnserializableBatchedGrowableArray)(o);
       if (!b) return -1;
       if (b.length() != this.length()) return false;
       foreach (size_t i, ref T v; b.data) {
@@ -433,7 +433,7 @@ class BatchedGrowableArray(T,int batchSize1=((2048/T.sizeof>128)?2048/T.sizeof:1
 
     equals_t opEquals(Object o) {
       if (this is o) return 1;
-      auto b = cast(BatchedGrowableArray)(o);
+      auto b = cast(UnserializableBatchedGrowableArray)(o);
       if (!b) return 0;
       if (b.length() != this.length()) return 0;
       foreach (size_t i, ref T v; b.data) {
@@ -617,54 +617,33 @@ class BatchedGrowableArray(T,int batchSize1=((2048/T.sizeof>128)?2048/T.sizeof:1
         this.data[i]=val;
     }
     
-   // static if (isCoreType!(T) ||is(typeof(T.init.serialize(Serializer.init)))) {
-        static ClassMetaInfo metaI;
-        static this(){
-            if (metaI is null){
-                metaI=ClassMetaInfo.createForType!(typeof(this))("blip.container.BatchedGrowableArray("~T.mangleof~")","a batched growable array");
-                metaI.addFieldOfType!(T[])("array","the items in the array");
-            }
-        }
-        ClassMetaInfo getSerializationMetaInfo(){
-            return metaI;
-        }
-        void preSerialize(Serializer s){ }
-        void postSerialize(Serializer s){ }
-        void serialize(Serializer s){
-            LazyArray!(T) la=LazyArray!(T).opCall(delegate int(int delegate(ref T)loopBody){
-                int res=0;
-                foreach (b;this.view.sBatchLoop){
-                    for (size_t i=0;i<b.length;++i){
-                        res=loopBody(b[i]);
-                        if (res!=0) break;
-                    }
-                    if (res!=0) break;
-                }
-                return res;
-            },cast(ulong)this.length);
-            s.field(metaI[0],la);
-        }
-        Serializable preUnserialize(Unserializer s){ return this; }
-        Serializable postUnserialize(Unserializer s){ return this; }
+  /// description of the object
+  void desc(void delegate(cstring)sink){
+    // this is the only dependency on BasicIO...
+    auto s=dumper(sink);
+    s("<UnserializableBatchedGrowableArray@")(cast(void*)this)(" len:")(this.data.length);
+    s(" capacity:")(this.capacity)(">")("\n");
+    s(" array:");
+    /*s("[");
+    int iEl = 0;
+    foreach (el; this.data) {
+      if (iEl != 0)
+        s(", ");
+      if (iEl > 5) {
+        s(",...");
+        break;
+      }
+      iEl += 1;
+      s(el.toString);
+    }
+    s("]");*/
+  }
 
-        void unserialize(Unserializer s){
-            LazyArray!(T) la=LazyArray!(T).opCall(&this.appendEl,delegate void(ulong l){ 
-                if (l!=ulong.max) this.growCapacityTo(cast(size_t) l);
-            });
-            s.field(metaI[0],la);
-        }
-    
-        //mixin printOut!();
-    //} else {
-        /// description of the object
-        void desc(void delegate(cstring)sink){
-            // this is the only dependency on BasicIO...
-            auto s=dumper(sink);
-            s("<BatchedGrowableArray@")(cast(void*)this)(" len:")(this.data.length);
-            s(" capacity:")(this.capacity)(">")("\n");
-	    s(" array:");
-	    serializeToSink(sink, this);
-        }
-    //}
-    
+  string toString(){
+    char[200] buf;
+    auto l = sprintf(buf.ptr, "<UnserializableBatchedGrowableArray@%zx len: %zd capacity: %zd>",
+                     cast(size_t)cast(void*)this, this.data.length, this.capacity);
+    return buf[0..l];
+  }
+
 }
