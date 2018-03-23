@@ -49,9 +49,9 @@ struct fixed32T(int fracBits_) {
     
     static ClassMetaInfo metaI;
     static this(){
-        metaI=ClassMetaInfo.createForType!(typeof(this))("fixed32T!("~ctfe_i2a(fracBits)~")","a fractional number with a fixed precision");
+      /*metaI=ClassMetaInfo.createForType!(typeof(this))("fixed32T!("~ctfe_i2a(fracBits)~")","a fractional number with a fixed precision");
         metaI.addFieldOfType!(int)("int","integer part");
-        metaI.addFieldOfType!(int)("frac","fractional part");
+        metaI.addFieldOfType!(int)("frac","fractional part");*/
     }
     ClassMetaInfo getSerializationMetaInfo(){
         return metaI;
