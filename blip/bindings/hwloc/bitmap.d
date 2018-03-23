@@ -105,25 +105,25 @@ struct hwloc_bitmap_t{
     * \return the number of character that were actually written if not truncating,
     * or that would have been written (not including the ending \\0).
     */
-    int listSprintf(char[] s){
-    	return hwloc_bitmap_list_snprintf(s.ptr, s.length, *this);
-    }
+//    int listSprintf(char[] s){
+//    	return hwloc_bitmap_list_snprintf(s.ptr, s.length, *this);
+//    }
 
     /** \brief Stringify a bitmap into a newly allocated list string.
      */
-    cstring listString(){
-        char *res;
-        auto len = hwloc_bitmap_list_asprintf(&res, *this);
-	auto s=res[0..len].dup;
-	stdlib.free(res);
-	return s;
-    }
+//    cstring listString(){
+//        char *res;
+//        auto len = hwloc_bitmap_list_asprintf(&res, *this);
+//	auto s=res[0..len].dup;
+//	stdlib.free(res);
+//	return s;
+//    }
 
     /** \brief Parse a list string and stores it in bitmap \p bitmap.
      */
-    int fromListString(cstring s){
-	return hwloc_bitmap_list_sscanf(*this, toStringz(s));
-    }
+//    int fromListString(cstring s){
+//	return hwloc_bitmap_list_sscanf(*this, toStringz(s));
+//    }
 
     /** \brief
      *  Primitives & macros for building, modifying and consulting "sets" of cpus.
