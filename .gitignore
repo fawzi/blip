@@ -2,3 +2,6 @@
 *.a
 *~
 .DS_Store
+blipBuild
+exe
+libs
