@@ -173,7 +173,7 @@ case `uname` in
   die "unknown platform, you need to set extra_libs_os"
 esac
 if [ -z "$noTangoUser" ]; then
-    tangoUserOpt="${linkFlag}-ltango-user-${compShort}"
+    tangoUserOpt="${linkFlag}-ltango-user-${compShort}-opt"
     tangoUserDbg="${linkFlag}-ltango-user-${compShort}-dbg"
 fi
 extra_libs_opt="${linkFlag}-L${D_HOME}/lib $tangoUserOpt $extra_libs_os $extra_libs_comp $mpiFlags"
