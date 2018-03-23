@@ -754,6 +754,7 @@ else {
     in {
         static assert(isBlasType!(T),"only blas types accepted, not "~T.stringof);
         assert(a.shape[0]==a.shape[1],"matrix a has to be square");
+        //assert(false, "eig binding contains a bug");
         if (!isNullNArray(ev)) {
             assert(a.shape[0]==ev.shape[0],"ev has an incorrect size");
         }
@@ -902,6 +903,7 @@ else {
     in{
         static assert(isBlasType!(T),"non blas type "~T.stringof~" not supported");
         static assert(is(RealTypeOf!(T)==S),"singular values are real");
+        //assert(false, "svd binding contains a bug");
         index_type mn=min(a.shape[0],a.shape[1]);
         if (!isNullNArray(u)){
             assert(u.shape[0]==a.shape[0],"invalid shape[0] for u");
@@ -996,6 +998,7 @@ else {
     in {
         assert(a.shape[0]==a.shape[1],"a has to be square");
         assert(isNullNArray(ev) || ev.shape[0]==a.shape[0],"ev has incorret shape");
+        assert(false, "eigh binding contains a bug");
         if (!isNullNArray(eVect)){
             index_type m=a.shape[0];
             if (range.kind=='I') m=range.toI-range.fromI+1;

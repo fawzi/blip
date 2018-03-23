@@ -1,3 +1,4 @@
+
 /// N dimensional dense rectangular arrays
 /// 
 /// An attempt a creating a reasonably fast and easy to use multidimensional array
@@ -429,6 +430,8 @@ else {
             version(RefCount){
                 if (mBase !is null) mBase.retain;
             }
+            //static if (is(V == cfloat) || is(V == cdouble))
+            //  assert(false, "complex narrays have a bug");
         }
         void dispose(){
             version(RefCount){
